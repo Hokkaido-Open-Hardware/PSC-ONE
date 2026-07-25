@@ -106,3 +106,4 @@ disasm: $(ELF)
 
 clean:
 	rm -f *.o *.elf *.bin *.mem
+	find . -maxdepth 1 -type f -name '*.S' ! -name 'sp_start.S' -delete

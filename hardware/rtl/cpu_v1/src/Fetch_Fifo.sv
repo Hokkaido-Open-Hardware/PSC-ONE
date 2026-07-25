@@ -5,32 +5,32 @@ module Fetch_Fifo #(
     parameter int DEPTH     = 8,
     parameter int ADDR_BITS = $clog2(DEPTH)
 )(
-    input  logic             clock,
-    input  logic             reset_n,
+    input  logic               clock,
+    input  logic               reset_n,
 
     // Push side
-    input  logic             in_valid,
-    input  logic [WIDTH-1:0] in_data,
-    input  logic [WIDTH-1:0] in_pc_data,
-    output logic             in_ready,
+    input  logic               in_valid,
+    input  logic [WIDTH-1:0]   in_data,
+    input  logic [WIDTH-1:0]   in_pc_data,
+    output logic               in_ready,
 
     // Pop side
-    output logic             out_req_ready,
-    input  logic             out_valid,
-    output logic             out_ready,
-    output logic [WIDTH-1:0] out_data,
-    output logic [WIDTH-1:0] out_pc_data,
+    output logic               out_req_ready,
+    input  logic               out_valid,
+    output logic               out_ready,
+    output logic [WIDTH-1:0]   out_data,
+    output logic [WIDTH-1:0]   out_pc_data,
 
-    output logic             full,
-    output logic             empty,
-    input  logic             flush
+    output logic               full,
+    output logic               empty,
+    output logic [ADDR_BITS:0] count,
+    input  logic               flush
 );
 
     (* syn_keep = 1 *) logic [WIDTH-1:0] mem    [0:DEPTH-1];
     (* syn_keep = 1 *) logic [WIDTH-1:0] pc_mem [0:DEPTH-1];
 
     logic [ADDR_BITS-1:0] wptr, rptr;
-    logic [ADDR_BITS:0] count;
     logic push, pop;
     integer i;
 

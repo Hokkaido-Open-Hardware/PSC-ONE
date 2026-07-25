@@ -2,7 +2,10 @@
 
 import PSC_Types::*;
 
-module Execute(
+module Execute #(
+    parameter bit ENABLE_MUL = 1'b1,
+    parameter bit ENABLE_DIV = 1'b1
+)(
     input  logic        clock,
     input  logic        reset_n,
     input  logic        execute_enb,
@@ -34,36 +37,59 @@ module Execute(
     assign div_signed = (decoder_ctrl.alucon == 5'b1_1100) ||
                         (decoder_ctrl.alucon == 5'b1_1110);
 
-    assign div_start = execute_enb && (state == IDLE) &&
-                      (decoder_ctrl.alucon[4:2] == 3'b111);
+    assign div_start =
+                ENABLE_DIV &&
+                execute_enb &&
+                (state == IDLE) &&
+                (decoder_ctrl.alucon[4:2] == 3'b111);
 
-    assign mul_start = execute_enb && (state == IDLE) &&
-                      (decoder_ctrl.alucon[4:2] == 3'b110);
+    assign mul_start =
+                ENABLE_MUL &&
+                execute_enb &&
+                (state == IDLE) &&
+                (decoder_ctrl.alucon[4:2] == 3'b110);
 
-    Execute_Divider u_divider(
-        .clk         (clock),
-        .reset_n     (reset_n),
-        .start       (div_start),
-        .signed_mode (div_signed),
-        .dividend    (s_data1),
-        .divisor     (s_data2),
-        .busy        (div_busy),
-        .done        (div_done),
-        .quotient    (div_quotient),
-        .remainder   (div_remainder)
-    );
+generate
+    if (ENABLE_DIV) begin : g_divider
+        Execute_Divider u_divider (
+            .clk         (clock),
+            .reset_n     (reset_n),
+            .start       (div_start),
+            .signed_mode (div_signed),
+            .dividend    (s_data1),
+            .divisor     (s_data2),
+            .busy        (div_busy),
+            .done        (div_done),
+            .quotient    (div_quotient),
+            .remainder   (div_remainder)
+        );
+    end else begin : g_no_divider
+        assign div_busy      = 1'b0;
+        assign div_done      = 1'b0;
+        assign div_quotient  = 32'd0;
+        assign div_remainder = 32'd0;
+    end
+endgenerate
 
-    Execute_Mul u_multiplier(
-        .clk     (clock),
-        .reset_n (reset_n),
-        .start   (mul_start),
-        .alucon  (decoder_ctrl.alucon[1:0]),
-        .data_1  (s_data1),
-        .data_2  (s_data2),
-        .busy    (mul_busy),
-        .done    (mul_done),
-        .mul_out (mul_out)
-    );
+generate
+    if (ENABLE_MUL) begin : g_multiplier
+        Execute_Mul u_multiplier (
+            .clk     (clock),
+            .reset_n (reset_n),
+            .start   (mul_start),
+            .alucon  (decoder_ctrl.alucon[1:0]),
+            .data_1  (s_data1),
+            .data_2  (s_data2),
+            .busy    (mul_busy),
+            .done    (mul_done),
+            .mul_out (mul_out)
+        );
+    end else begin : g_no_multiplier
+        assign mul_busy = 1'b0;
+        assign mul_done = 1'b0;
+        assign mul_out  = 32'd0;
+    end
+endgenerate
 
     function automatic logic [31:0] alu_exec(
         input logic [4:0] control,

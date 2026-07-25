@@ -9,13 +9,6 @@ import cocotb
 from cocotb.triggers import Timer, RisingEdge
 from cocotb.handle import SimHandleBase
 
-# prev Bus
-from cocotb_tb.cpu.rv32_write_mem_data import push_words_to_sdram_from_file
-from cocotb_tb.cpu.rv32_read_mem_data  import read_words_from_addrs
-# AXI4 Bus
-from cocotb_tb.cpu.rv32_axi_write_mem_data import push_words_to_axi16_from_file
-from cocotb_tb.cpu.rv32_axi_read_mem_data  import read_words_from_axi16_addrs
-
 # ========= 設定 =========
 Assert = 1
 col_mismatch_Assert = 0

@@ -120,13 +120,13 @@ module Branch (
 
             unique case (state)
                 IDLE: begin
+                    pc_sel2 <= branch_exec(
+                        decoder_ctrl.funct3,
+                        r_data1,
+                        r_data2,
+                        decoder_ctrl.pc_sel
+                    );
                     if (branch_enb) begin
-                        pc_sel2 <= branch_exec(
-                            decoder_ctrl.funct3,
-                            r_data1,
-                            r_data2,
-                            decoder_ctrl.pc_sel
-                        );
                         if (decoder_ctrl.is_load) begin
                             state <= BRANCH_MMU;
                         end else begin

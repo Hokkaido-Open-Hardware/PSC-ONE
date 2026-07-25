@@ -304,16 +304,22 @@ module Decorder (
     // パイプライン処理 IMM判定
     wire is_op_imm_w = (op == IFORMAT_ALU);
 
+    // NOP
+    logic is_nop;
+
+    assign is_nop = (opcode == 32'h0000_0013);
+
     // パイプライン対象外となるM拡張命令
     wire is_mul_div_w =
-        //is_mul    |
-        //is_mulh   |
-        //is_mulhsu |
-        //is_mulhu  |
+        is_mul    |
+        is_mulh   |
+        is_mulhsu |
+        is_mulhu  |
         is_div    |
         is_divu   |
         is_rem    |
         is_remu;
+        //is_nop;
 
     // 通常のR-typeとI-Typeだけパイプライン対象
     wire pipeline_type_w =
@@ -358,9 +364,9 @@ module Decorder (
         decoder_ctrl_next.pipeline_type            = pipeline_type_w;
         decoder_ctrl_next.out_pc                   = in_pc;
         decoder_ctrl_next.raise_illegal_instruction =
-            raise_illegal_instruction_sw |
-            raise_illegal_instruction_mw |
-            raise_illegal_instruction_alu;
+                                    raise_illegal_instruction_sw |
+                                    raise_illegal_instruction_mw |
+                                    raise_illegal_instruction_alu;
     end
 
     // =============================================================================

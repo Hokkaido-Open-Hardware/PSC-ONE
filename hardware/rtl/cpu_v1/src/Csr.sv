@@ -1,162 +1,165 @@
 `timescale 1ns / 1ps
 module Csr (
-    input  wire             clock,
-    input  wire             reset_n,
-    input  wire             csr_enb,
-    input  wire             csr_valid,
+    input  logic             clock,
+    input  logic             reset_n,
+    input  logic             csr_enb,
+    input  logic             csr_valid,
 
     // ==== from pipeline (CSR ops) ====
-    input  wire             csr_wr,              // CSRRW/CSRRS/CSRRC (*I含む)
-    input  wire [1:0]       csr_cmd,             // 0:RW, 1:RS(OR), 2:RC(ANDN)
-    input  wire             csr_use_imm,         // *I (zimm)
-    input  wire [11:0]      csr_addr,            // CSR address
-    input  wire [31:0]      csr_rs1_val,         // rs1 value
-    input  wire [4:0]       csr_zimm,            // zimm (0..31)
-    output reg  [31:0]      csr_rdata,           // old value to rd
+    input  logic             csr_wr,              // CSRRW/CSRRS/CSRRC (*I含む)
+    input  logic [1:0]       csr_cmd,             // 0:RW, 1:RS(OR), 2:RC(ANDN)
+    input  logic             csr_use_imm,         // *I (zimm)
+    input  logic [11:0]      csr_addr,            // CSR address
+    input  logic [31:0]      csr_rs1_val,         // rs1 value
+    input  logic [4:0]       csr_zimm,            // zimm (0..31)
+    output logic  [31:0]     csr_rdata,           // old value to rd
 
     // ==== Supervisor trap in/out ====
-    input  wire             set_trap,
-    input  wire [31:0]      trap_sepc,
-    input  wire [31:0]      trap_scause,
-    input  wire [31:0]      trap_stval,
-    input  wire             do_sret,
+    input  logic             set_trap,
+    input  logic [31:0]      trap_sepc,
+    input  logic [31:0]      trap_scause,
+    input  logic [31:0]      trap_stval,
+    input  logic             do_sret,
 
     // ==== Machine trap in/out ====
-    input  wire             set_mtrap,           // TBD
-    input  wire [31:0]      trap_mepc,
-    input  wire [31:0]      trap_mcause,
-    input  wire             do_mret,
+    input  logic             set_mtrap,           // TBD
+    input  logic [31:0]      trap_mepc,
+    input  logic [31:0]      trap_mcause,
+    input  logic             do_mret,
 
     // ==== mip (pending) ====
-    input  wire        set_msip, input wire clr_msip,
-    input  wire        set_mtip, input wire clr_mtip,
-    input  wire        set_meip, input wire clr_meip,
+    input  logic             set_msip,
+    input  logic             clr_msip,
+    input  logic             set_mtip,
+    input  logic             clr_mtip,
+    input  logic             set_meip,
+    input  logic             clr_meip,
 
     // ==== current privilege mode ====
-    output reg [1:0]        priv_mode,
+    output logic [1:0]        priv_mode,
 
     // ==== observes (not used by the CPP test, but kept) ====
-    output reg [31:0]       out_mstatus,
-    output reg [31:0]       out_medeleg,
-    output reg [31:0]       out_mie,
-    output reg [31:0]       out_mip,
-    output reg [31:0]       out_mtvec,
-    output reg [31:0]       out_mepc,
-    output reg [31:0]       out_mcause,
+    output logic [31:0]       out_mstatus,
+    output logic [31:0]       out_medeleg,
+    output logic [31:0]       out_mie,
+    output logic [31:0]       out_mip,
+    output logic [31:0]       out_mtvec,
+    output logic [31:0]       out_mepc,
+    output logic [31:0]       out_mcause,
 
-    output reg [31:0]       out_sstatus,
-    output reg [31:0]       out_stvec,
-    output reg [31:0]       out_sepc,
-    output reg [31:0]       out_scause,
-    output reg [31:0]       out_stval,
-    output reg [31:0]       out_satp,
+    output logic [31:0]       out_sstatus,
+    output logic [31:0]       out_stvec,
+    output logic [31:0]       out_sepc,
+    output logic [31:0]       out_scause,
+    output logic [31:0]       out_stval,
+    output logic [31:0]       out_satp,
 
     // to Data-Cache
-    output reg [31:0]       out_DCACHE_CTRL,
+    output logic [31:0]       out_DCACHE_CTRL,
 
     // to DMA
-    output reg [31:0]       out_DMA_CTRL,
-    output reg [31:0]       out_DMA_WORDS,
-    output reg [31:0]       out_DMA_SRC,
-    output reg [31:0]       out_DMA_DST,
-    input wire [31:0]       in_DMA_STATUS,
+    output logic [31:0]       out_DMA_CTRL,
+    output logic [31:0]       out_DMA_WORDS,
+    output logic [31:0]       out_DMA_SRC,
+    output logic [31:0]       out_DMA_DST,
+    input  logic [31:0]       in_DMA_STATUS,
 
     // to SynapEngine
-    output reg [31:0]       out_SA_CTRL,
-    output reg [31:0]       out_SA_MODE,
-    input wire [31:0]       in_SA_STATUS,
-    output reg [31:0]       out_SA_ADDR_A,
-    output reg [31:0]       out_SA_ADDR_B,
-    output reg [31:0]       out_SA_ADDR_C,
+    output logic [31:0]       out_SA_CTRL,
+    output logic [31:0]       out_SA_MODE,
+    input  logic [31:0]       in_SA_STATUS,
+    output logic [31:0]       out_SA_ADDR_A,
+    output logic [31:0]       out_SA_ADDR_B,
+    output logic [31:0]       out_SA_ADDR_C,
 
     // to CPU Monitor
-    output reg [31:0]       out_CPU_MON_CTRL,
-    input wire [31:0]       in_CPU_MON_CYCLE
+    output logic [31:0]       out_CPU_MON_CTRL,
+    input  logic [31:0]       in_CPU_MON_CYCLE
 );
     // SA ADDRESS (TBD)
-    localparam [31:0]  SA_ADDR_A = 32'h0002_0000;
-    localparam [31:0]  SA_ADDR_B = 32'h0002_0010;
-    localparam [31:0]  SA_ADDR_C = 32'h0002_0020;
+    localparam logic [31:0]  SA_ADDR_A = 32'h0002_0000;
+    localparam logic [31:0]  SA_ADDR_B = 32'h0002_0010;
+    localparam logic [31:0]  SA_ADDR_C = 32'h0002_0020;
 
     // Privilege level encoding (RISC-V spec)
-    localparam [1:0] PRIV_U = 2'b00;
-    localparam [1:0] PRIV_S = 2'b01;
-    localparam [1:0] PRIV_M = 2'b11;
+    localparam logic [1:0] PRIV_U = 2'b00;
+    localparam logic [1:0] PRIV_S = 2'b01;
+    localparam logic [1:0] PRIV_M = 2'b11;
 
     // ---------------- Machine CSRs ----------------
-    reg  [31:0] csr_mstatus;
-    reg  [31:0] csr_medeleg;
-    wire [31:0] csr_misa    = 32'h4014_0100; // RV32 + I,S,U
-    reg  [31:0] csr_mie;
-    reg  [31:0] csr_mip;
-    reg  [31:0] csr_mtvec;
-    reg  [31:0] csr_mscratch;
-    reg  [31:0] csr_mepc;
-    reg  [31:0] csr_mcause;
-    reg  [31:0] csr_mtval;
+    logic  [31:0] csr_mstatus;
+    logic  [31:0] csr_medeleg;
+    localparam logic [31:0] CSR_MISA = 32'h4014_0100; // RV32 + I,S,U
+    logic  [31:0] csr_mie;
+    logic  [31:0] csr_mip;
+    logic  [31:0] csr_mtvec;
+    logic  [31:0] csr_mscratch;
+    logic  [31:0] csr_mepc;
+    logic  [31:0] csr_mcause;
+    logic  [31:0] csr_mtval;
 
     // ---------------- Supervisor CSRs ----------------
-    reg  [31:0] csr_sstatus;   // ★独立CSR（SIE=bit1 等）
-    reg  [31:0] csr_sie;       // ★独立CSR（SSIP=1, STIP=5, SEIP=9）
-    reg  [31:0] csr_stvec;
-    reg  [31:0] csr_sscratch;
-    reg  [31:0] csr_sepc;
-    reg  [31:0] csr_scause;
-    reg  [31:0] csr_stval;
-    reg  [31:0] csr_satp;
+    logic  [31:0] csr_sstatus;   // ★独立CSR（SIE=bit1 等）
+    logic  [31:0] csr_sie;       // ★独立CSR（SSIP=1, STIP=5, SEIP=9）
+    logic  [31:0] csr_stvec;
+    logic  [31:0] csr_sscratch;
+    logic  [31:0] csr_sepc;
+    logic  [31:0] csr_scause;
+    logic  [31:0] csr_stval;
+    logic  [31:0] csr_satp;
 
-    reg [1:0]   csr_priv_mode;
+    logic [1:0]   csr_priv_mode;
 
     // ---------------- DMA CSRs ----------------
-    reg  [31:0] csr_DCACHE_CTRL;
-    reg  [31:0] csr_DMA_CTRL;
-    reg  [31:0] csr_DMA_WORDS;
-    reg  [31:0] csr_DMA_SRC;
-    reg  [31:0] csr_DMA_DST;
-    reg  [31:0] csr_DMA_STATUS;
+    logic  [31:0] csr_DCACHE_CTRL;
+    logic  [31:0] csr_DMA_CTRL;
+    logic  [31:0] csr_DMA_WORDS;
+    logic  [31:0] csr_DMA_SRC;
+    logic  [31:0] csr_DMA_DST;
+    logic  [31:0] csr_DMA_STATUS;
 
     // ---------------- SynapEngine CSRs ----------------
-    reg  [31:0] csr_SA_CTRL;
-    reg  [31:0] csr_SA_MODE;
-    reg  [31:0] csr_SA_STATUS;
-    reg  [31:0] csr_SA_ADDR_A;
-    reg  [31:0] csr_SA_ADDR_B;
-    reg  [31:0] csr_SA_ADDR_C;
+    logic  [31:0] csr_SA_CTRL;
+    logic  [31:0] csr_SA_MODE;
+    logic  [31:0] csr_SA_STATUS;
+    logic  [31:0] csr_SA_ADDR_A;
+    logic  [31:0] csr_SA_ADDR_B;
+    logic  [31:0] csr_SA_ADDR_C;
 
     // ---------------- CPU Monitor CSRs ----------------
-    reg  [31:0] csr_CPU_MON_CTRL;
+    logic  [31:0] csr_CPU_MON_CTRL;
 
     // ---------------- constants ----------------
-    localparam integer S_SIE_BIT  = 1;
-    localparam integer S_SPIE_BIT = 5;
-    localparam integer S_SPP_BIT  = 8;
-    localparam integer S_SUM_BIT  = 18;
-    localparam integer S_MXR_BIT  = 19;
+    localparam int S_SIE_BIT  = 1;
+    localparam int S_SPIE_BIT = 5;
+    localparam int S_SPP_BIT  = 8;
+    localparam int S_SUM_BIT  = 18;
+    localparam int S_MXR_BIT  = 19;
 
-    localparam [31:0] SSTATUS_MASK =
+    localparam logic [31:0] SSTATUS_MASK =
         (32'h1<<S_SIE_BIT) | (32'h1<<S_SPIE_BIT) | (32'h1<<S_SPP_BIT) |
         (32'h1<<S_SUM_BIT) | (32'h1<<S_MXR_BIT);
 
     // M IRQ
-    localparam [31:0] MSIP_MASK = (32'h1<<3);
-    localparam [31:0] MTIP_MASK = (32'h1<<7);
-    localparam [31:0] MEIP_MASK = (32'h1<<11);
-    localparam [31:0] MIRQ_MASK = MSIP_MASK | MTIP_MASK | MEIP_MASK;
+    localparam logic [31:0] MSIP_MASK = (32'h1<<3);
+    localparam logic [31:0] MTIP_MASK = (32'h1<<7);
+    localparam logic [31:0] MEIP_MASK = (32'h1<<11);
+    localparam logic [31:0] MIRQ_MASK = MSIP_MASK | MTIP_MASK | MEIP_MASK;
 
     // S IRQ
-    localparam [31:0] SSIP_MASK = (32'h1<<1);
-    localparam [31:0] STIP_MASK = (32'h1<<5);
-    localparam [31:0] SEIP_MASK = (32'h1<<9);
-    localparam [31:0] SIRQ_MASK = SSIP_MASK | STIP_MASK | SEIP_MASK;
+    localparam logic [31:0] SSIP_MASK = (32'h1<<1);
+    localparam logic [31:0] STIP_MASK = (32'h1<<5);
+    localparam logic [31:0] SEIP_MASK = (32'h1<<9);
+    localparam logic [31:0] SIRQ_MASK = SSIP_MASK | STIP_MASK | SEIP_MASK;
 
     // ---------------- helpers ----------------
-    function [31:0] pack_tvec_direct(input [31:0] v);
+    function automatic logic [31:0] pack_tvec_direct(input logic [31:0] v);
         begin pack_tvec_direct = {v[31:2], 2'b00}; end
     endfunction
-    function [31:0] pack_epc(input [31:0] v);
+    function automatic logic [31:0] pack_epc(input logic [31:0] v);
       begin pack_epc = {v[31:2], 2'b00}; end   // 下位2bitゼロ固定
     endfunction
-    function [31:0] pack_satp_sv32(input [31:0] v);
+    function automatic logic [31:0] pack_satp_sv32(input logic [31:0] v);
         begin
             // ソフトが書いた値をほぼそのまま使う。
             // 必要なら MODE/PPN にマスクをかける程度でOK
@@ -168,8 +171,9 @@ module Csr (
     endfunction
 
     // sip view（mip -> sip）
-    function [31:0] sip_view(input [31:0] mip);
-        reg [31:0] v; begin
+    function automatic logic [31:0] sip_view(input logic [31:0] mip);
+        logic [31:0] v;
+        begin
             v = 32'b0;
             v[1] = mip[3];   // SSIP <- MSIP
             v[5] = mip[7];   // STIP <- MTIP
@@ -179,15 +183,19 @@ module Csr (
     endfunction
 
     // CSR apply (RW/RS/RC)
-    wire [31:0] csr_wr_val = csr_use_imm ? {27'b0, csr_zimm} : csr_rs1_val;
-    wire side_effect_none_rs =
+    logic [31:0] csr_wr_val;
+    logic        side_effect_none_rs;
+
+    assign csr_wr_val =
+        csr_use_imm ? {27'b0, csr_zimm} : csr_rs1_val;
+    assign side_effect_none_rs =
         csr_use_imm ? (csr_zimm == 5'd0) : (csr_rs1_val == 32'd0);
 
-    function [31:0] csr_apply(
-        input [1:0]  cmd,
-        input        no_side_effect_rs,
-        input [31:0] oldv,
-        input [31:0] wv
+    function automatic logic [31:0] csr_apply(
+        input logic [1:0]  cmd,
+        input logic no_side_effect_rs,
+        input logic [31:0] oldv,
+        input logic [31:0] wv
     );
         begin
             case (cmd)
@@ -199,10 +207,13 @@ module Csr (
         end
     endfunction
     
-    wire trap_to_s = (priv_mode != PRIV_M) && csr_medeleg[trap_scause];
+    logic trap_to_s;
+
+    assign trap_to_s =
+        (priv_mode != PRIV_M) && csr_medeleg[trap_scause];
 
     // ---------------- outputs ----------------
-    always @(posedge clock or negedge reset_n) begin
+    always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             out_mstatus <= 32'd0;
             out_medeleg <= 32'd0;
@@ -277,7 +288,7 @@ module Csr (
     end
 
     // ---------------- read mux ----------------
-    function [31:0] csr_read_mux(input [11:0] a);
+    function automatic logic [31:0] csr_read_mux(input logic [11:0] a);
         begin
             case (a)
                 // Supervisor
@@ -292,7 +303,7 @@ module Csr (
                 12'h180: csr_read_mux = csr_satp;
                 // Machine
                 12'h300: csr_read_mux = csr_mstatus;
-                12'h301: csr_read_mux = csr_misa;
+                12'h301: csr_read_mux = CSR_MISA;
                 12'h302: csr_read_mux = csr_medeleg;
                 12'h304: csr_read_mux = (csr_mie & MIRQ_MASK);
                 12'h305: csr_read_mux = csr_mtvec;
@@ -314,9 +325,9 @@ module Csr (
 
     // ---------------- main ----------------
     //reg [31:0] oldv, newv;
-    wire [31:0] oldv, newv;
+    logic [31:0] oldv, newv;
 
-    always @(posedge clock or negedge reset_n) begin
+    always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             csr_rdata <= 32'd0;
         end else begin
@@ -328,7 +339,7 @@ module Csr (
     assign  oldv = csr_read_mux(csr_addr);
     assign  newv = csr_apply(csr_cmd, side_effect_none_rs, oldv, csr_wr_val);
 
-    always @(posedge clock or negedge reset_n) begin
+    always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             //oldv          <= 32'h0;
             //newv          <= 32'h0;
@@ -476,8 +487,8 @@ module Csr (
                 if (set_mtrap) begin
                     csr_mepc       <= pack_epc(trap_mepc);
                     csr_mcause     <= trap_mcause;
-                    csr_mstatus[7] <= csr_mstatus[3]; // MPIE <- MIE
-                    csr_mstatus[3] <= 1'b0;           // MIE  <- 0
+                    csr_mstatus[7] <= csr_mstatus[3];   // MPIE <- MIE
+                    csr_mstatus[3] <= 1'b0;             // MIE  <- 0
                 end
             end
 

@@ -14,7 +14,7 @@ module PSC_RV32ISP_Fetch #(
     input  logic        execute_task_done,
 
     // FIFO
-    output logic        fifo_empty,
+    output logic        fifo_req_ready,
     output logic        fifo_full,
     input  logic        fifo_read_valid,
     output logic        fifo_read_ready,
@@ -59,16 +59,10 @@ module PSC_RV32ISP_Fetch #(
     } state_t;
 
     state_t fetch_state, next_state;
-
     logic [15:0] fetch_wakeup_timer;
-
     logic [31:0] fetch_pc, next_pc;
     logic fetch_state_fifo_flush;
     logic next_ready;
-    logic full, empty;
-
-    assign fifo_empty = empty;
-    assign fifo_full  = full;
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
@@ -192,6 +186,12 @@ module PSC_RV32ISP_Fetch #(
 
     // FIFO
     logic in_ready;
+    localparam int ADDR_BITS = $clog2(FIFO_DEPTH);
+    logic [ADDR_BITS:0] count;
+
+    logic full, empty;
+    assign fifo_req_ready = !empty;
+    assign fifo_full  = full;
 
     Fetch_Fifo #(
         .WIDTH                    (32),
@@ -210,6 +210,7 @@ module PSC_RV32ISP_Fetch #(
         .out_pc_data              (out_fetch_pc),
         .full                     (full),
         .empty                    (empty),
+        .count                    (count),
         .flush                    (
             fifo_flush || 
             fetch_state_fifo_flush || 

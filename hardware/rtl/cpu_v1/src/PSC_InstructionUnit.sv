@@ -16,14 +16,14 @@ module PSC_InstructionUnit (
     input  logic [31:0] pc_now,
 
     // Cell state
-    output logic        EXECUTE_state,
-    output logic        BRANCH_state,
-    output logic        BRANCH_W_state,
-    output logic        STORE_state,
-    output logic        STORE_W_state,
+    output logic        EXECUTE_st,
+    output logic        BRANCH_st,
+    output logic        BRANCH_W_st,
+    output logic        STORE_st,
+    output logic        STORE_W_st,
 
     // FIFO
-    input  logic        fifo_empty,
+    input  logic        fifo_req_ready,
     input  logic        fifo_read_ready,
     output logic        fifo_read_valid,
     output logic        fifo_flush,
@@ -36,10 +36,12 @@ module PSC_InstructionUnit (
     input  logic [31:0] alu_data,
 
     // Pipeline alu control
-    output logic        ri_execute_valid,       // TBD
-    output dec_ctrl_t   ri_execute_ctrl,        // TBD
-    output logic [31:0] ri_execute_reg_data_1,  // TBD
-    output logic [31:0] ri_execute_reg_data_2,  // TBD
+    output logic        ri_execute_valid,      
+    output dec_ctrl_t   ri_execute_ctrl,       
+    output logic [31:0] ri_execute_reg_data_1,
+    output logic [31:0] ri_execute_reg_data_2,
+    input  logic [31:0] ri_alu_data,
+    input  logic        ri_alu_done,
 
     // Branch
     input  logic        pc_sel2,
@@ -107,7 +109,7 @@ module PSC_InstructionUnit (
     PSC_Register u_regfile (
         .clock             (clock),
         .reset_n           (reset_n),
-        .store_enb         (regfile_wen),
+        .register_wenb     (regfile_wen),
         .rf_wen            (regfile_wen),
         .w_addr            (regfile_waddr),
         .w_data            (regfile_wdata),
@@ -170,31 +172,33 @@ module PSC_InstructionUnit (
         .decoder_ctrl_now     (decoder_ctrl_now),
         .inst_state           (inst_state),
 
-        .fifo_empty           (fifo_empty),
+        .fifo_req_ready       (fifo_req_ready),
         .fifo_read_ready      (fifo_read_ready),
         .decode_done          (decode_done),
         .alu_done             (alu_done),
         .branch_done          (branch_done),
         .store_done           (store_done),
 
-        .IDLE_state           (IDLE_state),
-        .FIFO_READ_state      (FIFO_READ_state),
-        .DECODE_state         (DECODE_state),
-        .REGISTER_READ_state  (REGISTER_READ_state),
-        .EXECUTE_state        (EXECUTE_state),
-        .BRANCH_state         (BRANCH_state),
-        .BRANCH_W_state       (BRANCH_W_state),
-        .STORE_state          (STORE_state),
-        .STORE_W_state        (STORE_W_state),
+        .IDLE_st              (IDLE_st),
+        .FIFO_READ_st         (FIFO_READ_st),
+        .DECODE_st            (DECODE_st),
+        .REGISTER_READ_st     (REGISTER_READ_st),
+        .EXECUTE_st           (EXECUTE_st),
+        .BRANCH_st            (BRANCH_st),
+        .BRANCH_W_st          (BRANCH_W_st),
+        .STORE_st             (STORE_st),
+        .STORE_W_st           (STORE_W_st),
+
+        .ri_wb_done           (ri_ex_complete),
 
         .fsm_task_busy        (execute_task_busy),
         .fsm_task_done        (execute_task_done)
     );
 
-    logic IDLE_state;
-    logic FIFO_READ_state;
-    logic DECODE_state;
-    logic REGISTER_READ_state;
+    logic IDLE_st;
+    logic FIFO_READ_st;
+    logic DECODE_st;
+    logic REGISTER_READ_st;
 
     // ============================================================
     // R/I-Type ID/EX pipeline register
@@ -296,7 +300,7 @@ module PSC_InstructionUnit (
                 (ri_ex_complete && ri_ex_wb_ready);
 
     assign ri_id_ex_issue =
-                REGISTER_READ_state                 &&
+                REGISTER_READ_st                    &&
                 decoder_ctrl_now.pipeline_type      &&
                 ri_id_ex_ready                      &&
                 !raw_hazard;
@@ -304,18 +308,6 @@ module PSC_InstructionUnit (
     assign ri_pipeline_busy =
                 ri_id_ex.valid ||
                 ri_ex_wb.valid;
-
-    logic ri_alu_done;
-
-    assign ri_alu_done =
-                // alu_done
-                1'b0;   //★TBD
-
-    logic [31:0] ri_alu_data;
-
-    assign ri_alu_data =
-                // alu_data
-                32'h0;  //★TBD
 
     assign ri_ex_complete =
                 ri_id_ex.valid &&
@@ -338,6 +330,7 @@ module PSC_InstructionUnit (
             end
         end
     end
+
     // ============================================================
     // Instruction state registers
     // ============================================================
@@ -347,7 +340,7 @@ module PSC_InstructionUnit (
     logic [31:0] regfile_wdata;
 
     assign normal_wb_valid =
-                STORE_W_state &&
+                STORE_W_st &&
                 store_done &&
                 decoder_ctrl_now.rf_wen &&
                 (decoder_ctrl_now.w_addr != 5'd0);
@@ -378,29 +371,29 @@ module PSC_InstructionUnit (
         if (!reset_n) begin
             inst_state <= '0;
         end else begin
-            if (FIFO_READ_state && fifo_read_ready) begin
+            if (FIFO_READ_st && fifo_read_ready) begin
                 inst_state.valid  <= 1'b1;
                 inst_state.pc     <= pc_now;
                 inst_state.opcode <= opcode;
             end
 
-            if (DECODE_state && decode_done) begin
+            if (DECODE_st && decode_done) begin
                 inst_state.decoder_ctrl <= decoder_ctrl;
                 inst_state.reg_data_1   <= reg_data_1;
                 inst_state.reg_data_2   <= reg_data_2;
             end
 
-            if (EXECUTE_state && alu_done) begin
+            if (EXECUTE_st && alu_done) begin
                 inst_state.alu_data      <= alu_data;
                 inst_state.alu_data_low2 <= alu_data_low2;
             end
 
-            if (BRANCH_W_state && branch_done) begin
+            if (BRANCH_W_st && branch_done) begin
                 inst_state.pc_sel2      <= pc_sel2;
                 inst_state.branch_rdata <= branch_mem_read_data;
             end
 
-            if (STORE_W_state && store_done) begin
+            if (STORE_W_st && store_done) begin
                 inst_state.w_data <= w_data;
                 inst_state.valid  <= 1'b0;
             end
@@ -408,9 +401,9 @@ module PSC_InstructionUnit (
     end
 
     // FIFO
-    assign fifo_read_valid = FIFO_READ_state;
+    assign fifo_read_valid = FIFO_READ_st;
     assign fifo_flush =
-                STORE_state &&
+                STORE_st &&
                 (
                     pc_sel2                        ||
                     decoder_ctrl_now.is_sfence_vma ||
@@ -423,22 +416,22 @@ module PSC_InstructionUnit (
 
     // Module enable
     assign decode_enb =
-                DECODE_state &&
+                DECODE_st &&
                 fifo_read_ready;
     assign execute_enb = 
-                EXECUTE_state;
+                EXECUTE_st;
     assign branch_enb = 
-                BRANCH_state;
+                BRANCH_st;
     assign memory_store_enb = 
-                STORE_state;
+                STORE_st;
     assign register_store_enb =
-                STORE_W_state             &&
+                STORE_W_st                &&
                 store_done                &&
                 decoder_ctrl_now.rf_wen   &&
                 (decoder_ctrl_now.w_addr != 5'd0);
     // CSR
     assign csr_enb =
-                BRANCH_W_state &&
+                BRANCH_W_st &&
                 branch_done;
     assign csr_valid = 
                 execute_task_done;

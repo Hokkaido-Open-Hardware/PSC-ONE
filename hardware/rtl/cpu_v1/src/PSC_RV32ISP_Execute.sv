@@ -13,7 +13,7 @@ module PSC_RV32ISP_Execute #(
     input  logic [3:0]  cpu_state,
     input  logic        cpu_trap,
 
-    input  logic        execute_valid,
+    input  logic        fifo_req_ready,
     output logic        execute_task_busy,
     output logic        execute_task_done,
 
@@ -58,8 +58,8 @@ module PSC_RV32ISP_Execute #(
     output logic [8:0]  uart_out
 );
 
-    logic EXECUTE_state, BRANCH_state, BRANCH_W_state;
-    logic STORE_state, STORE_W_state;
+    logic EXECUTE_st, BRANCH_st, BRANCH_W_st;
+    logic STORE_st, STORE_W_st;
     logic decode_enb, execute_enb, branch_enb;
     logic memory_store_enb, register_store_enb;
     logic decode_done, alu_done, branch_done, store_done;
@@ -83,11 +83,11 @@ module PSC_RV32ISP_Execute #(
     logic [31:0] d_mmu_mem_addr, d_paddr;
     logic d_MMU_enb, cpu_state_done;
 
-    assign execute_state_sig     = EXECUTE_state;
+    assign execute_state_sig     = EXECUTE_st;
     assign mem_write_sel         = decoder_ctrl_now.funct3;
 
-    assign vaddr = BRANCH_W_state ? branch_vaddr :
-                   STORE_W_state  ? memory_store_vaddr : 32'd0;
+    assign vaddr = BRANCH_W_st ? branch_vaddr :
+                   STORE_W_st  ? memory_store_vaddr : 32'd0;
 
     assign d_MMU_enb = (branch_mmu_valid || memory_store_mmu_valid) &&
                        (decoder_ctrl_now.is_load || decoder_ctrl_now.is_store);
@@ -100,6 +100,11 @@ module PSC_RV32ISP_Execute #(
     assign data_mem_read_address = d_mmu_mem_valid ?   d_mmu_mem_addr :
                                                        branch_data_mem_read_address;
     assign data_mem_write_address = store_mem_write_address;
+
+    logic ri_execute_valid;
+    dec_ctrl_t ri_execute_ctrl;
+    logic [31:0] ri_execute_reg_data_1;
+    logic [31:0] ri_execute_reg_data_2;
 
     dec_ctrl_t   decoder_ctrl_now;
 
@@ -115,13 +120,13 @@ module PSC_RV32ISP_Execute #(
         .opcode               (opcode),
         .pc_now               (pc_now),
 
-        .EXECUTE_state        (EXECUTE_state),
-        .BRANCH_state         (BRANCH_state),
-        .BRANCH_W_state       (BRANCH_W_state),
-        .STORE_state          (STORE_state),
-        .STORE_W_state        (STORE_W_state),
+        .EXECUTE_st           (EXECUTE_st),
+        .BRANCH_st            (BRANCH_st),
+        .BRANCH_W_st          (BRANCH_W_st),
+        .STORE_st             (STORE_st),
+        .STORE_W_st           (STORE_W_st),
 
-        .fifo_empty           (!execute_valid),
+        .fifo_req_ready       (fifo_req_ready),
         .fifo_read_ready      (fifo_read_ready),
         .fifo_read_valid      (fifo_read_state_sig),
         .fifo_flush           (fifo_flush_sig),
@@ -131,10 +136,12 @@ module PSC_RV32ISP_Execute #(
 
         .alu_data             (alu_data),
         
-        .ri_execute_valid     (),
-        .ri_execute_ctrl      (),
-        .ri_execute_reg_data_1(),
-        .ri_execute_reg_data_2(),
+        .ri_execute_valid     (ri_execute_valid),
+        .ri_execute_ctrl      (ri_execute_ctrl),
+        .ri_execute_reg_data_1(ri_execute_reg_data_1),
+        .ri_execute_reg_data_2(ri_execute_reg_data_2),
+        .ri_alu_data          (ri_alu_data),
+        .ri_alu_done          (ri_alu_done),
         
         .pc_sel2              (pc_sel2),
         .ld_low2_q            (ld_low2_q),
@@ -186,7 +193,10 @@ module PSC_RV32ISP_Execute #(
     // =====================================
     // EXECUTE
     // =====================================
-    Execute u_execute(
+    Execute #(
+        .ENABLE_MUL          (1'b1),
+        .ENABLE_DIV          (1'b1)
+    ) u_execute_norm(
         .clock               (clock),
         .reset_n             (reset_n),
         .execute_enb         (execute_enb),
@@ -198,6 +208,29 @@ module PSC_RV32ISP_Execute #(
         .r_data2             (r_data2),
         .out_pc              (execute_pc),
         .alu_done            (alu_done)
+    );
+
+    // =====================================
+    // EXECUTE (R-Type, I-Type)
+    // =====================================
+    logic [31:0] ri_alu_data;
+    logic        ri_alu_done;
+
+    Execute #(
+        .ENABLE_MUL          (1'b0),
+        .ENABLE_DIV          (1'b0)
+    ) u_execute_ri(
+        .clock               (clock),
+        .reset_n             (reset_n),
+        .execute_enb         (ri_execute_valid),
+        .decoder_ctrl        (ri_execute_ctrl),
+        .reg_data_addr1      (ri_execute_reg_data_1),
+        .reg_data_addr2      (ri_execute_reg_data_2),
+        .alu_data            (ri_alu_data),
+        .r_data1             (),
+        .r_data2             (),
+        .out_pc              (),
+        .alu_done            (ri_alu_done)
     );
 
     // =====================================

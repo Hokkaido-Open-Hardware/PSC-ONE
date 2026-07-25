@@ -83,7 +83,7 @@ module cache_dma_controller #(
     reg  [1:0]                req_word_sel_r;    // ライン内 word 選択（[1:0]）
 
     reg                       cpu_cache_clear_d1;
-    reg                       cpu_cache_clear_latch;
+    reg                       cpu_cache_clear_slot;
 
     // アドレス
     wire [ADDR_WIDTH-1:0]     cpu_byte_addr = {cpu_addr[31:2], 2'b00};   // byte address [1:0]==2'b00
@@ -114,6 +114,13 @@ module cache_dma_controller #(
     reg                           victim_dirty_r;
     reg  [CACHE_DATA_WIDTH-1:0]   line_read_r;
     reg  [CACHE_DATA_WIDTH-1:0]   fill_line_r;
+
+    // ---------------- mmu_valid, sa_valid, cpu_valid の場合のlatch ----------------
+    reg                           cpu_req_slot_valid;
+    reg [ADDR_WIDTH-1:0]          cpu_word_addr_slot;
+    reg [ADDR_WIDTH-1:0]          cpu_byte_addr_slot;
+    reg                           cpu_rw_slot;
+    reg [CPU_DATA_WIDTH-1:0]      cpu_data_slot;
 
     // ---------------- ヘルパ関数 ----------------
     function [31:0] pick_word(input [127:0] line, input [1:0] sel);
@@ -164,6 +171,13 @@ module cache_dma_controller #(
             state         <= S_INIT;        // ★まず初期化へ
             init_idx      <= {INDEX_WIDTH_BA{1'b0}};
 
+            // Valid latch 
+            cpu_req_slot_valid  <= 1'b0;    // CPU
+            cpu_word_addr_slot  <= 32'h0;
+            cpu_byte_addr_slot  <= 32'h0;
+            cpu_rw_slot         <= 1'b0;
+            cpu_data_slot       <= 32'h0;
+
             mem_valid     <= 1'b0;  mem_rw <= 1'b0;
             mem_addr      <= {ADDR_WIDTH{1'b0}};
             mem_data_out  <= {MAIN_MEM_DATA_WIDTH{1'b0}};
@@ -172,7 +186,7 @@ module cache_dma_controller #(
             cpu_data_out  <= {CPU_DATA_WIDTH{1'b0}};
 
             cpu_cache_clear_d1    <= 1'b0;
-            cpu_cache_clear_latch <= 1'b0;
+            cpu_cache_clear_slot  <= 1'b0;
 
             tag_we        <= 1'b0;
             data_write    <= {CPU_DATA_WIDTH{1'b0}};
@@ -205,11 +219,21 @@ module cache_dma_controller #(
             cache_hit_pulse  <= 1'b0;
             cache_miss_pulse <= 1'b0;
 
+            // ---------------- Valid latch ----------------
+            // CPU port
+            if (cpu_valid) begin
+                cpu_req_slot_valid  <= 1'b1;
+                cpu_word_addr_slot <= cpu_word_addr;
+                cpu_byte_addr_slot <= cpu_byte_addr;
+                cpu_rw_slot        <= cpu_rw;
+                cpu_data_slot      <= cpu_data;
+            end
+
             cpu_cache_clear_d1 <= cpu_cache_clear;
 
             // cpu_cache_clear posedge
             if (cpu_cache_clear & !cpu_cache_clear_d1) begin
-                cpu_cache_clear_latch <= 1'b1;
+                cpu_cache_clear_slot <= 1'b1;
             end
 
             case (state)
@@ -227,20 +251,21 @@ module cache_dma_controller #(
 
                 // ---------------- IDLE ----------------
                 S_IDLE: begin
-                    if (cpu_valid) begin
+                    if (cpu_req_slot_valid) begin
                         // 要求ラッチ
-                        req_is_write    <= cpu_rw;
-                        req_addr_w      <= cpu_byte_addr;
-                        req_wdata       <= cpu_data;
-                        req_word_sel_r  <= cpu_word_addr[1:0];
+                        cpu_req_slot_valid <= 1'b0;
+                        req_is_write    <= cpu_rw_slot;
+                        req_addr_w      <= cpu_byte_addr_slot;
+                        req_wdata       <= cpu_data_slot;
+                        req_word_sel_r  <= cpu_word_addr_slot[1:0];
                         // キャッシュ参照（次拍でBRAM出力）
-                        cur_index_r <= cpu_byte_addr[TAGLSB-1:4];
-                        cur_tag_r   <= cpu_byte_addr[TAGMSB:TAGLSB];
+                        cur_index_r <= cpu_byte_addr_slot[TAGLSB-1:4];
+                        cur_tag_r   <= cpu_byte_addr_slot[TAGMSB:TAGLSB];
                         state       <= S_LOOKUP_ISSUE;
                     end 
-                    else if (cpu_cache_clear_latch) begin
+                    else if (cpu_cache_clear_slot) begin
                         state       <= S_INIT;
-                        cpu_cache_clear_latch <= 1'b0;
+                        cpu_cache_clear_slot <= 1'b0;
                     end 
                 end
 

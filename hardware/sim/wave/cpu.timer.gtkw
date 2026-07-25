@@ -1,0 +1,49 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Sat Jul 25 05:56:38 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_ONE_Chip_test.fst"
+[dumpfile_mtime] "Sat Jul 25 05:55:44 2026"
+[dumpfile_size] 187531
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.timer.gtkw"
+[timestart] 453600000
+[size] 2755 1290
+[pos] -1 -1
+*-22.703209 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[sst_width] 278
+[signals_width] 190
+[sst_expanded] 1
+[sst_vpaned_height] 397
+@28
+PSC_ONE_Chip_sim.u_chip.u_timer.clock
+@22
+PSC_ONE_Chip_sim.u_chip.u_timer.counter[15:0]
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_byte_raddr[33:0]
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_byte_waddr[33:0]
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_raddr[31:0]
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_rdata[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_rready
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_rvalid
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_rvalid_latch
+@22
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_waddr[31:0]
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_wdata[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_wready
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_wvalid
+PSC_ONE_Chip_sim.u_chip.u_timer.cpu_wvalid_latch
+PSC_ONE_Chip_sim.u_chip.u_timer.irq_enable
+PSC_ONE_Chip_sim.u_chip.u_timer.irq_pending
+PSC_ONE_Chip_sim.u_chip.u_timer.irq_tx
+@22
+PSC_ONE_Chip_sim.u_chip.u_timer.presc[6:0]
+PSC_ONE_Chip_sim.u_chip.u_timer.reload_val[15:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_timer.reset_n
+PSC_ONE_Chip_sim.u_chip.u_timer.running
+PSC_ONE_Chip_sim.u_chip.u_timer.tick_en
+[pattern_trace] 1
+[pattern_trace] 0

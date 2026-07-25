@@ -1,5 +1,7 @@
 // NISHIHARU
 
+//`define PIPELINE_DEBUG_MODE
+
 import PSC_Types::*;
 
 module PSC_InstructionFSM (
@@ -14,7 +16,7 @@ module PSC_InstructionFSM (
     input  instruction_state_t inst_state,
 
     // FIFO / completion
-    input  logic        fifo_empty,
+    input  logic        fifo_req_ready,
     input  logic        fifo_read_ready,    // not used
     input  logic        decode_done,
     input  logic        alu_done,
@@ -22,15 +24,18 @@ module PSC_InstructionFSM (
     input  logic        store_done,
 
     // State decode
-    output logic        IDLE_state,
-    output logic        FIFO_READ_state,
-    output logic        DECODE_state,
-    output logic        REGISTER_READ_state,
-    output logic        EXECUTE_state,
-    output logic        BRANCH_state,
-    output logic        BRANCH_W_state,
-    output logic        STORE_state,
-    output logic        STORE_W_state,
+    output logic        IDLE_st,
+    output logic        FIFO_READ_st,
+    output logic        DECODE_st,
+    output logic        REGISTER_READ_st,
+    output logic        EXECUTE_st,
+    output logic        BRANCH_st,
+    output logic        BRANCH_W_st,
+    output logic        STORE_st,
+    output logic        STORE_W_st,
+
+    // Pipeline 
+    input  logic        ri_wb_done,
 
     // Completion pulse
     output logic        fsm_task_busy,
@@ -46,7 +51,8 @@ module PSC_InstructionFSM (
         ST_BRANCH,
         ST_BRANCH_W,
         ST_STORE,
-        ST_STORE_W
+        ST_STORE_W,
+        ST_PIPELINE_W
     } execute_state_t;
 
     execute_state_t execute_state;
@@ -83,7 +89,7 @@ module PSC_InstructionFSM (
         unique case (execute_state)
 
             ST_IDLE: begin
-                if (!fifo_empty)
+                if (fifo_req_ready)
                     next_state = ST_FIFO_READ;
             end
 
@@ -97,15 +103,19 @@ module PSC_InstructionFSM (
             end
 
             ST_REGISTER_READ: begin
+                `ifndef PIPELINE_DEBUG_MODE
+                if (decoder_ctrl_now.pipeline_type)
+                    next_state = ST_PIPELINE_W;     // TBD
+                else
+                    next_state = ST_EXECUTE;
+                `else
                 next_state = ST_EXECUTE;
+                `endif
             end
 
             ST_EXECUTE: begin
                 if (alu_done)
-                    if (decoder_ctrl_now.pipeline_type)
-                        next_state = ST_STORE;
-                    else
-                        next_state = ST_BRANCH;
+                    next_state = ST_BRANCH;
             end
 
             ST_BRANCH: begin
@@ -126,6 +136,12 @@ module PSC_InstructionFSM (
                     next_state = ST_IDLE;
             end
 
+            // TBD
+            ST_PIPELINE_W: begin
+                if (ri_wb_done)
+                    next_state = ST_IDLE;
+            end
+
             default: begin
                 next_state = ST_IDLE;
             end
@@ -136,21 +152,20 @@ module PSC_InstructionFSM (
     // ============================================================
     // State decode
     // ============================================================
-    assign IDLE_state       = (execute_state == ST_IDLE);
-    assign FIFO_READ_state  = (execute_state == ST_FIFO_READ);
-    assign DECODE_state     = (execute_state == ST_DECODE);
-    assign REGISTER_READ_state = (execute_state == ST_REGISTER_READ);
-    assign EXECUTE_state    = (execute_state == ST_EXECUTE);
-    assign BRANCH_state     = (execute_state == ST_BRANCH) || 
-                              ((execute_state == ST_EXECUTE) && decoder_ctrl_now.pipeline_type);
-    assign BRANCH_W_state   = (execute_state == ST_BRANCH_W);
-    assign STORE_state      = (execute_state == ST_STORE);
-    assign STORE_W_state    = (execute_state == ST_STORE_W);
+    assign IDLE_st          = (execute_state == ST_IDLE);
+    assign FIFO_READ_st     = (execute_state == ST_FIFO_READ);
+    assign DECODE_st        = (execute_state == ST_DECODE);
+    assign REGISTER_READ_st = (execute_state == ST_REGISTER_READ);
+    assign EXECUTE_st       = (execute_state == ST_EXECUTE);
+    assign BRANCH_st        = (execute_state == ST_BRANCH);
+    assign BRANCH_W_st      = (execute_state == ST_BRANCH_W);
+    assign STORE_st         = (execute_state == ST_STORE);
+    assign STORE_W_st       = (execute_state == ST_STORE_W);
 
     assign fsm_task_busy = 
                 (execute_state != ST_IDLE);
 
     assign fsm_task_done =
-                IDLE_state && (execute_state_d != ST_IDLE);
+                IDLE_st && (execute_state_d != ST_IDLE);
 
 endmodule

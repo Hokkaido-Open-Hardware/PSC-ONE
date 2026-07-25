@@ -5,7 +5,7 @@ module PSC_Register #(
 )(
     input  logic        clock,
     input  logic        reset_n,
-    input  logic        store_enb,
+    input  logic        register_wenb,
     input  logic        rf_wen,
     input  logic [4:0]  w_addr,
     input  logic [31:0] w_data,
@@ -30,20 +30,20 @@ module PSC_Register #(
                 
         end else begin
             // WB
-            if (store_enb && rf_wen && (w_addr != 5'd0))
+            if (register_wenb && rf_wen && (w_addr != 5'd0))
                 registers[w_addr] <= w_data;
 
             // ID＋WB→ID forwarding
             reg_data_1 <=
                 (r_addr1 == 5'd0) ? 32'd0 :
-                (store_enb && rf_wen &&
+                (register_wenb && rf_wen &&
                 (w_addr != 5'd0) &&
                 (w_addr == r_addr1)) ? w_data :
                 registers[r_addr1];
 
             reg_data_2 <=
                 (r_addr2 == 5'd0) ? 32'd0 :
-                (store_enb && rf_wen &&
+                (register_wenb && rf_wen &&
                 (w_addr != 5'd0) &&
                 (w_addr == r_addr2)) ? w_data :
                 registers[r_addr2];

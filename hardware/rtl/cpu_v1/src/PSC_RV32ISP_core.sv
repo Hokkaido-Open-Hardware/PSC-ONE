@@ -93,7 +93,7 @@ module PSC_RV32ISP_core #(
     } cpu_state_t;
 
     cpu_state_t cpu_state;
-    logic        fetch_valid;
+    logic       fetch_valid;
     logic       fetch_ready;
 
     always_ff @(posedge clock or negedge reset_n) begin
@@ -295,7 +295,7 @@ module PSC_RV32ISP_core #(
     logic [31:0] opcode;
     logic [31:0] fifo_opcode_data;
     logic [31:0] fifo_fetch_pc;
-    logic        fifo_empty;
+    logic        fifo_req_ready;
     logic        fifo_full;
     logic        fifo_flush_sig;
     logic        fifo_read_ready;
@@ -326,7 +326,7 @@ module PSC_RV32ISP_core #(
         .execute_task_busy          (execute_task_busy),
         .execute_task_done          (execute_task_done),
         // fifo sig.
-        .fifo_empty                 (fifo_empty),
+        .fifo_req_ready             (fifo_req_ready),
         .fifo_full                  (fifo_full),
         .fifo_read_valid            (fifo_read_state_sig),
         .fifo_read_ready            (fifo_read_ready),
@@ -379,7 +379,7 @@ module PSC_RV32ISP_core #(
         .cpu_state                  (cpu_state),
         .cpu_trap                   (cpu_state==CPU_TRAP),
         // in,out
-        .execute_valid              (!fifo_empty),
+        .fifo_req_ready             (fifo_req_ready),
         .execute_task_busy          (execute_task_busy),
         .execute_task_done          (execute_task_done),
         // fifo sig.

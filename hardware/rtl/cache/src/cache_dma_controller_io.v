@@ -201,18 +201,18 @@ module cache_dma_controller_io #(
     reg  [CACHE_DATA_WIDTH-1:0]   fill_line_r;
 
     // ---------------- mmu_valid, sa_valid, cpu_valid の場合のlatch ----------------
-    reg                           cpu_valid_latch;
-    reg                           sa_valid_latch;
-    reg                           mmu_valid_latch;
-    reg [ADDR_WIDTH-1:0]          mmu_addr_latch;
-    reg [ADDR_WIDTH-1:0]          cpu_word_addr_latch;
-    reg [ADDR_WIDTH-1:0]          cpu_byte_addr_latch;
+    reg                           cpu_req_slot_valid;
+    reg                           sa_req_slot_valid;
+    reg                           mmu_req_slot_valid;
+    reg [ADDR_WIDTH-1:0]          mmu_addr_slot;
+    reg [ADDR_WIDTH-1:0]          cpu_word_addr_slot;
+    reg [ADDR_WIDTH-1:0]          cpu_byte_addr_slot;
     reg                           cpu_rw_latch;
     reg [CPU_DATA_WIDTH-1:0]      cpu_data_latch;
     reg [2:0]                     cpu_write_sel_latch;
 
-    reg [ADDR_WIDTH-1:0]          sa_word_addr_latch;
-    reg [ADDR_WIDTH-1:0]          sa_byte_addr_latch;
+    reg [ADDR_WIDTH-1:0]          sa_word_addr_slot;
+    reg [ADDR_WIDTH-1:0]          sa_byte_addr_slot;
     reg                           sa_rw_latch;
     reg [CPU_DATA_WIDTH-1:0]      sa_data_latch;
     reg [2:0]                     sa_write_sel_latch;
@@ -333,22 +333,22 @@ module cache_dma_controller_io #(
             init_idx      <= {INDEX_WIDTH_BA{1'b0}};
 
             // Valid latch 
-            cpu_valid_latch     <= 1'b0;    // CPU
-            cpu_word_addr_latch <= 32'h0;
-            cpu_byte_addr_latch <= 32'h0;
+            cpu_req_slot_valid  <= 1'b0;    // CPU
+            cpu_word_addr_slot  <= 32'h0;
+            cpu_byte_addr_slot  <= 32'h0;
             byte_sel            <= 2'b00;
             half_sel            <= 1'b0;
             cpu_rw_latch        <= 1'b0;
             cpu_data_latch      <= 32'h0;
             cpu_write_sel_latch <= 3'b000;
-            sa_valid_latch      <= 1'b0;    // SA
-            sa_word_addr_latch  <= 32'h0;
-            sa_byte_addr_latch  <= 32'h0;
+            sa_req_slot_valid   <= 1'b0;    // SA
+            sa_word_addr_slot   <= 32'h0;
+            sa_byte_addr_slot   <= 32'h0;
             sa_data_latch       <= 32'h0;
             sa_rw_latch         <= 1'b0;
             sa_write_sel_latch  <= 3'b000;
-            mmu_valid_latch     <= 1'b0;    // MMU
-            mmu_addr_latch      <= 32'h0;
+            mmu_req_slot_valid  <= 1'b0;    // MMU
+            mmu_addr_slot       <= 32'h0;
 
             // MMIO
             mmio_valid    <= 1'b0;
@@ -437,26 +437,26 @@ module cache_dma_controller_io #(
             // ---------------- Valid latch ----------------
             // CPU port
             if (cpu_valid) begin
-                cpu_valid_latch     <= 1'b1;
-                cpu_word_addr_latch <= cpu_word_addr;
-                cpu_byte_addr_latch <= cpu_byte_addr;
+                cpu_req_slot_valid  <= 1'b1;
+                cpu_word_addr_slot  <= cpu_word_addr;
+                cpu_byte_addr_slot  <= cpu_byte_addr;
                 cpu_rw_latch        <= cpu_rw;
                 cpu_data_latch      <= cpu_data;
                 cpu_write_sel_latch <= cpu_write_sel;
             end
             // SA port
             if (sa_valid) begin
-                sa_valid_latch      <= 1'b1;
-                sa_word_addr_latch  <= sa_word_addr;
-                sa_byte_addr_latch  <= sa_byte_addr;
+                sa_req_slot_valid   <= 1'b1;
+                sa_word_addr_slot   <= sa_word_addr;
+                sa_byte_addr_slot   <= sa_byte_addr;
                 sa_rw_latch         <= sa_rw;
                 sa_data_latch       <= sa_data;
                 sa_write_sel_latch  <= 3'b010;
             end
             // MMU port
             if (mmu_valid) begin
-                mmu_valid_latch     <= 1'b1;
-                mmu_addr_latch      <= mmu_addr;
+                mmu_req_slot_valid  <= 1'b1;
+                mmu_addr_slot       <= mmu_addr;
             end
             // ---------------------------------------------
 
@@ -478,7 +478,7 @@ module cache_dma_controller_io #(
                 // ---------------- IDLE ----------------
                 // state = 1
                 S_IDLE: begin
-                    if (cpu_valid_latch | sa_valid_latch | mmu_valid_latch) begin
+                    if (cpu_req_slot_valid | sa_req_slot_valid | mmu_req_slot_valid) begin
                         state <= S_CASHE_START;
                     end else begin
                         if (cpu_cache_clear_latch) begin
@@ -496,79 +496,79 @@ module cache_dma_controller_io #(
                 // state = 2
                 S_CASHE_START: begin
                     // cpu_validよりmmu_valid優先.
-                    if (mmu_valid_latch) begin
+                    if (mmu_req_slot_valid) begin
                         // ===== MMU READ ONLY =====
                         req_from_mmu    <= 1'b1;
                         req_from_sa     <= 1'b0;
                         req_is_write    <= 1'b0;
-                        req_addr_b      <= mmu_addr_latch;
-                        req_addr_w      <= mmu_addr_latch[31:2];
-                        req_word_sel_r  <= mmu_addr_latch[3:2];
-                        mmu_valid_latch <= 1'b0;    // _valid をクリア
+                        req_addr_b      <= mmu_addr_slot;
+                        req_addr_w      <= mmu_addr_slot[31:2];
+                        req_word_sel_r  <= mmu_addr_slot[3:2];
+                        mmu_req_slot_valid <= 1'b0;    // _valid をクリア
 
                         // MMIO は MMU では使わない（即ミス扱い or 無視）
-                        cur_index_r <= mmu_addr_latch[TAGLSB-1:4];
-                        cur_tag_r   <= mmu_addr_latch[TAGMSB:TAGLSB];
+                        cur_index_r <= mmu_addr_slot[TAGLSB-1:4];
+                        cur_tag_r   <= mmu_addr_slot[TAGMSB:TAGLSB];
                         state       <= S_LOOKUP_ISSUE;
 
                     // cpu_validよりsa_valid優先.
-                    end else if (sa_valid_latch) begin
+                    end else if (sa_req_slot_valid) begin
                         req_from_mmu    <= 1'b0;
                         req_from_sa     <= 1'b1;
                         req_is_write    <= sa_rw_latch;
-                        req_addr_w      <= sa_word_addr_latch;
-                        req_addr_b      <= sa_byte_addr_latch;
+                        req_addr_w      <= sa_word_addr_slot;
+                        req_addr_b      <= sa_byte_addr_slot;
                         req_wdata       <= sa_data_latch;
                         req_write_sel_r <= sa_write_sel_latch;
-                        byte_sel        <= sa_byte_addr_latch[1:0];
-                        half_sel        <= sa_byte_addr_latch[1];
-                        req_word_sel_r  <= sa_word_addr_latch[1:0];
+                        byte_sel        <= sa_byte_addr_slot[1:0];
+                        half_sel        <= sa_byte_addr_slot[1];
+                        req_word_sel_r  <= sa_word_addr_slot[1:0];
                         // MMIO は SA では使わない（即ミス扱い or 無視）
-                        cur_index_r     <= sa_byte_addr_latch[TAGLSB-1:4];
-                        cur_tag_r       <= sa_byte_addr_latch[TAGMSB:TAGLSB];
+                        cur_index_r     <= sa_byte_addr_slot[TAGLSB-1:4];
+                        cur_tag_r       <= sa_byte_addr_slot[TAGMSB:TAGLSB];
                         state           <= S_LOOKUP_ISSUE;
 
-                    end else if (cpu_valid_latch) begin
+                    end else if (cpu_req_slot_valid) begin
                         // 要求ラッチ
                         req_from_mmu    <= 1'b0;
                         req_from_sa     <= 1'b0;
                         req_is_write    <= cpu_rw_latch;
-                        req_addr_w      <= cpu_word_addr_latch;
-                        req_addr_b      <= cpu_byte_addr_latch;
+                        req_addr_w      <= cpu_word_addr_slot;
+                        req_addr_b      <= cpu_byte_addr_slot;
                         req_wdata       <= cpu_data_latch;
                         req_write_sel_r <= cpu_write_sel_latch;
-                        byte_sel        <= cpu_byte_addr_latch[1:0];
-                        half_sel        <= cpu_byte_addr_latch[1];
-                        req_word_sel_r  <= cpu_word_addr_latch[1:0];
-                        cpu_valid_latch <= 1'b0;    // _valid をクリア
+                        byte_sel        <= cpu_byte_addr_slot[1:0];
+                        half_sel        <= cpu_byte_addr_slot[1];
+                        req_word_sel_r  <= cpu_word_addr_slot[1:0];
+                        cpu_req_slot_valid <= 1'b0;    // _valid をクリア
 
                         // ---------- PROTECT MODE: 書き込み禁止 ----------
-                        if (PROTECT_MODE && cpu_rw_latch && (cpu_byte_addr_latch < PROTECT_ADDR)) begin
+                        if (PROTECT_MODE && cpu_rw_latch && (cpu_byte_addr_slot < PROTECT_ADDR)) begin
                             cpu_ready    <= 1'b1;
                             cpu_data_out <= 32'd0;
                             state        <= S_IDLE;
                         end
 
                         // ---------- PIO：MMIO ----------
-                        else if (mmio_hit(cpu_byte_addr_latch)) begin
+                        else if (mmio_hit(cpu_byte_addr_slot)) begin
                             if(cpu_rw_latch) begin
                                 mmio_valid  <= 1'b1;
                                 mmio_rw     <= 1'b1;
-                                mmio_addr   <= cpu_byte_addr_latch;
+                                mmio_addr   <= cpu_byte_addr_slot;
                                 mmio_wdata  <= cpu_data_latch;
                                 state       <= S_MMIO_WAIT;
                             end else begin
                                 mmio_valid  <= 1'b1;
                                 mmio_rw     <= 1'b0;
-                                mmio_addr   <= cpu_byte_addr_latch;
+                                mmio_addr   <= cpu_byte_addr_slot;
                                 state       <= S_MMIO_WAIT;
                             end
                         end
 
                         // ---------- キャッシュルックアップ ----------
                         else begin
-                            cur_index_r <= cpu_byte_addr_latch[TAGLSB-1:4];
-                            cur_tag_r   <= cpu_byte_addr_latch[TAGMSB:TAGLSB];
+                            cur_index_r <= cpu_byte_addr_slot[TAGLSB-1:4];
+                            cur_tag_r   <= cpu_byte_addr_slot[TAGMSB:TAGLSB];
                             state       <= S_LOOKUP_ISSUE;
                         end
                     end
@@ -648,7 +648,7 @@ module cache_dma_controller_io #(
                             data_we    <= 1'b1;
                             tag_write  <= {victim_tag_r, 1'b1, 1'b1};  // valid=1, dirty=1
                             tag_we     <= 1'b1;
-                            if (req_from_sa) sa_valid_latch  <= 1'b0;
+                            if (req_from_sa) sa_req_slot_valid  <= 1'b0;
                             if (req_from_sa) sa_ready   <= 1'b1;
                             else             cpu_ready  <= 1'b1;
                             cache_hit_pulse <= 1'b1;
@@ -657,15 +657,15 @@ module cache_dma_controller_io #(
                             // ---- READ HIT ----
                             if (req_from_mmu) begin
                                 mmu_data_out <= pick_word(line_read_r, req_word_sel_r);
-                                mmu_valid_latch <= 1'b0;
+                                mmu_req_slot_valid <= 1'b0;
                                 mmu_ready    <= 1'b1;
                             end else if (req_from_sa) begin
                                 sa_data_out <= pick_word(line_read_r, req_word_sel_r);
-                                sa_valid_latch <= 1'b0;
+                                sa_req_slot_valid <= 1'b0;
                                 sa_ready    <= 1'b1;
                             end else begin
                                 cpu_data_out <= pick_word(line_read_r, req_word_sel_r);
-                                cpu_valid_latch <= 1'b0;
+                                cpu_req_slot_valid <= 1'b0;
                                 cpu_ready    <= 1'b1;
                             end
                             cache_hit_pulse <= 1'b1;
@@ -678,10 +678,10 @@ module cache_dma_controller_io #(
                         if (req_is_write && PROTECT_MODE &&
                             (req_addr_b < PROTECT_ADDR)) begin
                             if (req_from_sa) begin
-                                sa_valid_latch <= 1'b0;
+                                sa_req_slot_valid <= 1'b0;
                                 sa_ready       <= 1'b1;
                             end else begin
-                                cpu_valid_latch <= 1'b0;
+                                cpu_req_slot_valid <= 1'b0;
                                 cpu_ready       <= 1'b1;
                             end
                             state <= S_IDLE;
@@ -775,10 +775,10 @@ module cache_dma_controller_io #(
 
                             // 処理した要求だけをクリアする
                             if (req_from_sa) begin
-                                sa_valid_latch <= 1'b0;
+                                sa_req_slot_valid <= 1'b0;
                                 sa_ready       <= 1'b1;
                             end else begin
-                                cpu_valid_latch <= 1'b0;
+                                cpu_req_slot_valid <= 1'b0;
                                 cpu_ready       <= 1'b1;
                             end
 
@@ -799,15 +799,15 @@ module cache_dma_controller_io #(
                 S_ALLOC_RESP: begin
                     if (req_from_mmu) begin
                         mmu_data_out <= pick_word(fill_line_r, req_word_sel_r);
-                        mmu_valid_latch  <= 1'b0;
+                        mmu_req_slot_valid  <= 1'b0;
                         mmu_ready    <= 1'b1;
                     end else if (req_from_sa) begin
                         sa_data_out  <= pick_word(fill_line_r, req_word_sel_r);
-                        sa_valid_latch  <= 1'b0;
+                        sa_req_slot_valid  <= 1'b0;
                         sa_ready     <= 1'b1;
                     end else begin
                         cpu_data_out <= pick_word(fill_line_r, req_word_sel_r);
-                        cpu_valid_latch  <= 1'b0;
+                        cpu_req_slot_valid  <= 1'b0;
                         cpu_ready    <= 1'b1;
                     end
                     state <= S_IDLE;
