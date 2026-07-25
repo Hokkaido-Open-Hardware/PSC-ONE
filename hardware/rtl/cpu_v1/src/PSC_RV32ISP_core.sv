@@ -304,6 +304,7 @@ module PSC_RV32ISP_core #(
     logic        fifo_read_state_sig;
     logic        is_sfence_vma;
 
+    assign is_sfence_vma = decoder_ctrl.is_sfence_vma;
     assign is_fence_i = decoder_ctrl.is_fence_i;
 
     // MMU fault
@@ -315,7 +316,7 @@ module PSC_RV32ISP_core #(
 
     assign fetch_pc = pc;
 
-    PSC_RV32ISP_Fetch u_fetch_state(
+    PSC_RV32ISP_FetchUnit u_fetch_unit(
         // clock, reset
         .clock                      (clock),
         .reset_n                    (reset_n),
@@ -371,7 +372,7 @@ module PSC_RV32ISP_core #(
 
     assign illegal_instruction = decoder_ctrl.raise_illegal_instruction;
 
-    PSC_RV32ISP_Execute u_execute_state(
+    PSC_RV32ISP_InstructionEngine u_inst_engine(
         // clock, reset
         .clock                      (clock),
         .reset_n                    (reset_n),

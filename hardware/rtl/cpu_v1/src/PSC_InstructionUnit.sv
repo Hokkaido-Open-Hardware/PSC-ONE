@@ -122,6 +122,9 @@ module PSC_InstructionUnit (
     // ============================================================
     // PROGRAM COUNTER
     // ============================================================
+    assign execute_task_busy = fsm_task_busy || ri_pipeline_busy;
+    assign execute_task_done = fsm_task_done || ri_wb_commit;
+
     PSC_PC u_PSC_PC (
         .clock             (clock),
         .reset_n           (reset_n),
@@ -163,6 +166,9 @@ module PSC_InstructionUnit (
     // ============================================================
     // Cell state
     // ============================================================
+    logic fsm_task_busy;
+    logic fsm_task_done;
+
     PSC_InstructionFSM u_PSC_inst_fsm (
         .clock                (clock),
         .reset_n              (reset_n),
@@ -191,8 +197,8 @@ module PSC_InstructionUnit (
 
         .ri_wb_done           (ri_ex_complete),
 
-        .fsm_task_busy        (execute_task_busy),
-        .fsm_task_done        (execute_task_done)
+        .fsm_task_busy        (fsm_task_busy),
+        .fsm_task_done        (fsm_task_done)
     );
 
     logic IDLE_st;

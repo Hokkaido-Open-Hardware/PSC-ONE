@@ -105,7 +105,8 @@ module PSC_InstructionFSM (
             ST_REGISTER_READ: begin
                 `ifndef PIPELINE_DEBUG_MODE
                 if (decoder_ctrl_now.pipeline_type)
-                    next_state = ST_PIPELINE_W;     // TBD
+                    //next_state = ST_PIPELINE_W;     // TBD
+                    next_state = ST_IDLE;
                 else
                     next_state = ST_EXECUTE;
                 `else
@@ -166,6 +167,6 @@ module PSC_InstructionFSM (
                 (execute_state != ST_IDLE);
 
     assign fsm_task_done =
-                IDLE_st && (execute_state_d != ST_IDLE);
+                IDLE_st && ((execute_state_d == ST_STORE_W) || (execute_state_d == ST_PIPELINE_W));
 
 endmodule

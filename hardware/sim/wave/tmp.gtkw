@@ -1,74 +1,51 @@
 [*]
 [*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Sat Jul 25 05:12:13 2026
+[*] Sat Jul 25 22:16:17 2026
 [*]
-[dumpfile] "(null)"
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_RV32ISP_V1_core.fst"
+[dumpfile_mtime] "Sat Jul 25 22:13:26 2026"
+[dumpfile_size] 26463
 [savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/tmp.gtkw"
-[timestart] 8350000
-[size] 2692 1167
+[timestart] 13773900
+[size] 2677 1196
 [pos] -1 -1
-*-16.543339 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-17.164494 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] PSC_RV32ISP_core.
-[treeopen] PSC_RV32ISP_core.u_execute_state.
-[treeopen] PSC_RV32ISP_core.u_execute_state.u_inst_unit.
+[treeopen] PSC_RV32ISP_core.u_fetch_unit.
+[treeopen] PSC_RV32ISP_core.u_inst_engine.
+[treeopen] PSC_RV32ISP_core.u_inst_engine.u_inst_unit.
 [sst_width] 278
-[signals_width] 273
+[signals_width] 246
 [sst_expanded] 1
-[sst_vpaned_height] 436
-@28
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.ri_id_ex_issue
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.raw_hazard
-PSC_RV32ISP_core.u_execute_state.u_execute_ri.execute_enb
+[sst_vpaned_height] 790
 @22
-PSC_RV32ISP_core.u_execute_state.u_execute_ri.reg_data_addr1[31:0]
-PSC_RV32ISP_core.u_execute_state.u_execute_ri.reg_data_addr2[31:0]
+PSC_RV32ISP_core.u_inst_engine.ri_alu_data[31:0]
 @28
-PSC_RV32ISP_core.u_execute_state.u_execute_ri.alu_done
+PSC_RV32ISP_core.u_inst_engine.ri_alu_done
 @22
-PSC_RV32ISP_core.u_execute_state.u_execute_ri.alu_data[31:0]
-@200
--
+PSC_RV32ISP_core.u_inst_engine.ri_execute_ctrl[129:0]
+PSC_RV32ISP_core.u_inst_engine.ri_execute_reg_data_1[31:0]
+PSC_RV32ISP_core.u_inst_engine.ri_execute_reg_data_2[31:0]
 @28
-PSC_RV32ISP_core.u_execute_state.u_execute_norm.execute_enb
-@22
-PSC_RV32ISP_core.u_execute_state.u_execute_norm.alu_data[31:0]
-@200
--
-@28
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.ri_alu_done
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.alu_data_low2[1:0]
-@22
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.alu_data[31:0]
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.ri_alu_data[31:0]
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.regfile_wdata[31:0]
-@28
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.normal_wb_valid
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.ri_ex_complete
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.ri_wb_commit
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.normal_wb_valid
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.ri_execute_valid
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.u_regfile.rf_wen
-@22
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.u_regfile.w_addr[4:0]
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.u_regfile.w_data[31:0]
+PSC_RV32ISP_core.u_inst_engine.u_Decorder.pipeline_type_w
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.execute_task_busy
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.execute_task_done
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.fsm_task_busy
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.fsm_task_done
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.ri_pipeline_busy
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.ri_ex_complete
 @100000028
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.u_PSC_inst_fsm.execute_state[3:0]
-@22
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.u_regfile.w_addr[4:0]
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.u_regfile.w_data[31:0]
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.u_PSC_inst_fsm.execute_state[3:0]
 @28
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.fifo_read_valid
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.execute_task_done
+PSC_RV32ISP_core.u_inst_engine.ri_execute_valid
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.ri_id_ex_issue
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.ri_wb_commit
 @22
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.reg_data_1[31:0]
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.reg_data_2[31:0]
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.ri_execute_reg_data_1[31:0]
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.ri_execute_reg_data_2[31:0]
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.u_PSC_inst_fsm.decoder_ctrl_now[129:0]
+PSC_RV32ISP_core.u_fetch_unit.count[4:0]
+PSC_RV32ISP_core.u_inst_engine.pc[31:0]
 @28
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.u_PSC_inst_fsm.store_done
-PSC_RV32ISP_core.u_execute_state.u_Decorder.pipeline_type_w
-@29
-PSC_RV32ISP_core.u_execute_state.u_inst_unit.u_regfile.register_wenb
+PSC_RV32ISP_core.u_fetch_unit.u_fetch_fifo.pop
+PSC_RV32ISP_core.u_fetch_unit.execute_task_busy
+PSC_RV32ISP_core.u_inst_engine.u_inst_unit.raw_hazard
 [pattern_trace] 1
 [pattern_trace] 0

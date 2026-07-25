@@ -2,7 +2,7 @@
 
 import PSC_Types::*;
 
-module PSC_RV32ISP_Execute #(
+module PSC_RV32ISP_InstructionEngine #(
     parameter logic [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,
     parameter logic [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
     parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0

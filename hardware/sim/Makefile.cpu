@@ -93,9 +93,9 @@ CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
 CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
 	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_core.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_Fetch.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
 	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_Execute.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
 	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
 	$(CPU_V1_SRC_DIR)/PSC_InstructionFSM.sv \
 	$(CPU_V1_SRC_DIR)/Fetch.sv \
@@ -219,7 +219,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	boot_test1:RV32ISP_chip_test:./mem/boot_test1.mem:0x00001321 \
+	sa_matrix_test1:RV32ISP_chip_test:./mem/sa_matrix_test1.mem:0x0000BEEF \
 
 # ============================================================
 # 複数テスト定義

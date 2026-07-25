@@ -2,7 +2,7 @@
 
 //`define fifo_pipeline_off
 
-module PSC_RV32ISP_Fetch #(
+module PSC_RV32ISP_FetchUnit #(
     parameter int FIFO_DEPTH = 16
 )(
     input  logic        clock,

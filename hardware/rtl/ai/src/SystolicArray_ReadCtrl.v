@@ -43,6 +43,11 @@ module SystolicArray_ReadCtrl #(
 
     reg [2:0] state;
     reg [1:0] read_idx;
+    
+    reg [7:0] i_idx_r;
+    reg [7:0] j_idx_r;
+    reg [7:0] k_idx_r;
+    reg [7:0] matrix_size_r;
 
     /*
      * tile_row_offset
@@ -123,9 +128,9 @@ module SystolicArray_ReadCtrl #(
             matrix_addr_A =
                 RADDR_MASK &
                 (BASE_ADDR_A
-                + tile_row_offset(i_idx, matrix_size)
-                + row_offset(local_row, matrix_size)
-                + ({24'd0, k_idx} << 2));
+                + tile_row_offset(i_idx_r, matrix_size_r)
+                + row_offset(local_row, matrix_size_r)
+                + ({24'd0, k_idx_r} << 2));
         end
     endfunction
 
@@ -143,9 +148,9 @@ module SystolicArray_ReadCtrl #(
             matrix_addr_B =
                 RADDR_MASK &
                 (BASE_ADDR_B
-                + tile_row_offset(k_idx, matrix_size)
-                + row_offset(local_row, matrix_size)
-                + ({24'd0, j_idx} << 2));
+                + tile_row_offset(k_idx_r, matrix_size_r)
+                + row_offset(local_row, matrix_size_r)
+                + ({24'd0, j_idx_r} << 2));
         end
     endfunction
 
@@ -153,6 +158,10 @@ module SystolicArray_ReadCtrl #(
         if (!reset_n) begin
             state           <= R_IDLE;
             read_idx        <= 2'd0;
+            i_idx_r         <= 8'd0;
+            j_idx_r         <= 8'd0;
+            k_idx_r         <= 8'd0;
+            matrix_size_r   <= 8'd0;
 
             rd_read_addr    <= 32'd0;
             rd_read_valid   <= 1'b0;
@@ -162,6 +171,10 @@ module SystolicArray_ReadCtrl #(
             b_data_out      <= 128'd0;
 
         end else begin
+            i_idx_r       <= i_idx;
+            j_idx_r       <= j_idx;
+            k_idx_r       <= k_idx;
+            matrix_size_r <= matrix_size;
             rd_read_valid <= 1'b0;
             read_ready    <= 1'b0;
 
