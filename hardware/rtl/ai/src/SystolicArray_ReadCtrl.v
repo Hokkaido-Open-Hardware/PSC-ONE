@@ -60,32 +60,47 @@ module SystolicArray_ReadCtrl #(
      * matrix_size=12にも対応するため、単純なシフトだけではなく
      * シフト＋加算を使用する。
      */
-    function [31:0] tile_row_offset;
+    function automatic [31:0] tile_row_offset;
         input [7:0] tile_idx;
         input [7:0] size;
+
         begin
             case (size)
                 8'd4:
-                    tile_row_offset = {24'd0, tile_idx} << 4;
+                    tile_row_offset =
+                        {24'd0, tile_idx} << 4;
                     // tile_idx * 16
 
                 8'd8:
-                    tile_row_offset = {24'd0, tile_idx} << 5;
+                    tile_row_offset =
+                        {24'd0, tile_idx} << 5;
                     // tile_idx * 32
 
                 8'd12:
                     tile_row_offset =
                         ({24'd0, tile_idx} << 5)
-                      + ({24'd0, tile_idx} << 4);
+                    + ({24'd0, tile_idx} << 4);
                     // tile_idx * 48
 
                 8'd16:
-                    tile_row_offset = {24'd0, tile_idx} << 6;
+                    tile_row_offset =
+                        {24'd0, tile_idx} << 6;
                     // tile_idx * 64
+
+                8'd32:
+                    tile_row_offset =
+                        {24'd0, tile_idx} << 7;
+                    // tile_idx * 128
+
+                8'd64:
+                    tile_row_offset =
+                        {24'd0, tile_idx} << 8;
+                    // tile_idx * 256
 
                 default:
                     tile_row_offset =
-                        ({24'd0, tile_idx} << 2) * size;
+                        ({24'd0, tile_idx} << 2)
+                    * {24'd0, size};
             endcase
         end
     endfunction

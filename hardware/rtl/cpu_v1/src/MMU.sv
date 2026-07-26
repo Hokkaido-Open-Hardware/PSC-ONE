@@ -28,6 +28,22 @@ module MMU (
     output logic            mmu_done      // MMU完了通知
 );
 
+    `ifdef COCOTB_SIM
+    `ifdef CPU_MMU_SIM
+    initial begin
+        `ifdef DUMP_VCD
+        $display("COCOTB_SIM MMU DUMP_VCD ENABLE");
+        $dumpfile("./wave/PSC_RV32ISP_MMU.vcd");
+        $dumpvars(0);
+        `else
+        $display("COCOTB_SIM MMU verilator FST ENABLE");
+        $dumpfile("./wave/PSC_RV32ISP_MMU.fst");
+        $dumpvars(0);
+        `endif
+    end
+    `endif
+    `endif
+
     // Privilege level encoding (RISC-V spec)
     localparam logic [1:0] PRIV_U = 2'b00;
     localparam logic [1:0] PRIV_S = 2'b01;
@@ -36,8 +52,8 @@ module MMU (
     // MMU完了通知.
     //assign  mmu_done = (state==S_DONE);
 
-    // sfence_vma_reg
-    logic     sfence_vma_reg;
+    // sfence_vma_req
+    logic     sfence_vma_req;
 
     // ---- SV32 のアドレス分解 ----
     logic [9:0]  vpn1;
@@ -153,27 +169,18 @@ module MMU (
             l0_cached       <= 1'b0;
             cache_vpn0      <= 10'd0;
             // sfence_vma
-            sfence_vma_reg  <= 1'b0;
+            sfence_vma_req  <= 1'b0;
             mmu_done        <= 1'b0;
         end else begin
             
-            // --------------------------------------------------
-            //  cpu state done. sfence_vma. 
-            // --------------------------------------------------
+            // cpu state done. 
             // page_falut=Lに戻す.
             if(cpu_state_done) 
-                page_fault <= 1'b0; 
+                page_fault <= 1'b0;
+            // sfence_vma.  
             // PTEキャッシュクリア. cpu_state_done=Hと同じ
             if (sfence_vma) 
-                sfence_vma_reg <= 1'b1;
-
-            // sfence_vmaの処理. 無条件でcache_vpnをクリア
-            if(sfence_vma_reg) begin
-                pte_cached      <= 1'b0;
-                l0_cached       <= 1'b0;
-                if (state == S_IDLE || state == S_DONE)
-                    sfence_vma_reg  <= 1'b0;    // sfence_vma_reg をクリア
-            end
+                sfence_vma_req <= 1'b1;
 
             // --------------------------------------------------
             //  MMU  state machine 
@@ -184,10 +191,17 @@ module MMU (
 
             // MMUステートマシン
             unique case (state)
+            
                 // --------------------------------------------------
                 S_IDLE: begin
                     if (MMU_enb)
                         state    <= S_START;
+                    // sfence_vma_req をクリア
+                    if(sfence_vma_req) begin
+                        pte_cached      <= 1'b0;
+                        l0_cached       <= 1'b0;
+                        sfence_vma_req  <= 1'b0;
+                    end
                 end
 
                 // --------------------------------------------------

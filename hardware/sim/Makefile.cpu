@@ -219,7 +219,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	sa_matrix_test1:RV32ISP_chip_test:./mem/sa_matrix_test1.mem:0x0000BEEF \
+	nn_test4:RV32ISP_chip_test:./mem/nn_test4.mem:0x00657FA5 \
 
 # ============================================================
 # 複数テスト定義
@@ -286,8 +286,10 @@ PSCONE_LONG_TESTS = \
 	pio_uart_test1:RV32ISP_chip_test:./mem/pio_uart_test1.mem:0x00001212 \
 	fencei_test1:RV32ISP_chip_test:./mem/fencei_test1.mem:0xabcd5678 \
 	sret_test1:RV32ISP_chip_test:./mem/sret_test1.mem:0x0000DC12 \
+	nn_64x16x1_test1:RV32ISP_chip_test:./mem/nn_64x16x1_test1.mem:0x00000780 \
 	mmu_test1:RV32ISP_chip_test:./mem/mmu_test1.mem:0x00000033 \
 	i2s_test1:RV32ISP_chip_test:./mem/i2s_test1.mem:0x0abc0123 \
+	nn_test4:RV32ISP_chip_test:./mem/nn_test4.mem:0x00657FA5 \
 	memcpy_test1:RV32ISP_chip_test:./mem/memcpy_test1.mem:0x00002521 \
 	pipeline_test1:RV32ISP_chip_test:./mem/pipeline_test1.mem:0x0000009d \
 	pipeline_test2:RV32ISP_chip_test:./mem/pipeline_test2.mem:0xfc1667c7 \

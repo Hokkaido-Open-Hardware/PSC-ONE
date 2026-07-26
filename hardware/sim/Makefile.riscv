@@ -1,0 +1,72 @@
+# ============================================================
+# RISC-V official ISA test build
+# ============================================================
+
+RISCV_GCC ?= riscv32-unknown-elf-gcc
+RISCV_OBJDUMP ?= riscv32-unknown-elf-objdump
+RISCV_OBJCOPY ?= riscv32-unknown-elf-objcopy
+
+RISCV_TEST_ROOT := riscv_tests
+RISCV_BUILD_DIR := riscv_build
+
+TEST_GROUP ?= rv32ui
+TEST_NAME  ?= add
+
+TEST_SRC := $(RISCV_TEST_ROOT)/isa/$(TEST_GROUP)/$(TEST_NAME).S
+TEST_ELF := $(RISCV_BUILD_DIR)/$(TEST_GROUP)-$(TEST_NAME).elf
+TEST_BIN := $(RISCV_BUILD_DIR)/$(TEST_GROUP)-$(TEST_NAME).bin
+TEST_DUMP := $(RISCV_BUILD_DIR)/$(TEST_GROUP)-$(TEST_NAME).dump
+
+ARCH ?= rv32i_zicsr_zifencei
+ABI  ?= ilp32
+
+RISCV_CFLAGS := \
+	-march=$(ARCH) \
+	-mabi=$(ABI) \
+	-nostdlib \
+	-nostartfiles \
+	-static \
+	-mcmodel=medany \
+	-fvisibility=hidden \
+	-I $(RISCV_TEST_ROOT)/env/p \
+	-I $(RISCV_TEST_ROOT)/env \
+	-I $(RISCV_TEST_ROOT)/isa/macros/scalar
+
+RISCV_LDFLAGS := \
+	-T $(RISCV_TEST_ROOT)/env/p/link.ld
+
+.PHONY: all build dump bin clean help
+
+all: build dump
+
+build: $(TEST_ELF)
+
+$(TEST_ELF): $(TEST_SRC)
+	@mkdir -p $(RISCV_BUILD_DIR)
+	$(RISCV_GCC) \
+		$(RISCV_CFLAGS) \
+		$(RISCV_LDFLAGS) \
+		$< \
+		-o $@
+
+dump: $(TEST_DUMP)
+
+$(TEST_DUMP): $(TEST_ELF)
+	$(RISCV_OBJDUMP) -D $< > $@
+
+bin: $(TEST_BIN)
+
+$(TEST_BIN): $(TEST_ELF)
+	$(RISCV_OBJCOPY) -O binary $< $@
+
+clean:
+	rm -rf $(RISCV_BUILD_DIR)
+
+help:
+	@echo "Usage:"
+	@echo "  make -f Makefile.riscv"
+	@echo "  make -f Makefile.riscv TEST_NAME=sub"
+	@echo "  make -f Makefile.riscv TEST_GROUP=rv32ui TEST_NAME=lw"
+	@echo "  make -f Makefile.riscv dump"
+	@echo "  make -f Makefile.riscv bin"
+	@echo "  make -f Makefile.riscv clean"

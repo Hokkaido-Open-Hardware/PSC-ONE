@@ -76,27 +76,41 @@ module SystolicArray4x4_Ctrl #(
     //
     // C is uint32_t C[matrix_size][matrix_size].
     //--------------------------------------------
-    function [31:0] matrix_row_elements;
+    function automatic [31:0] matrix_row_elements;
         input [7:0] row_idx;
         input [7:0] size;
+
         begin
             case (size)
                 8'd4:
-                    matrix_row_elements = {24'd0, row_idx} << 2;
+                    matrix_row_elements =
+                        {24'd0, row_idx} << 2;
 
                 8'd8:
-                    matrix_row_elements = {24'd0, row_idx} << 3;
+                    matrix_row_elements =
+                        {24'd0, row_idx} << 3;
 
                 8'd12:
                     matrix_row_elements =
                         ({24'd0, row_idx} << 3)
-                      + ({24'd0, row_idx} << 2);
+                    + ({24'd0, row_idx} << 2);
 
                 8'd16:
-                    matrix_row_elements = {24'd0, row_idx} << 4;
+                    matrix_row_elements =
+                        {24'd0, row_idx} << 4;
+
+                8'd32:
+                    matrix_row_elements =
+                        {24'd0, row_idx} << 5;
+
+                8'd64:
+                    matrix_row_elements =
+                        {24'd0, row_idx} << 6;
 
                 default:
-                    matrix_row_elements = row_idx * size;
+                    matrix_row_elements =
+                        {24'd0, row_idx}
+                    * {24'd0, size};
             endcase
         end
     endfunction
@@ -421,6 +435,7 @@ module SystolicArray4x4_Ctrl #(
 
                     `ifdef COCOTB_SIM
                     `ifdef DUMP_VCD_CTRL
+                    /*
                     $display(
                         "OS tile=(%0d,%0d,%0d) idx=%0d A=%08x B=%08x",
                         i_idx,
@@ -430,6 +445,7 @@ module SystolicArray4x4_Ctrl #(
                         a_left_in_bus,
                         b_top_in_bus
                     );
+                    */
                     `endif
                     `endif
                 end

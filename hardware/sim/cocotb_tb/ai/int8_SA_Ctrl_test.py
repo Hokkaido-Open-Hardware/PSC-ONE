@@ -44,7 +44,7 @@ def python_systolic_model(A,B):
 # memory_driver
 # ------------------------------
 
-async def memory_driver(dut, mem):
+async def memory_driver(dut, mem, dump=False):
     pending = False
     pending_addr = 0
 
@@ -79,10 +79,11 @@ async def memory_driver(dut, mem):
             mem[addr] = data
             dut.c_write_ready.value = 1
 
-            dut._log.info(
-                f"MEM WRITE addr=0x{addr:08X} "
-                f"data=0x{data:08X}"
-            )
+            if dump==True:
+                dut._log.info(
+                    f"MEM WRITE addr=0x{addr:08X} "
+                    f"data=0x{data:08X}"
+                )
 
 # ------------------------------
 # packing helpers
@@ -132,10 +133,10 @@ async def dump_mem(dut, mem, MATRIX_N):
                 f"C[{i}]  addr=0x{addr:08X}  data=0x{mem[addr]:08X}"
             )
 
+
 # ------------------------------
 # main test
 # ------------------------------
-
 
 # =============================================
 # 1st test
@@ -450,3 +451,365 @@ async def test_systolic_array_driver_8x8(dut):
     assert np.array_equal(C_hw, C_exp)
 
     dut._log.info("✅ PASS")
+
+# =============================================
+# 3rd test
+# =============================================
+@cocotb.test()
+async def test_systolic_array_driver_32x32(dut):
+
+    dut._log.info("\n")
+    dut._log.info("=============================================")
+
+    # ==================
+    MATRIX_N = 32
+    WORDS_PER_ROW = MATRIX_N // 4
+    dut.matrix_size.value = MATRIX_N
+    # ==================
+
+    clock = Clock(dut.clock, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+
+    # reset
+    dut.reset_n.value = 0
+    dut.sa_clear.value = 0
+    dut.rd_read_ready.value = 0
+    dut.c_write_ready.value = 0
+    dut.sa_state_reset.value = 0
+    dut.sa_req_ready.value = 1
+
+    # mode
+    dut.sa_os_instruction.value = 0b0000
+
+    dut.BASE_ADDR_A.value = BASE_ADDR_A
+    dut.BASE_ADDR_B.value = BASE_ADDR_B
+    dut.BASE_ADDR_C.value = BASE_ADDR_C
+
+    dut.start.value = 0
+
+    for _ in range(5):
+        await RisingEdge(dut.clock)
+
+    dut.reset_n.value = 1
+
+    for _ in range(5):
+        await RisingEdge(dut.clock)
+
+    # ------------------------------
+    # generate deterministic matrices
+    # ------------------------------
+    rng = np.random.default_rng(0x3232)
+
+    A_np = rng.integers(
+        1, 10, size=(MATRIX_N, MATRIX_N), dtype=np.uint8
+    )
+    B_np = rng.integers(
+        1, 10, size=(MATRIX_N, MATRIX_N), dtype=np.uint8
+    )
+
+    # Python/NumPy reference.
+    # uint8のまま積和すると型の影響を受ける可能性があるため、
+    # 明示的に64bitへ拡張する。
+    C_exp = (
+        A_np.astype(np.int64)
+        @ B_np.astype(np.int64)
+    )
+
+    dut._log.info(section("32x32 Matrix Test"))
+    dut._log.info(
+        f"A checksum = {int(A_np.sum())}, "
+        f"B checksum = {int(B_np.sum())}, "
+        f"C checksum = {int(C_exp.sum())}"
+    )
+
+    # ------------------------------
+    # memory model
+    # ------------------------------
+    mem = {}
+
+    # A/B:
+    # 32要素/行 = 8ワード/行
+    # 各ワードにはuint8_tを4要素ずつ格納する。
+    for row in range(MATRIX_N):
+        for word_index in range(WORDS_PER_ROW):
+            col_base = word_index * 4
+            byte_offset = (
+                row * MATRIX_N
+                + col_base
+            )
+
+            mem[BASE_ADDR_A + byte_offset] = pack_u8x4(
+                A_np[row, col_base:col_base + 4]
+            )
+            mem[BASE_ADDR_B + byte_offset] = pack_u8x4(
+                B_np[row, col_base:col_base + 4]
+            )
+
+    # C: 32x32 uint32_t
+    for index in range(MATRIX_N * MATRIX_N):
+        mem[BASE_ADDR_C + (index * 4)] = 0
+
+    cocotb.start_soon(memory_driver(dut, mem))
+
+    # ------------------------------
+    # start DUT
+    # ------------------------------
+    dut.start.value = 1
+    await RisingEdge(dut.clock)
+    dut.start.value = 0
+
+    timeout = 200_000
+
+    for cycle in range(timeout):
+        if int(dut.done.value) == 1:
+            dut._log.info(
+                f"32x32 operation completed after {cycle} cycles"
+            )
+            break
+
+        await RisingEdge(dut.clock)
+    else:
+        raise AssertionError(
+            f"32x32 operation timeout after {timeout} cycles"
+        )
+
+    # 書き込み完了を確実に観測するため少し待つ。
+    for _ in range(10):
+        await RisingEdge(dut.clock)
+
+    # ------------------------------
+    # assemble C matrix
+    # ------------------------------
+    C_hw = np.zeros(
+        (MATRIX_N, MATRIX_N),
+        dtype=np.uint32
+    )
+
+    for row in range(MATRIX_N):
+        for col in range(MATRIX_N):
+            index = row * MATRIX_N + col
+            addr = BASE_ADDR_C + (index * 4)
+            C_hw[row, col] = mem.get(addr, 0) & 0xFFFFFFFF
+
+    # ------------------------------
+    # result
+    # ------------------------------
+    dut._log.info(section("32x32 Assert"))
+    dut._log.info(
+        f"Expected checksum = {int(C_exp.sum())}"
+    )
+    dut._log.info(
+        f"HW checksum       = {int(C_hw.astype(np.uint64).sum())}"
+    )
+
+    if not np.array_equal(C_hw, C_exp):
+        mismatch = np.argwhere(
+            C_hw.astype(np.int64) != C_exp
+        )
+
+        first_row = int(mismatch[0][0])
+        first_col = int(mismatch[0][1])
+
+        dut._log.error(
+            "First mismatch: "
+            f"C[{first_row}][{first_col}] "
+            f"expected={int(C_exp[first_row, first_col])} "
+            f"got={int(C_hw[first_row, first_col])}"
+        )
+
+        # 不一致行だけを表示し、巨大な32x32ログを避ける。
+        dut._log.error(
+            fmt_list(
+                [
+                    int(value)
+                    for value in C_exp[first_row]
+                ]
+            )
+        )
+        dut._log.error(
+            fmt_list(
+                [
+                    int(value)
+                    for value in C_hw[first_row]
+                ]
+            )
+        )
+
+    assert np.array_equal(C_hw, C_exp)
+
+    dut._log.info("✅ 32x32 PASS")
+
+# =============================================
+# 4th test
+# =============================================
+@cocotb.test()
+async def test_systolic_array_driver_64x64(dut):
+
+    dut._log.info("\n")
+    dut._log.info("=============================================")
+
+    # ==================
+    MATRIX_N = 64
+    WORDS_PER_ROW = MATRIX_N // 4
+    dut.matrix_size.value = MATRIX_N
+    # ==================
+
+    clock = Clock(dut.clock, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+
+    # reset
+    dut.reset_n.value = 0
+    dut.sa_clear.value = 0
+    dut.rd_read_ready.value = 0
+    dut.c_write_ready.value = 0
+    dut.sa_state_reset.value = 0
+    dut.sa_req_ready.value = 1
+
+    # Output-Stationary mode
+    dut.sa_os_instruction.value = 0b0000
+
+    dut.BASE_ADDR_A.value = BASE_ADDR_A
+    dut.BASE_ADDR_B.value = BASE_ADDR_B
+    dut.BASE_ADDR_C.value = BASE_ADDR_C
+
+    dut.start.value = 0
+
+    for _ in range(5):
+        await RisingEdge(dut.clock)
+
+    dut.reset_n.value = 1
+
+    for _ in range(5):
+        await RisingEdge(dut.clock)
+
+    # ------------------------------
+    # generate deterministic matrices
+    # ------------------------------
+    rng = np.random.default_rng(0x6464)
+
+    A_np = rng.integers(
+        1, 10, size=(MATRIX_N, MATRIX_N), dtype=np.uint8
+    )
+    B_np = rng.integers(
+        1, 10, size=(MATRIX_N, MATRIX_N), dtype=np.uint8
+    )
+
+    # uint8のまま積和せず、64bitへ拡張して参照値を作る。
+    C_exp = (
+        A_np.astype(np.int64)
+        @ B_np.astype(np.int64)
+    )
+
+    dut._log.info(section("64x64 Matrix Test"))
+    dut._log.info(
+        f"A checksum = {int(A_np.sum())}, "
+        f"B checksum = {int(B_np.sum())}, "
+        f"C checksum = {int(C_exp.sum())}"
+    )
+
+    # ------------------------------
+    # memory model
+    # ------------------------------
+    mem = {}
+
+    # A/B:
+    # 64要素/行 = 16ワード/行。
+    # 各ワードへuint8_tを4要素ずつ格納する。
+    for row in range(MATRIX_N):
+        for word_index in range(WORDS_PER_ROW):
+            col_base = word_index * 4
+            byte_offset = row * MATRIX_N + col_base
+
+            mem[BASE_ADDR_A + byte_offset] = pack_u8x4(
+                A_np[row, col_base:col_base + 4]
+            )
+            mem[BASE_ADDR_B + byte_offset] = pack_u8x4(
+                B_np[row, col_base:col_base + 4]
+            )
+
+    # C: 64x64 uint32_t = 16 KiB
+    for index in range(MATRIX_N * MATRIX_N):
+        mem[BASE_ADDR_C + (index * 4)] = 0
+
+    cocotb.start_soon(memory_driver(dut, mem))
+
+    # ------------------------------
+    # start DUT
+    # ------------------------------
+    dut.start.value = 1
+    await RisingEdge(dut.clock)
+    dut.start.value = 0
+
+    # 32x32実測のおよそ8倍を見込み、余裕を持たせる。
+    timeout = 1_500_000
+
+    for cycle in range(timeout):
+        if int(dut.done.value) == 1:
+            dut._log.info(
+                f"64x64 operation completed after {cycle} cycles"
+            )
+            break
+
+        await RisingEdge(dut.clock)
+    else:
+        raise AssertionError(
+            f"64x64 operation timeout after {timeout} cycles"
+        )
+
+    # 最後のC書き込みを確実に取り込む。
+    for _ in range(10):
+        await RisingEdge(dut.clock)
+
+    # ------------------------------
+    # assemble C matrix
+    # ------------------------------
+    C_hw = np.zeros(
+        (MATRIX_N, MATRIX_N),
+        dtype=np.uint32
+    )
+
+    for row in range(MATRIX_N):
+        for col in range(MATRIX_N):
+            index = row * MATRIX_N + col
+            addr = BASE_ADDR_C + (index * 4)
+            C_hw[row, col] = mem.get(addr, 0) & 0xFFFFFFFF
+
+    # ------------------------------
+    # result
+    # ------------------------------
+    dut._log.info(section("64x64 Assert"))
+    dut._log.info(
+        f"Expected checksum = {int(C_exp.sum())}"
+    )
+    dut._log.info(
+        f"HW checksum       = {int(C_hw.astype(np.uint64).sum())}"
+    )
+
+    if not np.array_equal(C_hw, C_exp):
+        mismatch = np.argwhere(
+            C_hw.astype(np.int64) != C_exp
+        )
+
+        first_row = int(mismatch[0][0])
+        first_col = int(mismatch[0][1])
+
+        dut._log.error(
+            "First mismatch: "
+            f"C[{first_row}][{first_col}] "
+            f"expected={int(C_exp[first_row, first_col])} "
+            f"got={int(C_hw[first_row, first_col])}"
+        )
+
+        # 巨大な64x64行列全体は出さず、不一致行のみ表示する。
+        dut._log.error(
+            "Expected row: "
+            + fmt_list([int(value) for value in C_exp[first_row]])
+        )
+        dut._log.error(
+            "HW row      : "
+            + fmt_list([int(value) for value in C_hw[first_row]])
+        )
+
+    assert np.array_equal(C_hw, C_exp)
+
+    dut._log.info("✅ 64x64 PASS")

@@ -30,8 +30,8 @@ CLK_PERIOD_NS = int(os.getenv("CLK_PERIOD_NS", "10"))     # 100 MHz
 # === RUN CYCLE Setting.
 #RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "50000"))   # run_test_P setting
 #RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "800000"))   # sd_read setting
-RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "3500000"))
-#RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "5000000000"))  # sa_matrix_test
+#RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "3500000"))
+RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "5000000000"))  # sa_matrix_test
 
 SDRAM_INIT_TIMEOUT = int(os.getenv("SDRAM_INIT_TIMEOUT", "500000"))  # cycles
 BOOT_ROM_TIMEOUT   = int(os.getenv("SDRAM_INIT_TIMEOUT", "5000000"))  # cycles
@@ -60,16 +60,13 @@ def int_resolved(x, xfill: str = "0") -> int:
     else:
         return int(x)
 
-    #s = bv.binstr  # ここは文字列。X/Z を自前置換できる
     s = str(bv)
     if s is None:
-        # ドライバ未接続などで None の可能性を保険
         return 0
     s = s.lower().replace('x', xfill).replace('z', xfill)
     try:
         return int(s, 2)
     except ValueError:
-        # 長さ0など異常時の保険
         return 0
 
 

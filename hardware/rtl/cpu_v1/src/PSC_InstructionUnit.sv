@@ -276,6 +276,8 @@ module PSC_InstructionUnit (
                     )
                 );
 
+    // DECORD -> FIFO READ -> DECORDまで4CLKなので
+    // raw_hazardしない (TBD)
     assign raw_hazard =
                 raw_hazard_id_ex ||
                 raw_hazard_ex_wb;

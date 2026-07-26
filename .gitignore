@@ -23,3 +23,7 @@ results.xml
 # Wave
 *.wav
 
+
+# Simulation logs and RISC-V test build outputs
+hardware/sim/log/test_result_*.log
+hardware/sim/riscv_build/
