@@ -155,6 +155,38 @@ The task-driven design provides:
 
 PSC_RV32ISP_V1 currently uses a state-controlled execution model. Future versions may hold multiple instruction tasks simultaneously and permit independent tasks to overlap when there are no register, memory, or control dependencies.
 
+## RISC-V ISA Test Results
+
+The `PSC_RV32ISP_V1` processor has been verified using the official `riscv-tests` instruction test suite.
+
+The following test groups currently pass in Verilator and cocotb simulation:
+
+* RV32I base integer instruction tests
+* RV32M multiplication, division, and remainder tests
+* Load and store instruction tests
+* Branch and jump instruction tests
+* Shift and comparison instruction tests
+* `FENCE.I` instruction test
+
+A total of **49 official RISC-V ISA tests pass** on `PSC_RV32ISP_V1`.
+
+The `rv32ui-ma_data` test is currently excluded because it requires misaligned data access support. PSC_RV32ISP_V1 currently expects naturally aligned load and store accesses.
+
+Test sources are based on:
+
+```text
+https://github.com/riscv-software-src/riscv-tests
+```
+
+The tests are executed using:
+
+```text
+Verilator
+cocotb
+RISC-V GNU Toolchain
+```
+
+
 ---
 
 ## PSC_RV32ISP vs PicoRV32 (Yosys Analysis)
@@ -420,7 +452,7 @@ If an error is detected, the system automatically retries the read operation, en
 - [x] Icarus Verilog
 - [x] Verilator
 - [x] Cocotb Test Environment
-- [x] CPU Instruction Tests
+- [x] Official RISC-V ISA tests: 49 RV32I/RV32M tests passed
 - [x] SDRAM Tests
 - [x] MMU Tests
 - [x] PSC-OS Boot Test
