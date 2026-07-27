@@ -10,10 +10,10 @@ $(Build):
 # ========================
 # Tools
 # ========================
-QEMU    ?= qemu-system-riscv32
+QEMU    ?= qemu-system-riscv64
 CC      := clang
 OBJCOPY := llvm-objcopy
-OBJDUMP := riscv32-unknown-elf-objdump
+OBJDUMP := riscv64-unknown-elf-objdump
 
 # ========================
 # Mode (sbi default / psc)
@@ -76,7 +76,7 @@ DUSERBASE   := -DUSER_BASE=$(USER_BASE_VAL)
 ARCH := -march=rv32im_zicsr_zifencei -mabi=ilp32 -mno-relax
 
 CFLAGS ?= -std=c11 -O2 -g3 -Wall -Wextra \
-          --target=riscv32-unknown-elf $(ARCH) \
+          --target=riscv64-unknown-elf $(ARCH) \
           -fno-stack-protector -ffreestanding -nostdlib \
 		  -fomit-frame-pointer
 
@@ -91,9 +91,9 @@ LDFLAGS_KERNEL = -Wl,-Map=$(Build)/kernel.map -Wl,--no-relax
 # ========================
 # Builtins autodetect
 # ========================
-GCC_PREFIX ?= riscv32-unknown-elf
+GCC_PREFIX ?= riscv64-unknown-elf
 #LIBGCC := $(shell $(GCC_PREFIX)-gcc -print-libgcc-file-name 2>/dev/null)
-LIBGCC := $(shell riscv32-unknown-elf-gcc -print-libgcc-file-name)
+LIBGCC := $(shell riscv64-unknown-elf-gcc -print-libgcc-file-name)
 CLANG_RES := $(shell $(CC) --print-resource-dir 2>/dev/null)
 CRT_BUILTINS := $(CLANG_RES)/lib/linux/libclang_rt.builtins-riscv32.a
 
@@ -123,7 +123,7 @@ KERNEL_BIN  := $(Build)/kernel.bin
 MEM_FILE    := $(Build)/kernel.mem
 
 RISCV_CLANG := clang
-RISCV_TARGET := --target=riscv32-unknown-elf
+RISCV_TARGET := --target=riscv64-unknown-elf
 RISCV_ARCH   := -march=rv32im_zicsr_zifencei -mabi=ilp32
 
 $(Build)/mulsi3.o: $(Src)/mulsi3.c | $(Build)
@@ -321,7 +321,7 @@ endif
 # ============================================================
 # Disassemble BootROM / Kernel
 # ============================================================
-RISCV_OBJDUMP = riscv32-unknown-elf-objdump
+RISCV_OBJDUMP = riscv64-unknown-elf-objdump
 
 disasm: 
 	@echo "[INFO] Rebuilding kernel.elf in PSC mode for disassembly"

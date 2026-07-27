@@ -1,27 +1,58 @@
 # ============================================================
-# RISC-V official ISA test build
+# RISC-V official ISA test bulk build
 # ============================================================
 
-RISCV_GCC ?= riscv32-unknown-elf-gcc
-RISCV_OBJDUMP ?= riscv32-unknown-elf-objdump
-RISCV_OBJCOPY ?= riscv32-unknown-elf-objcopy
+RISCV_GCC     ?= riscv64-unknown-elf-gcc
+RISCV_OBJDUMP ?= riscv64-unknown-elf-objdump
+RISCV_OBJCOPY ?= riscv64-unknown-elf-objcopy
 
 RISCV_TEST_ROOT := riscv_tests
 RISCV_BUILD_DIR := riscv_build
 
-TEST_GROUP ?= rv32ui
-TEST_NAME  ?= add
+RISCV_LINKER_SCRIPT := riscv/link_psc.ld
 
-TEST_SRC := $(RISCV_TEST_ROOT)/isa/$(TEST_GROUP)/$(TEST_NAME).S
-TEST_ELF := $(RISCV_BUILD_DIR)/$(TEST_GROUP)-$(TEST_NAME).elf
-TEST_BIN := $(RISCV_BUILD_DIR)/$(TEST_GROUP)-$(TEST_NAME).bin
-TEST_DUMP := $(RISCV_BUILD_DIR)/$(TEST_GROUP)-$(TEST_NAME).dump
+ABI ?= ilp32
 
-ARCH ?= rv32i_zicsr_zifencei
-ABI  ?= ilp32
+# ============================================================
+# Build target groups
+#
+# rv32ui : RV32I integer instructions
+# rv32um : RV32M multiply/divide instructions
+#
+# Example:
+#   make -f Makefile.riscv TEST_GROUPS="rv32ui"
+#   make -f Makefile.riscv TEST_GROUPS="rv32ui rv32um"
+# ============================================================
 
-RISCV_CFLAGS := \
-	-march=$(ARCH) \
+TEST_GROUPS ?= rv32ui rv32um
+
+# ============================================================
+# Source discovery
+# ============================================================
+
+TEST_SOURCES := $(foreach group,$(TEST_GROUPS), \
+	$(wildcard $(RISCV_TEST_ROOT)/isa/$(group)/*.S))
+
+TEST_NAMES := $(foreach source,$(TEST_SOURCES), \
+	$(notdir $(basename $(source))))
+
+TEST_TARGETS := $(foreach source,$(TEST_SOURCES), \
+	$(notdir $(patsubst %.S,%,$(source))))
+
+# パスからグループ名とテスト名を組み合わせる
+TEST_IDS := $(foreach source,$(TEST_SOURCES), \
+	$(notdir $(patsubst %/,%,$(dir $(source))))-$(notdir $(basename $(source))))
+
+TEST_ELFS := $(addprefix $(RISCV_BUILD_DIR)/,$(addsuffix .elf,$(TEST_IDS)))
+TEST_BINS := $(addprefix $(RISCV_BUILD_DIR)/,$(addsuffix .bin,$(TEST_IDS)))
+TEST_DUMPS := $(addprefix $(RISCV_BUILD_DIR)/,$(addsuffix .dump,$(TEST_IDS)))
+TEST_MEMS := $(addprefix $(RISCV_BUILD_DIR)/,$(addsuffix .mem,$(TEST_IDS)))
+
+# ============================================================
+# Compiler flags
+# ============================================================
+
+RISCV_COMMON_CFLAGS := \
 	-mabi=$(ABI) \
 	-nostdlib \
 	-nostartfiles \
@@ -33,40 +64,155 @@ RISCV_CFLAGS := \
 	-I $(RISCV_TEST_ROOT)/isa/macros/scalar
 
 RISCV_LDFLAGS := \
-	-T $(RISCV_TEST_ROOT)/env/p/link.ld
+	-T $(RISCV_LINKER_SCRIPT)
 
-.PHONY: all build dump bin clean help
+# グループごとのISA設定
+ARCH_rv32ui := rv32i_zicsr_zifencei
+ARCH_rv32um := rv32im_zicsr_zifencei
 
-all: build dump
+# 未定義グループのデフォルト
+DEFAULT_ARCH := rv32im_zicsr_zifencei
 
-build: $(TEST_ELF)
+# ============================================================
+# Targets
+# ============================================================
 
-$(TEST_ELF): $(TEST_SRC)
+.PHONY: \
+	all \
+	build \
+	dump \
+	bin \
+	mem \
+	list \
+	clean \
+	help
+
+all: build dump mem
+
+build: $(TEST_ELFS)
+
+dump: $(TEST_DUMPS)
+
+bin: $(TEST_BINS)
+
+mem: $(TEST_MEMS)
+
+# ============================================================
+# ELF build
+#
+# $*:
+#   rv32ui-add
+#   rv32um-mul
+#
+# group:
+#   rv32ui
+#   rv32um
+#
+# test:
+#   add
+#   mul
+# ============================================================
+
+define BUILD_ELF_template
+
+$(RISCV_BUILD_DIR)/$(1)-%.elf: \
+	$(RISCV_TEST_ROOT)/isa/$(1)/%.S \
+	$(RISCV_LINKER_SCRIPT)
 	@mkdir -p $(RISCV_BUILD_DIR)
-	$(RISCV_GCC) \
-		$(RISCV_CFLAGS) \
-		$(RISCV_LDFLAGS) \
-		$< \
-		-o $@
+	@echo "========================================"
+	@echo "[BUILD] $(1)-$$*"
+	@echo "[ARCH ] $$(or $$(ARCH_$(1)),$$(DEFAULT_ARCH))"
+	@echo "[SRC  ] $$<"
+	@echo "[ELF  ] $$@"
+	@echo "========================================"
+	$$(RISCV_GCC) \
+		-march=$$(or $$(ARCH_$(1)),$$(DEFAULT_ARCH)) \
+		$$(RISCV_COMMON_CFLAGS) \
+		$$(RISCV_LDFLAGS) \
+		$$< \
+		-o $$@
 
-dump: $(TEST_DUMP)
+endef
 
-$(TEST_DUMP): $(TEST_ELF)
+$(foreach group,$(TEST_GROUPS), \
+	$(eval $(call BUILD_ELF_template,$(group))))
+
+# ============================================================
+# Disassembly dump
+# ============================================================
+
+$(RISCV_BUILD_DIR)/%.dump: $(RISCV_BUILD_DIR)/%.elf
+	@echo "[DUMP ] $@"
 	$(RISCV_OBJDUMP) -D $< > $@
 
-bin: $(TEST_BIN)
+# ============================================================
+# Raw binary
+# ============================================================
 
-$(TEST_BIN): $(TEST_ELF)
+$(RISCV_BUILD_DIR)/%.bin: $(RISCV_BUILD_DIR)/%.elf
+	@echo "[BIN  ] $@"
 	$(RISCV_OBJCOPY) -O binary $< $@
+
+# ============================================================
+# PSC-ONE memory image
+#
+# 32-bit little-endian binary data is converted into
+# one 32-bit hexadecimal word per line.
+# ============================================================
+
+$(RISCV_BUILD_DIR)/%.mem: $(RISCV_BUILD_DIR)/%.bin
+	@echo "[MEM  ] $@"
+	hexdump -v -e '1/4 "%08x\n"' $< > $@
+
+# ============================================================
+# Test list
+# ============================================================
+
+list:
+	@echo "TEST_GROUPS=$(TEST_GROUPS)"
+	@echo ""
+	@echo "Detected tests:"
+	@$(foreach id,$(TEST_IDS),echo "  $(id)";)
+	@echo ""
+	@echo "Total: $(words $(TEST_IDS)) tests"
+
+# ============================================================
+# Clean
+# ============================================================
 
 clean:
 	rm -rf $(RISCV_BUILD_DIR)
 
+# ============================================================
+# Help
+# ============================================================
+
 help:
 	@echo "Usage:"
-	@echo "  make -f Makefile.riscv"
-	@echo "  make -f Makefile.riscv TEST_NAME=sub"
-	@echo "  make -f Makefile.riscv TEST_GROUP=rv32ui TEST_NAME=lw"
-	@echo "  make -f Makefile.riscv dump"
-	@echo "  make -f Makefile.riscv bin"
-	@echo "  make -f Makefile.riscv clean"
+	@echo ""
+	@echo "  Build all default groups:"
+	@echo "    make -f Makefile.riscv"
+	@echo ""
+	@echo "  Build only RV32I tests:"
+	@echo "    make -f Makefile.riscv TEST_GROUPS=\"rv32ui\""
+	@echo ""
+	@echo "  Build RV32I and RV32M tests:"
+	@echo "    make -f Makefile.riscv TEST_GROUPS=\"rv32ui rv32um\""
+	@echo ""
+	@echo "  Generate only ELF files:"
+	@echo "    make -f Makefile.riscv build"
+	@echo ""
+	@echo "  Generate only BIN files:"
+	@echo "    make -f Makefile.riscv bin"
+	@echo ""
+	@echo "  Generate only MEM files:"
+	@echo "    make -f Makefile.riscv mem"
+	@echo ""
+	@echo "  Show detected test programs:"
+	@echo "    make -f Makefile.riscv list"
+	@echo ""
+	@echo "  Clean generated files:"
+	@echo "    make -f Makefile.riscv clean"
+	@echo ""
+	@echo "Build directory:"
+	@echo "  $(RISCV_BUILD_DIR)"

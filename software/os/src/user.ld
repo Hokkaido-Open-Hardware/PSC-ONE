@@ -31,7 +31,7 @@ SECTIONS {
         . += 128 * 1024;   /* stack 128KB */
         __user_stack_top = .;
 
-        ASSERT(__user_stack_top <= USER_MAX, "user image + stack overflow USER_MAX")
+        ASSERT(__user_stack_top <= USER_MAX, "user image + stack overflow USER_MAX");
     }
 }
 

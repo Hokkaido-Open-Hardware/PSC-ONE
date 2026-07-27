@@ -20,12 +20,14 @@ ifeq ($(SIM_FAST),1)
 EXTRA_ARGS = \
 	-O3 --bbox-sys --x-assign fast --x-initial fast \
 	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
-	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
 else
 EXTRA_ARGS = \
 	-O3 --trace --trace-fst \
 	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
-	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
 endif
 
 endif
@@ -256,6 +258,7 @@ simulate_PSCOS:
 	mv $$tmp ./mem/user.mem
 	
 	@mkdir -p ./wave
+	@mkdir -p ./log_uart
 
 	@echo "MODE=$(MODE)"
 	@echo "CPU_VERSION=$(CPU_VERSION)"
@@ -319,6 +322,7 @@ simulate_SD_PSCOS:
 	mv $$tmp ./mem/bootloader.mem
 	
 	@mkdir -p ./wave
+	@mkdir -p ./log_uart
 
 	@echo "MODE=$(MODE)"
 	@echo "CPU_VERSION=$(CPU_VERSION)"

@@ -120,37 +120,62 @@ SIM_BUILD        ?= sim_build
 # ============================================================
 # PSC-ONE CPU CORE単体テスト
 # tang 20k 
-RV32ISP_SINGLE_TEST = \
-	add_test1:RV32ISP_core_test:./mem/add_test1.mem:0xff00ff0b \
+RISCV_SINGLE_TEST = \
+	rv32ui-ld_st:RV32ISP_riscv_test:./riscv_build/rv32ui-ld_st.mem:0x00000001:0x00002000 \
 
-RV32ISP_BASIC_TEST = \
-	add_test1:RV32ISP_core_test:./mem/add_test1.mem:0xff00ff0b \
-	add_test2:RV32ISP_core_test:./mem/add_test2.mem:0x00000000 \
-	sbwrite_test1:RV32ISP_core_test:./mem/sbwrite_test1.mem:0xE500000F \
-	jal_test1:RV32ISP_core_test:./mem/jal_test1.mem:0x12345678 \
-	jalr_test1:RV32ISP_core_test:./mem/jalr_test1.mem:0x00005AA5 \
-	mul_test1:RV32ISP_core_test:./mem/mul_test1.mem:0x00000063 \
-	mul_test2:RV32ISP_core_test:./mem/mul_test2.mem:0x00000033 \
-	nn_test1:RV32ISP_core_test:./mem/nn_test1.mem:0x00000170 \
-	montepi_test1:RV32ISP_core_test:./mem/montepi_test1.mem:0x0000beef \
-	rem_test1:RV32ISP_core_test:./mem/rem_test1.mem:0x00000001 \
-	matrix_test1:RV32ISP_core_test:./mem/matrix_test1.mem:0x0000ABCD \
-	shift_test1:RV32ISP_core_test:./mem/shift_test1.mem:0x00001234 \
-	jump_test1:RV32ISP_core_test:./mem/jump_test1.mem:0x12345678 \
-	lui_test1:RV32ISP_core_test:./mem/lui_test1.mem:0x12345000 \
-	divmod_test1:RV32ISP_core_test:./mem/divmod_test1.mem:0x00000e02 \
-	csr_test1:RV32ISP_core_test:./mem/csr_test1.mem:0x00000022 \
-	sp_test1:RV32ISP_core_test:./mem/sp_test1.mem:0x00005AA5 \
-	ecall_test1:RV32ISP_core_test:./mem/ecall_test1.mem:0x00000321 \
-	prime_test1:RV32ISP_core_test:./mem/prime_test1.mem:0x00000061 \
-	audipc_test1:RV32ISP_core_test:./mem/audipc_test1.mem:0xFFFFFFF8 \
-	alu_mul_test1:RV32ISP_core_test:./mem/alu_mul_test1.mem:0x00000000 \
-	fft_test1:RV32ISP_core_test:./mem/fft_test1.mem:0x0000beef \
-	q15_fft_test1:RV32ISP_core_test:./mem/q15_fft_test1.mem:0x0000beef \
-	fft_N8_test1:RV32ISP_core_test:./mem/fft_N8_test1.mem:0x0000beef \
-	sret_test1:RV32ISP_core_test:./mem/sret_test1.mem:0x0000DC12 \
-	memcpy_test1:RV32ISP_core_test:./mem/memcpy_test1.mem:0x00002521 \
-	mmu_test1:RV32ISP_core_test:./mem/mmu_test1.mem:0x00000033 \
+RISCV_BASIC_TEST = \
+	rv32ui-ld_st:RV32ISP_riscv_test:./riscv_build/rv32ui-ld_st.mem:0x00000001:0x00002000 \
+	rv32ui-add:RV32ISP_riscv_test:./riscv_build/rv32ui-add.mem:0x00000001:0x00001000 \
+	rv32ui-addi:RV32ISP_riscv_test:./riscv_build/rv32ui-addi.mem:0x00000001:0x00001000 \
+	rv32ui-and:RV32ISP_riscv_test:./riscv_build/rv32ui-and.mem:0x00000001:0x00001000 \
+	rv32ui-andi:RV32ISP_riscv_test:./riscv_build/rv32ui-andi.mem:0x00000001:0x00001000 \
+	rv32ui-auipc:RV32ISP_riscv_test:./riscv_build/rv32ui-auipc.mem:0x00000001:0x00001000 \
+	rv32ui-lb:RV32ISP_riscv_test:./riscv_build/rv32ui-lb.mem:0x00000001:0x00001000 \
+	rv32ui-lbu:RV32ISP_riscv_test:./riscv_build/rv32ui-lbu.mem:0x00000001:0x00001000 \
+	rv32ui-lh:RV32ISP_riscv_test:./riscv_build/rv32ui-lh.mem:0x00000001:0x00001000 \
+	rv32ui-lhu:RV32ISP_riscv_test:./riscv_build/rv32ui-lhu.mem:0x00000001:0x00001000 \
+	rv32ui-lui:RV32ISP_riscv_test:./riscv_build/rv32ui-lui.mem:0x00000001:0x00001000 \
+	rv32ui-lw:RV32ISP_riscv_test:./riscv_build/rv32ui-lw.mem:0x00000001:0x00001000 \
+	rv32ui-sb:RV32ISP_riscv_test:./riscv_build/rv32ui-sb.mem:0x00000001:0x00001000 \
+	rv32ui-sh:RV32ISP_riscv_test:./riscv_build/rv32ui-sh.mem:0x00000001:0x00001000 \
+	rv32ui-fence_i:RV32ISP_riscv_test:./riscv_build/rv32ui-fence_i.mem:0x00000001:0x00001000 \
+	rv32ui-beq:RV32ISP_riscv_test:./riscv_build/rv32ui-beq.mem:0x00000001:0x00001000 \
+	rv32ui-bge:RV32ISP_riscv_test:./riscv_build/rv32ui-bge.mem:0x00000001:0x00001000 \
+	rv32ui-bgeu:RV32ISP_riscv_test:./riscv_build/rv32ui-bgeu.mem:0x00000001:0x00001000 \
+	rv32ui-blt:RV32ISP_riscv_test:./riscv_build/rv32ui-blt.mem:0x00000001:0x00001000 \
+	rv32ui-bltu:RV32ISP_riscv_test:./riscv_build/rv32ui-bltu.mem:0x00000001:0x00001000 \
+	rv32ui-bne:RV32ISP_riscv_test:./riscv_build/rv32ui-bne.mem:0x00000001:0x00001000 \
+	rv32ui-jal:RV32ISP_riscv_test:./riscv_build/rv32ui-jal.mem:0x00000001:0x00001000 \
+	rv32ui-jalr:RV32ISP_riscv_test:./riscv_build/rv32ui-jalr.mem:0x00000001:0x00001000 \
+	rv32ui-or:RV32ISP_riscv_test:./riscv_build/rv32ui-or.mem:0x00000001:0x00001000 \
+	rv32ui-ori:RV32ISP_riscv_test:./riscv_build/rv32ui-ori.mem:0x00000001:0x00001000 \
+	rv32ui-simple:RV32ISP_riscv_test:./riscv_build/rv32ui-simple.mem:0x00000001:0x00001000 \
+	rv32ui-sll:RV32ISP_riscv_test:./riscv_build/rv32ui-sll.mem:0x00000001:0x00001000 \
+	rv32ui-slli:RV32ISP_riscv_test:./riscv_build/rv32ui-slli.mem:0x00000001:0x00001000 \
+	rv32ui-slt:RV32ISP_riscv_test:./riscv_build/rv32ui-slt.mem:0x00000001:0x00001000 \
+	rv32ui-slti:RV32ISP_riscv_test:./riscv_build/rv32ui-slti.mem:0x00000001:0x00001000 \
+	rv32ui-sltiu:RV32ISP_riscv_test:./riscv_build/rv32ui-sltiu.mem:0x00000001:0x00001000 \
+	rv32ui-sltu:RV32ISP_riscv_test:./riscv_build/rv32ui-sltu.mem:0x00000001:0x00001000 \
+	rv32ui-sra:RV32ISP_riscv_test:./riscv_build/rv32ui-sra.mem:0x00000001:0x00001000 \
+	rv32ui-srai:RV32ISP_riscv_test:./riscv_build/rv32ui-srai.mem:0x00000001:0x00001000 \
+	rv32ui-srl:RV32ISP_riscv_test:./riscv_build/rv32ui-srl.mem:0x00000001:0x00001000 \
+	rv32ui-srli:RV32ISP_riscv_test:./riscv_build/rv32ui-srli.mem:0x00000001:0x00001000 \
+	rv32ui-st_ld:RV32ISP_riscv_test:./riscv_build/rv32ui-st_ld.mem:0x00000001:0x00001000 \
+	rv32ui-sub:RV32ISP_riscv_test:./riscv_build/rv32ui-sub.mem:0x00000001:0x00001000 \
+	rv32ui-sw:RV32ISP_riscv_test:./riscv_build/rv32ui-sw.mem:0x00000001:0x00001000 \
+	rv32ui-xor:RV32ISP_riscv_test:./riscv_build/rv32ui-xor.mem:0x00000001:0x00001000 \
+	rv32ui-xori:RV32ISP_riscv_test:./riscv_build/rv32ui-xori.mem:0x00000001:0x00001000 \
+	rv32um-div:RV32ISP_riscv_test:./riscv_build/rv32um-div.mem:0x00000001:0x00001000 \
+	rv32um-divu:RV32ISP_riscv_test:./riscv_build/rv32um-divu.mem:0x00000001:0x00001000 \
+	rv32um-mul:RV32ISP_riscv_test:./riscv_build/rv32um-mul.mem:0x00000001:0x00001000 \
+	rv32um-mulh:RV32ISP_riscv_test:./riscv_build/rv32um-mulh.mem:0x00000001:0x00001000 \
+	rv32um-mulhsu:RV32ISP_riscv_test:./riscv_build/rv32um-mulhsu.mem:0x00000001:0x00001000 \
+	rv32um-mulhu:RV32ISP_riscv_test:./riscv_build/rv32um-mulhu.mem:0x00000001:0x00001000 \
+	rv32um-rem:RV32ISP_riscv_test:./riscv_build/rv32um-rem.mem:0x00000001:0x00001000 \
+	rv32um-remu:RV32ISP_riscv_test:./riscv_build/rv32um-remu.mem:0x00000001:0x00001000
+
+# 非アラインアクセス試験のため除外
+#rv32ui-ma_data:RV32ISP_riscv_test:./riscv_build/rv32ui-ma_data.mem:0x00000001 \
 
 # ============================================================
 # テストプログラムの切り替え（basic / single）
@@ -159,16 +184,16 @@ RV32ISP_BASIC_TEST = \
 TEST_PROGRAM_LIST ?= basic
 
 ifeq ($(TEST_PROGRAM_LIST),basic)
-RV32ISP_TEST = $(RV32ISP_BASIC_TEST)
+RV32ISP_TEST = $(RISCV_BASIC_TEST)
 else ifeq ($(TEST_PROGRAM_LIST),single)
-RV32ISP_TEST = $(RV32ISP_SINGLE_TEST)
+RV32ISP_TEST = $(RISCV_SINGLE_TEST)
 else
 $(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic または long, single を指定してください)
 endif
 
 # run test
-.PHONY: simulate_CPU_CORE
-simulate_CPU_CORE:
+.PHONY: simulate_RISCV_TESTS
+simulate_RISCV_TESTS:
 	@echo "MODE=$(MODE)"
 	@echo "SIM=$(SIM)"
 	@echo "CPU_VERSION=$(CPU_VERSION)"
@@ -182,20 +207,19 @@ simulate_CPU_CORE:
 		cocotb_file=$$(echo $$t | cut -d: -f2); \
 		mem_file=$$(echo $$t | cut -d: -f3); \
 		expected=$$(echo $$t | cut -d: -f4); \
+		tohost_addr=$$(echo $$t | cut -d: -f5); \
 		echo "========================================"; \
 		echo "[TEST] $$name"; \
 		echo "[MEM ] $$mem_file"; \
 		echo "[EXP ] $$expected"; \
 		echo "========================================"; \
 		$(MAKE) clean; \
-		$(MAKE) -C ./cpp $$name; \
-		$(MAKE) -C ./cpp clean; \
-		$(MAKE) clean; \
 		tmp=$$(mktemp); \
 		head -n 4096 "$$mem_file" > $$tmp; \
 		cp $$tmp ./mem/test_program.mem; \
 		rm -f $$tmp; \
 		COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
+		TOHOST_ADDR="$$tohost_addr" \
 		EXPECTED_RESULT=$$expected \
 		TOPLEVEL=$(CPU_TOP) TOPLEVEL_LANG=verilog \
 		SIM=$(SIM) \

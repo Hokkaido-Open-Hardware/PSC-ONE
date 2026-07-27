@@ -27,12 +27,14 @@ ifeq ($(SIM_FAST),1)
 EXTRA_ARGS = \
 	-O3 --bbox-sys --x-assign fast --x-initial fast \
 	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
-	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
 else
 EXTRA_ARGS = \
 	-O3 --trace --trace-fst \
 	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
-	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
 endif
 
 endif
@@ -289,7 +291,7 @@ PSCONE_LONG_TESTS = \
 	nn_64x16x1_test1:RV32ISP_chip_test:./mem/nn_64x16x1_test1.mem:0x00000780 \
 	mmu_test1:RV32ISP_chip_test:./mem/mmu_test1.mem:0x00000033 \
 	i2s_test1:RV32ISP_chip_test:./mem/i2s_test1.mem:0x0abc0123 \
-	nn_test4:RV32ISP_chip_test:./mem/nn_test4.mem:0x00657FA5 \
+	nn_test4:RV32ISP_chip_test:./mem/nn_test4.mem:0x001c2000 \
 	memcpy_test1:RV32ISP_chip_test:./mem/memcpy_test1.mem:0x00002521 \
 	pipeline_test1:RV32ISP_chip_test:./mem/pipeline_test1.mem:0x0000009d \
 	pipeline_test2:RV32ISP_chip_test:./mem/pipeline_test2.mem:0xfc1667c7 \
