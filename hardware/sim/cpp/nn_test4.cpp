@@ -106,7 +106,7 @@ static constexpr uint32_t sa_command(
     uint32_t command)
 {
     return
-        (MATRIX_SIZE << 16) |
+        (MATRIX_SIZE << 24) | (MATRIX_SIZE << 16) |
         command;
 }
 

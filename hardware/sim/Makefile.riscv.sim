@@ -124,7 +124,6 @@ RISCV_SINGLE_TEST = \
 	rv32ui-ld_st:RV32ISP_riscv_test:./riscv_build/rv32ui-ld_st.mem:0x00000001:0x00002000 \
 
 RISCV_BASIC_TEST = \
-	rv32ui-ld_st:RV32ISP_riscv_test:./riscv_build/rv32ui-ld_st.mem:0x00000001:0x00002000 \
 	rv32ui-add:RV32ISP_riscv_test:./riscv_build/rv32ui-add.mem:0x00000001:0x00001000 \
 	rv32ui-addi:RV32ISP_riscv_test:./riscv_build/rv32ui-addi.mem:0x00000001:0x00001000 \
 	rv32ui-and:RV32ISP_riscv_test:./riscv_build/rv32ui-and.mem:0x00000001:0x00001000 \
@@ -172,7 +171,8 @@ RISCV_BASIC_TEST = \
 	rv32um-mulhsu:RV32ISP_riscv_test:./riscv_build/rv32um-mulhsu.mem:0x00000001:0x00001000 \
 	rv32um-mulhu:RV32ISP_riscv_test:./riscv_build/rv32um-mulhu.mem:0x00000001:0x00001000 \
 	rv32um-rem:RV32ISP_riscv_test:./riscv_build/rv32um-rem.mem:0x00000001:0x00001000 \
-	rv32um-remu:RV32ISP_riscv_test:./riscv_build/rv32um-remu.mem:0x00000001:0x00001000
+	rv32um-remu:RV32ISP_riscv_test:./riscv_build/rv32um-remu.mem:0x00000001:0x00001000 \
+	rv32ui-ld_st:RV32ISP_riscv_test:./riscv_build/rv32ui-ld_st.mem:0x00000001:0x00002000 \
 
 # 非アラインアクセス試験のため除外
 #rv32ui-ma_data:RV32ISP_riscv_test:./riscv_build/rv32ui-ma_data.mem:0x00000001 \

@@ -1,6 +1,17 @@
 #include <cstdint>
 
 // ============================================================
+//   Timer MMIO
+// ============================================================
+#define TIMER_MMIOADDR_W \
+    (*reinterpret_cast<volatile uint32_t*>(0x10002000u))
+
+#define TIMER_MMIOADDR_R \
+    (*reinterpret_cast<volatile uint32_t*>(0x10002004u))
+
+extern "C" volatile uint32_t timer_data;
+
+// ============================================================
 // MMIO / CSR
 // ============================================================
 
@@ -46,13 +57,16 @@ extern "C" volatile uint32_t result;
 static constexpr uint32_t INPUT_SIZE  = 64u;
 static constexpr uint32_t HIDDEN_SIZE = 16u;
 
-static constexpr uint32_t SA_SIZE = 4u;
+static constexpr uint32_t SA_SIZE = 16u;
+
+static_assert((INPUT_SIZE % SA_SIZE) == 0u);
+static_assert((HIDDEN_SIZE % SA_SIZE) == 0u);
 
 static constexpr uint32_t INPUT_BLOCKS =
-    INPUT_SIZE / SA_SIZE;       // 16
+    INPUT_SIZE / SA_SIZE;       // 4
 
 static constexpr uint32_t HIDDEN_BLOCKS =
-    HIDDEN_SIZE / SA_SIZE;      // 4
+    HIDDEN_SIZE / SA_SIZE;      // 1
 
 // ============================================================
 // NN Input
@@ -124,18 +138,51 @@ static inline uint8_t weight2_at(
 
 // ============================================================
 // SA Control
+//
+// csr_SA_CTRL[23:16] : matrix_size_x
+// csr_SA_CTRL[31:24] : matrix_size_y
+// csr_SA_CTRL[7:0]   : control bits
 // ============================================================
 
-static inline void sa_clear()
+static constexpr uint32_t SA_CTRL_START       = 0x01u;
+static constexpr uint32_t SA_CTRL_STATE_RESET = 0x02u;
+static constexpr uint32_t SA_CTRL_CLEAR       = 0x04u;
+
+static constexpr uint32_t sa_make_ctrl(
+    uint32_t matrix_size_x,
+    uint32_t matrix_size_y,
+    uint32_t control)
 {
-    CSR_WRITE(0x7C0, (0x04u << 16) | 0x04u);
-    CSR_WRITE(0x7C0, (0x04u << 16) | 0x00u);
+    return ((matrix_size_y & 0xFFu) << 24) |
+           ((matrix_size_x & 0xFFu) << 16) |
+           (control & 0xFFFFu);
 }
 
-static inline void sa_state_reset()
+static inline void sa_write_ctrl(
+    uint32_t matrix_size_x,
+    uint32_t matrix_size_y,
+    uint32_t control)
 {
-    CSR_WRITE(0x7C0, (0x04u << 16) | 0x02u);
-    CSR_WRITE(0x7C0, (0x04u << 16) | 0x00u);
+    CSR_WRITE(
+        0x7C0,
+        sa_make_ctrl(matrix_size_x, matrix_size_y, control)
+    );
+}
+
+static inline void sa_clear(
+    uint32_t matrix_size_x,
+    uint32_t matrix_size_y)
+{
+    sa_write_ctrl(matrix_size_x, matrix_size_y, SA_CTRL_CLEAR);
+    sa_write_ctrl(matrix_size_x, matrix_size_y, 0u);
+}
+
+static inline void sa_state_reset(
+    uint32_t matrix_size_x,
+    uint32_t matrix_size_y)
+{
+    sa_write_ctrl(matrix_size_x, matrix_size_y, SA_CTRL_STATE_RESET);
+    sa_write_ctrl(matrix_size_x, matrix_size_y, 0u);
 }
 
 static inline void sa_wait_done()
@@ -180,25 +227,28 @@ static inline void sa_read_C(
 }
 
 // ============================================================
-// 4×4 SA Matrix Multiplication
+// 16×16 SA Matrix Multiplication
 // ============================================================
 
-static inline void sa_matmul4x4(
+static inline void sa_matmul16x16(
     const uint8_t A[SA_SIZE][SA_SIZE],
     const uint8_t B[SA_SIZE][SA_SIZE],
     uint32_t C[SA_SIZE][SA_SIZE])
 {
+    static constexpr uint32_t MATRIX_SIZE_X = SA_SIZE;
+    static constexpr uint32_t MATRIX_SIZE_Y = SA_SIZE;
+
     // 前回の累積結果を消去
-    sa_clear();
+    sa_clear(MATRIX_SIZE_X, MATRIX_SIZE_Y);
 
     sa_set_A(A);
     sa_set_B(B);
 
-    sa_state_reset();
+    sa_state_reset(MATRIX_SIZE_X, MATRIX_SIZE_Y);
 
     // SA start
-    CSR_WRITE(0x7C0, (0x04u << 16) | 0x01u);
-    CSR_WRITE(0x7C0, (0x04u << 16) | 0x00u);
+    sa_write_ctrl(MATRIX_SIZE_X, MATRIX_SIZE_Y, SA_CTRL_START);
+    sa_write_ctrl(MATRIX_SIZE_X, MATRIX_SIZE_Y, 0u);
 
     sa_wait_done();
     sa_read_C(C);
@@ -255,103 +305,91 @@ static uint32_t nn_forward_cpu()
 //
 // 64 inputs → 16 hidden neurons
 //
-// 入力を4個ずつ16ブロック、
-// ニューロンを4個ずつ4ブロックに分割する。
+// A : 16 × 64
+// B : 64 × 16
+// C : 16 × 16
 //
-// 合計:
-//   16 input blocks × 4 neuron blocks
-//   = 64回の4×4行列積
+// matrix_size_x = 64  (共通次元 K)
+// matrix_size_y = 16  (出力列数 N)
+//
+// 1回の64×16 SA演算で16ニューロンを計算する。
+// Aの全16行へ同じ入力ベクトルを配置するため、
+// Cの各行には同じ16ニューロンの結果が現れる。
 // ============================================================
 
 static void nn_layer1_sa(
     uint32_t hidden[HIDDEN_SIZE])
 {
+    static constexpr uint32_t MATRIX_SIZE_X = INPUT_SIZE;   // 64
+    static constexpr uint32_t MATRIX_SIZE_Y = HIDDEN_SIZE;  // 16
+
+    alignas(4) uint8_t A[MATRIX_SIZE_Y][MATRIX_SIZE_X];
+    alignas(4) uint8_t B[MATRIX_SIZE_X][MATRIX_SIZE_Y];
+
+    // ------------------------------------------------
+    // A行列: 16 × 64
+    // 同じ64入力を全16行へ配置する。
+    // ------------------------------------------------
+    for (uint32_t row = 0u;
+         row < MATRIX_SIZE_Y;
+         ++row) {
+
+        for (uint32_t k = 0u;
+             k < MATRIX_SIZE_X;
+             ++k) {
+
+            A[row][k] = nn_input[k];
+        }
+    }
+
+    // ------------------------------------------------
+    // B行列: 64 × 16
+    // B[k][neuron]
+    // ------------------------------------------------
+    for (uint32_t k = 0u;
+         k < MATRIX_SIZE_X;
+         ++k) {
+
+        for (uint32_t neuron = 0u;
+             neuron < MATRIX_SIZE_Y;
+             ++neuron) {
+
+            B[k][neuron] = weight1_at(neuron, k);
+        }
+    }
+
+    // 前回の累積結果を消去
+    sa_clear(MATRIX_SIZE_X, MATRIX_SIZE_Y);
+
+    CSR_WRITE(
+        0x7D0,
+        reinterpret_cast<uintptr_t>(&A[0][0])
+    );
+
+    CSR_WRITE(
+        0x7D4,
+        reinterpret_cast<uintptr_t>(&B[0][0])
+    );
+
+    sa_state_reset(MATRIX_SIZE_X, MATRIX_SIZE_Y);
+
+    // SA start
+    sa_write_ctrl(MATRIX_SIZE_X, MATRIX_SIZE_Y, SA_CTRL_START);
+    sa_write_ctrl(MATRIX_SIZE_X, MATRIX_SIZE_Y, 0u);
+
+    sa_wait_done();
+
+    // Cは16×16。全行が同じ結果なのでrow 0だけ読む。
+    volatile const uint32_t* const c_base =
+        reinterpret_cast<volatile const uint32_t*>(
+            SA_BASE_ADDR_C
+        );
+
     for (uint32_t neuron = 0u;
          neuron < HIDDEN_SIZE;
          ++neuron) {
 
-        hidden[neuron] = 0u;
-    }
-
-    for (uint32_t input_block = 0u;
-         input_block < INPUT_BLOCKS;
-         ++input_block) {
-
-        const uint32_t input_base =
-            input_block * SA_SIZE;
-
-        for (uint32_t neuron_block = 0u;
-             neuron_block < HIDDEN_BLOCKS;
-             ++neuron_block) {
-
-            const uint32_t neuron_base =
-                neuron_block * SA_SIZE;
-
-            alignas(4) uint8_t A[SA_SIZE][SA_SIZE];
-            alignas(4) uint8_t B[SA_SIZE][SA_SIZE];
-
-            uint32_t C[SA_SIZE][SA_SIZE];
-
-            // ------------------------------------------------
-            // A行列
-            //
-            // 同じ4入力を全行へ配置する。
-            // そのため、Cの各行には同じ結果が現れる。
-            // ------------------------------------------------
-            for (uint32_t row = 0u;
-                 row < SA_SIZE;
-                 ++row) {
-
-                for (uint32_t k = 0u;
-                     k < SA_SIZE;
-                     ++k) {
-
-                    A[row][k] =
-                        nn_input[input_base + k];
-                }
-            }
-
-            // ------------------------------------------------
-            // B行列
-            //
-            // B[k][local_neuron]
-            // ------------------------------------------------
-            for (uint32_t k = 0u;
-                 k < SA_SIZE;
-                 ++k) {
-
-                const uint32_t input_index =
-                    input_base + k;
-
-                for (uint32_t local_neuron = 0u;
-                     local_neuron < SA_SIZE;
-                     ++local_neuron) {
-
-                    const uint32_t neuron =
-                        neuron_base + local_neuron;
-
-                    B[k][local_neuron] =
-                        weight1_at(
-                            neuron,
-                            input_index
-                        );
-                }
-            }
-
-            sa_matmul4x4(A, B, C);
-
-            // row 0に4ニューロン分の部分和が並ぶ
-            for (uint32_t local_neuron = 0u;
-                 local_neuron < SA_SIZE;
-                 ++local_neuron) {
-
-                const uint32_t neuron =
-                    neuron_base + local_neuron;
-
-                hidden[neuron] +=
-                    C[0][local_neuron];
-            }
-        }
+        hidden[neuron] = c_base[neuron];
     }
 }
 
@@ -360,7 +398,7 @@ static void nn_layer1_sa(
 //
 // 16 hidden neurons → 1 output
 //
-// hiddenを4個ずつ処理し、4回のSA演算結果を加算する。
+// hidden 16個を1回の16×16 SA演算で処理する。
 // ============================================================
 
 static uint32_t nn_layer2_sa(
@@ -394,7 +432,7 @@ static uint32_t nn_layer2_sa(
             }
         }
 
-        // Aのrow 0へhiddenを4個配置
+        // Aのrow 0へhiddenを16個配置
         for (uint32_t k = 0u;
              k < SA_SIZE;
              ++k) {
@@ -414,7 +452,7 @@ static uint32_t nn_layer2_sa(
                 weight2_at(neuron);
         }
 
-        sa_matmul4x4(A, B, C);
+        sa_matmul16x16(A, B, C);
 
         output += C[0][0];
     }
@@ -435,12 +473,14 @@ static uint32_t nn_forward_sa()
     // hidden表示開始
     PIO32 = 0xEE10u;
 
+    /*
     for (uint32_t neuron = 0u;
          neuron < HIDDEN_SIZE;
          ++neuron) {
 
         PIO32 = hidden[neuron];
     }
+    */
 
     return nn_layer2_sa(hidden);
 }
@@ -462,19 +502,45 @@ extern "C" void run()
     // ------------------------------------------------
     PIO32 = 0xEE21u;
 
+    /*
+     * Software reference
+     */
+    TIMER_MMIOADDR_W = 0x0001FFFFu;
+
     const uint32_t cpu_result =
         nn_forward_cpu();
 
     PIO32 = 0xEE20u;
     PIO32 = cpu_result;
 
+
+    /*
+     * Software実行時間
+     */
+    timer_data = TIMER_MMIOADDR_R;
+    PIO32 = 0x0000A001u;
+    PIO32 = 0xFFFFu - timer_data;
+
     // ------------------------------------------------
     // SA calculation
     // ------------------------------------------------
     PIO32 = 0xEE31u;
 
+    /*
+     * SynapEngine
+     */
+    TIMER_MMIOADDR_W = 0x0001FFFFu;
+
     const uint32_t sa_result =
         nn_forward_sa();
+
+    /*
+     * SynapEngine
+     */
+
+    timer_data = TIMER_MMIOADDR_R;
+    PIO32 = 0x0000A002u;
+    PIO32 = 0xFFFFu - timer_data;
 
     PIO32 = 0xEE30u;
     PIO32 = sa_result;
@@ -524,5 +590,6 @@ extern "C" void run()
 extern "C" {
 
 volatile uint32_t result = 0u;
+volatile uint32_t timer_data = 0;
 
 }

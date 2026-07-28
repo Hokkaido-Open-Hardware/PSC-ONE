@@ -149,7 +149,8 @@ async def test_systolic_array_driver_4x4(dut):
     # ==================
     MATRIX_N = 4
     CYCLE_N  = 2
-    dut.matrix_size.value  = 4
+    dut.matrix_size_x.value  = 4
+    dut.matrix_size_y.value  = 4
     # ==================
 
     clock = Clock(dut.clock,10,unit="ns")
@@ -301,7 +302,8 @@ async def test_systolic_array_driver_8x8(dut):
     # ==================
     MATRIX_N = 8
     CYCLE_N  = 2
-    dut.matrix_size.value  = 8
+    dut.matrix_size_x.value  = 8
+    dut.matrix_size_y.value  = 8
     # ==================
 
     clock = Clock(dut.clock,10,unit="ns")
@@ -464,7 +466,8 @@ async def test_systolic_array_driver_32x32(dut):
     # ==================
     MATRIX_N = 32
     WORDS_PER_ROW = MATRIX_N // 4
-    dut.matrix_size.value = MATRIX_N
+    dut.matrix_size_x.value = MATRIX_N
+    dut.matrix_size_y.value = MATRIX_N
     # ==================
 
     clock = Clock(dut.clock, 10, unit="ns")
@@ -651,7 +654,8 @@ async def test_systolic_array_driver_64x64(dut):
     # ==================
     MATRIX_N = 64
     WORDS_PER_ROW = MATRIX_N // 4
-    dut.matrix_size.value = MATRIX_N
+    dut.matrix_size_x.value = MATRIX_N
+    dut.matrix_size_y.value = MATRIX_N
     # ==================
 
     clock = Clock(dut.clock, 10, unit="ns")
@@ -813,3 +817,261 @@ async def test_systolic_array_driver_64x64(dut):
     assert np.array_equal(C_hw, C_exp)
 
     dut._log.info("✅ 64x64 PASS")
+
+
+# =============================================
+# 5th test
+# matrix_size_x = 4
+# matrix_size_y = 8
+# A: 8x4
+# B: 4x8
+# C: 8x8
+# =============================================
+@cocotb.test()
+async def test_systolic_array_driver_4x8(dut):
+
+    dut._log.info("\n")
+    dut._log.info("=============================================")
+
+    # ==================
+    MATRIX_X = 4
+    MATRIX_Y = 8
+
+    A_ROWS = MATRIX_Y
+    A_COLS = MATRIX_X
+
+    B_ROWS = MATRIX_X
+    B_COLS = MATRIX_Y
+
+    C_ROWS = MATRIX_Y
+    C_COLS = MATRIX_Y
+
+    A_WORDS_PER_ROW = A_COLS // 4
+    B_WORDS_PER_ROW = B_COLS // 4
+
+    dut.matrix_size_x.value = MATRIX_X
+    dut.matrix_size_y.value = MATRIX_Y
+    # ==================
+
+    clock = Clock(dut.clock, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+
+    # reset
+    dut.reset_n.value = 0
+    dut.sa_clear.value = 0
+    dut.rd_read_ready.value = 0
+    dut.c_write_ready.value = 0
+    dut.sa_state_reset.value = 0
+    dut.sa_req_ready.value = 1
+
+    # Output-Stationary mode
+    dut.sa_os_instruction.value = 0b0000
+
+    dut.BASE_ADDR_A.value = BASE_ADDR_A
+    dut.BASE_ADDR_B.value = BASE_ADDR_B
+    dut.BASE_ADDR_C.value = BASE_ADDR_C
+
+    dut.start.value = 0
+
+    for _ in range(5):
+        await RisingEdge(dut.clock)
+
+    dut.reset_n.value = 1
+
+    for _ in range(5):
+        await RisingEdge(dut.clock)
+
+    # ------------------------------
+    # generate deterministic matrices
+    # ------------------------------
+    rng = np.random.default_rng(0x0408)
+
+    # A: 8x4
+    A_np = rng.integers(
+        1,
+        10,
+        size=(A_ROWS, A_COLS),
+        dtype=np.uint8
+    )
+
+    # B: 4x8
+    B_np = rng.integers(
+        1,
+        10,
+        size=(B_ROWS, B_COLS),
+        dtype=np.uint8
+    )
+
+    # C: 8x8
+    # uint8のまま積和せず、64bitへ拡張して参照値を作る。
+    C_exp = (
+        A_np.astype(np.int64)
+        @ B_np.astype(np.int64)
+    )
+
+    dut._log.info(section("4x8 Matrix Test"))
+    dut._log.info(
+        f"matrix_size_x = {MATRIX_X}, "
+        f"matrix_size_y = {MATRIX_Y}"
+    )
+    dut._log.info(
+        f"A shape = {A_np.shape}, "
+        f"B shape = {B_np.shape}, "
+        f"C shape = {C_exp.shape}"
+    )
+    dut._log.info(
+        f"A checksum = {int(A_np.sum())}, "
+        f"B checksum = {int(B_np.sum())}, "
+        f"C checksum = {int(C_exp.sum())}"
+    )
+
+    dut._log.info(fmt_mat("A", A_np))
+    dut._log.info(fmt_mat("B", B_np))
+
+    # ------------------------------
+    # memory model
+    # ------------------------------
+    mem = {}
+
+    # ------------------------------
+    # A: 8x4 uint8
+    #
+    # 4要素/行 = 1ワード/行
+    # メモリ上の行サイズは4 byte
+    # ------------------------------
+    for row in range(A_ROWS):
+        for word_index in range(A_WORDS_PER_ROW):
+            col_base = word_index * 4
+
+            byte_offset = (
+                row * A_COLS
+                + col_base
+            )
+
+            mem[BASE_ADDR_A + byte_offset] = pack_u8x4(
+                A_np[row, col_base:col_base + 4]
+            )
+
+    # ------------------------------
+    # B: 4x8 uint8
+    #
+    # 8要素/行 = 2ワード/行
+    # メモリ上の行サイズは8 byte
+    # ------------------------------
+    for row in range(B_ROWS):
+        for word_index in range(B_WORDS_PER_ROW):
+            col_base = word_index * 4
+
+            byte_offset = (
+                row * B_COLS
+                + col_base
+            )
+
+            mem[BASE_ADDR_B + byte_offset] = pack_u8x4(
+                B_np[row, col_base:col_base + 4]
+            )
+
+    # C: 8x8 uint32_t
+    for index in range(C_ROWS * C_COLS):
+        mem[BASE_ADDR_C + (index * 4)] = 0
+
+    cocotb.start_soon(memory_driver(dut, mem))
+
+    # ------------------------------
+    # start DUT
+    # ------------------------------
+    dut.start.value = 1
+    await RisingEdge(dut.clock)
+    dut.start.value = 0
+
+    timeout = 10_000
+
+    for cycle in range(timeout):
+        if int(dut.done.value) == 1:
+            dut._log.info(
+                f"4x8 operation completed after {cycle} cycles"
+            )
+            break
+
+        await RisingEdge(dut.clock)
+    else:
+        raise AssertionError(
+            f"4x8 operation timeout after {timeout} cycles"
+        )
+
+    # 最後のC書き込みを確実に取り込む。
+    for _ in range(10):
+        await RisingEdge(dut.clock)
+
+    # ------------------------------
+    # assemble C matrix
+    # ------------------------------
+    C_hw = np.zeros(
+        (C_ROWS, C_COLS),
+        dtype=np.uint32
+    )
+
+    for row in range(C_ROWS):
+        for col in range(C_COLS):
+            index = row * C_COLS + col
+            addr = BASE_ADDR_C + (index * 4)
+
+            C_hw[row, col] = (
+                mem.get(addr, 0)
+                & 0xFFFFFFFF
+            )
+
+    # ------------------------------
+    # result
+    # ------------------------------
+    dut._log.info(section("4x8 Assert"))
+
+    dut._log.info(
+        f"Expected checksum = {int(C_exp.sum())}"
+    )
+    dut._log.info(
+        f"HW checksum       = "
+        f"{int(C_hw.astype(np.uint64).sum())}"
+    )
+
+    dut._log.info(fmt_mat("Expected", C_exp))
+    dut._log.info(fmt_mat("HW", C_hw))
+
+    if not np.array_equal(C_hw, C_exp):
+        mismatch = np.argwhere(
+            C_hw.astype(np.int64) != C_exp
+        )
+
+        first_row = int(mismatch[0][0])
+        first_col = int(mismatch[0][1])
+
+        dut._log.error(
+            "First mismatch: "
+            f"C[{first_row}][{first_col}] "
+            f"expected={int(C_exp[first_row, first_col])} "
+            f"got={int(C_hw[first_row, first_col])}"
+        )
+
+        dut._log.error(
+            "Expected row: "
+            + fmt_list(
+                [
+                    int(value)
+                    for value in C_exp[first_row]
+                ]
+            )
+        )
+
+        dut._log.error(
+            "HW row      : "
+            + fmt_list(
+                [
+                    int(value)
+                    for value in C_hw[first_row]
+                ]
+            )
+        )
+
+    assert np.array_equal(C_hw, C_exp)
+
+    dut._log.info("✅ 4x8 PASS")

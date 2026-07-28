@@ -200,8 +200,8 @@ extern "C" void run() {
     // 4. SA開始
     // --------------------------------------------------------
     // sa_state_reset
-    CSR_WRITE(0x7C0, (0x04 << 16) | 0x02);
-    CSR_WRITE(0x7C0, (0x04 << 16) | 0x00);
+    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x02);
+    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00);
     // sa_mode : OS mode.
     CSR_WRITE(0x7C4, 0x01);
     // sa_start
@@ -211,8 +211,8 @@ extern "C" void run() {
     // TIMER書き込み start
     TIMER_MMIOADDR_W = 0x100FF;
 
-    CSR_WRITE(0x7C0, (0x04 << 16) | 0x01);   // SA start
-    CSR_WRITE(0x7C0, (0x04 << 16) | 0x00);   // clear start
+    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x01);   // SA start
+    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00);   // clear start
 
     // SA計算待ち
     //tiny_delay(100);

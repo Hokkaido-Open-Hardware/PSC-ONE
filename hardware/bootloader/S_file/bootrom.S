@@ -1,8 +1,8 @@
 
-./build/bootrom.elf:     ファイル形式 elf32-littleriscv
+./build/bootrom.elf:     file format elf32-littleriscv
 
 
-セクション .text の逆アセンブル:
+Disassembly of section .text:
 
 00000000 <_start>:
 
@@ -115,7 +115,7 @@ sbi_ecall:
     li t1, 1
   90:	00100313          	li	t1,1
     beq a7, t1, sbi_putchar
-  94:	00688a63          	beq	a7,t1,a8 <$x.2>
+  94:	00688a63          	beq	a7,t1,a8 <sbi_putchar>
 
     li t1, 2
   98:	00200313          	li	t1,2
@@ -125,11 +125,11 @@ sbi_ecall:
     j illegal
   a0:	fedff06f          	j	8c <illegal>
 
-000000a4 <$d.1>:
+000000a4 <uart_base>:
   a4:	0000                	.insn	2, 0x0000
   a6:	1000                	.insn	2, 0x1000
 
-000000a8 <$x.2>:
+000000a8 <sbi_putchar>:
 
 /* ------------------------------------------------------------
  * SBI console putchar
@@ -137,7 +137,7 @@ sbi_ecall:
 sbi_putchar:
     la t1, uart_base
   a8:	00000317          	auipc	t1,0x0
-  ac:	ffc30313          	addi	t1,t1,-4 # a4 <$d.1>
+  ac:	ffc30313          	addi	t1,t1,-4 # a4 <uart_base>
     lw t1, 0(t1)
   b0:	00032303          	lw	t1,0(t1)
 
@@ -147,7 +147,7 @@ sbi_putchar:
     andi t2, t2, 1 # TX busy
   b8:	0013f393          	andi	t2,t2,1
     bnez t2, 1b
-  bc:	fe039ce3          	bnez	t2,b4 <$x.2+0xc>
+  bc:	fe039ce3          	bnez	t2,b4 <sbi_putchar+0xc>
 
     sb a0, 0(t1)   # UART_TX
   c0:	00a30023          	sb	a0,0(t1)
@@ -164,7 +164,7 @@ sbi_putchar:
 sbi_getchar:
     la t1, uart_base
   cc:	00000317          	auipc	t1,0x0
-  d0:	fd830313          	addi	t1,t1,-40 # a4 <$d.1>
+  d0:	fd830313          	addi	t1,t1,-40 # a4 <uart_base>
     lw t1, 0(t1)
   d4:	00032303          	lw	t1,0(t1)
 
@@ -224,17 +224,17 @@ sbi_ret:
     mret
  12c:	30200073          	mret
 
-セクション .riscv.attributes の逆アセンブル:
+Disassembly of section .riscv.attributes:
 
 00000000 <.riscv.attributes>:
+   0:	3c41                	.insn	2, 0x3c41
     la      sp, _mstack_top
-   0:	3341                	.insn	2, 0x3341
    2:	0000                	.insn	2, 0x0000
    4:	7200                	.insn	2, 0x7200
    6:	7369                	.insn	2, 0x7369
     la      t0, m_trap_vector
    8:	01007663          	bgeu	zero,a6,14 <_start+0x14>
-   c:	0029                	.insn	2, 0x0029
+   c:	0032                	.insn	2, 0x0032
    e:	0000                	.insn	2, 0x0000
     csrw    mtvec, t0
   10:	7205                	.insn	2, 0x7205
@@ -258,217 +258,220 @@ sbi_ret:
   2e:	6965                	.insn	2, 0x6965
     li      t1, (1 << 11)      # MPP = S
   30:	7032                	.insn	2, 0x7032
-  32:	0030                	.insn	2, 0x0030
+  32:	5f30                	.insn	2, 0x5f30
+  34:	6d7a                	.insn	2, 0x6d7a
+  36:	756d                	.insn	2, 0x756d
+    or      t0, t0, t1
+  38:	316c                	.insn	2, 0x316c
+  3a:	3070                	.insn	2, 0x3070
+	...
 
-セクション .debug_info の逆アセンブル:
+Disassembly of section .debug_info:
 
-00000000 <$d.7>:
-   0:	013d                	.insn	2, 0x013d
+00000000 <.debug_info>:
+   0:	013e                	.insn	2, 0x013e
     la      sp, _mstack_top
    2:	0000                	.insn	2, 0x0000
-   4:	0004                	.insn	2, 0x0004
-   6:	0000                	.insn	2, 0x0000
+   4:	0005                	.insn	2, 0x0005
+   6:	0401                	.insn	2, 0x0401
     la      t0, m_trap_vector
    8:	0000                	.insn	2, 0x0000
-   a:	0104                	.insn	2, 0x0104
-	...
+   a:	0000                	.insn	2, 0x0000
+   c:	0001                	.insn	2, 0x0001
+   e:	0000                	.insn	2, 0x0000
+    csrw    mtvec, t0
+  10:	0000                	.insn	2, 0x0000
+  12:	0000                	.insn	2, 0x0000
     csrw    satp, zero
-  14:	0130                	.insn	2, 0x0130
-  16:	0000                	.insn	2, 0x0000
+  14:	3000                	.insn	2, 0x3000
+  16:	0001                	.insn	2, 0x0001
     li      t0, (1 << 8)
-  18:	2f2e                	.insn	2, 0x2f2e
-  1a:	2f637273          	csrrci	tp,0x2f6,6
+  18:	2e00                	.insn	2, 0x2e00
+  1a:	6372732f          	.insn	4, 0x6372732f
     csrw    medeleg, t0
-  1e:	7370                	.insn	2, 0x7370
+  1e:	6373702f          	.insn	4, 0x6373702f
     csrr    t0, mstatus
-  20:	626d5f63          	bge	s10,t1,65e <$d.3+0x52e>
+  22:	6d5f 6962 736f      	.insn	6, 0x736f69626d5f
     li      t1, ~(3 << 11)     # MPP mask clear
-  24:	6f69                	.insn	2, 0x6f69
-  26:	00532e73          	csrrs	t3,0x5,t1
-  2a:	6d6f682f          	.insn	4, 0x6d6f682f
+  28:	532e                	.insn	2, 0x532e
+  2a:	2f00                	.insn	2, 0x2f00
     and     t0, t0, t1
-  2e:	2f65                	.insn	2, 0x2f65
+  2c:	6f68                	.insn	2, 0x6f68
+  2e:	656d                	.insn	2, 0x656d
     li      t1, (1 << 11)      # MPP = S
-  30:	6168                	.insn	2, 0x6168
-  32:	7572                	.insn	2, 0x7572
-  34:	6968                	.insn	2, 0x6968
-  36:	502f6f6b          	.insn	4, 0x502f6f6b
+  30:	7261682f          	.insn	4, 0x7261682f
+  34:	6875                	.insn	2, 0x6875
+  36:	6b69                	.insn	2, 0x6b69
     or      t0, t0, t1
-  3a:	6f72                	.insn	2, 0x6f72
+  38:	72502f6f          	jal	t5,2f5c <_mstack_top+0x1e2c>
     csrw    mstatus, t0
-  3c:	6d617267          	.insn	4, 0x6d617267
+  3c:	6172676f          	jal	a4,26e52 <_mstack_top+0x25d22>
     li t0, 0x00100000
-  40:	4353502f          	.insn	4, 0x4353502f
+  40:	2f6d                	.insn	2, 0x2f6d
+  42:	5350                	.insn	2, 0x5350
     csrw mepc, t0
-  44:	525f 3356 4932      	.insn	6, 0x49323356525f
+  44:	56525f43          	.insn	4, 0x56525f43
     mret
-  4a:	4353502f          	.insn	4, 0x4353502f
+  48:	2f493233          	.insn	4, 0x2f493233
     addi    sp, sp, -128
-  4e:	4f2d                	.insn	2, 0x4f2d
+  4c:	5350                	.insn	2, 0x5350
+  4e:	4e4f2d43          	.insn	4, 0x4e4f2d43
     sw      ra,   0(sp)
-  50:	454e                	.insn	2, 0x454e
-  52:	666f732f          	.insn	4, 0x666f732f
+  52:	2f45                	.insn	2, 0x2f45
     sw      t0,   4(sp)
-  56:	7774                	.insn	2, 0x7774
+  54:	74666f73          	csrrsi	t5,0x746,12
     sw      t1,   8(sp)
-  58:	7261                	.insn	2, 0x7261
-  5a:	2f65                	.insn	2, 0x2f65
+  58:	65726177          	.insn	4, 0x65726177
     sw      t2,  12(sp)
-  5c:	5500736f          	jal	t1,75ac <_mstack_top+0x647c>
+  5c:	00736f2f          	.insn	4, 0x00736f2f
     sw      a0,  16(sp)
-  60:	7562                	.insn	2, 0x7562
-  62:	746e                	.insn	2, 0x746e
+  60:	6255                	.insn	2, 0x6255
+  62:	6e75                	.insn	2, 0x6e75
     sw      a1,  20(sp)
-  64:	2075                	.insn	2, 0x2075
-  66:	6e616c63          	bltu	sp,t1,75e <$d.3+0x62e>
+  64:	7574                	.insn	2, 0x7574
+  66:	6320                	.insn	2, 0x6320
     sw      a2,  24(sp)
-  6a:	65762067          	.insn	4, 0x65762067
+  68:	616c                	.insn	2, 0x616c
+  6a:	676e                	.insn	2, 0x676e
     sw      a3,  28(sp)
-  6e:	7372                	.insn	2, 0x7372
+  6c:	7620                	.insn	2, 0x7620
+  6e:	7265                	.insn	2, 0x7265
     sw      a4,  32(sp)
-  70:	6f69                	.insn	2, 0x6f69
-  72:	206e                	.insn	2, 0x206e
+  70:	6e6f6973          	csrrsi	s2,0x6e6,30
     sw      a5,  36(sp)
-  74:	3831                	.insn	2, 0x3831
-  76:	312e                	.insn	2, 0x312e
+  74:	3220                	.insn	2, 0x3220
+  76:	2e31                	.insn	2, 0x2e31
     sw      a6,  40(sp)
-  78:	332e                	.insn	2, 0x332e
-  7a:	2820                	.insn	2, 0x2820
+  78:	2e31                	.insn	2, 0x2e31
+  7a:	2038                	.insn	2, 0x2038
     sw      a7,  44(sp)
-  7c:	7531                	.insn	2, 0x7531
-  7e:	7562                	.insn	2, 0x7562
+  7c:	3628                	.insn	2, 0x3628
+  7e:	6275                	.insn	2, 0x6275
     csrr    t0, mcause
-  80:	746e                	.insn	2, 0x746e
-  82:	3175                	.insn	2, 0x3175
+  80:	6e75                	.insn	2, 0x6e75
+  82:	7574                	.insn	2, 0x7574
     li      t1, 9              # S-mode ECALL
-  84:	0029                	.insn	2, 0x0029
-  86:	8001                	.insn	2, 0x8001
+  84:	2931                	.insn	2, 0x2931
+  86:	0100                	.insn	2, 0x0100
     beq     t0, t1, sbi_ecall
-  88:	7302                	.insn	2, 0x7302
-  8a:	6174                	.insn	2, 0x6174
+  88:	0280                	.insn	2, 0x0280
+  8a:	72617473          	csrrci	s0,mhpmevent6h,2
     j       illegal
-  8c:	7472                	.insn	2, 0x7472
-  8e:	0100                	.insn	2, 0x0100
+  8e:	0074                	.insn	2, 0x0074
     li t1, 1
   90:	0000                	.insn	2, 0x0000
-  92:	1700                	.insn	2, 0x1700
+  92:	0000                	.insn	2, 0x0000
     beq a7, t1, sbi_putchar
-  94:	0000                	.insn	2, 0x0000
-  96:	0000                	.insn	2, 0x0000
+  94:	00000017          	auipc	zero,0x0
     li t1, 2
   98:	0000                	.insn	2, 0x0000
-  9a:	0200                	.insn	2, 0x0200
+  9a:	0000                	.insn	2, 0x0000
     beq a7, t1, sbi_getchar
-  9c:	5f6d                	.insn	2, 0x5f6d
-  9e:	7274                	.insn	2, 0x7274
+  9c:	6d02                	.insn	2, 0x6d02
+  9e:	745f 6172 5f70      	.insn	6, 0x5f706172745f
     j illegal
-  a0:	7061                	.insn	2, 0x7061
-  a2:	765f 6365 6f74      	.insn	6, 0x6f746365765f
+  a4:	6576                	.insn	2, 0x6576
+  a6:	726f7463          	bgeu	t5,t1,7ce <_mstack+0x69e>
     la t1, uart_base
-  a8:	0072                	.insn	2, 0x0072
-  aa:	0001                	.insn	2, 0x0001
+  aa:	0000                	.insn	2, 0x0000
   ac:	0000                	.insn	2, 0x0000
-  ae:	003a                	.insn	2, 0x003a
+  ae:	3a00                	.insn	2, 0x3a00
     lw t1, 0(t1)
   b0:	0000                	.insn	2, 0x0000
-  b2:	004c                	.insn	2, 0x004c
+  b2:	4c00                	.insn	2, 0x4c00
     lw t2, 8(t1)   # UART_ST
   b4:	0000                	.insn	2, 0x0000
-  b6:	6902                	.insn	2, 0x6902
+  b6:	0200                	.insn	2, 0x0200
     andi t2, t2, 1 # TX busy
-  b8:	6c6c                	.insn	2, 0x6c6c
-  ba:	6765                	.insn	2, 0x6765
+  b8:	6c69                	.insn	2, 0x6c69
+  ba:	656c                	.insn	2, 0x656c
     bnez t2, 1b
-  bc:	6c61                	.insn	2, 0x6c61
-  be:	0100                	.insn	2, 0x0100
+  bc:	006c6167          	.insn	4, 0x006c6167
     sb a0, 0(t1)   # UART_TX
   c0:	0000                	.insn	2, 0x0000
-  c2:	4d00                	.insn	2, 0x4d00
+  c2:	0000                	.insn	2, 0x0000
     li a0, 0       # return OK
-  c4:	0000                	.insn	2, 0x0000
-  c6:	8c00                	.insn	2, 0x8c00
+  c4:	004d                	.insn	2, 0x004d
+  c6:	0000                	.insn	2, 0x0000
     j sbi_ret
-  c8:	0000                	.insn	2, 0x0000
-  ca:	0200                	.insn	2, 0x0200
+  c8:	008c                	.insn	2, 0x008c
+  ca:	0000                	.insn	2, 0x0000
     la t1, uart_base
-  cc:	5f696273          	csrrsi	tp,0x5f6,18
-  d0:	6365                	.insn	2, 0x6365
-  d2:	6c61                	.insn	2, 0x6c61
+  cc:	7302                	.insn	2, 0x7302
+  ce:	6962                	.insn	2, 0x6962
+  d0:	655f 6163 6c6c      	.insn	6, 0x6c6c6163655f
     lw t1, 0(t1)
-  d4:	006c                	.insn	2, 0x006c
-  d6:	0001                	.insn	2, 0x0001
+  d6:	0000                	.insn	2, 0x0000
     lw t2, 8(t1)    # UART_ST
   d8:	0000                	.insn	2, 0x0000
-  da:	0055                	.insn	2, 0x0055
+  da:	5500                	.insn	2, 0x5500
     andi t2, t2, 2  # RX available
   dc:	0000                	.insn	2, 0x0000
-  de:	0090                	.insn	2, 0x0090
+  de:	9000                	.insn	2, 0x9000
     beqz t2, 2b
   e0:	0000                	.insn	2, 0x0000
-  e2:	7502                	.insn	2, 0x7502
+  e2:	0200                	.insn	2, 0x0200
     lb a0, 4(t1)    # UART_RX
-  e4:	7261                	.insn	2, 0x7261
-  e6:	5f74                	.insn	2, 0x5f74
+  e4:	6175                	.insn	2, 0x6175
+  e6:	7472                	.insn	2, 0x7472
     j sbi_ret
-  e8:	6162                	.insn	2, 0x6162
-  ea:	01006573          	csrrsi	a0,0x10,0
+  e8:	625f 7361 0065      	.insn	6, 0x00657361625f
     csrr t0, mepc
   ee:	0000                	.insn	2, 0x0000
     addi t0, t0, 4
-  f0:	6200                	.insn	2, 0x6200
-  f2:	0000                	.insn	2, 0x0000
+  f0:	0000                	.insn	2, 0x0000
+  f2:	0062                	.insn	2, 0x0062
     csrw mepc, t0
-  f4:	a400                	.insn	2, 0xa400
-  f6:	0000                	.insn	2, 0x0000
+  f4:	0000                	.insn	2, 0x0000
+  f6:	00a4                	.insn	2, 0x00a4
     lw      ra,   0(sp)
-  f8:	0200                	.insn	2, 0x0200
-  fa:	5f696273          	csrrsi	tp,0x5f6,18
+  f8:	0000                	.insn	2, 0x0000
+  fa:	7302                	.insn	2, 0x7302
     lw      t0,   4(sp)
-  fe:	7570                	.insn	2, 0x7570
-    lw      t1,   8(sp)
- 100:	6374                	.insn	2, 0x6374
- 102:	6168                	.insn	2, 0x6168
+  fc:	6962                	.insn	2, 0x6962
+  fe:	705f 7475 6863      	.insn	6, 0x68637475705f
     lw      t2,  12(sp)
- 104:	0072                	.insn	2, 0x0072
- 106:	0001                	.insn	2, 0x0001
+ 104:	7261                	.insn	2, 0x7261
+ 106:	0000                	.insn	2, 0x0000
     lw      a0,  16(sp)
  108:	0000                	.insn	2, 0x0000
- 10a:	0068                	.insn	2, 0x0068
+ 10a:	6800                	.insn	2, 0x6800
     lw      a1,  20(sp)
  10c:	0000                	.insn	2, 0x0000
- 10e:	00a8                	.insn	2, 0x00a8
+ 10e:	a800                	.insn	2, 0xa800
     lw      a2,  24(sp)
  110:	0000                	.insn	2, 0x0000
- 112:	7302                	.insn	2, 0x7302
+ 112:	0200                	.insn	2, 0x0200
     lw      a3,  28(sp)
- 114:	6962                	.insn	2, 0x6962
- 116:	675f 7465 6863      	.insn	6, 0x68637465675f
+ 114:	5f696273          	csrrsi	tp,0x5f6,18
+    lw      a4,  32(sp)
+ 118:	63746567          	.insn	4, 0x63746567
     lw      a5,  36(sp)
- 11c:	7261                	.insn	2, 0x7261
- 11e:	0100                	.insn	2, 0x0100
+ 11c:	6168                	.insn	2, 0x6168
+ 11e:	0072                	.insn	2, 0x0072
     lw      a6,  40(sp)
  120:	0000                	.insn	2, 0x0000
- 122:	7800                	.insn	2, 0x7800
+ 122:	0000                	.insn	2, 0x0000
     lw      a7,  44(sp)
- 124:	0000                	.insn	2, 0x0000
- 126:	cc00                	.insn	2, 0xcc00
+ 124:	0078                	.insn	2, 0x0078
+ 126:	0000                	.insn	2, 0x0000
     addi    sp, sp, 128
- 128:	0000                	.insn	2, 0x0000
- 12a:	0200                	.insn	2, 0x0200
+ 128:	00cc                	.insn	2, 0x00cc
+ 12a:	0000                	.insn	2, 0x0000
     mret
- 12c:	5f696273          	csrrsi	tp,0x5f6,18
- 130:	6572                	.insn	2, 0x6572
- 132:	0074                	.insn	2, 0x0074
- 134:	0001                	.insn	2, 0x0001
+ 12c:	7302                	.insn	2, 0x7302
+ 12e:	6962                	.insn	2, 0x6962
+ 130:	725f 7465 0000      	.insn	6, 0x7465725f
  136:	0000                	.insn	2, 0x0000
- 138:	00000087          	.insn	4, 0x0087
- 13c:	00ec                	.insn	2, 0x00ec
+ 138:	8700                	.insn	2, 0x8700
+ 13a:	0000                	.insn	2, 0x0000
+ 13c:	ec00                	.insn	2, 0xec00
  13e:	0000                	.insn	2, 0x0000
 	...
 
-セクション .debug_abbrev の逆アセンブル:
+Disassembly of section .debug_abbrev:
 
-00000000 <$d.6>:
+00000000 <.debug_abbrev>:
    0:	1101                	.insn	2, 0x1101
     la      sp, _mstack_top
    2:	1001                	.insn	2, 0x1001
@@ -490,9 +493,9 @@ sbi_ret:
   1e:	0000                	.insn	2, 0x0000
 	...
 
-セクション .debug_aranges の逆アセンブル:
+Disassembly of section .debug_aranges:
 
-00000000 <$d.5>:
+00000000 <.debug_aranges>:
    0:	001c                	.insn	2, 0x001c
     la      sp, _mstack_top
    2:	0000                	.insn	2, 0x0000
@@ -506,323 +509,141 @@ sbi_ret:
   14:	0130                	.insn	2, 0x0130
 	...
 
-セクション .debug_line の逆アセンブル:
+Disassembly of section .debug_line:
 
-00000000 <$d.8>:
-   0:	000001d7          	.insn	4, 0x01d7
+00000000 <.debug_line>:
+   0:	009d                	.insn	2, 0x009d
     la      sp, _mstack_top
-   4:	0004                	.insn	2, 0x0004
-   6:	0029                	.insn	2, 0x0029
+   2:	0000                	.insn	2, 0x0000
+   4:	0005                	.insn	2, 0x0005
+   6:	0004                	.insn	2, 0x0004
     la      t0, m_trap_vector
-   8:	0000                	.insn	2, 0x0000
-   a:	0101                	.insn	2, 0x0101
-   c:	fb01                	.insn	2, 0xfb01
-   e:	0d0e                	.insn	2, 0x0d0e
+   8:	0025                	.insn	2, 0x0025
+   a:	0000                	.insn	2, 0x0000
+   c:	0101                	.insn	2, 0x0101
+   e:	fb01                	.insn	2, 0xfb01
     csrw    mtvec, t0
-  10:	0100                	.insn	2, 0x0100
-  12:	0101                	.insn	2, 0x0101
+  10:	0d0e                	.insn	2, 0x0d0e
+  12:	0100                	.insn	2, 0x0100
     csrw    satp, zero
-  14:	0001                	.insn	2, 0x0001
-  16:	0000                	.insn	2, 0x0000
+  14:	0101                	.insn	2, 0x0101
+  16:	0001                	.insn	2, 0x0001
     li      t0, (1 << 8)
-  18:	0001                	.insn	2, 0x0001
-  1a:	0100                	.insn	2, 0x0100
+  18:	0000                	.insn	2, 0x0000
+  1a:	0001                	.insn	2, 0x0001
     csrw    medeleg, t0
-  1c:	2f2e                	.insn	2, 0x2f2e
-  1e:	00637273          	csrrci	tp,0x6,6
+  1c:	0100                	.insn	2, 0x0100
+  1e:	0101                	.insn	2, 0x0101
     csrr    t0, mstatus
-  22:	7000                	.insn	2, 0x7000
+  20:	011f 0000 0000      	.insn	6, 0x011f
     li      t1, ~(3 << 11)     # MPP mask clear
-  24:	6d5f6373          	csrrsi	t1,0x6d5,30
-  28:	6962                	.insn	2, 0x6962
-  2a:	532e736f          	jal	t1,e755c <_mstack_top+0xe642c>
+  26:	0102                	.insn	2, 0x0102
+  28:	021f 010f 0035      	.insn	6, 0x0035010f021f
     and     t0, t0, t1
-  2e:	0100                	.insn	2, 0x0100
+  2e:	0000                	.insn	2, 0x0000
     li      t1, (1 << 11)      # MPP = S
-  30:	0000                	.insn	2, 0x0000
+  30:	0400                	.insn	2, 0x0400
   32:	0000                	.insn	2, 0x0000
   34:	0205                	.insn	2, 0x0205
   36:	0000                	.insn	2, 0x0000
     or      t0, t0, t1
   38:	0000                	.insn	2, 0x0000
-  3a:	03011003          	lh	zero,48(sp) # 12011034 <_mstack_top+0x1200ff04>
+  3a:	85011003          	lh	zero,-1968(sp) # 12010854 <_mstack_top+0x1200f724>
     csrw    mstatus, t0
-  3e:	00080903          	lb	s2,0(a6)
+  3e:	4b4d4d83          	lbu	s11,1204(s10)
     li t0, 0x00100000
-  42:	0301                	.insn	2, 0x0301
+  42:	4b4d                	.insn	2, 0x4b4d
     csrw mepc, t0
-  44:	0901                	.insn	2, 0x0901
-  46:	0008                	.insn	2, 0x0008
+  44:	4b834b83          	lbu	s7,1208(t1)
     mret
-  48:	0301                	.insn	2, 0x0301
-  4a:	00040903          	lb	s2,0(s0)
+  48:	4f4e                	.insn	2, 0x4f4e
+  4a:	4b4b504b          	.insn	4, 0x4b4b504b
     addi    sp, sp, -128
-  4e:	0301                	.insn	2, 0x0301
+  4e:	4b4b4b4b          	.insn	4, 0x4b4b4b4b
     sw      ra,   0(sp)
-  50:	00040903          	lb	s2,0(s0)
+  52:	4b4b4b4b          	.insn	4, 0x4b4b4b4b
     sw      t0,   4(sp)
-  54:	0301                	.insn	2, 0x0301
-  56:	0901                	.insn	2, 0x0901
+  56:	4b4c4b4b          	.insn	4, 0x4b4c4b4b
     sw      t1,   8(sp)
-  58:	0004                	.insn	2, 0x0004
-  5a:	0301                	.insn	2, 0x0301
+  5a:	0903034b          	.insn	4, 0x0903034b
     sw      t2,  12(sp)
-  5c:	00040903          	lb	s2,0(s0)
+  5e:	0004                	.insn	2, 0x0004
     sw      a0,  16(sp)
-  60:	0301                	.insn	2, 0x0301
-  62:	0901                	.insn	2, 0x0901
+  60:	5201                	.insn	2, 0x5201
+  62:	0902034b          	.insn	4, 0x0902034b
     sw      a1,  20(sp)
-  64:	0004                	.insn	2, 0x0004
-  66:	0301                	.insn	2, 0x0301
+  66:	0004                	.insn	2, 0x0004
     sw      a2,  24(sp)
-  68:	0901                	.insn	2, 0x0901
-  6a:	0008                	.insn	2, 0x0008
+  68:	4b01                	.insn	2, 0x4b01
+  6a:	04090203          	lb	tp,64(s2)
     sw      a3,  28(sp)
-  6c:	0301                	.insn	2, 0x0301
-  6e:	0901                	.insn	2, 0x0901
+  6e:	0100                	.insn	2, 0x0100
     sw      a4,  32(sp)
-  70:	0004                	.insn	2, 0x0004
-  72:	0301                	.insn	2, 0x0301
+  70:	83820d03          	lb	s10,-1992(tp) # fffff838 <_mstack_top+0xffffe708>
     sw      a5,  36(sp)
-  74:	0901                	.insn	2, 0x0901
-  76:	0008                	.insn	2, 0x0008
+  74:	4b4d                	.insn	2, 0x4b4d
+  76:	0902034b          	.insn	4, 0x0902034b
     sw      a6,  40(sp)
-  78:	0301                	.insn	2, 0x0301
-  7a:	0901                	.insn	2, 0x0901
+  7a:	0004                	.insn	2, 0x0004
     sw      a7,  44(sp)
-  7c:	0004                	.insn	2, 0x0004
-  7e:	0301                	.insn	2, 0x0301
+  7c:	4b01                	.insn	2, 0x4b01
+  7e:	4d83504b          	.insn	4, 0x4d83504b
     csrr    t0, mcause
-  80:	0904                	.insn	2, 0x0904
-  82:	0004                	.insn	2, 0x0004
+  82:	02034b4b          	.insn	4, 0x02034b4b
     li      t1, 9              # S-mode ECALL
-  84:	0301                	.insn	2, 0x0301
-  86:	0905                	.insn	2, 0x0905
+  86:	0409                	.insn	2, 0x0409
     beq     t0, t1, sbi_ecall
-  88:	0004                	.insn	2, 0x0004
-  8a:	0301                	.insn	2, 0x0301
+  88:	0100                	.insn	2, 0x0100
+  8a:	4b4b504b          	.insn	4, 0x4b4b504b
     j       illegal
-  8c:	0901                	.insn	2, 0x0901
-  8e:	0004                	.insn	2, 0x0004
+  8e:	4b4c                	.insn	2, 0x4b4c
     li t1, 1
-  90:	0301                	.insn	2, 0x0301
-  92:	0906                	.insn	2, 0x0906
+  90:	4b4b4b4b          	.insn	4, 0x4b4b4b4b
     beq a7, t1, sbi_putchar
-  94:	0004                	.insn	2, 0x0004
-  96:	0301                	.insn	2, 0x0301
+  94:	4b4b4b4b          	.insn	4, 0x4b4b4b4b
     li t1, 2
-  98:	0901                	.insn	2, 0x0901
-  9a:	0004                	.insn	2, 0x0004
+  98:	4c4b4b4b          	.insn	4, 0x4c4b4b4b
     beq a7, t1, sbi_getchar
-  9c:	0301                	.insn	2, 0x0301
-  9e:	0901                	.insn	2, 0x0901
+  9c:	0402                	.insn	2, 0x0402
+  9e:	0100                	.insn	2, 0x0100
     j illegal
-  a0:	0004                	.insn	2, 0x0004
-  a2:	0301                	.insn	2, 0x0301
-  a4:	0901                	.insn	2, 0x0901
-  a6:	0004                	.insn	2, 0x0004
-    la t1, uart_base
-  a8:	0301                	.insn	2, 0x0301
-  aa:	0901                	.insn	2, 0x0901
-  ac:	0004                	.insn	2, 0x0004
-  ae:	0301                	.insn	2, 0x0301
-    lw t1, 0(t1)
-  b0:	0901                	.insn	2, 0x0901
-  b2:	0004                	.insn	2, 0x0004
-    lw t2, 8(t1)   # UART_ST
-  b4:	0301                	.insn	2, 0x0301
-  b6:	0901                	.insn	2, 0x0901
-    andi t2, t2, 1 # TX busy
-  b8:	0004                	.insn	2, 0x0004
-  ba:	0301                	.insn	2, 0x0301
-    bnez t2, 1b
-  bc:	0901                	.insn	2, 0x0901
-  be:	0004                	.insn	2, 0x0004
-    sb a0, 0(t1)   # UART_TX
-  c0:	0301                	.insn	2, 0x0301
-  c2:	0901                	.insn	2, 0x0901
-    li a0, 0       # return OK
-  c4:	0004                	.insn	2, 0x0004
-  c6:	0301                	.insn	2, 0x0301
-    j sbi_ret
-  c8:	0901                	.insn	2, 0x0901
-  ca:	0004                	.insn	2, 0x0004
-    la t1, uart_base
-  cc:	0301                	.insn	2, 0x0301
-  ce:	0901                	.insn	2, 0x0901
-  d0:	0004                	.insn	2, 0x0004
-  d2:	0301                	.insn	2, 0x0301
-    lw t1, 0(t1)
-  d4:	0901                	.insn	2, 0x0901
-  d6:	0004                	.insn	2, 0x0004
-    lw t2, 8(t1)    # UART_ST
-  d8:	0301                	.insn	2, 0x0301
-  da:	0901                	.insn	2, 0x0901
-    andi t2, t2, 2  # RX available
-  dc:	0004                	.insn	2, 0x0004
-  de:	0301                	.insn	2, 0x0301
-    beqz t2, 2b
-  e0:	0902                	.insn	2, 0x0902
-  e2:	0004                	.insn	2, 0x0004
-    lb a0, 4(t1)    # UART_RX
-  e4:	0301                	.insn	2, 0x0301
-  e6:	0901                	.insn	2, 0x0901
-    j sbi_ret
-  e8:	0004                	.insn	2, 0x0004
-  ea:	0301                	.insn	2, 0x0301
-    csrr t0, mepc
-  ec:	0901                	.insn	2, 0x0901
-  ee:	0004                	.insn	2, 0x0004
-    addi t0, t0, 4
-  f0:	0301                	.insn	2, 0x0301
-  f2:	00040903          	lb	s2,0(s0)
-    csrw mepc, t0
-  f6:	0301                	.insn	2, 0x0301
-    lw      ra,   0(sp)
-  f8:	0908                	.insn	2, 0x0908
-  fa:	0004                	.insn	2, 0x0004
-    lw      t0,   4(sp)
-  fc:	0301                	.insn	2, 0x0301
-  fe:	0901                	.insn	2, 0x0901
-    lw      t1,   8(sp)
- 100:	0004                	.insn	2, 0x0004
- 102:	0301                	.insn	2, 0x0301
-    lw      t2,  12(sp)
- 104:	0902                	.insn	2, 0x0902
- 106:	0004                	.insn	2, 0x0004
-    lw      a0,  16(sp)
- 108:	0301                	.insn	2, 0x0301
- 10a:	0901                	.insn	2, 0x0901
-    lw      a1,  20(sp)
- 10c:	0004                	.insn	2, 0x0004
- 10e:	0301                	.insn	2, 0x0301
-    lw      a2,  24(sp)
- 110:	0902                	.insn	2, 0x0902
- 112:	0004                	.insn	2, 0x0004
-    lw      a3,  28(sp)
- 114:	0301                	.insn	2, 0x0301
- 116:	090d                	.insn	2, 0x090d
-    lw      a4,  32(sp)
- 118:	0008                	.insn	2, 0x0008
- 11a:	0301                	.insn	2, 0x0301
-    lw      a5,  36(sp)
- 11c:	0901                	.insn	2, 0x0901
- 11e:	0008                	.insn	2, 0x0008
-    lw      a6,  40(sp)
- 120:	0301                	.insn	2, 0x0301
- 122:	00040903          	lb	s2,0(s0)
-    lw      a7,  44(sp)
- 126:	0301                	.insn	2, 0x0301
-    addi    sp, sp, 128
- 128:	0901                	.insn	2, 0x0901
- 12a:	0004                	.insn	2, 0x0004
-    mret
- 12c:	0301                	.insn	2, 0x0301
- 12e:	0901                	.insn	2, 0x0901
- 130:	0004                	.insn	2, 0x0004
- 132:	0301                	.insn	2, 0x0301
- 134:	0902                	.insn	2, 0x0902
- 136:	0004                	.insn	2, 0x0004
- 138:	0301                	.insn	2, 0x0301
- 13a:	0901                	.insn	2, 0x0901
- 13c:	0004                	.insn	2, 0x0004
- 13e:	0301                	.insn	2, 0x0301
- 140:	0901                	.insn	2, 0x0901
- 142:	0004                	.insn	2, 0x0004
- 144:	0301                	.insn	2, 0x0301
- 146:	0906                	.insn	2, 0x0906
- 148:	0004                	.insn	2, 0x0004
- 14a:	0301                	.insn	2, 0x0301
- 14c:	0901                	.insn	2, 0x0901
- 14e:	0008                	.insn	2, 0x0008
- 150:	0301                	.insn	2, 0x0301
- 152:	00040903          	lb	s2,0(s0)
- 156:	0301                	.insn	2, 0x0301
- 158:	0901                	.insn	2, 0x0901
- 15a:	0004                	.insn	2, 0x0004
- 15c:	0301                	.insn	2, 0x0301
- 15e:	0901                	.insn	2, 0x0901
- 160:	0004                	.insn	2, 0x0004
- 162:	0301                	.insn	2, 0x0301
- 164:	0902                	.insn	2, 0x0902
- 166:	0004                	.insn	2, 0x0004
- 168:	0301                	.insn	2, 0x0301
- 16a:	0901                	.insn	2, 0x0901
- 16c:	0004                	.insn	2, 0x0004
- 16e:	0301                	.insn	2, 0x0301
- 170:	0906                	.insn	2, 0x0906
- 172:	0004                	.insn	2, 0x0004
- 174:	0301                	.insn	2, 0x0301
- 176:	0901                	.insn	2, 0x0901
- 178:	0004                	.insn	2, 0x0004
- 17a:	0301                	.insn	2, 0x0301
- 17c:	0901                	.insn	2, 0x0901
- 17e:	0004                	.insn	2, 0x0004
- 180:	0301                	.insn	2, 0x0301
- 182:	0902                	.insn	2, 0x0902
- 184:	0004                	.insn	2, 0x0004
- 186:	0301                	.insn	2, 0x0301
- 188:	0901                	.insn	2, 0x0901
- 18a:	0004                	.insn	2, 0x0004
- 18c:	0301                	.insn	2, 0x0301
- 18e:	0901                	.insn	2, 0x0901
- 190:	0004                	.insn	2, 0x0004
- 192:	0301                	.insn	2, 0x0301
- 194:	0901                	.insn	2, 0x0901
- 196:	0004                	.insn	2, 0x0004
- 198:	0301                	.insn	2, 0x0301
- 19a:	0901                	.insn	2, 0x0901
- 19c:	0004                	.insn	2, 0x0004
- 19e:	0301                	.insn	2, 0x0301
- 1a0:	0901                	.insn	2, 0x0901
- 1a2:	0004                	.insn	2, 0x0004
- 1a4:	0301                	.insn	2, 0x0301
- 1a6:	0901                	.insn	2, 0x0901
- 1a8:	0004                	.insn	2, 0x0004
- 1aa:	0301                	.insn	2, 0x0301
- 1ac:	0901                	.insn	2, 0x0901
- 1ae:	0004                	.insn	2, 0x0004
- 1b0:	0301                	.insn	2, 0x0301
- 1b2:	0901                	.insn	2, 0x0901
- 1b4:	0004                	.insn	2, 0x0004
- 1b6:	0301                	.insn	2, 0x0301
- 1b8:	0901                	.insn	2, 0x0901
- 1ba:	0004                	.insn	2, 0x0004
- 1bc:	0301                	.insn	2, 0x0301
- 1be:	0901                	.insn	2, 0x0901
- 1c0:	0004                	.insn	2, 0x0004
- 1c2:	0301                	.insn	2, 0x0301
- 1c4:	0901                	.insn	2, 0x0901
- 1c6:	0004                	.insn	2, 0x0004
- 1c8:	0301                	.insn	2, 0x0301
- 1ca:	0901                	.insn	2, 0x0901
- 1cc:	0004                	.insn	2, 0x0004
- 1ce:	0301                	.insn	2, 0x0301
- 1d0:	0902                	.insn	2, 0x0902
- 1d2:	0004                	.insn	2, 0x0004
- 1d4:	0901                	.insn	2, 0x0901
- 1d6:	0004                	.insn	2, 0x0004
- 1d8:	0100                	.insn	2, 0x0100
- 1da:	01                	.byte	0x01
+  a0:	01                	.byte	0x01
 
-セクション .comment の逆アセンブル:
+Disassembly of section .debug_line_str:
 
-00000000 <.comment>:
+00000000 <.debug_line_str>:
+   0:	6d6f682f          	.insn	4, 0x6d6f682f
     la      sp, _mstack_top
-   0:	694c                	.insn	2, 0x694c
-   2:	6b6e                	.insn	2, 0x6b6e
-   4:	7265                	.insn	2, 0x7265
-   6:	203a                	.insn	2, 0x203a
+   4:	2f65                	.insn	2, 0x2f65
+   6:	6168                	.insn	2, 0x6168
     la      t0, m_trap_vector
-   8:	6255                	.insn	2, 0x6255
-   a:	6e75                	.insn	2, 0x6e75
-   c:	7574                	.insn	2, 0x7574
-   e:	4c20                	.insn	2, 0x4c20
+   8:	7572                	.insn	2, 0x7572
+   a:	6968                	.insn	2, 0x6968
+   c:	502f6f6b          	.insn	4, 0x502f6f6b
     csrw    mtvec, t0
-  10:	444c                	.insn	2, 0x444c
-  12:	3120                	.insn	2, 0x3120
+  10:	6f72                	.insn	2, 0x6f72
+  12:	6d617267          	.insn	4, 0x6d617267
     csrw    satp, zero
-  14:	2e38                	.insn	2, 0x2e38
-  16:	2e31                	.insn	2, 0x2e31
+  16:	4353502f          	.insn	4, 0x4353502f
     li      t0, (1 << 8)
-  18:	0033                	.short	0x0033
+  1a:	525f 3356 4932      	.insn	6, 0x49323356525f
+    csrr    t0, mstatus
+  20:	4353502f          	.insn	4, 0x4353502f
+    li      t1, ~(3 << 11)     # MPP mask clear
+  24:	4f2d                	.insn	2, 0x4f2d
+  26:	454e                	.insn	2, 0x454e
+  28:	666f732f          	.insn	4, 0x666f732f
+    and     t0, t0, t1
+  2c:	7774                	.insn	2, 0x7774
+  2e:	7261                	.insn	2, 0x7261
+    li      t1, (1 << 11)      # MPP = S
+  30:	2f65                	.insn	2, 0x2f65
+  32:	2e00736f          	jal	t1,7312 <_mstack_top+0x61e2>
+  36:	6372732f          	.insn	4, 0x6372732f
+    or      t0, t0, t1
+  3a:	6373702f          	.insn	4, 0x6373702f
+    csrw    mstatus, t0
+  3e:	6d5f 6962 736f      	.insn	6, 0x736f69626d5f
+    csrw mepc, t0
+  44:	532e                	.insn	2, 0x532e
+	...

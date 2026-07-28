@@ -15,7 +15,8 @@ module SystolicArray4x4_Ctrl #(
     input  wire             sa_clear,
 
     // Runtime matrix size: 4, 8, 12, 16, ...
-    input  wire [7:0]       matrix_size,
+    input  wire [7:0]       matrix_size_x,
+    input  wire [7:0]       matrix_size_y,
 
     // SDRAM base address
     input  wire [31:0]      BASE_ADDR_A,
@@ -61,9 +62,14 @@ module SystolicArray4x4_Ctrl #(
     localparam integer PW = 32;
     localparam integer SW = 32;
 
-    // Number of 4x4 tiles on one matrix axis.
-    // matrix_size must be a non-zero multiple of four.
-    wire [7:0] tile_count = matrix_size >> 2;
+    // Runtime dimensions:
+    //   A = matrix_size_y x matrix_size_x
+    //   B = matrix_size_x x matrix_size_y
+    //   C = matrix_size_y x matrix_size_y
+    //
+    // Both dimensions must be non-zero multiples of four.
+    wire [7:0] tile_count_k = matrix_size_x >> 2;
+    wire [7:0] tile_count_y = matrix_size_y >> 2;
 
     // 4x4 tile loop indices:
     // C[i_idx][j_idx] += A[i_idx][k_idx] * B[k_idx][j_idx]
@@ -74,7 +80,7 @@ module SystolicArray4x4_Ctrl #(
     //--------------------------------------------
     // C address helper
     //
-    // C is uint32_t C[matrix_size][matrix_size].
+    // C is uint32_t C[matrix_size_y][matrix_size_y].
     //--------------------------------------------
     function automatic [31:0] matrix_row_elements;
         input [7:0] row_idx;
@@ -131,7 +137,7 @@ module SystolicArray4x4_Ctrl #(
             global_col = (j_idx << 2) + local_col;
 
             element_idx =
-                matrix_row_elements(global_row, matrix_size)
+                matrix_row_elements(global_row, matrix_size_y)
                 + {24'd0, global_col};
 
             matrix_addr_C = BASE_ADDR_C + (element_idx << 2);
@@ -202,7 +208,8 @@ module SystolicArray4x4_Ctrl #(
         .BASE_ADDR_A        (BASE_ADDR_A),
         .BASE_ADDR_B        (BASE_ADDR_B),
 
-        .matrix_size        (matrix_size),
+        .matrix_size_x      (matrix_size_x),
+        .matrix_size_y      (matrix_size_y),
 
         .i_idx              (i_idx),
         .j_idx              (j_idx),
@@ -496,7 +503,7 @@ module SystolicArray4x4_Ctrl #(
                             cur_a_data <= 32'd0;
                             cur_b_data <= 32'd0;
 
-                            if (k_idx == tile_count - 8'd1) begin
+                            if (k_idx == tile_count_k - 8'd1) begin
                                 // All K tiles for this C tile are complete.
                                 state <= S_OUTPUT_MEMORY;
                             end else begin
@@ -532,10 +539,10 @@ module SystolicArray4x4_Ctrl #(
                             row_s <= 6'd0;
                             k_idx <= 8'd0;
 
-                            if (j_idx != tile_count - 8'd1) begin
+                            if (j_idx != tile_count_y - 8'd1) begin
                                 j_idx <= j_idx + 8'd1;
                                 state <= S_CLEAR;
-                            end else if (i_idx != tile_count - 8'd1) begin
+                            end else if (i_idx != tile_count_y - 8'd1) begin
                                 i_idx <= i_idx + 8'd1;
                                 j_idx <= 8'd0;
                                 state <= S_CLEAR;

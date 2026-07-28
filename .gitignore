@@ -20,9 +20,11 @@ results.xml
 *.mem
 *.S
 
-# Wave
-*.wav
+# Vosk models
+vosk-model*/
 
+# Audio samples
+*.wav
 
 # Simulation logs and RISC-V test build outputs
 hardware/sim/log/test_result_*.log

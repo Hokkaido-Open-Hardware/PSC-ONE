@@ -49,7 +49,7 @@ static constexpr uint32_t TEST_END_CODE = 0x0000EE01u;
 static constexpr uint32_t MATRIX_SIZE = 8u;
 
 static constexpr uint32_t SA_CTRL_CONFIG =
-    MATRIX_SIZE << 16;
+    MATRIX_SIZE << 24 | MATRIX_SIZE << 16;
 
 /* ============================================================
    CSR helpers

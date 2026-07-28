@@ -76,16 +76,16 @@ extern "C" void run()
         // ----------------------------------------------------
         // SA開始
         // ----------------------------------------------------
-        CSR_WRITE(0x7C0, (0x04 << 16) | 0x04);  // clear
-        CSR_WRITE(0x7C0, (0x04 << 16) | 0x00);
+        CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x04);  // clear
+        CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00);
 
-        CSR_WRITE(0x7C0, (0x04 << 16) | 0x02);  // state_reset
-        CSR_WRITE(0x7C0, (0x04 << 16) | 0x00);
+        CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x02);  // state_reset
+        CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00);
 
         CSR_WRITE(0x7C4, 0x01);  // OS mode
 
-        CSR_WRITE(0x7C0, (0x04 << 16) | 0x01);  // start
-        CSR_WRITE(0x7C0, (0x04 << 16) | 0x00);
+        CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x01);  // start
+        CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00);
 
         while ((CSR_READ(0x7C8) & 0x01) == 0) {
             asm volatile("nop");

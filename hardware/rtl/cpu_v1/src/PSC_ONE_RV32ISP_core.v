@@ -290,8 +290,10 @@ module PSC_ONE_RV32ISP_core #(
     wire sa_clear         = csr_SA_CTRL[2];
     wire [3:0] sa_os_instruction 
                           = csr_SA_CTRL[11:8];
-    wire [7:0] sa_matrix_size 
+    wire [7:0] sa_matrix_size_x 
                           = csr_SA_CTRL[23:16];
+    wire [7:0] sa_matrix_size_y 
+                          = csr_SA_CTRL[31:24];
 
     //wire sa_os_mode = csr_SA_MODE[0];
     
@@ -328,7 +330,8 @@ module PSC_ONE_RV32ISP_core #(
         .sa_os_instruction  (sa_os_instruction),
         .sa_clear           (sa_clear),
 
-        .matrix_size        (sa_matrix_size),
+        .matrix_size_x      (sa_matrix_size_x),
+        .matrix_size_y      (sa_matrix_size_y),
 
         // SDRAM base address
         .BASE_ADDR_A        (csr_SA_ADDR_A),
