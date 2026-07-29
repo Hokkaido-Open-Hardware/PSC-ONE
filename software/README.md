@@ -31,7 +31,7 @@ It includes:
 
 The figure below illustrates the conceptual PSC-ONE software architecture, including user programs, kernel services, device drivers, and the PSC-ONE hardware platform.
 
-<img src="docs/PSC_OS_ChatGPT.png" width="800">
+<img src="docs/PSC_OS.jpg" width="800">
 
 > This diagram presents the conceptual architecture of PSC-OS and PSC-ONE.  
 > Some modules shown in the diagram may represent planned or experimental extensions.
