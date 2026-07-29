@@ -37,7 +37,7 @@ module PSC_ONE_Boot_axi #(
     parameter integer KERNEL_ROM_WORD  = 50000,
     parameter integer USER_ROM_WORD    = 5000
 `else
-    parameter integer ROM_WORD         = 2048,
+    parameter integer ROM_WORD         = 4096,
     parameter integer BOOT_LOADER_WORD = ROM_WORD,
     parameter integer KERNEL_ROM_WORD  = ROM_WORD,
     parameter integer USER_ROM_WORD    = ROM_WORD

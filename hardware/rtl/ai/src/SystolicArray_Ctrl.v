@@ -3,7 +3,7 @@
 module SystolicArray4x4_Ctrl #(
     parameter integer PE_N     = 4,     // Physical SA size: 4x4 fixed
     parameter integer MATRIX_N = 4,     // Default matrix size
-    parameter integer MUL_NUM  = 2      // Number of physical multipliers
+    parameter integer MUL_NUM  = 4      // Number of physical multipliers
 )(
     input  wire             clock,
     input  wire             reset_n,

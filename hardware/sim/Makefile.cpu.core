@@ -121,8 +121,11 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE CPU CORE単体テスト
 # tang 20k 
 RV32ISP_SINGLE_TEST = \
-	add_test1:RV32ISP_core_test:./mem/add_test1.mem:0xff00ff0b \
+	voice_test3:RV32ISP_core_test:./mem/voice_test3.mem:0x00001216 \
 
+# ============================================================
+# Basic Test List
+# ============================================================
 RV32ISP_BASIC_TEST = \
 	add_test1:RV32ISP_core_test:./mem/add_test1.mem:0xff00ff0b \
 	add_test2:RV32ISP_core_test:./mem/add_test2.mem:0x00000000 \
@@ -142,6 +145,7 @@ RV32ISP_BASIC_TEST = \
 	csr_test1:RV32ISP_core_test:./mem/csr_test1.mem:0x00000022 \
 	sp_test1:RV32ISP_core_test:./mem/sp_test1.mem:0x00005AA5 \
 	ecall_test1:RV32ISP_core_test:./mem/ecall_test1.mem:0x00000321 \
+	ret_test1:RV32ISP_core_test:./mem/ret_test1.mem:0x12345678 \
 	prime_test1:RV32ISP_core_test:./mem/prime_test1.mem:0x00000061 \
 	audipc_test1:RV32ISP_core_test:./mem/audipc_test1.mem:0xFFFFFFF8 \
 	alu_mul_test1:RV32ISP_core_test:./mem/alu_mul_test1.mem:0x00000000 \
@@ -153,6 +157,17 @@ RV32ISP_BASIC_TEST = \
 	mmu_test1:RV32ISP_core_test:./mem/mmu_test1.mem:0x00000033 \
 
 # ============================================================
+# Voice Test List
+# ============================================================
+
+RV32ISP_VOICE_TEST = \
+	audio_feature_test1:RV32ISP_core_test:./mem/audio_feature_test1.mem:0x00001212 \
+	audio_nn_test1:RV32ISP_core_test:./mem/audio_nn_test1.mem:0x00001213 \
+	voice_test1:RV32ISP_core_test:./mem/voice_test1.mem:0x00001214 \
+	voice_test2:RV32ISP_core_test:./mem/voice_test2.mem:0x00001215 \
+	voice_test3:RV32ISP_core_test:./mem/voice_test3.mem:0x00001216 \
+
+# ============================================================
 # テストプログラムの切り替え（basic / single）
 # ============================================================
 # デフォルトはbasic
@@ -162,8 +177,10 @@ ifeq ($(TEST_PROGRAM_LIST),basic)
 RV32ISP_TEST = $(RV32ISP_BASIC_TEST)
 else ifeq ($(TEST_PROGRAM_LIST),single)
 RV32ISP_TEST = $(RV32ISP_SINGLE_TEST)
+else ifeq ($(TEST_PROGRAM_LIST),voice)
+RV32ISP_TEST = $(RV32ISP_VOICE_TEST)
 else
-$(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic または long, single を指定してください)
+$(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic または voice, single を指定してください)
 endif
 
 # run test
@@ -203,5 +220,10 @@ simulate_CPU_CORE:
 		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
 		make --silent -f $(COCOTB_MAKEFILE); \
-	done
+	done; \
+	printf '\a'; \
+	echo ""; \
+	echo "========================================"; \
+	echo "✅ All RV32ISP_core tests completed"; \
+	echo "========================================"
 	

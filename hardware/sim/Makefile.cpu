@@ -222,7 +222,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	nn_64x16x1_test1:RV32ISP_chip_test:./mem/nn_64x16x1_test1.mem:0x00000780 \
+	voice_test2:RV32ISP_chip_test:./mem/voice_test2.mem:0x00001215 \
 
 # ============================================================
 # 複数テスト定義
@@ -362,7 +362,7 @@ simulate_PSC_ONE_TESTS:
 		$(MAKE) -C ./cpp clean; \
 		$(MAKE) -C ./cpp $$name; \
 		tmp=$$(mktemp); \
-		head -n 2048 "$$mem_file" > $$tmp; \
+		head -n 4096 "$$mem_file" > $$tmp; \
 		cp $$tmp ./mem/test_program.mem; \
 		rm -f $$tmp; \
 		COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
@@ -378,6 +378,7 @@ simulate_PSC_ONE_TESTS:
 		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
 		make --silent -f $(COCOTB_MAKEFILE); \
 	done; \
+	printf '\a'; \
 	echo ""; \
 	echo "========================================"; \
 	echo "✅ All PSC-ONE tests completed"; \

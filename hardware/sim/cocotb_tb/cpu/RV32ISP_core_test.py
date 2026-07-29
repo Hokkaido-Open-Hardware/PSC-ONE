@@ -12,12 +12,12 @@ from cocotb.triggers import FallingEdge, ReadOnly
 Assert = 0
 
 CLK_PERIOD_NS = int(os.getenv("CLK_PERIOD_NS", "10"))  # 100 MHz
-RUN_CYCLES = int(os.getenv("RUN_CYCLES", "2000000"))
+RUN_CYCLES = int(os.getenv("RUN_CYCLES", "5000000000"))
 PROGRAM_FILE = os.getenv("PROGRAM_FILE", "./mem/test_program.mem")
 
-PROGRAM_READ_CYCLE  = 45
-DATA_READ_CYCLE     = 220
-DATA_WRITE_CYCLE    = 250
+PROGRAM_READ_CYCLE  = 15
+DATA_READ_CYCLE     = 20
+DATA_WRITE_CYCLE    = 25
 
 # ------------------------------------------------
 # wait

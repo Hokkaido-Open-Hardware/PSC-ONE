@@ -194,6 +194,7 @@ endif
 # run test
 .PHONY: simulate_RISCV_TESTS
 simulate_RISCV_TESTS:
+	$(MAKE) -f Makefile.riscv all
 	@echo "MODE=$(MODE)"
 	@echo "SIM=$(SIM)"
 	@echo "CPU_VERSION=$(CPU_VERSION)"

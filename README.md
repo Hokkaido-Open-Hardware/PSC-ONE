@@ -334,6 +334,35 @@ Instead, the goal is to explore:
 
 ---
 
+# PSC-OS
+
+PSC-OS is a custom operating system developed specifically for the PSC-ONE platform.
+
+Unlike Linux, BSD, or existing RTOSes, PSC-OS is designed together with the PSC_RV32ISP CPU, memory subsystem, peripherals, and hardware accelerators, providing a tightly integrated hardware/software co-design environment.
+
+The following diagram illustrates the software architecture of PSC-OS, including user applications, the kernel, device drivers, and the underlying PSC-ONE hardware platform.
+
+<img src="docs/images/PSC_OS.jpg" width="800">
+
+> This diagram presents the conceptual architecture of PSC-OS and PSC-ONE. Some modules shown may represent planned or experimental extensions.
+
+Current PSC-OS features include:
+
+- Bootloader and kernel
+- Machine, Supervisor, and User privilege modes
+- Sv32 virtual memory
+- ECALL-based system-call interface
+- Interactive command shell
+- FAT32 filesystem support
+- SD-card boot and storage
+- User-program loading and execution
+- Device drivers for UART, LCD, I2S microphone, and SD card
+- Native support for the SynapEngine and PFE hardware accelerators
+
+PSC-OS serves both as the runtime environment for the PSC-ONE SoC and as an experimental platform for operating-system, CPU, and hardware/software co-design research.
+
+---
+
 # Demo
 
 ## PSC-OS LCD Demo
