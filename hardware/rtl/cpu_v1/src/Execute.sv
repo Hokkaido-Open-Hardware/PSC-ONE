@@ -17,7 +17,8 @@ module Execute #(
     output logic [31:0] r_data1,
     output logic [31:0] r_data2,
     output logic [31:0] out_pc,
-    output logic        alu_done
+    output logic        busy,
+    output logic        done
 );
 
     typedef enum logic [2:0] {
@@ -118,19 +119,23 @@ endgenerate
             r_data1  <= 32'd0;
             r_data2  <= 32'd0;
             out_pc   <= 32'd0;
-            alu_done <= 1'b0;
+            busy     <= 1'b0;
+            done     <= 1'b0;
         end else begin
-            alu_done <= 1'b0;
+            done <= 1'b0;
 
             case (state)
                 IDLE: begin
-                    if (div_start)
+                    busy <= 1'b0;
+                    if (div_start && !busy) begin
+                        busy  <= 1'b1;
                         state <= ALU_DIV_WAIT;
-                    else if (mul_start)
+                    end else if (mul_start && !busy) begin
+                        busy  <= 1'b1;
                         state <= ALU_MUL_WAIT;
-                    else if (execute_enb) begin
+                    end else if (execute_enb && !busy) begin
                         alu_data <= alu_exec(decoder_ctrl.alucon, s_data1, s_data2);
-                        alu_done <= 1'b1;
+                        done     <= 1'b1;
                     end
 
                     if (execute_enb) begin
@@ -146,14 +151,14 @@ endgenerate
                 ALU_DIV_DONE: begin
                     alu_data <= decoder_ctrl.alucon[1] ? div_remainder
                                                        : div_quotient;
-                    alu_done <= 1'b1;
+                    done     <= 1'b1;
                     state    <= IDLE;
                 end
 
                 ALU_MUL_WAIT:
                     if (mul_done) begin
                         alu_data <= mul_out;
-                        alu_done <= 1'b1;
+                        done     <= 1'b1;
                         state    <= IDLE;
                     end
 

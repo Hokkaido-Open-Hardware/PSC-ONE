@@ -228,5 +228,10 @@ simulate_RISCV_TESTS:
 		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
 		make --silent -f $(COCOTB_MAKEFILE); \
-	done
+	done; \
+	printf '\a'; \
+	echo ""; \
+	echo "========================================"; \
+	echo "✅ All riscv tests completed"; \
+	echo "========================================"
 	

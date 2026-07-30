@@ -30,9 +30,7 @@ module PSC_InstructionFSM (
     output logic        REGISTER_READ_st,
     output logic        EXECUTE_st,
     output logic        BRANCH_st,
-    output logic        BRANCH_W_st,
     output logic        STORE_st,
-    output logic        STORE_W_st,
 
     // Pipeline 
     input  logic        ri_wb_done,
@@ -49,9 +47,7 @@ module PSC_InstructionFSM (
         ST_REGISTER_READ,
         ST_EXECUTE,
         ST_BRANCH,
-        ST_BRANCH_W,
         ST_STORE,
-        ST_STORE_W,
         ST_PIPELINE_W
     } execute_state_t;
 
@@ -120,24 +116,16 @@ module PSC_InstructionFSM (
             end
 
             ST_BRANCH: begin
-                next_state = ST_BRANCH_W;
-            end
-
-            ST_BRANCH_W: begin
                 if (branch_done)
                     next_state = ST_STORE;
             end
 
             ST_STORE: begin
-                next_state = ST_STORE_W;
-            end
-
-            ST_STORE_W: begin
                 if (store_done)
                     next_state = ST_IDLE;
             end
 
-            // TBD
+            // Debug(未使用)
             ST_PIPELINE_W: begin
                 if (ri_wb_done)
                     next_state = ST_IDLE;
@@ -159,14 +147,12 @@ module PSC_InstructionFSM (
     assign REGISTER_READ_st = (execute_state == ST_REGISTER_READ);
     assign EXECUTE_st       = (execute_state == ST_EXECUTE);
     assign BRANCH_st        = (execute_state == ST_BRANCH);
-    assign BRANCH_W_st      = (execute_state == ST_BRANCH_W);
     assign STORE_st         = (execute_state == ST_STORE);
-    assign STORE_W_st       = (execute_state == ST_STORE_W);
 
     assign fsm_task_busy = 
                 (execute_state != ST_IDLE);
 
     assign fsm_task_done =
-                IDLE_st && ((execute_state_d == ST_STORE_W) || (execute_state_d == ST_PIPELINE_W));
+                IDLE_st && ((execute_state_d == ST_STORE) || (execute_state_d == ST_PIPELINE_W));
 
 endmodule

@@ -29,17 +29,14 @@ module Branch (
     output logic        pc_sel2,
 
     // Completion
+    output logic        busy,
     output logic        branch_done
 );
 
     typedef enum logic [3:0] {
-        IDLE             = 4'd0,
-        BRANCH_MMU       = 4'd1,
-        BRANCH_MMU_W     = 4'd2,
-        BRANCH_ACCESS    = 4'd3,
-        BRANCH_WAIT      = 4'd4,
-        BRANCH_DONE      = 4'd5,
-        BRANCH_DONE_WAIT = 4'd6
+        IDLE, BRANCH_MMU, BRANCH_MMU_W,
+        BRANCH_ACCESS, BRANCH_WAIT,
+        BRANCH_DONE
     } state_t;
 
     state_t state;
@@ -111,6 +108,7 @@ module Branch (
             vaddr                 <= 32'd0;
             data_mem_read_valid   <= 1'b0;
             data_mem_read_address <= 32'd0;
+            busy                  <= 1'b0;
             branch_done           <= 1'b0;
         end else begin
             // Default pulse outputs
@@ -120,13 +118,15 @@ module Branch (
 
             unique case (state)
                 IDLE: begin
+                    busy <= 1'b0;
                     pc_sel2 <= branch_exec(
                         decoder_ctrl.funct3,
                         r_data1,
                         r_data2,
                         decoder_ctrl.pc_sel
                     );
-                    if (branch_enb) begin
+                    if (branch_enb && !busy) begin
+                        busy <= 1'b1;
                         if (decoder_ctrl.is_load) begin
                             state <= BRANCH_MMU;
                         end else begin
@@ -134,35 +134,39 @@ module Branch (
                         end
                     end
                 end
+
                 BRANCH_MMU: begin
                     mmu_valid <= 1'b1;
                     vaddr     <= in_vaddr;
                     state     <= BRANCH_MMU_W;
                 end
+
                 BRANCH_MMU_W: begin
                     if (mmu_ready) begin
                         data_mem_read_address <= d_paddr;
                         state                 <= BRANCH_ACCESS;
                     end
                 end
+
                 BRANCH_ACCESS: begin
                     if (data_mem_req_ready) begin
                         data_mem_read_valid <= 1'b1;
                         state               <= BRANCH_WAIT;
                     end
                 end
+
                 BRANCH_WAIT: begin
                     if (data_mem_read_ready) begin
                         state <= BRANCH_DONE;
                     end
+
                 end
+
                 BRANCH_DONE: begin
-                    state       <= BRANCH_DONE_WAIT;
-                end
-                BRANCH_DONE_WAIT: begin
                     branch_done <= 1'b1;
-                    state <= IDLE;
+                    state       <= IDLE;
                 end
+
                 default: begin
                     state                 <= IDLE;
                     mmu_valid             <= 1'b0;

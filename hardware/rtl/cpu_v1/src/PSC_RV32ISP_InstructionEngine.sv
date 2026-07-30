@@ -58,8 +58,8 @@ module PSC_RV32ISP_InstructionEngine #(
     output logic [8:0]  uart_out
 );
 
-    logic EXECUTE_st, BRANCH_st, BRANCH_W_st;
-    logic STORE_st, STORE_W_st;
+    logic EXECUTE_st, BRANCH_st;
+    logic STORE_st;
     logic decode_enb, execute_enb, branch_enb;
     logic memory_store_enb, register_store_enb;
     logic decode_done, alu_done, branch_done, store_done;
@@ -86,8 +86,8 @@ module PSC_RV32ISP_InstructionEngine #(
     assign execute_state_sig     = EXECUTE_st;
     assign mem_write_sel         = decoder_ctrl_now.funct3;
 
-    assign vaddr = BRANCH_W_st ? branch_vaddr :
-                   STORE_W_st  ? memory_store_vaddr : 32'd0;
+    assign vaddr = BRANCH_st   ? branch_vaddr :
+                   STORE_st    ? memory_store_vaddr : 32'd0;
 
     assign d_MMU_enb = (branch_mmu_valid || memory_store_mmu_valid) &&
                        (decoder_ctrl_now.is_load || decoder_ctrl_now.is_store);
@@ -122,9 +122,7 @@ module PSC_RV32ISP_InstructionEngine #(
 
         .EXECUTE_st           (EXECUTE_st),
         .BRANCH_st            (BRANCH_st),
-        .BRANCH_W_st          (BRANCH_W_st),
         .STORE_st             (STORE_st),
-        .STORE_W_st           (STORE_W_st),
 
         .fifo_req_ready       (fifo_req_ready),
         .fifo_read_ready      (fifo_read_ready),
@@ -207,7 +205,8 @@ module PSC_RV32ISP_InstructionEngine #(
         .r_data1             (r_data1),
         .r_data2             (r_data2),
         .out_pc              (execute_pc),
-        .alu_done            (alu_done)
+        .busy                (),
+        .done                (alu_done)
     );
 
     // =====================================
@@ -230,7 +229,8 @@ module PSC_RV32ISP_InstructionEngine #(
         .r_data1             (),
         .r_data2             (),
         .out_pc              (),
-        .alu_done            (ri_alu_done)
+        .busy                (),
+        .done                (ri_alu_done)
     );
 
     // =====================================
@@ -253,6 +253,7 @@ module PSC_RV32ISP_InstructionEngine #(
         .data_mem_req_ready    (data_mem_req_ready),
         .data_mem_read_ready   (data_mem_read_ready),
         .pc_sel2               (pc_sel2),
+        .busy                  (),
         .branch_done           (branch_done)
     );
 
@@ -288,6 +289,7 @@ module PSC_RV32ISP_InstructionEngine #(
         .data_mem_req_ready     (data_mem_req_ready),
         .uart                   (uart_out),
         .w_data                 (w_data),
+        .busy                   (),
         .store_done             (store_done)
     );
 

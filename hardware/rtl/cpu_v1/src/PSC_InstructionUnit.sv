@@ -18,9 +18,7 @@ module PSC_InstructionUnit (
     // Cell state
     output logic        EXECUTE_st,
     output logic        BRANCH_st,
-    output logic        BRANCH_W_st,
     output logic        STORE_st,
-    output logic        STORE_W_st,
 
     // FIFO
     input  logic        fifo_req_ready,
@@ -191,9 +189,7 @@ module PSC_InstructionUnit (
         .REGISTER_READ_st     (REGISTER_READ_st),
         .EXECUTE_st           (EXECUTE_st),
         .BRANCH_st            (BRANCH_st),
-        .BRANCH_W_st          (BRANCH_W_st),
         .STORE_st             (STORE_st),
-        .STORE_W_st           (STORE_W_st),
 
         .ri_wb_done           (ri_ex_complete),
 
@@ -348,7 +344,6 @@ module PSC_InstructionUnit (
     logic [31:0] regfile_wdata;
 
     assign normal_wb_valid =
-                STORE_W_st &&
                 store_done &&
                 decoder_ctrl_now.rf_wen &&
                 (decoder_ctrl_now.w_addr != 5'd0);
@@ -396,12 +391,12 @@ module PSC_InstructionUnit (
                 inst_state.alu_data_low2 <= alu_data_low2;
             end
 
-            if (BRANCH_W_st && branch_done) begin
+            if (BRANCH_st && branch_done) begin
                 inst_state.pc_sel2      <= pc_sel2;
                 inst_state.branch_rdata <= branch_mem_read_data;
             end
 
-            if (STORE_W_st && store_done) begin
+            if (STORE_st && store_done) begin
                 inst_state.w_data <= w_data;
                 inst_state.valid  <= 1'b0;
             end
@@ -411,7 +406,7 @@ module PSC_InstructionUnit (
     // FIFO
     assign fifo_read_valid = FIFO_READ_st;
     assign fifo_flush =
-                STORE_st &&
+                STORE_st && store_done &&
                 (
                     pc_sel2                        ||
                     decoder_ctrl_now.is_sfence_vma ||
@@ -433,13 +428,12 @@ module PSC_InstructionUnit (
     assign memory_store_enb = 
                 STORE_st;
     assign register_store_enb =
-                STORE_W_st                &&
                 store_done                &&
                 decoder_ctrl_now.rf_wen   &&
                 (decoder_ctrl_now.w_addr != 5'd0);
     // CSR
     assign csr_enb =
-                BRANCH_W_st &&
+                BRANCH_st &&
                 branch_done;
     assign csr_valid = 
                 execute_task_done;

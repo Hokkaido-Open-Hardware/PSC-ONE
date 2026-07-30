@@ -36,6 +36,7 @@ module MemoryStore #(
 
     output logic [8:0]  uart,
     output logic [31:0] w_data,
+    output logic        busy,
     output logic        store_done
 );
 
@@ -97,6 +98,7 @@ module MemoryStore #(
             data_mem_write_address <= 32'd0;
             uart                   <= 9'd0;
             w_data                 <= 32'h0;
+            busy                   <= 1'b0;
             store_done             <= 1'b0;
         end else begin
             mmu_valid            <= 1'b0;
@@ -104,12 +106,17 @@ module MemoryStore #(
             store_done           <= 1'b0;
 
             case (state)
-                IDLE:
-                    if (store_enb) begin
+                IDLE: begin
+                    busy       <= 1'b0;
+                    if (store_enb && !busy) begin
+                        busy   <= 1'b1;
                         w_data <= w_data_w;
-                        state <= decoder_ctrl.mem_rw ? STORE_MMU
-                                                    : STORE_DONE;
+                        if (decoder_ctrl.mem_rw)
+                            state <= STORE_MMU;
+                        else 
+                            state <= STORE_DONE;
                     end
+                end
 
                 STORE_MMU: begin
                     if (mode_sv32) begin
@@ -137,8 +144,9 @@ module MemoryStore #(
                     end
 
                 STORE_WAIT:
-                    if (data_mem_write_ready)
+                    if (data_mem_write_ready) begin
                         state <= STORE_DONE;
+                    end
 
                 STORE_DONE: begin
                     store_done <= 1'b1;

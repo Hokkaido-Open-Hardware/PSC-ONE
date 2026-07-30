@@ -121,7 +121,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE CPU CORE単体テスト
 # tang 20k 
 RV32ISP_SINGLE_TEST = \
-	voice_test3:RV32ISP_core_test:./mem/voice_test3.mem:0x00001216 \
+	add_test1:RV32ISP_core_test:./mem/add_test1.mem:0xff00ff0b \
 
 # ============================================================
 # Basic Test List
