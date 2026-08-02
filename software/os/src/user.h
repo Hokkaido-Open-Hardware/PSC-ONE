@@ -48,6 +48,9 @@ void call_sd_read_api(unsigned sector);
 void call_sd_write_test_api(unsigned sector);
 uint32_t call_sd_write_buf_api(uint32_t sector, const uint8_t *buf);
 int call_sd_read_buf_api(uint32_t sector, void *buf);
+// speech
+void cmd_speech(void);
+int call_speech_recognition_api(void);
 // Dump command
 void call_dump_api(uint32_t addr, uint32_t len);
 
@@ -60,7 +63,7 @@ int getchar(void);
 int getchar_timeout(void);
 void print_int(int v);
 
-inline static uint32_t sa_api(uint32_t n, uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a4);
+static inline uint32_t sa_api(uint32_t sysno, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg4);
 static inline uint32_t mic_api(uint32_t sysno, uint32_t arg0);
 
 inline static uint32_t sd_api(uint32_t sysno, uint32_t arg0);

@@ -250,7 +250,7 @@ simulate_PSCOS:
 	mv $$tmp ./mem/bootrom.mem
 
 	@tmp=$$(mktemp); \
-	head -n 50000 ./mem/kernel.mem > $$tmp; \
+	head -n 100000 ./mem/kernel.mem > $$tmp; \
 	mv $$tmp ./mem/kernel.mem
 
 	@tmp=$$(mktemp); \
@@ -274,7 +274,8 @@ simulate_PSCOS:
 	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
 	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
-	make --silent -f $(COCOTB_MAKEFILE)
+	make --silent -f $(COCOTB_MAKEFILE); \
+	printf '\a'
 
 # ============================================================
 # PSC-OS テスト from SD-Card
@@ -310,7 +311,7 @@ simulate_SD_PSCOS:
 	mv $$tmp ./mem/bootrom.mem
 
 	@tmp=$$(mktemp); \
-	head -n 50000 ./mem/kernel.mem > $$tmp; \
+	head -n 100000 ./mem/kernel.mem > $$tmp; \
 	mv $$tmp ./mem/kernel.mem
 
 	@tmp=$$(mktemp); \
@@ -338,4 +339,5 @@ simulate_SD_PSCOS:
 	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
 	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS) $(SD_VDEF)" \
-	make --silent -f $(COCOTB_MAKEFILE)
+	make --silent -f $(COCOTB_MAKEFILE); \
+	printf '\a'

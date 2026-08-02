@@ -25,14 +25,14 @@ ifeq ($(MODE),sim)
   BOOT_FLOW     := direct
   RUN_QEMU      := 1
   #KCPPFLAGS     :=
-  KCPPFLAGS     := -DBSS_CLEAR=1
+  KCPPFLAGS     := -DBSS_CLEAR_OFF=1
   USER_BASE_VAL := 0x00400000
 
 else ifeq ($(MODE),fpga_mem)
   BOOT_FLOW     := direct
   RUN_QEMU      := 1
   #KCPPFLAGS     :=
-  KCPPFLAGS     := -DBSS_CLEAR=0
+  KCPPFLAGS     := -DBSS_CLEAR_OFF=0
   USER_BASE_VAL := 0x00400000
 
 else ifeq ($(MODE),sbi)
@@ -45,7 +45,7 @@ else ifeq ($(MODE),psc)
   BOOT_FLOW     := loader
   RUN_QEMU      := 0
   #KCPPFLAGS     :=
-  KCPPFLAGS     := -DBSS_CLEAR=0
+  KCPPFLAGS     := -DBSS_CLEAR_OFF=0
   USER_BASE_VAL := 0x00400000
 
 else
@@ -78,7 +78,8 @@ ARCH := -march=rv32im_zicsr_zifencei -mabi=ilp32 -mno-relax
 CFLAGS ?= -std=c11 -O2 -g3 -Wall -Wextra \
           --target=riscv64-unknown-elf $(ARCH) \
           -fno-stack-protector -ffreestanding -nostdlib \
-		  -fomit-frame-pointer
+		  -fomit-frame-pointer \
+		  -mstrict-align
 
 # ★ LDFLAGS_KERNEL は後でターゲット依存で上書きされる
 LDFLAGS_USER := -Wl,-T$(Src)/user.ld   -Wl,-Map=$(Build)/shell.map  -Wl,--no-relax
@@ -112,7 +113,8 @@ endif
 # ========================
 SRCS_USER   := $(Src)/shell.c $(Src)/user.c $(Src)/fat32.c
 SRCS_KERNEL := $(Src)/kernel.c $(Src)/common.c $(Src)/dma.c $(Src)/synap_api.c $(Src)/sdcard_api.c \
-							   $(Src)/mic_api.c $(Src)/lcd_api.c $(Src)/fft_api.c $(Src)/mem_test.c 
+							   $(Src)/mic_api.c $(Src)/lcd_api.c $(Src)/fft_api.c $(Src)/mem_test.c \
+							   $(Src)/speech_recognition_api.c
 SRCS_MBIOS  := $(Src)/psc_mbios.S
 
 USER_ELF    := $(Build)/shell.elf

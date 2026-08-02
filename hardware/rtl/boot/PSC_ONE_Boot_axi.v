@@ -29,12 +29,12 @@ module PSC_ONE_Boot_axi #(
 `ifdef OS_SIM
     parameter integer ROM_WORD         = 128,
     parameter integer BOOT_LOADER_WORD = 4500,
-    parameter integer KERNEL_ROM_WORD  = 50000,
+    parameter integer KERNEL_ROM_WORD  = 100000,
     parameter integer USER_ROM_WORD    = 5000
 `elsif FPGA_BOOT_LOADER_MODE
     parameter integer ROM_WORD         = 128,
     parameter integer BOOT_LOADER_WORD = 4500,
-    parameter integer KERNEL_ROM_WORD  = 50000,
+    parameter integer KERNEL_ROM_WORD  = 100000,
     parameter integer USER_ROM_WORD    = 5000
 `else
     parameter integer ROM_WORD         = 4096,
@@ -524,7 +524,7 @@ module kernel_rom #(
     input  wire [ADDR_WIDTH-1:0] addr,
     output reg  [31:0]           dout
 );
-    localparam integer ROM_WORD = 50000;
+    localparam integer ROM_WORD = 100000;
     reg [31:0] mem [0:ROM_WORD-1];
     initial $readmemh("mem/kernel.mem", mem);
 

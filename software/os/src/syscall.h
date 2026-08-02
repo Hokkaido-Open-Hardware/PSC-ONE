@@ -29,6 +29,9 @@
 #define SYS_READFILE        51
 #define SYS_WRITEFILE       52
 
+// --- SPEECH_RECOGNITION ---
+#define SYS_SPEECH_RECOGNITION 60
+
 // --- SYSTEM ---
 #define SYS_EXIT            90
 #define SYS_PRINT_INT       91

@@ -200,7 +200,8 @@ module SystolicArray4x4_Ctrl #(
     wire [127:0] b_data_out_cur;
 
     SystolicArray_ReadCtrl #(
-        .PE_N               (PE_N)
+        .PE_N               (PE_N),
+        .RADDR_MASK         (32'h00FF_FFFF)
     ) u_systolic_array_read_ctrl (
         .clock              (clock),
         .reset_n            (reset_n),

@@ -6,7 +6,8 @@ void main(void) {
 
     //SA API call
     //printf("call sa start.\n");
-    //call_sa_api();
+    call_sa_api(0x04);
+    //printf("call sa returned.\n");
 
     // DUMP API call
     //call_dump_api();
@@ -288,7 +289,9 @@ prompt:
             if (fat32_touch(argv[1]) != 0) {
                 printf("fat32_touch failed\n");
             } 
-            
+        } else if (strcmp(argv[0], "speech") == 0) {
+            cmd_speech();
+                    
         // ---- Helps出力 ----
         } else if (strcmp(argv[0], "help") == 0) {
             printf("commands:\n");

@@ -250,6 +250,7 @@ async def RV32IS_chip_test1(dut):
     #dump_sdram_mem(dut, 0x0020_1400, 84)
     #dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
     #dump_page_table(dut, 0x024)
+    #satp_val = int(dut.u_chip.u_core_axi.u_core.u_csr.csr_satp.value)
 
     while waited < timeout_cycles:
         await RisingEdge(dut.clock)
@@ -268,7 +269,7 @@ async def RV32IS_chip_test1(dut):
             dump_sdram_mem(dut, 0x0027_E000, 1024)
 
             # 正しい page table の物理アドレスを取得
-            satp_val = int(dut.u_chip.u_core_axi.u_core.csr_satp.value)
+            satp_val = int(dut.u_chip.u_core_axi.u_core.u_csr.csr_satp.value)
             ppn = satp_val & 0b11_1111_1111_1111_1111_1111    # 22bit and
             root_pt = ppn << 12
 

@@ -120,78 +120,75 @@ void exit(void) {
 void call_sa_api(uint32_t matrix_size)
 {
     /*
-    static const uint8_t mat2x2_A[2][2] = {
-         {7,  2},
-         {5,  6}
-    };
-
-    static const uint8_t mat2x2_B[2][2] = {
-         {3,  5},
-         {1,  2}
-    };
+    static uint8_t matrix_A[SA_MAT_MAX * SA_MAT_MAX];
+    static uint8_t matrix_B[SA_MAT_MAX * SA_MAT_MAX];
+    static uint32_t matrix_C[SA_MAT_MAX * SA_MAT_MAX];
     */
 
-    uint8_t matrix_A[SA_MAT_MAX][SA_MAT_MAX];
-    uint8_t matrix_B[SA_MAT_MAX][SA_MAT_MAX];
-    uint32_t matrix_C[SA_MAT_MAX][SA_MAT_MAX];
+    uint8_t matrix_A[SA_MAT_MAX * SA_MAT_MAX];
+    uint8_t matrix_B[SA_MAT_MAX * SA_MAT_MAX];
+    uint32_t matrix_C[SA_MAT_MAX * SA_MAT_MAX];
 
-    // --- ランダム生成 ---
-    for (uint32_t i = 0; i < matrix_size; i++) {
-        for (uint32_t j = 0; j < matrix_size; j++) {
-            //matrix_A[i][j] = (uint8_t)(i+j);
-            //matrix_B[i][j] = (uint8_t)(i+j);
-            matrix_A[i][j] = (uint8_t)(2*i + 2*j + 2);
-            matrix_B[i][j] = (uint8_t)(3*i + j + 5);
-        }
+    if (matrix_size == 0 ||
+        matrix_size > SA_MAT_MAX ||
+        (matrix_size & 3u) != 0u) {
+        printf("invalid matrix size\n");
+        return;
     }
 
-    /*
-    matrix_A[2][3] = 6;
-    matrix_B[5][3] = 2;
-    */
+    for (uint32_t i = 0; i < matrix_size; ++i) {
+        for (uint32_t j = 0; j < matrix_size; ++j) {
+            const uint32_t index = i * matrix_size + j;
+
+            matrix_A[index] = (uint8_t)(2u * i + 2u * j + 2u);
+            matrix_B[index] = (uint8_t)(3u * i + j + 5u);
+            matrix_C[index] = 0u;
+        }
+    }
 
     sa_api(
         SYS_SA_RUN,
-        (uint32_t)&matrix_A[0][0],      // a0: input
-        (uint32_t)&matrix_B[0][0],      // a1: input
-        (uint32_t)&matrix_C[0][0],      // a2: output 
-        (uint32_t)matrix_size           // a4: matrix size
+        (uint32_t)(uintptr_t)matrix_A,
+        (uint32_t)(uintptr_t)matrix_B,
+        (uint32_t)(uintptr_t)matrix_C,
+        matrix_size
     );
 
-    // ---- A表示 ----
     putchar('A');
     putchar('\n');
-    for (uint32_t i = 0; i < matrix_size; i++) {
-        for (uint32_t j = 0; j < matrix_size; j++) {
-            print_int((int)matrix_A[i][j]);
+
+    for (uint32_t i = 0; i < matrix_size; ++i) {
+        for (uint32_t j = 0; j < matrix_size; ++j) {
+            print_int((int)matrix_A[i * matrix_size + j]);
             putchar(' ');
         }
         putchar('\n');
     }
-    putchar('\n');
 
-    // ---- B表示 ----
+    putchar('\n');
     putchar('B');
     putchar('\n');
-    for (uint32_t i = 0; i < matrix_size; i++) {
-        for (uint32_t j = 0; j < matrix_size; j++) {
-            print_int((int)matrix_B[i][j]);
+
+    for (uint32_t i = 0; i < matrix_size; ++i) {
+        for (uint32_t j = 0; j < matrix_size; ++j) {
+            print_int((int)matrix_B[i * matrix_size + j]);
             putchar(' ');
         }
         putchar('\n');
     }
-    putchar('\n');
 
-    // ---- 結果表示 ----
+    putchar('\n');
     putchar('C');
     putchar('\n');
-    for (uint32_t i = 0; i < matrix_size; i++) {
-        for (uint32_t j = 0; j < matrix_size; j++) {
-            print_int((int)matrix_C[i][j]);
+
+    for (uint32_t i = 0; i < matrix_size; ++i) {
+        for (uint32_t j = 0; j < matrix_size; ++j) {
+            print_int((int)matrix_C[i * matrix_size + j]);
             putchar(' ');
         }
         putchar('\n');
     }
+
     putchar('\n');
 }
 
@@ -308,6 +305,33 @@ uint32_t call_sd_write_buf_api(
         sector,
         (uint32_t)buf
     );
+}
+
+// -------------------------------------------------------
+void cmd_speech(void)
+{
+    printf("Speech recognition start\n");
+
+    int result =
+        call_speech_recognition_api();
+
+    switch (result) {
+    case 0:
+        printf("RESULT: UP\n");
+        break;
+
+    case 1:
+        printf("RESULT: DOWN\n");
+        break;
+
+    case 2:
+        printf("RESULT: UNKNOWN\n");
+        break;
+
+    default:
+        printf("RESULT: ERROR %d\n", result);
+        break;
+    }
 }
 
 // -------------------------------------------------------
@@ -566,26 +590,30 @@ void print_int(int v)
 #endif /* USE_SBI_CONSOLE */
 
 // SA API
-static inline uint32_t sa_api(uint32_t n,
-                              uint32_t a0,
-                              uint32_t a1,
-                              uint32_t a2,
-                              uint32_t a4)
+static inline uint32_t sa_api(
+    uint32_t sysno,
+    uint32_t arg0,
+    uint32_t arg1,
+    uint32_t arg2,
+    uint32_t arg4)
 {
-    uint32_t ret;
-    __asm__ __volatile__ (
-        "mv a0, %1\n"
-        "mv a1, %2\n"
-        "mv a2, %3\n"
-        "mv a3, %4\n"
-        "mv a4, %5\n"   
-        "ecall\n"
-        "mv %0, a0\n"
-        : "=r"(ret)
-        : "r"(a0), "r"(a1), "r"(a2), "r"(n), "r"(a4)
-        : "a0", "a1", "a2", "a3", "a4", "memory"
+    register uint32_t reg_a0 __asm__("a0") = arg0;
+    register uint32_t reg_a1 __asm__("a1") = arg1;
+    register uint32_t reg_a2 __asm__("a2") = arg2;
+    register uint32_t reg_a3 __asm__("a3") = sysno;
+    register uint32_t reg_a4 __asm__("a4") = arg4;
+
+    __asm__ volatile(
+        "ecall"
+        : "+r"(reg_a0)
+        : "r"(reg_a1),
+          "r"(reg_a2),
+          "r"(reg_a3),
+          "r"(reg_a4)
+        : "memory"
     );
-    return ret;
+
+    return reg_a0;
 }
 
 // I2S MIC IF API
@@ -675,6 +703,22 @@ static inline void dump_api(uint32_t sysno,
           "r"(a3)
         : "memory"
     );
+}
+
+int call_speech_recognition_api(void)
+{
+    register uint32_t a0 __asm__("a0") = 0;
+    register uint32_t a3 __asm__("a3") =
+        SYS_SPEECH_RECOGNITION;
+
+    __asm__ __volatile__(
+        "ecall"
+        : "+r"(a0)
+        : "r"(a3)
+        : "memory"
+    );
+
+    return (int32_t)a0;
 }
 
 // -------------------------------------------------------

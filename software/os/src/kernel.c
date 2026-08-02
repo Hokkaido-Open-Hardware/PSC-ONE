@@ -6,6 +6,7 @@
 #include "lcd_api.h"
 #include "fft_api.h"
 #include "mem_test.h"
+#include "speech_recognition_api.h"
 #include "kernel.h"
 #include <stdint.h>
 
@@ -607,16 +608,37 @@ void handle_syscall(struct trap_frame *f) {
             
         // -------------------------------------------
         case SYS_SA_RUN: {
-            const uint8_t *in_A  =
-                (const uint8_t *)(uint32_t)f->a0;
-            const uint8_t *in_B  =
-                (const uint8_t *)(uint32_t)f->a1;
-            uint32_t *out =
-                (uint32_t *)(uint32_t)f->a2;
-            uint8_t max_matrix =
-                (uint8_t)f->a4;
+            const uint8_t *user_A =
+                (const uint8_t *)(uintptr_t)f->a0;
+            const uint8_t *user_B =
+                (const uint8_t *)(uintptr_t)f->a1;
+            uint32_t *user_C =
+                (uint32_t *)(uintptr_t)f->a2;
 
-            sa_run(in_A, in_B, max_matrix, out);
+            uint32_t n = f->a4;
+
+            static uint8_t kernel_A[SA_MAT_MAX * SA_MAT_MAX];
+            static uint8_t kernel_B[SA_MAT_MAX * SA_MAT_MAX];
+            static uint32_t kernel_C[SA_MAT_MAX * SA_MAT_MAX];
+
+            uint32_t elements = n * n;
+
+            /* ユーザー領域からカーネル領域へコピー */
+            for (uint32_t i = 0; i < elements; ++i) {
+                kernel_A[i] = user_A[i];
+                kernel_B[i] = user_B[i];
+                kernel_C[i] = 0;
+            }
+
+            /* SAにはカーネル側の物理的に有効なアドレスを渡す */
+            sa_run(kernel_A, kernel_B, (uint8_t)n, kernel_C);
+
+            /* 結果をユーザー領域へ返す */
+            for (uint32_t i = 0; i < elements; ++i) {
+                user_C[i] = kernel_C[i];
+            }
+
+            f->a0 = 0;
             break;
         }
         
@@ -711,7 +733,16 @@ void handle_syscall(struct trap_frame *f) {
             f->a0 = tmp & 0x03;
             break;
         }
-        
+
+        // -------------------------------------------
+        case SYS_SPEECH_RECOGNITION: {
+            int32_t result =
+                s_call_speech_recognition_api();
+
+            f->a0 = (uint32_t)result;
+            break;
+        }
+                
         // -------------------------------------------
         case SYS_EXIT: {
             /*
@@ -781,12 +812,12 @@ extern char __kernel_base[];
 
 void kernel_main(void) {
 
-#if 0
+#if 1
     // SA run.
     s_printf("SA run\n");
     s_call_sa_api(4, true);
     s_call_sa_api(8, true);
-    s_call_sa_api(16, true);
+    //s_call_sa_api(16, true);
     s_printf("\n");
 #endif
 
@@ -800,75 +831,20 @@ void kernel_main(void) {
     cmd_dump(2, argv);
 #endif
 
-#if BSS_CLEAR
+#if BSS_CLEAR_OFF
     s_printf("memset = OFF\n");
-    memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
 #else
     s_printf("memset = ON\n");
+    memset(__bss, 0, (size_t) __bss_end - (size_t) __bss);
 #endif
     s_printf("PSC_OS Boot Start.........\n");
     s_printf("--- memset done ---\n");
 
     // compline number.
-    s_printf("Test Ver: test_1.4.7\n");
+    s_printf("Test Ver: test_1.4.8\n");
 #if 0
     s_printf("Draw PSC Logo\n");
     lcd_draw_boot_logo();
-#endif
-#if 0
-    s_printf("SW data\n");
-    uint32_t sw = PIO32_ADDR & 0x03;
-    s_printf("%x\n", sw);
-#endif
-
-#if 0
-    // I2S mic 
-    uint32_t sample24;
-
-    if (mic_read_sample24(&sample24) == 0) {
-        s_printf("mic=%x\n", sample24);
-        s_printf("\n");
-    } else {
-        s_printf("mic timeout\n");
-    }
-#endif
-
-#if 0
-    s_call_mic_read_samples24(10);
-#endif
-
-#if 0
-    s_printf("FFT data\n");
-    fft_complex_t a = {32767, 0};
-    fft_complex_t b = {32767, 0};
-
-    fft_complex_t c = fft_mul_q15(a, b);
-
-    s_printf("%d %d\n", c.re, c.im);
-    
-    // fft
-    fft_complex_t fft_test_data[8] =
-    {
-        {32767, 0},
-        {32767, 0},
-        {32767, 0},
-        {32767, 0},
-        {    0, 0},
-        {    0, 0},
-        {    0, 0},
-        {    0, 0},
-    };
-
-    fft_q15(fft_test_data, 8);
-
-    for (int i = 0; i < 8; i++)
-    {
-        s_printf("%d : %d %d\n",
-            i,
-            fft_test_data[i].re,
-            fft_test_data[i].im);
-    }
-
 #endif
 
     s_printf(
@@ -888,6 +864,7 @@ void kernel_main(void) {
         "| CMD   : mic_read, mic_write\n"
         "| CMD   : fat32_info, fat32_ls, fat32_cat\n"
         "| CMD   : fat32_touch\n"
+        "| CMD   : speech\n"
         "| quit  : Ctl+A C. q.\n"
         "+--------------------------------------------------+\n",
         __DATE__, __TIME__

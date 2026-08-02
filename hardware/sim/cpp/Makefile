@@ -51,7 +51,8 @@ CXXFLAGS := -std=c++23 -march=rv32im_zicsr_zifencei -mabi=ilp32 -O2 -g \
   -Wduplicated-branches -Wlogical-op -Wnull-dereference -Wuseless-cast \
   -Wdouble-promotion -Wformat=2 -Wimplicit-fallthrough \
   -Wno-stringop-overflow -Wno-unused-function -Wno-unused-parameter \
-  -Wl,-T,$(LINKER) -Wl,--no-warn-rwx-segment
+  -Wl,-T,$(LINKER) -Wl,--no-warn-rwx-segment \
+  -mstrict-align
 
 ###############################################################################
 # 拡張子ルール（明示的）
