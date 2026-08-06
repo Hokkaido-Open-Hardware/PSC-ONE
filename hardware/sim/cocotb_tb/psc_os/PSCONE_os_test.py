@@ -21,8 +21,8 @@ PROGRAM_FILE   = (MEM_FILE_ENV if MEM_FILE_ENV else
 
 EXPECTED_STR = os.getenv("EXPECTED_RESULT", "").strip()
 CLK_PERIOD_NS = int(os.getenv("CLK_PERIOD_NS", "10"))     # 100 MHz
-#RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "500000"))  # addi Debug
-RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "200000000"))
+#RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "2_0000_0000"))
+RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "1000_0000"))   # lcd test
 SDRAM_INIT_TIMEOUT = int(os.getenv("SDRAM_INIT_TIMEOUT", "500000"))  # cycles
 BOOT_ROM_TIMEOUT   = int(os.getenv("BOOT_ROM_TIMEOUT", "5000000"))  # cycles
 # ======================
@@ -35,7 +35,7 @@ else:
 # ---------- Utils ----------
 def int_resolved(x, xfill: str = "0") -> int:
     """
-    cocotb 2.0対応: 安全に int 変換（X/Z を解決）
+    cocotb 2.0対応: 安全に int 変換(X/Z を解決）
     """
     # Handleの場合
     if isinstance(x, SimHandleBase):

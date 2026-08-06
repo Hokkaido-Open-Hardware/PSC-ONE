@@ -35,8 +35,9 @@ module PSC_ONE_RV32ISP_core #(
     parameter [ADDR_WIDTH-1:0]  PIO_ADDRESS             = 32'h1000_1000,
     parameter [ADDR_WIDTH-1:0]  TIMER_WRITE_ADDR        = 32'h1000_2000,
     parameter [ADDR_WIDTH-1:0]  TIMER_READ_ADDR         = 32'h1000_2004,
-    parameter [ADDR_WIDTH-1:0]  LCD_PIX_DATA            = 32'h1000_3000,
-    parameter [ADDR_WIDTH-1:0]  LCD_PIXS_ST             = 32'h1000_3004,
+    parameter [ADDR_WIDTH-1:0]  LCD_PIX_ADDRESS         = 32'h1000_3000,
+    parameter [ADDR_WIDTH-1:0]  LCD_PIX_DATA            = 32'h1000_3004,
+    parameter [ADDR_WIDTH-1:0]  LCD_PIXS_ST             = 32'h1000_3008,
     parameter [ADDR_WIDTH-1:0]  LED_ADDRESS             = 32'h1000_4000,
     parameter [ADDR_WIDTH-1:0]  PSC_SA_CTRL             = 32'h0,
     parameter [ADDR_WIDTH-1:0]  PSC_SA_STATUS           = 32'h0,
@@ -289,8 +290,10 @@ module PSC_ONE_RV32ISP_core #(
     wire sa_clear         = csr_SA_CTRL[2];
     wire [3:0] sa_os_instruction 
                           = csr_SA_CTRL[11:8];
-    wire [7:0] sa_matrix_size 
+    wire [7:0] sa_matrix_size_x 
                           = csr_SA_CTRL[23:16];
+    wire [7:0] sa_matrix_size_y 
+                          = csr_SA_CTRL[31:24];
 
     //wire sa_os_mode = csr_SA_MODE[0];
     
@@ -327,8 +330,8 @@ module PSC_ONE_RV32ISP_core #(
         .sa_os_instruction  (sa_os_instruction),
         .sa_clear           (sa_clear),
 
-        .matrix_size_x      (sa_matrix_size),
-        .matrix_size_y      (sa_matrix_size),
+        .matrix_size_x      (sa_matrix_size_x),
+        .matrix_size_y      (sa_matrix_size_y),
 
         // SDRAM base address
         .BASE_ADDR_A        (csr_SA_ADDR_A),
@@ -529,6 +532,7 @@ module PSC_ONE_RV32ISP_core #(
         .PIO_ADDRESS         (PIO_ADDRESS),
         .TIMER_WRITE_ADDR    (TIMER_WRITE_ADDR),
         .TIMER_READ_ADDR     (TIMER_READ_ADDR),
+        .LCD_PIX_ADDRESS     (LCD_PIX_ADDRESS),
         .LCD_PIX_DATA        (LCD_PIX_DATA),
         .LCD_PIXS_ST         (LCD_PIXS_ST),
         .LED_ADDRESS         (LED_ADDRESS),

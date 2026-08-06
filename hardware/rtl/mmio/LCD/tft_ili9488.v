@@ -1,81 +1,62 @@
 // NISHIHARU
 // Verilog-2001版 ST7796 SPI ドライバ + framebuffer read request + reset_n対応
 `timescale 1ns/1ps
+
+`define RGB111_mode
+
 module tft_ili9488 #(
-    parameter integer INPUT_CLK_MHZ     = 100,
-    parameter integer DIV_CLK           = 8,
-    parameter integer X_PIXELS          = 32,
-    parameter integer Y_PIXELS          = 32,
-    parameter integer READ_MEM_CYCLE    = 50,
-    parameter integer PANEL_PIXELS      = X_PIXELS * Y_PIXELS
+    parameter integer  INPUT_CLK_MHZ     = 100
 )(
-    input  wire        clk,
+    input  wire        clock,
     input  wire        reset_n,     // Input
 
-    input  wire        write_start,
-    output reg         write_ready,
-    input  wire [8:0]  x_start_pos,
-    input  wire [8:0]  y_start_pos,
-    input  wire [8:0]  x_end_pos,
-    input  wire [8:0]  y_end_pos,
-
+    // SPI
     input  wire        tft_sdo,     // 現状未使用 (MISO)
     output wire        tft_sck,
     output wire        tft_sdi,
     output wire        tft_dc,
-    output reg         tft_reset,
     output wire        tft_cs,
+    output wire        spi_idle,
 
-    input  wire [23:0] framebufferData,         // 8bit x 3
-    output reg         framebufferData_valid,
-    input  wire        framebufferData_ready,   // 未使用
-    output wire        frame_change
+    // CPU-IF
+    input  wire        cpu_if_valid,
+    output reg         cpu_if_ready,
+    input  wire [8:0]  cpu_if_data
 );
 
-    // ------------------------------------------------------------
-    reg [32:0] pixel_count;
-    assign frame_change = (pixel_count == 32'd0);
+    reg     dataAvailable;
 
     // ------------------------------------------------------------
     // SPIインターフェース制御側レジスタ
     // ------------------------------------------------------------
-    reg [8:0] spiData;
-    reg       spiCmdSet;
-    reg       spiDataSet;
-    wire      spiIdle;
+    always @(posedge clock or negedge reset_n) begin
+        if (~reset_n) begin
+            cpu_if_ready  <= 1'b0;
+            dataAvailable <= 1'b0;
+        end else begin
+            // default
+            cpu_if_ready  <= 1'b0;
+
+            if (cpu_if_valid) begin
+                cpu_if_ready  <= 1'b1;
+                dataAvailable <= 1'b1;
+            end else if (~spi_idle) begin
+                dataAvailable <= 1'b0;
+            end
+        end
+    end
 
     // SPIサブモジュール
     tft_ili9488_spi spi (
-        .spiClk        (clk),
-        .data          (spiData),
-        .dataAvailable (spiCmdSet | spiDataSet),
+        .spiClk        (clock),
+        .data          (cpu_if_data),
+        .dataAvailable (cpu_if_valid),
         .tft_sck       (tft_sck),
         .tft_sdi       (tft_sdi),
         .tft_dc        (tft_dc),
         .tft_cs        (tft_cs),
-        .idle          (spiIdle)
+        .idle          (spi_idle)
     );
-
-    // ------------------------------------------------------------
-    // 初期化シーケンス
-    // ------------------------------------------------------------
-    //localparam integer INIT_SEQ_LEN = 52;
-    localparam integer INIT_SEQ_LEN = 19;
-    wire [8:0] INIT_SEQ [0:INIT_SEQ_LEN-1];
-
-    reg [7:0] initSeqCounter;
-
-    localparam [2:0] ST_START            = 3'd0;
-    localparam [2:0] ST_HOLD_RESET       = 3'd1;
-    localparam [2:0] ST_WAIT_FOR_POWERUP = 3'd2;
-    localparam [2:0] ST_SEND_INIT_SEQ    = 3'd3;
-    localparam [2:0] ST_DATA_READ        = 3'd4;
-    localparam [2:0] ST_LOOP             = 3'd5;
-
-    reg [2:0]  state;
-    reg [23:0] remainingDelayTicks;
-
-    reg [3:0]  sub_pixel_count;
 
     // ------------------------------------------------------------
     // INIT_SEQ の内容を初期設定（これはFPGA合成可）
@@ -107,6 +88,7 @@ module tft_ili9488 #(
     end
     */
 
+    /*
     // Software Reset
     assign INIT_SEQ[0] = {1'b0,8'h01};
 
@@ -115,7 +97,11 @@ module tft_ili9488 #(
 
     // Pixel Format = RGB666
     assign INIT_SEQ[2] = {1'b0,8'h3A};
+`ifdef RGB111_mode
+    assign INIT_SEQ[3] = {1'b1,8'h01};
+`else
     assign INIT_SEQ[3] = {1'b1,8'h66};
+`endif
 
     // Memory Access Control
     assign INIT_SEQ[4] = {1'b0,8'h36};
@@ -150,133 +136,7 @@ module tft_ili9488 #(
 
     // Memory Write
     assign INIT_SEQ[18] = {1'b0,8'h2C};
+    */
 
-
-    // ------------------------------------------------------------
-    // ステートマシン
-    // ------------------------------------------------------------
-    always @(posedge clk or negedge reset_n) begin
-        if (!reset_n) begin
-            // ★ リセット時の同期初期化
-            tft_reset             <= 1'b1;
-            spiData               <= 9'd0;
-            spiCmdSet             <= 1'b0;
-            spiDataSet            <= 1'b0;
-            framebufferData_valid <= 1'b0;
-            initSeqCounter        <= 8'd0;
-            state                 <= ST_START;
-            remainingDelayTicks   <= 24'd0;
-            pixel_count           <= 32'd0;
-            sub_pixel_count       <= 4'd0;
-            write_ready           <= 1'b0;
-        end else begin
-            // 通常動作
-            spiCmdSet             <= 1'b0;
-            spiDataSet            <= 1'b0;
-            write_ready           <= 1'b0;
-            framebufferData_valid <= 1'b0;
-
-            if (remainingDelayTicks > 0) begin
-                remainingDelayTicks <= remainingDelayTicks - 24'd1;
-            end else if (write_start && spiIdle && (spiCmdSet == 1'b0) && (spiDataSet == 1'b0)) begin
-                case (state)
-                    // state = 0
-                    ST_START: begin
-                        tft_reset           <= 1'b0;
-                        remainingDelayTicks <= INPUT_CLK_MHZ * 10;
-                        state               <= ST_HOLD_RESET;
-                    end
-
-                    // state = 1
-                    ST_HOLD_RESET: begin
-                        tft_reset           <= 1'b1;
-                        `ifdef COCOTB_SIM
-                        remainingDelayTicks <= INPUT_CLK_MHZ * 10;
-                        `else
-                        remainingDelayTicks <= INPUT_CLK_MHZ * 120000;
-                        `endif
-                        state               <= ST_WAIT_FOR_POWERUP;
-                    end
-
-                    // state = 2
-                    ST_WAIT_FOR_POWERUP: begin
-                        spiData             <= {1'b0, 8'h11};
-                        spiCmdSet           <= 1'b1;
-                        `ifdef COCOTB_SIM
-                        remainingDelayTicks <= INPUT_CLK_MHZ * 5;
-                        `else
-                        remainingDelayTicks <= INPUT_CLK_MHZ * 5000;
-                        `endif
-                        state               <= ST_SEND_INIT_SEQ;
-                    end
-
-                    // state = 3
-                    ST_SEND_INIT_SEQ: begin
-                        if (initSeqCounter < INIT_SEQ_LEN) begin
-                            spiData        <= INIT_SEQ[initSeqCounter];
-                            spiCmdSet      <= 1'b1;
-                            initSeqCounter <= initSeqCounter + 8'd1;
-                        end else begin
-                            state               <= ST_DATA_READ;
-                            `ifdef COCOTB_SIM
-                            remainingDelayTicks <= INPUT_CLK_MHZ * 10;
-                            `else
-                            remainingDelayTicks <= INPUT_CLK_MHZ * 10000;
-                            `endif
-                        end
-                    end
-
-                    // state = 4
-                    ST_DATA_READ: begin
-                        framebufferData_valid <= 1'b1;
-                        state               <= ST_LOOP;
-                        remainingDelayTicks <= READ_MEM_CYCLE;
-                    end
-
-                    // state = 5
-                    ST_LOOP: begin
-
-                        case (sub_pixel_count)
-                            4'd0: begin
-                                spiData <= {1'b1, framebufferData[23:16]};    // LCDパネルがRGBではなく、BRGなどになってる
-                                sub_pixel_count   <= 4'd1;
-                                spiDataSet        <= 1'b1;
-                            end
-                            4'd1: begin
-                                spiData <= {1'b1, framebufferData[7:0]};
-                                sub_pixel_count   <= 4'd2;
-                                spiDataSet        <= 1'b1;
-                            end
-                            4'd2: begin
-                                spiDataSet        <= 1'b1;
-                                if (pixel_count == PANEL_PIXELS - 1) begin
-                                    pixel_count         <= 32'd0;
-                                    write_ready         <= 1'b1;
-                                    remainingDelayTicks <= INPUT_CLK_MHZ * 100;
-                                    sub_pixel_count     <= 4'd0;
-                                    initSeqCounter      <= 8;      // Column Address Set
-                                    state               <= ST_SEND_INIT_SEQ;
-                                end else begin
-                                    spiData <= {1'b1, framebufferData[15:8]};
-                                    sub_pixel_count      <= 4'd0;
-                                    pixel_count          <= pixel_count + 32'd1;
-                                    state                <= ST_DATA_READ;
-                                end
-                            end
-                            default: begin
-                                spiData <= {1'b0, 8'h0};
-                                spiDataSet        <= 1'b1;
-                            end
-                        endcase
-                    end
-
-                    default: begin
-                        state               <= ST_START;
-                        remainingDelayTicks <= 24'd0;
-                    end
-                endcase
-            end
-        end
-    end
 
 endmodule

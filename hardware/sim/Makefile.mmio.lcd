@@ -50,6 +50,7 @@ MMIO_DIR = ../rtl/mmio
 SRC_LCD = \
 	$(MMIO_DIR)/LCD/sim_PSC_ONE_LCD.v \
 	$(MMIO_DIR)/LCD/PSC_ONE_LCD.v \
+	$(MMIO_DIR)/LCD/tft_clock_divider.v \
 	$(MMIO_DIR)/LCD/tft_ili9488.v \
 	$(MMIO_DIR)/LCD/tft_ili9488_spi.v \
 	$(LCD_ILI9488_MODEL)

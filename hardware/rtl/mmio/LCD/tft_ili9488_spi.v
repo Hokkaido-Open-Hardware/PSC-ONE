@@ -4,14 +4,17 @@
 // * Data is only copied if 'dataAvailable' is set to 1
 // * SPI CLK will stop (high state) if no data is being sent
 module tft_ili9488_spi(
-		input spiClk, 
-		input[8:0] data, 
-		input dataAvailable,
+		input 		spiClk,
+		// Set Data
+		input[8:0] 	data, 
+		input 		dataAvailable,
+		// SPI
 		output wire tft_sck, 
-		output reg tft_sdi, 
-		output reg tft_dc, 
+		output reg 	tft_sdi, 
+		output reg 	tft_dc, 
 		output wire tft_cs,
-		output reg idle
+		// state
+		output reg 	idle
 	);
 
 	// Registers

@@ -64,8 +64,8 @@ module sim_PSC_ONE_LCD #(
         .DIV_CLK        (8),
         .IPS_MODE       (0),
         .ADDR_WIDTH     (32),
-        .LCD_PIXS_ADDR  (32'h1000_3000),
-        .LCD_PIXS_DATA  (32'h1000_3004)
+        .LCD_PIXS_DATA  (32'h1000_3000),
+        .LCD_PIXS_ST    (32'h1000_3004)
     ) u_lcd (
         .clock          (clock),
         .reset_n        (reset_n),

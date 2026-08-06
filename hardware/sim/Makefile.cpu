@@ -174,6 +174,7 @@ MMIO_BASE_DIR	= ../rtl/mmio
 # LCD
 PSCONELCD_FILE = \
 	$(MMIO_BASE_DIR)/LCD/PSC_ONE_LCD.v \
+	$(MMIO_BASE_DIR)/LCD/tft_clock_divider.v \
 	$(MMIO_BASE_DIR)/LCD/tft_ili9488.v \
 	$(MMIO_BASE_DIR)/LCD/tft_ili9488_spi.v
 

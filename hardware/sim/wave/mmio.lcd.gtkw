@@ -1,116 +1,67 @@
 [*]
-[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
-[*] Sat Jun 13 10:04:29 2026
+[*] GTKWave Analyzer v3.3.126 (w)1999-2026 BSI
+[*] Wed Aug  5 14:51:33 2026
 [*]
 [dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_LCD_test.vcd"
-[dumpfile_mtime] "Sat Jun 13 10:04:03 2026"
-[dumpfile_size] 2988770
+[dumpfile_mtime] "Wed Aug  5 14:51:33 2026"
+[dumpfile_size] 79151104
 [savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/mmio.lcd.gtkw"
 [timestart] 0
-[size] 3374 1361
+[size] 2575 1231
 [pos] -1 -1
-*-25.790520 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-30.722082 324500000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] sim_PSC_ONE_LCD.
 [treeopen] sim_PSC_ONE_LCD.u_lcd.
 [treeopen] sim_PSC_ONE_LCD.u_lcd.u_tft.
 [sst_width] 278
-[signals_width] 300
+[signals_width] 402
 [sst_expanded] 1
-[sst_vpaned_height] 777
-@420
-sim_PSC_ONE_LCD.u_lcd_model.DATA_WIDTH
-sim_PSC_ONE_LCD.u_lcd_model.ID_BYTE0
-sim_PSC_ONE_LCD.u_lcd_model.ID_BYTE1
-sim_PSC_ONE_LCD.u_lcd_model.ID_BYTE2
+[sst_vpaned_height] 377
 @28
-sim_PSC_ONE_LCD.u_lcd_model.LCD_BL
-sim_PSC_ONE_LCD.u_lcd_model.LCD_CS
-[color] 1
-sim_PSC_ONE_LCD.u_lcd_model.LCD_DC
-sim_PSC_ONE_LCD.u_lcd_model.LCD_RST
-sim_PSC_ONE_LCD.u_lcd_model.LCD_SCK
-sim_PSC_ONE_LCD.u_lcd_model.LCD_SDI
-sim_PSC_ONE_LCD.u_lcd_model.LCD_SDO
-sim_PSC_ONE_LCD.u_lcd_model.clock
-@24
-sim_PSC_ONE_LCD.u_lcd.u_tft.state[2:0]
-@28
-sim_PSC_ONE_LCD.u_lcd_model.id_read_active
-@22
-sim_PSC_ONE_LCD.u_lcd_model.last_cmd[7:0]
-@420
-sim_PSC_ONE_LCD.u_lcd_model.rst_low_count
-@24
-sim_PSC_ONE_LCD.u_lcd_model.rx_bit_count[2:0]
-@28
-sim_PSC_ONE_LCD.u_lcd.fbClk
-sim_PSC_ONE_LCD.u_lcd.fbClk_posedge
-sim_PSC_ONE_LCD.u_lcd.u_tft.framebufferClk
-sim_PSC_ONE_LCD.u_lcd.u_tft.frameBufferLowNibble
-sim_PSC_ONE_LCD.u_lcd.u_tft.spiDataSet
 sim_PSC_ONE_LCD.u_lcd.u_tft.clk
-@22
-sim_PSC_ONE_LCD.u_lcd.u_tft.remainingDelayTicks[23:0]
-@28
-sim_PSC_ONE_LCD.u_lcd.u_tft.spiIdle
-sim_PSC_ONE_LCD.u_lcd.u_tft.spiDataSet
+sim_PSC_ONE_LCD.u_lcd.u_tft.frame_change
 @22
 sim_PSC_ONE_LCD.u_lcd.u_tft.framebufferData[23:0]
-@c00022
-sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
 @28
-(0)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
-(1)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
-(2)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
-(3)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
-(4)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
-(5)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
-(6)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
-(7)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
-(8)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.data[8:0]
-@1401200
--group_end
-@c00022
-sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
-@28
-(0)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
-(1)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
-(2)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
-(3)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
-(4)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
-(5)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
-(6)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
-(7)sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
-@1401200
--group_end
-@24
+sim_PSC_ONE_LCD.u_lcd.u_tft.framebufferData_RGB111_even[2:0]
+sim_PSC_ONE_LCD.u_lcd.u_tft.framebufferData_RGB111_odd[2:0]
+sim_PSC_ONE_LCD.u_lcd.u_tft.framebufferData_ready
+sim_PSC_ONE_LCD.u_lcd.u_tft.framebufferData_valid
+@22
+sim_PSC_ONE_LCD.u_lcd.u_tft.initSeqCounter[7:0]
 sim_PSC_ONE_LCD.u_lcd.u_tft.pixel_count[32:0]
+sim_PSC_ONE_LCD.u_lcd.u_tft.remainingDelayTicks[23:0]
+@28
+sim_PSC_ONE_LCD.u_lcd.u_tft.reset_n
+sim_PSC_ONE_LCD.u_lcd.u_tft.spiCmdSet
+sim_PSC_ONE_LCD.u_lcd.u_tft.spiDataSet
+@22
+sim_PSC_ONE_LCD.u_lcd.u_tft.spiData[8:0]
+@28
+sim_PSC_ONE_LCD.u_lcd.u_tft.spiIdle
+@22
+sim_PSC_ONE_LCD.u_lcd.u_tft.state[3:0]
 sim_PSC_ONE_LCD.u_lcd.u_tft.sub_pixel_count[3:0]
-@22
-sim_PSC_ONE_LCD.u_lcd.cpu_wdata[31:0]
-sim_PSC_ONE_LCD.u_lcd.cpu_waddr[31:0]
 @28
-sim_PSC_ONE_LCD.u_lcd.cpu_wvalid
-sim_PSC_ONE_LCD.u_lcd.pix_wdata[2:0]
-sim_PSC_ONE_LCD.u_lcd.cpu_wready
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_cs
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_dc
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_reset
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_sck
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_sdi
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_sdo
 @22
+sim_PSC_ONE_LCD.u_lcd.u_tft.x_end_pos[8:0]
+sim_PSC_ONE_LCD.u_lcd.u_tft.x_start_pos[8:0]
+sim_PSC_ONE_LCD.u_lcd.u_tft.y_end_pos[8:0]
+sim_PSC_ONE_LCD.u_lcd.u_tft.y_start_pos[8:0]
+@28
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_write_start
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_write_busy
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_write_end
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_init_start
+sim_PSC_ONE_LCD.u_lcd.u_tft.tft_init_end
+@24
 sim_PSC_ONE_LCD.u_lcd.x_pos[8:0]
-@23
 sim_PSC_ONE_LCD.u_lcd.y_pos[8:0]
-@420
-sim_PSC_ONE_LCD.u_lcd.u_data.INDEX_WIDTH
-@28
-sim_PSC_ONE_LCD.u_lcd.u_data.clock
-@22
-sim_PSC_ONE_LCD.u_lcd.u_data.data_raddr[15:0]
-@28
-sim_PSC_ONE_LCD.u_lcd.u_data.data_read[2:0]
-sim_PSC_ONE_LCD.u_lcd.u_data.data_rvalid
-@22
-sim_PSC_ONE_LCD.u_lcd.u_data.data_waddr[15:0]
-@28
-sim_PSC_ONE_LCD.u_lcd.u_data.data_wready
-sim_PSC_ONE_LCD.u_lcd.u_data.data_write[2:0]
-sim_PSC_ONE_LCD.u_lcd.u_data.data_wvalid
 [pattern_trace] 1
 [pattern_trace] 0

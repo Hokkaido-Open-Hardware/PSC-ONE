@@ -53,9 +53,8 @@ module PSC_ONE_Chip #(
     parameter [ADDR_WIDTH-1:0]  TIMER_WRITE_ADDR    = 32'h1000_2000,
     parameter [ADDR_WIDTH-1:0]  TIMER_READ_ADDR     = 32'h1000_2004,
     parameter [ADDR_WIDTH-1:0]  TIMER_ST_ADDR       = 32'h1000_2008,
-    parameter [ADDR_WIDTH-1:0]  LCD_PIX_ADDRESS     = 32'h1000_3000,
-    parameter [ADDR_WIDTH-1:0]  LCD_PIX_DATA        = 32'h1000_3004,
-    parameter [ADDR_WIDTH-1:0]  LCD_PIXS_ST         = 32'h1000_3008,
+    parameter [ADDR_WIDTH-1:0]  LCD_PIX_DATA        = 32'h1000_3000,
+    parameter [ADDR_WIDTH-1:0]  LCD_PIXS_ST         = 32'h1000_3004,
     parameter [ADDR_WIDTH-1:0]  LED_ADDRESS         = 32'h1000_4000,
     parameter [ADDR_WIDTH-1:0]  PSC_SA_CTRL         = 32'h0,
     parameter [ADDR_WIDTH-1:0]  PSC_SA_STATUS       = 32'h0,
@@ -445,9 +444,8 @@ module PSC_ONE_Chip #(
         .PIO_ADDRESS         (PIO_ADDRESS),
         .TIMER_WRITE_ADDR    (TIMER_WRITE_ADDR),
         .TIMER_READ_ADDR     (TIMER_READ_ADDR),
-        .LCD_PIX_ADDRESS     (LCD_PIX_ADDRESS),
-        .LCD_PIXS_ST         (LCD_PIXS_ST),
         .LCD_PIX_DATA        (LCD_PIX_DATA),
+        .LCD_PIXS_ST         (LCD_PIXS_ST),
         .LED_ADDRESS         (LED_ADDRESS),
         .PSC_SA_CTRL         (PSC_SA_CTRL),
         .PSC_SA_STATUS       (PSC_SA_STATUS),
@@ -984,8 +982,8 @@ module PSC_ONE_Chip #(
     //==========================================================
     PSC_ONE_LCD #(
         .CLK_FREQ       (CLK_FREQ),
-        .LCD_PIXS_ADDR  (LCD_PIX_ADDRESS),
-        .LCD_PIXS_DATA  (LCD_PIX_DATA)
+        .LCD_PIXS_DATA  (LCD_PIX_DATA),
+        .LCD_PIXS_ST    (LCD_PIXS_ST)
     ) u_lcd (
         .clock          (clock_100MHz),
         .reset_n        (reset_n),

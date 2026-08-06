@@ -812,7 +812,7 @@ extern char __kernel_base[];
 
 void kernel_main(void) {
 
-#if 1
+#if 0
     // SA run.
     s_printf("SA run\n");
     s_call_sa_api(4, true);
@@ -842,7 +842,8 @@ void kernel_main(void) {
 
     // compline number.
     s_printf("Test Ver: test_1.4.8\n");
-#if 0
+
+#if 1
     s_printf("Draw PSC Logo\n");
     lcd_draw_boot_logo();
 #endif
