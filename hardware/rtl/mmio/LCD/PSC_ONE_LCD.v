@@ -7,9 +7,6 @@ module PSC_ONE_LCD #(
     // MMIO base (word addressed)
     parameter integer CLK_FREQ               = 80,
     parameter integer DIV_CLK                = 2,
-    parameter         IPS_MODE               = 1,           // IPS LCD = 1.
-    parameter integer X_PIXELS               = 320,
-    parameter integer Y_PIXELS               = 480,
     parameter integer ADDR_WIDTH             = 32,
     parameter [ADDR_WIDTH-1:0] LCD_PIXS_DATA = 32'h1000_3000,
     parameter [ADDR_WIDTH-1:0] LCD_PIXS_ST   = 32'h1000_3004

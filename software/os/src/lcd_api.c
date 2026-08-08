@@ -3,6 +3,8 @@
 #include "kernel.h"
 #include "common.h"
 
+#define IPS_MODE 1
+
 #define AFTER_WAIT  50000
 
 static inline void tiny_delay(unsigned n){
@@ -18,6 +20,15 @@ void tft_write(uint32_t data, uint32_t wait)
 {
     uint32_t tft_reset = 0x01;
 
+    // spi_idle=0の場合はwait
+    uint32_t timeout = 100000u;
+    while ((PSC_LCD_PIXS_ST & 0x01) == 0x00) {
+        if (--timeout == 0u) {
+            s_printf("spi_idle TIMEOUT\n");
+            return;
+        }
+        __asm__ volatile("nop");
+    }
     PSC_LCD_PIXS_DATA   = data;
     PSC_LCD_PIXS_ST     = 0x01 | (tft_reset << 1);
 
@@ -74,11 +85,11 @@ void tft_init_seq(uint32_t after_wait)
 // ============================================================
 void tft_wire_pix_setting(uint32_t x_start, uint32_t y_start)
 {
-    uint32_t x_end = x_start + 479;
-    uint32_t y_end = y_start + 319;
+    uint32_t x_end = x_start + 319;
+    uint32_t y_end = y_start + 479;
 
     // Column Address Set
-    tft_write(0x029, 500);
+    tft_write(0x02A, 500);
     tft_write(0x100 | ((x_start & 0x1FF) >> 8), 100);
     tft_write(0x100 | (x_start & 0x0FF), 100);
     tft_write(0x100 | ((x_end & 0x1FF) >> 8), 100);
@@ -105,7 +116,7 @@ void tft_wire_pix_setting(uint32_t x_start, uint32_t y_start)
 // bit1 = Green
 // bit2 = Blue
 //
-// LCD出力 : RGB666
+// LCD出力 : RGB666(RGB111)
 // ------------------------------------------------------------
 void lcd_draw_boot_logo(void)
 {
@@ -135,15 +146,20 @@ void lcd_draw_boot_logo(void)
                 c = 0x07;
             }
 
-            r_buf = (c & 1) ? 63 : 0;
-            g_buf = (c & 2) ? 63 : 0;
-            b_buf = (c & 4) ? 63 : 0;
+            r_buf = (c & 1) ? 255 : 0;
+            g_buf = (c & 2) ? 255 : 0;
+            b_buf = (c & 4) ? 255 : 0;
             
-            tft_write((r_buf & 0xFF) | 0x100, 10);
-            tft_write((g_buf & 0xFF) | 0x100, 10);
-            tft_write((b_buf & 0xFF) | 0x100, 10);
+            if (IPS_MODE==1) {
+                tft_write(((255 - r_buf) & 0xFF) | 0x100, 10);
+                tft_write(((255 - g_buf) & 0xFF) | 0x100, 10);
+                tft_write(((255 - b_buf) & 0xFF) | 0x100, 10);
+            } else {
+                tft_write((r_buf & 0xFF) | 0x100, 10);
+                tft_write((g_buf & 0xFF) | 0x100, 10);
+                tft_write((b_buf & 0xFF) | 0x100, 10);
+            }
             //tiny_delay(300);
-        
         }
     }
 

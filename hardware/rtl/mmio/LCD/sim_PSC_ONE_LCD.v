@@ -62,7 +62,6 @@ module sim_PSC_ONE_LCD #(
     PSC_ONE_LCD #(
         .CLK_FREQ       (80),
         .DIV_CLK        (8),
-        .IPS_MODE       (0),
         .ADDR_WIDTH     (32),
         .LCD_PIXS_DATA  (32'h1000_3000),
         .LCD_PIXS_ST    (32'h1000_3004)
@@ -94,14 +93,14 @@ module sim_PSC_ONE_LCD #(
     PSC_LCD_ILI9488_MODEL #(
         .DATA_WIDTH     (32)
     ) u_lcd_model (
-        .clock      (clock),
-        .LCD_CS     (PSCONE_LCD_CS),
-        .LCD_RST    (PSCONE_LCD_RST),
-        .LCD_BL     (1'b1),
-        .LCD_DC     (PSCONE_LCD_DC),
-        .LCD_SCK    (PSCONE_LCD_SCK),
-        .LCD_SDI    (PSCONE_LCD_SDI),
-        .LCD_SDO    (PSCONE_LCD_SDO)
+        .clock          (clock),
+        .LCD_CS         (PSCONE_LCD_CS),
+        .LCD_RST        (PSCONE_LCD_RST),
+        .LCD_BL         (1'b1),
+        .LCD_DC         (PSCONE_LCD_DC),
+        .LCD_SCK        (PSCONE_LCD_SCK),
+        .LCD_SDI        (PSCONE_LCD_SDI),
+        .LCD_SDO        (PSCONE_LCD_SDO)
     );
 
 endmodule
