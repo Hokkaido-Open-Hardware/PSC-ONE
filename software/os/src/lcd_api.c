@@ -3,6 +3,7 @@
 #include "boot_logo.h"
 #include "kernel.h"
 #include "common.h"
+#include <stdarg.h>
 
 #define IPS_MODE 1
 
@@ -108,6 +109,43 @@ void tft_wire_pix_setting(uint32_t x_start, uint32_t y_start)
 }
 
 // ------------------------------------------------------------
+static void lcd_scroll_init(void)
+{
+    // Vertical Scrolling Definition
+    tft_write(0x033, 100);
+
+    // TFA = 0
+    tft_write(0x100 | 0x00, 100);
+    tft_write(0x100 | 0x00, 100);
+
+    // VSA = 480 = 0x01E0
+    tft_write(0x100 | 0x01, 100);
+    tft_write(0x100 | 0xE0, 100);
+
+    // BFA = 0
+    tft_write(0x100 | 0x00, 100);
+    tft_write(0x100 | 0x00, 100);
+}
+
+// ------------------------------------------------------------
+static void lcd_set_scroll(uint32_t vsp)
+{
+    vsp %= 480;
+
+    tft_write(0x037, 100);
+
+    tft_write(
+        0x100 | ((vsp >> 8) & 0xFF),
+        100
+    );
+
+    tft_write(
+        0x100 | (vsp & 0xFF),
+        100
+    );
+}
+
+// ------------------------------------------------------------
 // PSC-ONE Boot Logo Display
 //
 // boot_logo[] : 240x160
@@ -125,6 +163,9 @@ void lcd_draw_boot_logo(void)
 
     // tft_init
     tft_init_seq(AFTER_WAIT);
+
+    // scroll_init
+    lcd_scroll_init();
 
     // tft write pix data settiing
     tft_wire_pix_setting(0, 0);
@@ -163,8 +204,44 @@ void lcd_draw_boot_logo(void)
             //tiny_delay(300);
         }
     }
-
 #endif
+
+#if 0
+    // scroll lcd
+
+    lcd_set_scroll(0);
+    tiny_delay(1000000);
+
+    lcd_set_scroll(12);
+    tiny_delay(1000000);
+
+    lcd_set_scroll(24);
+    tiny_delay(1000000);
+
+    lcd_set_scroll(36);
+#endif
+}
+
+// ------------------------------------------------------------
+// LCD text mode : 90 degree rotation from landscape mode
+//
+// landscape MADCTL = 0xE8
+// text portrait    = 0x88
+//
+// 0x88 is the experimentally verified portrait setting:
+//   - 90 degree text orientation
+//   - left/right mirror corrected
+//
+// Boot logo keeps using the original landscape setting in
+// tft_init_seq(); this setting is applied only for text mode.
+// ------------------------------------------------------------
+static void lcd_set_text_rotate90(void)
+{
+    // Memory Access Control
+    tft_write(0x036, 100);
+    // Portrait + horizontal mirror correction
+    // 0xC8 -> 0x88 : toggle MX(bit6)
+    tft_write(0x188, 100);
 }
 
 // ------------------------------------------------------------
@@ -173,6 +250,14 @@ void lcd_draw_text(void)
     s_printf("LCD TEXT Output start.\n");
 
     tft_init_seq(AFTER_WAIT);
+
+    // Text display only: rotate 90 degrees.
+    lcd_set_text_rotate90();
+
+    // In portrait mode the ILI9488 vertical scroll direction
+    // matches the text screen vertical direction.
+    lcd_scroll_init();
+    lcd_set_scroll(0);
 
     lcd_clear();
 
@@ -190,14 +275,18 @@ void lcd_draw_text(void)
 // 12x12 font
 // ============================================================
 
-#define LCD_WIDTH   480
-#define LCD_HEIGHT  320
+#define LCD_WIDTH   320
+#define LCD_HEIGHT  480
 
 #define LCD_FONT_W      12
 #define LCD_FONT_H      12
 
 static uint32_t lcd_cursor_x = 0;
 static uint32_t lcd_cursor_y = 0;
+
+// ILI9488 GRAM vertical scroll start address.
+// Text mode is 320x480 portrait, 12-pixel line pitch.
+static uint32_t lcd_scroll_y = 0;
 
 
 // ============================================================
@@ -307,6 +396,7 @@ void lcd_draw_char(
     uint32_t px;
     uint32_t py;
     uint16_t bits;
+    uint32_t draw_y;
 
     // ASCII 0x20 ～ 0x7E
     if ((uint8_t)ch < 0x20 ||
@@ -323,12 +413,25 @@ void lcd_draw_char(
         return;
     }
 
+    // Logical screen Y -> physical GRAM Y.
+    //
+    // On the verified MADCTL=0x88 setting, visible upward scrolling
+    // is obtained by DECREASING VSP.  Therefore the logical-to-GRAM
+    // conversion must use the opposite sign from VSP.
+    //
+    // lcd_scroll_y is always a multiple of 12, and text rows are
+    // 12 pixels high, so draw_y is also a multiple of 12 and the
+    // 12-pixel window never crosses 479 -> 0.
+    draw_y =
+        (y + LCD_HEIGHT - lcd_scroll_y)
+        % LCD_HEIGHT;
+
     // 12x12領域
     lcd_set_window(
         x,
-        y,
+        draw_y,
         x + LCD_FONT_W - 1,
-        y + LCD_FONT_H - 1
+        draw_y + LCD_FONT_H - 1
     );
 
     // 12行
@@ -397,6 +500,93 @@ uint32_t lcd_get_cursor_y(void)
 
 
 // ============================================================
+// lcd_clear_text_line
+//
+// logical_y : visible screen coordinate (0..479)
+//
+// Clear one 12-pixel text row in the physical GRAM ring buffer.
+// ============================================================
+static void lcd_clear_text_line(uint32_t logical_y)
+{
+    uint32_t draw_y;
+
+    // Must use exactly the same logical->GRAM transform as
+    // lcd_draw_char(), otherwise the recycled line is not cleared.
+    draw_y =
+        (logical_y + LCD_HEIGHT - lcd_scroll_y)
+        % LCD_HEIGHT;
+
+    lcd_set_window(
+        0,
+        draw_y,
+        LCD_WIDTH - 1,
+        draw_y + LCD_FONT_H - 1
+    );
+
+    for (uint32_t py = 0; py < LCD_FONT_H; py++) {
+        for (uint32_t px = 0; px < LCD_WIDTH; px++) {
+            lcd_write_rgb(0, 0, 0);
+        }
+    }
+}
+
+// ============================================================
+// lcd_scroll_one_line
+//
+// Visible behavior:
+//   old lines move upward by one text row,
+//   and a blank new row appears at the bottom.
+//
+// MADCTL=0x88 was verified on the real LCD.
+// For this orientation, VSP must DECREASE by 12 pixels.
+// ============================================================
+static void lcd_scroll_one_line(void)
+{
+    // --------------------------------------------------------
+    // Move VSP by one 12-pixel text row.
+    // --------------------------------------------------------
+    if (lcd_scroll_y >= LCD_FONT_H) {
+        lcd_scroll_y -= LCD_FONT_H;
+    } else {
+        lcd_scroll_y = LCD_HEIGHT - LCD_FONT_H;
+    }
+
+    // --------------------------------------------------------
+    // Apply hardware scroll.
+    // --------------------------------------------------------
+    lcd_set_scroll(lcd_scroll_y);
+
+    // --------------------------------------------------------
+    // Cursor remains at the last visible text row.
+    // --------------------------------------------------------
+    lcd_cursor_y = LCD_HEIGHT - LCD_FONT_H;
+
+    // --------------------------------------------------------
+    // Clear the GRAM row that is now the new bottom row.
+    //
+    // lcd_clear_text_line() uses the same logical->GRAM mapping
+    // as lcd_draw_char(), so the row cleared here is exactly the
+    // row into which the next text will be written.
+    // --------------------------------------------------------
+    lcd_clear_text_line(lcd_cursor_y);
+}
+
+
+// ============================================================
+// lcd_line_feed
+// ============================================================
+static void lcd_line_feed(void)
+{
+    lcd_cursor_x = 0;
+    lcd_cursor_y += LCD_FONT_H;
+
+    if ((lcd_cursor_y + LCD_FONT_H) > LCD_HEIGHT) {
+        lcd_scroll_one_line();
+    }
+}
+
+
+// ============================================================
 // lcd_putc
 // ============================================================
 void lcd_putc(char ch)
@@ -407,17 +597,7 @@ void lcd_putc(char ch)
     // --------------------------------------------------------
     if (ch == '\n') {
 
-        lcd_cursor_x = 0;
-
-        lcd_cursor_y += LCD_FONT_H;
-
-        // 画面下端
-        if (
-            (lcd_cursor_y + LCD_FONT_H)
-            > LCD_HEIGHT
-        ) {
-            lcd_cursor_y = 0;
-        }
+        lcd_line_feed();
 
         return;
     }
@@ -457,10 +637,7 @@ void lcd_putc(char ch)
             (lcd_cursor_x + LCD_FONT_W)
             > LCD_WIDTH
         ) {
-
-            lcd_cursor_x = 0;
-
-            lcd_cursor_y += LCD_FONT_H;
+            lcd_line_feed();
         }
 
         return;
@@ -487,23 +664,7 @@ void lcd_putc(char ch)
         (lcd_cursor_x + LCD_FONT_W)
         > LCD_WIDTH
     ) {
-
-        lcd_cursor_x = 0;
-
-        lcd_cursor_y += LCD_FONT_H;
-    }
-
-
-    // --------------------------------------------------------
-    // 下端
-    // 現状は上端へ戻る
-    // --------------------------------------------------------
-    if (
-        (lcd_cursor_y + LCD_FONT_H)
-        > LCD_HEIGHT
-    ) {
-
-        lcd_cursor_y = 0;
+        lcd_line_feed();
     }
 }
 
@@ -534,6 +695,10 @@ void lcd_clear(void)
     uint32_t x;
     uint32_t y;
 
+    // Return the GRAM ring buffer to its initial position.
+    lcd_scroll_y = 0;
+    lcd_set_scroll(0);
+
     lcd_set_window(
         0,
         0,
@@ -557,4 +722,120 @@ void lcd_clear(void)
 
     lcd_cursor_x = 0;
     lcd_cursor_y = 0;
+}
+
+// ============================================================
+// lcd_printf
+// ============================================================
+void lcd_printf(const char *fmt, ...)
+{
+    va_list vargs;
+    va_start(vargs, fmt);
+
+    while (*fmt) {
+
+        if (*fmt == '%') {
+
+            fmt++;
+
+            switch (*fmt) {
+
+                case '\0':
+                    lcd_putc('%');
+                    goto end;
+
+                case '%':
+                    lcd_putc('%');
+                    break;
+
+                case 's': {
+                    const char *s =
+                        va_arg(vargs, const char *);
+
+                    while (*s) {
+                        lcd_putc(*s);
+                        s++;
+                    }
+
+                    break;
+                }
+
+                case 'd': {
+                    int value =
+                        va_arg(vargs, int);
+
+                    unsigned int u;
+
+                    if (value < 0) {
+
+                        lcd_putc('-');
+
+                        u =
+                            (unsigned int)
+                            (-(value + 1))
+                            + 1;
+
+                    } else {
+
+                        u =
+                            (unsigned int)value;
+                    }
+
+                    char buf[11];
+                    int i = 0;
+
+                    if (u == 0) {
+                        lcd_putc('0');
+                        break;
+                    }
+
+                    while (u > 0) {
+                        buf[i++] =
+                            '0' + (u % 10);
+                        u /= 10;
+                    }
+
+                    while (i > 0) {
+                        lcd_putc(buf[--i]);
+                    }
+
+                    break;
+                }
+
+                case 'x': {
+
+                    unsigned value =
+                        va_arg(vargs, unsigned);
+
+                    for (int i = 7; i >= 0; i--) {
+
+                        unsigned nibble =
+                            (value >> (i * 4))
+                            & 0x0f;
+
+                        lcd_putc(
+                            "0123456789abcdef"
+                            [nibble]
+                        );
+                    }
+
+                    break;
+                }
+
+                default:
+                    lcd_putc('%');
+                    lcd_putc(*fmt);
+                    break;
+            }
+
+        } else {
+
+            lcd_putc(*fmt);
+        }
+
+        fmt++;
+    }
+
+end:
+    va_end(vargs);
 }

@@ -49,3 +49,5 @@ void lcd_putc(char ch);
 void lcd_puts(
     const char *str
 );
+
+void lcd_printf(const char *fmt, ...);
