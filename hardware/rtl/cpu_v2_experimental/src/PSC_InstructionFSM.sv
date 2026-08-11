@@ -1,7 +1,5 @@
 // NISHIHARU
 
-//`define PIPELINE_DEBUG_MODE
-
 import PSC_Types::*;
 
 module PSC_InstructionFSM (
@@ -32,9 +30,6 @@ module PSC_InstructionFSM (
     output logic        BRANCH_st,
     output logic        STORE_st,
 
-    // Pipeline 
-    input  logic        ri_wb_done,
-
     // Completion pulse
     output logic        fsm_task_busy,
     output logic        fsm_task_done
@@ -47,8 +42,7 @@ module PSC_InstructionFSM (
         ST_REGISTER_READ,
         ST_EXECUTE,
         ST_BRANCH,
-        ST_STORE,
-        ST_PIPELINE_W
+        ST_STORE
     } execute_state_t;
 
     execute_state_t execute_state;
@@ -99,15 +93,7 @@ module PSC_InstructionFSM (
             end
 
             ST_REGISTER_READ: begin
-                `ifndef PIPELINE_DEBUG_MODE
-                if (decoder_ctrl_now.pipeline_type)
-                    //next_state = ST_PIPELINE_W;     // TBD
-                    next_state = ST_IDLE;
-                else
-                    next_state = ST_EXECUTE;
-                `else
                 next_state = ST_EXECUTE;
-                `endif
             end
 
             ST_EXECUTE: begin
@@ -122,12 +108,6 @@ module PSC_InstructionFSM (
 
             ST_STORE: begin
                 if (store_done)
-                    next_state = ST_IDLE;
-            end
-
-            // Debug(未使用)
-            ST_PIPELINE_W: begin
-                if (ri_wb_done)
                     next_state = ST_IDLE;
             end
 
@@ -153,6 +133,6 @@ module PSC_InstructionFSM (
                 (execute_state != ST_IDLE);
 
     assign fsm_task_done =
-                IDLE_st && ((execute_state_d == ST_STORE) || (execute_state_d == ST_PIPELINE_W));
+                IDLE_st && (execute_state_d == ST_STORE);
 
 endmodule

@@ -22,3 +22,30 @@ typedef uint32_t vaddr_t;
 #define false 0
 
 void lcd_draw_boot_logo(void);
+void lcd_draw_text(void);
+
+// ============================================================
+// LCD TEXT API
+// ============================================================
+
+void lcd_clear(void);
+
+void lcd_set_cursor(
+    uint32_t x,
+    uint32_t y
+);
+
+uint32_t lcd_get_cursor_x(void);
+uint32_t lcd_get_cursor_y(void);
+
+void lcd_draw_char(
+    uint32_t x,
+    uint32_t y,
+    char ch
+);
+
+void lcd_putc(char ch);
+
+void lcd_puts(
+    const char *str
+);

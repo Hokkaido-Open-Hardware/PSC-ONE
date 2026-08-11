@@ -82,23 +82,6 @@ module PSC_InstructionUnit (
     output logic        execute_task_done
 );
 
-    typedef struct packed {
-        logic        valid;
-        dec_ctrl_t   decoder_ctrl;
-        logic [31:0] reg_data_1;
-        logic [31:0] reg_data_2;
-    } ri_id_ex_t;
-
-    typedef struct packed {
-        logic        valid;
-        logic [4:0]  w_addr;
-        logic        rf_wen;
-        logic [31:0] alu_data;
-    } ri_ex_wb_t;
-
-    ri_id_ex_t ri_id_ex;
-    ri_ex_wb_t ri_ex_wb;
-
     instruction_state_t inst_state;
 
     // ============================================================
@@ -120,8 +103,8 @@ module PSC_InstructionUnit (
     // ============================================================
     // PROGRAM COUNTER
     // ============================================================
-    assign execute_task_busy = fsm_task_busy || ri_pipeline_busy;
-    assign execute_task_done = fsm_task_done || ri_wb_commit;
+    assign execute_task_busy = fsm_task_busy;
+    assign execute_task_done = fsm_task_done;
 
     PSC_PC u_PSC_PC (
         .clock             (clock),
@@ -191,8 +174,6 @@ module PSC_InstructionUnit (
         .BRANCH_st            (BRANCH_st),
         .STORE_st             (STORE_st),
 
-        .ri_wb_done           (ri_ex_complete),
-
         .fsm_task_busy        (fsm_task_busy),
         .fsm_task_done        (fsm_task_done)
     );
@@ -201,139 +182,6 @@ module PSC_InstructionUnit (
     logic FIFO_READ_st;
     logic DECODE_st;
     logic REGISTER_READ_st;
-
-    // ============================================================
-    // R/I-Type ID/EX pipeline register
-    // ============================================================
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            ri_id_ex <= '0;
-        end else if (ri_pipeline_flush) begin
-            ri_id_ex <= '0;
-        end else begin
-            if (ri_id_ex_issue) begin
-                ri_id_ex.valid        <= 1'b1;
-                ri_id_ex.decoder_ctrl <= decoder_ctrl_now;
-                ri_id_ex.reg_data_1   <= reg_data_1;
-                ri_id_ex.reg_data_2   <= reg_data_2;
-            end else if (ri_ex_complete && ri_ex_wb_ready) begin
-                ri_id_ex.valid <= 1'b0;
-            end
-        end
-    end
-
-    assign ri_execute_valid =
-                ri_id_ex.valid;
-    assign ri_execute_ctrl =
-                ri_id_ex.decoder_ctrl;
-    assign ri_execute_reg_data_1 =
-                ri_id_ex.reg_data_1;
-    assign ri_execute_reg_data_2 =
-                ri_id_ex.reg_data_2;
-
-    // ============================================================
-    // RAW Hazard
-    // ============================================================
-    logic raw_hazard_id_ex;
-    logic raw_hazard_ex_wb;
-    logic raw_hazard;
-
-    assign raw_hazard_id_ex =
-                ri_id_ex.valid                         &&
-                ri_id_ex.decoder_ctrl.rf_wen           &&
-                (ri_id_ex.decoder_ctrl.w_addr != 5'd0) &&
-                (
-                    (
-                        decoder_ctrl_now.use_rs1 &&
-                        decoder_ctrl_now.r_addr1 ==
-                            ri_id_ex.decoder_ctrl.w_addr
-                    ) ||
-                    (
-                        decoder_ctrl_now.use_rs2 &&
-                        decoder_ctrl_now.r_addr2 ==
-                            ri_id_ex.decoder_ctrl.w_addr
-                    )
-                );
-
-    assign raw_hazard_ex_wb =
-                ri_ex_wb.valid            &&
-                ri_ex_wb.rf_wen           &&
-                (ri_ex_wb.w_addr != 5'd0) &&
-                (
-                    (
-                        decoder_ctrl_now.use_rs1 &&
-                        decoder_ctrl_now.r_addr1 ==
-                            ri_ex_wb.w_addr
-                    ) ||
-                    (
-                        decoder_ctrl_now.use_rs2 &&
-                        decoder_ctrl_now.r_addr2 ==
-                            ri_ex_wb.w_addr
-                    )
-                );
-
-    // DECORD -> FIFO READ -> DECORDまで4CLKなので
-    // raw_hazardしない (TBD)
-    assign raw_hazard =
-                raw_hazard_id_ex ||
-                raw_hazard_ex_wb;
-
-    // ============================================================
-    // Pipeline control
-    // ============================================================
-    logic ri_pipeline_flush;
-    logic ri_id_ex_ready;
-    logic ri_id_ex_issue;
-    logic ri_ex_wb_ready;
-    logic ri_ex_complete;
-    logic ri_wb_commit;
-    logic ri_pipeline_busy;
-
-    assign ri_pipeline_flush =
-                fifo_flush ||
-                cpu_trap   ||
-                d_pf       ||
-                i_pf;
-
-    assign ri_ex_wb_ready =
-                !ri_ex_wb.valid ||
-                ri_wb_commit;
-
-    assign ri_id_ex_ready =
-                !ri_id_ex.valid ||
-                (ri_ex_complete && ri_ex_wb_ready);
-
-    assign ri_id_ex_issue =
-                REGISTER_READ_st                    &&
-                decoder_ctrl_now.pipeline_type      &&
-                ri_id_ex_ready                      &&
-                !raw_hazard;
-
-    assign ri_pipeline_busy =
-                ri_id_ex.valid ||
-                ri_ex_wb.valid;
-
-    assign ri_ex_complete =
-                ri_id_ex.valid &&
-                ri_alu_done;
-
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            ri_ex_wb <= '0;
-        end else if (ri_pipeline_flush) begin
-            ri_ex_wb <= '0;
-        end else begin
-            if (ri_ex_complete && ri_ex_wb_ready) begin
-                ri_ex_wb.valid    <= ri_id_ex.decoder_ctrl.rf_wen &&
-                                    (ri_id_ex.decoder_ctrl.w_addr != 5'd0);
-                ri_ex_wb.w_addr   <= ri_id_ex.decoder_ctrl.w_addr;
-                ri_ex_wb.rf_wen   <= ri_id_ex.decoder_ctrl.rf_wen;
-                ri_ex_wb.alu_data <= ri_alu_data;
-            end else if (ri_wb_commit) begin
-                ri_ex_wb.valid <= 1'b0;
-            end
-        end
-    end
 
     // ============================================================
     // Instruction state registers
@@ -348,24 +196,11 @@ module PSC_InstructionUnit (
                 decoder_ctrl_now.rf_wen &&
                 (decoder_ctrl_now.w_addr != 5'd0);
 
-    // 通常WBを優先
-    assign ri_wb_commit =
-                ri_ex_wb.valid &&
-                !normal_wb_valid;
+    assign regfile_wen = normal_wb_valid;
 
-    assign regfile_wen =
-                normal_wb_valid ||
-                ri_wb_commit;
+    assign regfile_waddr = decoder_ctrl_now.w_addr;
 
-    assign regfile_waddr =
-                normal_wb_valid
-                    ? decoder_ctrl_now.w_addr
-                    : ri_ex_wb.w_addr;
-
-    assign regfile_wdata =
-                normal_wb_valid
-                    ? w_data
-                    : ri_ex_wb.alu_data;
+    assign regfile_wdata = w_data;
 
     // ============================================================
     // Instruction state registers

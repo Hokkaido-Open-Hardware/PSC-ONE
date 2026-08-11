@@ -66,11 +66,11 @@ module PSC_RV32ISP_core #(
     initial begin
         `ifdef DUMP_VCD
         $display("COCOTB_SIM CPU CORE DUMP_VCD ENABLE");
-        $dumpfile("./wave/PSC_RV32ISP_V1_core.vcd");
+        $dumpfile("./wave/PSC_RV32ISP_V2_core.vcd");
         $dumpvars(0);
         `else
         $display("COCOTB_SIM CPU CORE verilator FST ENABLE");
-        $dumpfile("./wave/PSC_RV32ISP_V1_core.fst");
+        $dumpfile("./wave/PSC_RV32ISP_V2_core.fst");
         $dumpvars(0);
         `endif
     end

@@ -848,6 +848,11 @@ void kernel_main(void) {
     lcd_draw_boot_logo();
 #endif
 
+#if 0
+    s_printf("Draw Test test\n");
+    lcd_draw_text();
+#endif
+
     s_printf(
         "\n"
         "+--------------------------------------------------+\n"
