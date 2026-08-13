@@ -180,7 +180,7 @@ DMA_SRC_DIR		= ../rtl/dma
 SDRAM_32bit_AXI_FILES = \
 	$(AXI_DIR)/sdram_32bit_to_128bit_axi_bridge.v \
 	$(AXI_DIR)/sdram_4port_controller_axi_slave_bX_32bit.v \
-	$(SDRAM_CNT_DIR)/sdram_controller.v \
+	$(SDRAM_CNT_DIR)/sdram_controller.sv \
 	$(GW2AR_SDRAM_MODEL)
 
 PSC_ONE_BOOT_FILE = $(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v
@@ -260,13 +260,6 @@ PSCONE_SINGLE_TEST = \
 # List
 
 PSCONE_BASIC_TESTS = \
-	nn_test1:RV32ISP_chip_test:./mem/nn_test1.mem:0x00000170 \
-	nn_test2:RV32ISP_chip_test:./mem/nn_test2.mem:0x00000170 \
-	nn_test3:RV32ISP_chip_test:./mem/nn_test3.mem:0x00000170 \
-	sa_test3:RV32ISP_chip_test:./mem/sa_test3.mem:0x0000BEEF \
-	sa_test2:RV32ISP_chip_test:./mem/sa_test2.mem:0x0000BEEF \
-	sa_test1:RV32ISP_chip_test:./mem/sa_test1.mem:0x0000BEEF \
-	matrix_test1:RV32ISP_chip_test:./mem/matrix_test1.mem:0x0000ABCD \
 	pfe_test1:RV32ISP_chip_test:./mem/pfe_test1.mem:0x00000000 \
 	fetch_test1:RV32ISP_chip_test:./mem/fetch_test1.mem:0xcd1023bb \
 	csr_test1:RV32ISP_chip_test:./mem/csr_test1.mem:0x00000022 \
@@ -291,6 +284,13 @@ PSCONE_BASIC_TESTS = \
 	jalr_test1:RV32ISP_chip_test:./mem/jalr_test1.mem:0x00005AA5 \
 	mul_test1:RV32ISP_chip_test:./mem/mul_test1.mem:0x00000063 \
 	mul_test2:RV32ISP_chip_test:./mem/mul_test2.mem:0x00000033 \
+	nn_test1:RV32ISP_chip_test:./mem/nn_test1.mem:0x00000170 \
+	nn_test2:RV32ISP_chip_test:./mem/nn_test2.mem:0x00000170 \
+	nn_test3:RV32ISP_chip_test:./mem/nn_test3.mem:0x00000170 \
+	sa_test3:RV32ISP_chip_test:./mem/sa_test3.mem:0x0000BEEF \
+	sa_test2:RV32ISP_chip_test:./mem/sa_test2.mem:0x0000BEEF \
+	sa_test1:RV32ISP_chip_test:./mem/sa_test1.mem:0x0000BEEF \
+	matrix_test1:RV32ISP_chip_test:./mem/matrix_test1.mem:0x0000ABCD \
 	montepi_test1:RV32ISP_chip_test:./mem/montepi_test1.mem:0x0000beef \
 	uart_tx:RV32ISP_chip_test:./mem/uart_tx.mem:0x00000123 \
 	mret_test1:RV32ISP_chip_test:./mem/mret_test1.mem:0x0000DCBA \

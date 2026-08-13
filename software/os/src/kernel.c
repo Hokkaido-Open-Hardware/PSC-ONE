@@ -868,7 +868,7 @@ void kernel_main(void) {
     lcd_printf("\n");
     lcd_printf("\n");
     for (uint32_t line=0; line < 48; line++) {
-        lcd_printf("abcd0123\n");
+        lcd_printf("\n");
         tiny_delay(100000);
     }
 #endif
@@ -895,6 +895,46 @@ void kernel_main(void) {
         "+--------------------------------------------------+\n",
         __DATE__, __TIME__
     );
+
+    lcd_printf(
+        "\n"
+        "+----------------------+\n"
+        "|       PSC-ONE        |\n"
+        "|    RISC-V COMPUTER   |\n"
+        "+----------------------+\n"
+        "\n"
+        "PSC_OS booting...\n"
+        "\n"
+        "CPU  : RISC-V 32bit\n"
+        "MMU  : Sv32\n"
+        "LCD  : Ready\n"
+        "SD   : Ready\n"
+        "MIC  : Ready\n"
+        "AI   : SynapEngine\n"
+        "\n"
+        "Voice Recognition Ready\n"
+        "\n"
+        "Build %s\n"
+        "\n"
+        "+----------------------+\n"
+        "     SYSTEM READY\n"
+        "+----------------------+\n",
+        __DATE__
+    );
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
+    lcd_printf("\n");
     /*
     printf("ADDR kernel_base=%x free_ram=%x free_ram_end=%x\n",
        (uint32_t)__kernel_base,

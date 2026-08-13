@@ -99,17 +99,17 @@ module PSC_ONE_Chip_sim #(
         .SD_D0               (SDI_MISO),
 
         // ---- SDRAM pins ----
-        .O_sdram_clk         (sdram_clk),
-        .O_sdram_cke         (sdram_cke),
-        .O_sdram_cs_n        (sdram_cs),
-        .O_sdram_cas_n       (sdram_cas),
-        .O_sdram_ras_n       (sdram_ras),
-        .O_sdram_wen_n       (sdram_we),
+        .O_sdram_clk         (O_sdram_clk),
+        .O_sdram_cke         (O_sdram_cke),
+        .O_sdram_cs_n        (O_sdram_cs_n),
+        .O_sdram_cas_n       (O_sdram_cas_n),
+        .O_sdram_ras_n       (O_sdram_ras_n),
+        .O_sdram_wen_n       (O_sdram_wen_n),
 
-        .IO_sdram_dq         (sdram_dq),
-        .O_sdram_addr        (sdram_adr),
-        .O_sdram_ba          (sdram_ba),
-        .O_sdram_dqm         (sdram_dqm),
+        .IO_sdram_dq         (IO_sdram_dq),
+        .O_sdram_addr        (O_sdram_addr),
+        .O_sdram_ba          (O_sdram_ba),
+        .O_sdram_dqm         (O_sdram_dqm),
 
         // ---- LCD IF ----
         .PSCONE_LCD_CS       (tft_cs),
@@ -141,16 +141,16 @@ module PSC_ONE_Chip_sim #(
     wire            tft_sdo;
 
     // SDRAM信号
-    wire            sdram_clk;
-    wire            sdram_cke;
-    wire            sdram_cs;
-    wire            sdram_ras;
-    wire            sdram_cas;
-    wire            sdram_we;
-    wire [10:0]     sdram_adr;
-    wire [1:0]      sdram_ba;
-    wire [3:0]      sdram_dqm;  
-    wire [31:0]     sdram_dq;       // 32bit bus
+    wire            O_sdram_clk;
+    wire            O_sdram_cke;
+    wire            O_sdram_cs_n;
+    wire            O_sdram_ras_n;
+    wire            O_sdram_cas_n;
+    wire            O_sdram_wen_n;
+    wire [10:0]     O_sdram_addr;
+    wire [1:0]      O_sdram_ba;
+    wire [3:0]      O_sdram_dqm;  
+    wire [31:0]     IO_sdram_dq;       // 32bit bus
 
     // SDカード信号
     wire            SDI_CS;
@@ -170,16 +170,16 @@ module PSC_ONE_Chip_sim #(
     // ------------------------------
     // SDRAMモデル（GW2AR SDRAM）
     GW2AR_sdram u_sdram_model (
-        .Dq         (sdram_dq),
-        .Addr       (sdram_adr),
-        .Ba         (sdram_ba),
-        .Clk        (sdram_clk),
+        .Dq         (IO_sdram_dq),
+        .Addr       (O_sdram_addr),
+        .Ba         (O_sdram_ba),
+        .Clk        (O_sdram_clk),
         .Cke        (1'b1),
-        .Cs_n       (sdram_cs),
-        .Ras_n      (sdram_ras),
-        .Cas_n      (sdram_cas),
-        .We_n       (sdram_we),
-        .Dqm        (sdram_dqm)
+        .Cs_n       (O_sdram_cs_n),
+        .Ras_n      (O_sdram_ras_n),
+        .Cas_n      (O_sdram_cas_n),
+        .We_n       (O_sdram_wen_n),
+        .Dqm        (O_sdram_dqm)
     );
 
     // ------------------------------

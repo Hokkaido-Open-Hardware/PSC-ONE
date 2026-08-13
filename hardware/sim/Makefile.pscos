@@ -158,7 +158,7 @@ SDRAM_32bit_AXI_FILES = \
 	$(CPU_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
 	$(AXI_DIR)/sdram_32bit_to_128bit_axi_bridge.v \
 	$(AXI_DIR)/sdram_4port_controller_axi_slave_bX_32bit.v \
-	$(SDRAM_CNT_DIR)/sdram_controller.v \
+	$(SDRAM_CNT_DIR)/sdram_controller.sv \
 	$(GW2AR_SDRAM_MODEL)
 
 PSC_ONE_BOOT_FILE = $(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v
