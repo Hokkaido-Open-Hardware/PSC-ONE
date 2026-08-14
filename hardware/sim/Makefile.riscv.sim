@@ -260,3 +260,83 @@ simulate_RISCV_TESTS:
 	echo "✅ All riscv tests completed"; \
 	echo "========================================"
 	
+
+# ============================================================
+# Parallel
+# ============================================================
+JOBS ?= 16
+
+.PHONY: run_RISCV_TEST_PARALLEL
+run_RISCV_TEST_PARALLEL:
+	@set -e; \
+	t='$(TEST_ENTRY)'; \
+	name=$$(echo "$$t" | cut -d: -f1); \
+	cocotb_file=$$(echo "$$t" | cut -d: -f2); \
+	mem_file=$$(echo "$$t" | cut -d: -f3); \
+	expected=$$(echo "$$t" | cut -d: -f4); \
+	tohost_addr=$$(echo "$$t" | cut -d: -f5); \
+	run_dir="$(CURDIR)/parallel_run/$$name"; \
+	echo "========================================"; \
+	echo "[START] $$name"; \
+	echo "[MEM  ] $$mem_file"; \
+	echo "[EXP  ] $$expected"; \
+	echo "========================================"; \
+	rm -rf "$$run_dir"; \
+	mkdir -p "$$run_dir/mem"; \
+	mkdir -p "$$run_dir/wave"; \
+	head -n 4096 "$$mem_file" > "$$run_dir/mem/test_program.mem"; \
+	cd "$$run_dir"; \
+	PYTHONPATH="$(CURDIR):$$PYTHONPATH" \
+	COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
+	TOHOST_ADDR="$$tohost_addr" \
+	EXPECTED_RESULT="$$expected" \
+	TOPLEVEL="$(CPU_TOP)" \
+	TOPLEVEL_LANG=verilog \
+	SIM="$(SIM)" \
+	SIM_BUILD="sim_build" \
+	VERILOG_SOURCES="$(foreach f,$(INPUT_CPU_CORE_SIM_FILE),$(abspath $(f)))" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+	make --silent -f "$(COCOTB_MAKEFILE)" > simulation.log 2>&1; \
+	echo "[PASS] $$name"
+
+.PHONY: simulate_RISCV_TESTS_PARALLEL
+simulate_RISCV_TESTS_PARALLEL:
+	$(MAKE) -f Makefile.riscv all
+	@rm -rf ./parallel_run
+	@mkdir -p ./parallel_run
+	@echo ""
+	@echo "========================================"
+	@echo " Parallel RISC-V tests"
+	@echo "========================================"
+	@echo "MODE              = $(MODE)"
+	@echo "SIM               = $(SIM)"
+	@echo "CPU_VERSION       = $(CPU_VERSION)"
+	@echo "TEST_PROGRAM_LIST = $(TEST_PROGRAM_LIST)"
+	@echo "JOBS              = $(JOBS)"
+	@echo "========================================"
+	@printf '%s\n' $(RV32ISP_TEST) | \
+	xargs -P $(JOBS) -I {} \
+	$(MAKE) --no-print-directory \
+		-f Makefile.riscv.sim \
+		run_RISCV_TEST_PARALLEL \
+		MODE="$(MODE)" \
+		CPU_VERSION="$(CPU_VERSION)" \
+		SIM_FAST="$(SIM_FAST)" \
+		TEST_ENTRY="{}"; \
+	rc=$$?; \
+	pass=$$(grep -rl "passed" parallel_run/*/simulation.log 2>/dev/null | wc -l); \
+	total=$$(find parallel_run -name simulation.log | wc -l); \
+	fail=$$((total - pass)); \
+	echo ""; \
+	echo "========================================"; \
+	echo " RISC-V TEST RESULT"; \
+	echo "========================================"; \
+	echo "PASS=$$pass FAIL=$$fail TOTAL=$$total"; \
+	echo "========================================"; \
+	if [ $$fail -ne 0 ] || [ $$rc -ne 0 ]; then \
+		echo "❌ RISC-V tests FAILED"; \
+		exit 1; \
+	fi; \
+	echo "✅ All parallel riscv tests completed"
+	@printf '\a'

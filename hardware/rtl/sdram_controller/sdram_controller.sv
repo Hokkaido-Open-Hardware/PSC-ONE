@@ -14,9 +14,11 @@ module sdram_controller #(
     parameter int DQM_BUS_WIDTH          = 2,
     parameter int SD_ADDR_BUS_WIDTH      = 11,
     parameter int SDRAM_INIT_CNT         = (64 * CLK_FREQ_MHz) / 10, // 64us
-    parameter int clk_dly_ps             = 1, // not use
+    parameter int clk_dly_ps             = 1, // Reserved for FPGA IODELAY implementation
     parameter int timing_CAS             = 3,
     parameter int timing_RCD             = 2,
+    parameter int timing_RTP             = 2,
+    parameter int timing_WR              = 2,
     parameter int timing_RP              = 3,
     parameter int timing_MD              = 3,
     parameter int timing_RFC             = 8,
@@ -90,6 +92,11 @@ module sdram_controller #(
     // ----------------------------------------------------------
     // SDRAM 初期化処理
     // ----------------------------------------------------------
+    localparam int INIT_TRP_TWAIT  = 6;
+    localparam int INIT_TRFC_TWAIT = 24;
+    localparam int INIT_TMRD_TWAIT = 14;
+    localparam int INIT_FIN_TWAIT  = 60;
+
     typedef enum logic [3:0] {
         INIT_WAIT      = 4'd0,
         INIT_PRECHARGE = 4'd1,
@@ -133,7 +140,7 @@ module sdram_controller #(
                         init_cas_r <= 1'b1;
                         init_we_r  <= 1'b0;
                         init_adr_r <= 11'h400; // PRECHARGE ALL
-                    end else if (init_cnt_r == 32'd6) begin
+                    end else if (init_cnt_r == INIT_TRP_TWAIT) begin
                         init_state <= INIT_REFRESH1;
                         init_cnt_r <= 32'd0;
                     end
@@ -143,7 +150,7 @@ module sdram_controller #(
                         init_ras_r <= 1'b0;
                         init_cas_r <= 1'b0;
                         init_we_r  <= 1'b1;
-                    end else if (init_cnt_r == 32'd24) begin
+                    end else if (init_cnt_r == INIT_TRFC_TWAIT) begin
                         init_state <= INIT_REFRESH2;
                         init_cnt_r <= 32'd0;
                     end
@@ -153,7 +160,7 @@ module sdram_controller #(
                         init_ras_r <= 1'b0;
                         init_cas_r <= 1'b0;
                         init_we_r  <= 1'b1;
-                    end else if (init_cnt_r == 32'd24) begin
+                    end else if (init_cnt_r == INIT_TRFC_TWAIT) begin
                         init_state <= INIT_MODE;
                         init_cnt_r <= 32'd0;
                     end
@@ -164,13 +171,13 @@ module sdram_controller #(
                         init_cas_r <= 1'b0;
                         init_we_r  <= 1'b0;
                         init_adr_r <= 11'h130;
-                    end else if (init_cnt_r == 32'd14) begin
+                    end else if (init_cnt_r == INIT_TMRD_TWAIT) begin
                         init_state <= INIT_FIN_WAIT;
                         init_cnt_r <= 32'd0;
                     end
                 end
                 INIT_FIN_WAIT: begin
-                    if (init_cnt_r == 32'd60) begin
+                    if (init_cnt_r == INIT_FIN_TWAIT) begin
                         sdram_init_fin <= 1'b1;
                         init_state <= INIT_DONE;
                         init_cnt_r <= 32'd0;
@@ -189,16 +196,15 @@ module sdram_controller #(
     // ----------------------------------------------------------
     // バッファと制御ロジック
     // ----------------------------------------------------------
-    logic [BA_BITS-1:0] read_ba_buf [0:7];
-    logic [ROW_BITS-1:0] read_row_buf [0:7];
-    logic [COL_BITS-1:0] read_col_buf [0:7];
-    logic [BA_BITS-1:0] write_ba_buf [0:7];
-    logic [ROW_BITS-1:0] write_row_buf [0:7];
-    logic [COL_BITS-1:0] write_col_buf [0:7];
+    logic [BW-1:0]           read_ba_buf;
+    logic [RW-1:0]           read_row_buf;
+    logic [CW-1:0]           read_col_buf [0:7];
+    logic [BW-1:0]           write_ba_buf;
+    logic [RW-1:0]           write_row_buf;
+    logic [CW-1:0]           write_col_buf [0:7];
     logic [DQ_BUS_WIDTH-1:0] write_data_buf [0:7];
     logic [3:0] read_count, write_count;
     logic [3:0] rw_index;
-    logic buffered_read_start, buffered_write_start;
 
     typedef enum logic [4:0] {
         IDLE            = 5'd0,
@@ -257,8 +263,6 @@ module sdram_controller #(
             rw_index    <= 4'd0;
             read_count  <= 4'd0;
             write_count <= 4'd0;
-            buffered_read_start  <= 1'b0;
-            buffered_write_start <= 1'b0;
         end else if (sdram_init_fin) begin
             cs_r  <= 1'b0;
             ras_r <= 1'b1;
@@ -270,24 +274,26 @@ module sdram_controller #(
                     if (refresh_req) begin
                         state <= REFRESH_START;
                     end else if (read_valid && read_count < rw_length) begin
-                        read_ba_buf[read_count]  <= read_addr_ba;
-                        read_row_buf[read_count] <= read_addr_row;
+                        if (read_count == 0) begin
+                            read_ba_buf  <= read_addr_ba;
+                            read_row_buf <= read_addr_row;
+                        end
                         read_col_buf[read_count] <= read_addr_col;
                         read_count <= read_count + 4'd1;
                         if (read_count == rw_length - 4'd1) begin
-                            buffered_read_start <= 1'b1;
                             rw_index <= 4'd0;
                             state <= READ_ACTIVATE;
                         end
                     end else if (write_valid && write_count < rw_length) begin
-                        write_ba_buf[write_count]   <= write_addr_ba;
-                        write_row_buf[write_count]  <= write_addr_row;
+                        if (write_count == 0) begin
+                            write_ba_buf  <= write_addr_ba;
+                            write_row_buf <= write_addr_row;
+                        end
                         write_col_buf[write_count]  <= write_addr_col;
                         write_data_buf[write_count] <= write_data;
                         write_ready <= 1'b0;
                         write_count <= write_count + 4'd1;
                         if (write_count == rw_length - 4'd1) begin
-                            buffered_write_start <= 1'b1;
                             rw_index <= 4'd0;
                             state <= WRITE_ACTIVATE;
                         end
@@ -295,8 +301,8 @@ module sdram_controller #(
                 end
                 // --- READ FLOW ---
                 READ_ACTIVATE: begin
-                    adr_r <= read_row_buf[0];
-                    ba_r  <= read_ba_buf[0];
+                    ba_r  <= read_ba_buf;
+                    adr_r <= read_row_buf;
                     cs_r  <= 1'b0;
                     ras_r <= 1'b0;
                     cas_r <= 1'b1;
@@ -325,8 +331,10 @@ module sdram_controller #(
                     end else begin
                         dq_oe <= 1'b0;
                         rw_index <= rw_index + 4'd1;
-                        adr_r <= {3'b000, read_col_buf[rw_index]};
-                        ba_r  <= read_ba_buf[rw_index];
+                        adr_r <= '0;
+                        adr_r[CW-1:0] <= read_col_buf[rw_index];
+                        adr_r[10] <= 1'b0; // Auto Precharge OFF
+                        ba_r  <= read_ba_buf;
                         cs_r  <= 1'b0;
                         ras_r <= 1'b1;
                         cas_r <= 1'b0;
@@ -352,14 +360,14 @@ module sdram_controller #(
                     cas_r <= 1'b1;
                     we_r  <= 1'b1;
                     wait_cnt <= wait_cnt + 5'd1;
-                    if (wait_cnt == timing_RP) begin
+                    if (wait_cnt == timing_RTP) begin
                         wait_cnt <= 5'd0;
                         state <= READ_PRECHARGE;
                     end
                 end
                 READ_PRECHARGE: begin
+                    ba_r  <= read_ba_buf;
                     adr_r <= '0;
-                    ba_r  <= read_ba_buf[0];
                     cs_r  <= 1'b0;
                     ras_r <= 1'b0;
                     cas_r <= 1'b1;
@@ -381,13 +389,12 @@ module sdram_controller #(
                 READ_DONE: begin
                     wait_cnt <= 5'd0;
                     read_count <= 4'd0;
-                    buffered_read_start <= 1'b0;
                     state <= IDLE;
                 end
                 // --- WRITE FLOW ---
                 WRITE_ACTIVATE: begin
-                    adr_r <= write_row_buf[0];
-                    ba_r  <= write_ba_buf[0];
+                    adr_r <= write_row_buf;
+                    ba_r  <= write_ba_buf;
                     cs_r  <= 1'b0;
                     ras_r <= 1'b0;
                     cas_r <= 1'b1;
@@ -422,8 +429,10 @@ module sdram_controller #(
                         write_ready <= 1'b1;
                         rw_index <= rw_index + 4'd1;
                         dq_out <= write_data_buf[rw_index];
-                        adr_r <= {3'b000, write_col_buf[rw_index]};
-                        ba_r  <= write_ba_buf[rw_index];
+                        adr_r <= '0;
+                        adr_r[CW-1:0] <= write_col_buf[rw_index];
+                        adr_r[10] <= 1'b0; // Auto Precharge OFF
+                        ba_r  <= write_ba_buf;
                         cs_r  <= 1'b0;
                         ras_r <= 1'b1;
                         cas_r <= 1'b0;
@@ -436,14 +445,14 @@ module sdram_controller #(
                     cas_r <= 1'b1;
                     we_r  <= 1'b1;
                     wait_cnt <= wait_cnt + 5'd1;
-                    if (wait_cnt == timing_RP) begin
+                    if (wait_cnt == timing_WR) begin
                         wait_cnt <= 5'd0;
                         state <= WRITE_PRECHARGE;
                     end
                 end
                 WRITE_PRECHARGE: begin
                     adr_r <= '0;
-                    ba_r  <= write_ba_buf[0];
+                    ba_r  <= write_ba_buf;
                     cs_r  <= 1'b0;
                     ras_r <= 1'b0;
                     cas_r <= 1'b1;
@@ -470,7 +479,6 @@ module sdram_controller #(
                     write_ready <= 1'b0;
                     dq_oe <= 1'b0;
                     write_count <= 4'd0;
-                    buffered_write_start <= 1'b0;
                     state <= IDLE;
                 end
                 // --- REFRESH ---
@@ -529,6 +537,8 @@ module sdram_controller #(
                 state == READ_CMD_WAIT ||
                 state == READ_PRECHARGE) begin
                 read_cnt <= read_cnt + 5'd1;
+                // 実FPGAではタイミングが安定しなかったため、
+                // 実機確認済みのread_cnt window方式を使用する。
                 if (read_cnt > timing_CAS + 5'd2 &&
                     read_cnt < rw_length + 5'd6) begin
                     read_ready <= 1'b1;

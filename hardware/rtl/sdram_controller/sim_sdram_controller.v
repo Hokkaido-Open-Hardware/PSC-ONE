@@ -10,8 +10,8 @@ module sim_sdram_controller #(
     parameter ROW_ADDR_BUS_WIDTH = 11,
     parameter BNK_ADDR_BUS_WIDTH = 2,
 
-    parameter DQ_BUS_WIDTH       = 16,
-    parameter DQM_BUS_WIDTH      = 2,
+    parameter DQ_BUS_WIDTH       = 32,
+    parameter DQM_BUS_WIDTH      = 4,
     parameter SD_ADDR_BUS_WIDTH  = 11,
 
     parameter CW   = COL_ADDR_BUS_WIDTH,
@@ -70,21 +70,19 @@ module sim_sdram_controller #(
     // SDRAM signals
     // ============================================================
 
-    wire                    O_sdram_clk;
-    wire                    O_sdram_cke = 1'b1;
+    wire                     O_sdram_clk;
+    wire                     O_sdram_cke = 1'b1;
 
-    wire                    O_sdram_cs_n;
-    wire                    O_sdram_ras_n;
-    wire                    O_sdram_cas_n;
-    wire                    O_sdram_wen_n;
+    wire                     O_sdram_cs_n;
+    wire                     O_sdram_ras_n;
+    wire                     O_sdram_cas_n;
+    wire                     O_sdram_wen_n;
 
-    wire [SDAW-1:0]         O_sdram_addr;
-    wire [1:0]              O_sdram_ba;
+    wire [SDAW-1:0]          O_sdram_addr;
+    wire [1:0]               O_sdram_ba;
 
     wire [DQM_BUS_WIDTH-1:0] O_sdram_dqm;
     wire [DQ_BUS_WIDTH-1:0]  IO_sdram_dq;
-
-    assign sdram_cke = 1'b1;
 
 
     // ============================================================
@@ -103,14 +101,6 @@ module sim_sdram_controller #(
         .SD_ADDR_BUS_WIDTH     (SD_ADDR_BUS_WIDTH),
 
         .SDRAM_INIT_CNT        ((64 * CLK_FREQ_MHz) / 10),
-
-        .clk_dly_ps            (1),
-
-        .timing_CAS            (3),
-        .timing_RCD            (2),
-        .timing_RP             (3),
-        .timing_MD             (3),
-        .timing_RFC            (8),
 
         .CW                    (CW),
         .RW                    (RW),

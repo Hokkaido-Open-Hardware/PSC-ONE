@@ -8,6 +8,9 @@ build/
 sim_build/
 results.xml
 
+# Paralell
+parallel_run/
+
 # FPGA
 *.vvp
 *.vcd
