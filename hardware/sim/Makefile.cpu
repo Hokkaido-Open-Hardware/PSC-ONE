@@ -166,8 +166,8 @@ CPU_FILES = \
 	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
 	$(UART_DIR)/PSC_RV32IS_UART.v \
 	$(LED_DIR)/PSC_RV32IS_LED.v \
-	$(CACHE_DIR)/cache_dma_controller.v \
-	$(CACHE_DIR)/cache_dma_controller_io.v \
+	$(CACHE_DIR)/cache_dma_controller.sv \
+	$(CACHE_DIR)/cache_dma_controller_io.sv \
 	$(CACHE_DIR)/dm_cache_data.v \
 	$(CACHE_DIR)/dm_cache_tag.v \
 	$(TOP_SRC_DIR)/Delay_N.v

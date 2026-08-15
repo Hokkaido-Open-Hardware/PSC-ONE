@@ -50,15 +50,15 @@ COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
 SRC_SIMTOP = \
 	../rtl/cache/src/sim_cache_dma_controller.v
 SRC_CASHE = \
-	../rtl/cache/src/cache_dma_controller.v \
-	../rtl/cache/src/cache_dma_controller_io.v \
+	../rtl/cache/src/cache_dma_controller.sv \
+	../rtl/cache/src/cache_dma_controller_io.sv \
 	../rtl/cache/src/dm_cache_data.v \
 	../rtl/cache/src/dm_cache_tag.v
 SRC_BRIDGE = \
 	../rtl/axi/sdram_32bit_to_128bit_axi_bridge.v
 SRC_AXI_SDRAM_CNT = \
 	../rtl/axi/sdram_4port_controller_axi_slave_bX_32bit.v \
-	../rtl/sdram_controller/sdram_controller.v
+	../rtl/sdram_controller/sdram_controller.sv
 
 SIM_SRC = $(SRC_SIMTOP) $(SRC_CASHE) $(SRC_BRIDGE) $(SRC_AXI_SDRAM_CNT) $(GW2AR_SDRAM_MODEL)
 	
@@ -78,5 +78,21 @@ simulate_CACHE:
 	VLOG_ARGS="$(VLOG_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
 	make -f $(COCOTB_MAKEFILE)
+
+simulate_ICACHE:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_DM_CACHE test)"
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+	$(MAKE) clean
+	@mkdir -p ./wave
+	COCOTB_TEST_MODULES=cocotb_tb.cache.I_cache_test \
+	TOPLEVEL=sim_cache_dma_controller TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(SIM_SRC)" \
+	COMPILE_ARGS="-DCOCOTB_SIM $(VCD_COMPILE_ARGS)" \
+	VLOG_ARGS="$(VLOG_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	make -f $(COCOTB_MAKEFILE)
+
+
 
 

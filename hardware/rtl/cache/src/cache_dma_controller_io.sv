@@ -43,62 +43,62 @@ module cache_dma_controller_io #(
     parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_DATA     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_CTRL     = {ADDR_WIDTH{1'b0}}
 )(
-    input  wire                           clock,
-    input  wire                           reset_n,
+    input  wire                             clock,
+    input  wire                             reset_n,
 
     // --------- CPU リクエスト/レスポンス ---------
-    input  wire                           cpu_valid,
-    input  wire                           cpu_rw,          // 1:W, 0:R
-    input  wire [2:0]                     cpu_write_sel,
-    input  wire [ADDR_WIDTH-1:0]          cpu_addr,        // byte address
-    input  wire [CPU_DATA_WIDTH-1:0]      cpu_data,
-    output reg                            cpu_ready,
-    output reg  [CPU_DATA_WIDTH-1:0]      cpu_data_out,
-    output wire                           cpu_req_ready,
+    input  wire                             cpu_valid,
+    input  wire                             cpu_rw,          // 1:W, 0:R
+    input  wire [2:0]                       cpu_write_sel,
+    input  wire [ADDR_WIDTH-1:0]            cpu_addr,        // byte address
+    input  wire [CPU_DATA_WIDTH-1:0]        cpu_data,
+    output logic                            cpu_ready,
+    output logic  [CPU_DATA_WIDTH-1:0]      cpu_data_out,
+    output wire                             cpu_req_ready,
 
     // --------- Cache 制御信号 ---------
-    input  wire                           cpu_cache_clear, 
-    input  wire                           cpu_cache_wb, 
+    input  wire                             cpu_cache_clear, 
+    input  wire                             cpu_cache_wb, 
 
     // --------- SynapEngine リクエスト/レスポンス ---------
-    input  wire                           sa_valid,
-    input  wire                           sa_rw,          // 1:W, 0:R
+    input  wire                             sa_valid,
+    input  wire                             sa_rw,          // 1:W, 0:R
     //input  wire [2:0]                     sa_write_sel,
-    input  wire [ADDR_WIDTH-1:0]          sa_addr,        // byte address
-    input  wire [CPU_DATA_WIDTH-1:0]      sa_data,
-    output reg                            sa_ready,
-    output reg  [CPU_DATA_WIDTH-1:0]      sa_data_out,
-    output wire                           sa_req_ready,
+    input  wire [ADDR_WIDTH-1:0]            sa_addr,        // byte address
+    input  wire [CPU_DATA_WIDTH-1:0]        sa_data,
+    output logic                            sa_ready,
+    output logic  [CPU_DATA_WIDTH-1:0]      sa_data_out,
+    output wire                             sa_req_ready,
 
     // --------- MMU リクエスト/レスポンス ---------
-    input  wire                           mmu_valid,
-    input  wire [ADDR_WIDTH-1:0]          mmu_addr,        // byte address
-    output reg                            mmu_ready,
-    output reg  [CPU_DATA_WIDTH-1:0]      mmu_data_out,
-    output wire                           mmu_req_ready,
+    input  wire                             mmu_valid,
+    input  wire [ADDR_WIDTH-1:0]            mmu_addr,        // byte address
+    output logic                            mmu_ready,
+    output logic  [CPU_DATA_WIDTH-1:0]      mmu_data_out,
+    output wire                             mmu_req_ready,
 
     // --------- MMIO I/F（8bit） ---------
-    output  reg                           mmio_valid,
-    output  reg                           mmio_rw,          // 1:W, 0:R
-    output  reg [ADDR_WIDTH-1:0]          mmio_addr,        // byte address
-    output  reg [CPU_DATA_WIDTH-1:0]      mmio_wdata,
-    input wire                            mmio_ready,
-    input wire  [CPU_DATA_WIDTH-1:0]      mmio_rdata,
+    output logic                            mmio_valid,
+    output logic                            mmio_rw,          // 1:W, 0:R
+    output logic [ADDR_WIDTH-1:0]           mmio_addr,        // byte address
+    output logic [CPU_DATA_WIDTH-1:0]       mmio_wdata,
+    input wire                              mmio_ready,
+    input wire  [CPU_DATA_WIDTH-1:0]        mmio_rdata,
 
     // --------- 外部メモリ（ライン転送） ---------
-    input  wire                           mem_ready,       // 1ライン応答
-    input  wire [MAIN_MEM_DATA_WIDTH-1:0] mem_data_in,
-    input  wire                           mem_req_ready,   // 要求受付可
+    input  wire                             mem_ready,       // 1ライン応答
+    input  wire [MAIN_MEM_DATA_WIDTH-1:0]   mem_data_in,
+    input  wire                             mem_req_ready,   // 要求受付可
 
     // --------- メモリアクセス要求 ---------
-    output reg                            mem_valid,       // 1clk パルス
-    output reg                            mem_rw,          // 1:WB, 0:READ
-    output reg  [ADDR_WIDTH-1:0]          mem_addr,        // byte addr (16B aligned推奨)
-    output reg  [MAIN_MEM_DATA_WIDTH-1:0] mem_data_out,
+    output logic                            mem_valid,       // 1clk パルス
+    output logic                            mem_rw,          // 1:WB, 0:READ
+    output logic  [ADDR_WIDTH-1:0]          mem_addr,        // byte addr (16B aligned推奨)
+    output logic  [MAIN_MEM_DATA_WIDTH-1:0] mem_data_out,
 
     // --------- メモリアクセス要求 ---------
-    output reg                            cache_hit_pulse,
-    output reg                            cache_miss_pulse
+    output logic                            cache_hit_pulse,
+    output logic                            cache_miss_pulse
 );
     // ---------------- 定数/ローカル ----------------
     localparam integer INDEX_WIDTH_BA = TAGLSB - 4;   // 例:10（index=[13:4]）
@@ -136,35 +136,35 @@ module cache_dma_controller_io #(
     // アドレス下位bits
     //wire [1:0] byte_sel = req_addr_b[1:0]; // 0..3 (SB用途)  ★修正
     //wire       half_sel = req_addr_b[1];   // 0 or 1 (SH用途) ★修正
-    reg [1:0]   byte_sel;
-    reg         half_sel;
+    logic [1:0]   byte_sel;
+    logic         half_sel;
 
     // 書き込み後の新ライン
-    reg [127:0] new_line;
+    logic [127:0] new_line;
 
     // ---------------- 内部レジスタ ----------------
-    reg [4:0]                 state;
+    logic [4:0]                 state;
 
     // 初期化スイープ
-    reg  [INDEX_WIDTH_BA-1:0] init_idx;
+    logic  [INDEX_WIDTH_BA-1:0] init_idx;
 
     // 要求ラッチ
-    reg                       req_from_mmu;
-    reg                       req_from_sa;
-    reg                       req_is_write;
-    reg  [ADDR_WIDTH-1:0]     req_addr_w;        // word address
-    reg  [ADDR_WIDTH-1:0]     req_addr_b;        // byte address
-    reg  [CPU_DATA_WIDTH-1:0] req_wdata;
-    reg  [1:0]                req_word_sel_r;    // ライン内 word 選択（[1:0]）
-    reg  [2:0]                req_write_sel_r;
+    logic                       req_from_mmu;
+    logic                       req_from_sa;
+    logic                       req_is_write;
+    logic  [ADDR_WIDTH-1:0]     req_addr_w;        // word address
+    logic  [ADDR_WIDTH-1:0]     req_addr_b;        // byte address
+    logic  [CPU_DATA_WIDTH-1:0] req_wdata;
+    logic  [1:0]                req_word_sel_r;    // ライン内 word 選択（[1:0]）
+    logic  [2:0]                req_write_sel_r;
 
     // キャッシュ初期化
-    reg                       cpu_cache_clear_d1;
-    reg                       cpu_cache_clear_latch;
+    logic                       cpu_cache_clear_d1;
+    logic                       cpu_cache_clear_latch;
 
     // キャッシュWB
-    reg                       cpu_cache_wb_d1;
-    reg                       cpu_cache_wb_latch;
+    logic                       cpu_cache_wb_d1;
+    logic                       cpu_cache_wb_latch;
 
     // アドレス
     wire [ADDR_WIDTH-1:0]     cpu_byte_addr =  cpu_addr[31:0];  
@@ -174,13 +174,13 @@ module cache_dma_controller_io #(
     wire [ADDR_WIDTH-1:0]     sa_word_addr  =  sa_addr[31:2];   // cpu_add[1:0]を削除
 
     // ルックアップ（次拍でBRAM出力）
-    reg  [INDEX_WIDTH_BA-1:0] cur_index_r;      // RAM アドレス
-    reg  [TAG_WIDTH-1:0]      cur_tag_r;        // 比較用タグ
+    logic  [INDEX_WIDTH_BA-1:0] cur_index_r;      // RAM アドレス
+    logic  [TAG_WIDTH-1:0]      cur_tag_r;        // 比較用タグ
 
     // Tag RAM I/F（パック形式）
-    reg                           tag_we;
-    reg  [TAG_ENTRY_WIDTH-1:0]    tag_write;
-    wire [TAG_ENTRY_WIDTH-1:0]    tag_read;
+    logic                           tag_we;
+    logic  [TAG_ENTRY_WIDTH-1:0]    tag_write;
+    wire [TAG_ENTRY_WIDTH-1:0]      tag_read;
 
     // アンパック
     wire [TAG_WIDTH-1:0]          tag_read_tag   = tag_read[TAG_ENTRY_WIDTH-1:2];
@@ -188,40 +188,40 @@ module cache_dma_controller_io #(
     wire                          tag_read_dirty = tag_read[0];
 
     // Data RAM I/F
-    reg                           data_we;
-    reg  [CACHE_DATA_WIDTH-1:0]   data_write;
-    wire [CACHE_DATA_WIDTH-1:0]   data_read;
+    logic                           data_we;
+    logic  [CACHE_DATA_WIDTH-1:0]   data_write;
+    wire [CACHE_DATA_WIDTH-1:0]     data_read;
 
     // victim/line バッファ
-    reg  [TAG_WIDTH-1:0]          victim_tag_r;
-    reg                           victim_valid_r;
-    reg                           victim_dirty_r;
-    reg  [CACHE_DATA_WIDTH-1:0]   line_read_r;
-    reg  [CACHE_DATA_WIDTH-1:0]   fill_line_r;
+    logic  [TAG_WIDTH-1:0]          victim_tag_r;
+    logic                           victim_valid_r;
+    logic                           victim_dirty_r;
+    logic  [CACHE_DATA_WIDTH-1:0]   line_read_r;
+    logic  [CACHE_DATA_WIDTH-1:0]   fill_line_r;
 
     // ---------------- mmu_valid, sa_valid, cpu_valid の場合のlatch ----------------
-    reg                           cpu_req_slot_valid;
-    reg                           sa_req_slot_valid;
-    reg                           mmu_req_slot_valid;
-    reg [ADDR_WIDTH-1:0]          mmu_addr_slot;
-    reg [ADDR_WIDTH-1:0]          cpu_word_addr_slot;
-    reg [ADDR_WIDTH-1:0]          cpu_byte_addr_slot;
-    reg                           cpu_rw_latch;
-    reg [CPU_DATA_WIDTH-1:0]      cpu_data_latch;
-    reg [2:0]                     cpu_write_sel_latch;
+    logic                           cpu_req_slot_valid;
+    logic                           sa_req_slot_valid;
+    logic                           mmu_req_slot_valid;
+    logic [ADDR_WIDTH-1:0]          mmu_addr_slot;
+    logic [ADDR_WIDTH-1:0]          cpu_word_addr_slot;
+    logic [ADDR_WIDTH-1:0]          cpu_byte_addr_slot;
+    logic                           cpu_rw_latch;
+    logic [CPU_DATA_WIDTH-1:0]      cpu_data_latch;
+    logic [2:0]                     cpu_write_sel_latch;
 
-    reg [ADDR_WIDTH-1:0]          sa_word_addr_slot;
-    reg [ADDR_WIDTH-1:0]          sa_byte_addr_slot;
-    reg                           sa_rw_latch;
-    reg [CPU_DATA_WIDTH-1:0]      sa_data_latch;
-    reg [2:0]                     sa_write_sel_latch;
+    logic [ADDR_WIDTH-1:0]          sa_word_addr_slot;
+    logic [ADDR_WIDTH-1:0]          sa_byte_addr_slot;
+    logic                           sa_rw_latch;
+    logic [CPU_DATA_WIDTH-1:0]      sa_data_latch;
+    logic [2:0]                     sa_write_sel_latch;
 
     // WB関連
-    reg [INDEX_WIDTH_BA-1:0]      cache_wb_index;
-    reg [TAG_WIDTH-1:0]           cache_wb_tag;
-    reg                           cache_wb_valid;
-    reg                           cache_wb_dirty;
-    reg [127:0]                   cache_wb_line;
+    logic [INDEX_WIDTH_BA-1:0]      cache_wb_index;
+    logic [TAG_WIDTH-1:0]           cache_wb_tag;
+    logic                           cache_wb_valid;
+    logic                           cache_wb_dirty;
+    logic [127:0]                   cache_wb_line;
 
     // ---------------- ヘルパ関数 ----------------
     function [31:0] pick_word(input [127:0] line, input [1:0] sel);
@@ -242,7 +242,7 @@ module cache_dma_controller_io #(
         input [1:0]   byte_sel,   // 0..3
         input [7:0]   b
     );
-        reg [127:0] t;
+        logic [127:0] t;
         integer pos;
         begin
             t = line;
@@ -259,7 +259,7 @@ module cache_dma_controller_io #(
         input         half_sel,   // bit1/bit0  → addr[1]
         input [15:0]  h
     );
-        reg [127:0] t;
+        logic [127:0] t;
         integer pos;
         begin
             t = line;
@@ -273,7 +273,7 @@ module cache_dma_controller_io #(
     function [127:0] place_word(
         input [127:0] line, input [1:0] sel, input [31:0] w
     );
-        reg [127:0] t;
+        logic [127:0] t;
         begin
             t = line;
             case (sel)
@@ -324,7 +324,7 @@ module cache_dma_controller_io #(
     endfunction
 
     // ------------------------ FSM 本体 ------------------------
-    always @(posedge clock or negedge reset_n) begin
+    always_ff @(posedge clock or negedge reset_n) begin
         if (~reset_n) begin
             // 出力/制御初期化
             state         <= S_INIT;        // ★まず初期化へ

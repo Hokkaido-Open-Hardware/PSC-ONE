@@ -63,6 +63,7 @@ async def reset_dut(dut):
     dut.program_mem_read_valid.value    = 0
     dut.program_mem_read_address.value  = 0
     dut.cpu_cache_clear.value           = 0
+    dut.burst_mode.value                = 0
     
     dut.data_mem_read_valid.value       = 0
     dut.data_mem_read_address.value     = 0

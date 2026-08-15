@@ -40,6 +40,7 @@ module sim_cache_dma_controller #(
     output                  program_mem_read_ready,
     output wire             cpu_req_ready,
     input  wire             cpu_cache_clear, 
+    input  wire             burst_mode,
     // Data
     input  wire             data_mem_read_valid,
     output wire             data_mem_read_ready,
@@ -119,6 +120,7 @@ module sim_cache_dma_controller #(
         .cpu_rw             (1'b0),
         .cpu_addr           (program_mem_read_address),
         .cpu_data           (32'd0),            // 未使用
+        .burst_mode         (burst_mode),
         .cpu_ready          (program_mem_read_ready),
         .cpu_data_out       (program_mem_read_data),
         .cpu_req_ready      (cpu_req_ready),
