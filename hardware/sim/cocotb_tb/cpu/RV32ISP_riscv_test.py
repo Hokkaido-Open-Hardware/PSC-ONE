@@ -399,16 +399,26 @@ async def program_memory_model(
 ):
     """
     program_mem_read_validを受信してから、
-    1〜read_delay_cyclesクロック後に
-    program_mem_read_readyとprogram_mem_read_dataを返す。
+    1〜read_delay_cyclesクロック後に応答する。
+
+    program_mem_burst_mode == 0:
+        32bit x 1word
+
+    program_mem_burst_mode == 1:
+        32bit x 4word burst
+        readyを4クロック連続assert
+        address +0,+4,+8,+12 を返す
 
     read_delay_cycles:
         0以下 : valid検出時に即時応答
         1     : 1クロック後に応答
         N     : 1〜Nクロック後にランダム応答
     """
+
     pending = False
     pending_address = 0
+    pending_burst = False
+    burst_index = 0
     delay_count = 0
     request_seen = False
 
@@ -419,13 +429,14 @@ async def program_memory_model(
     while True:
         await RisingEdge(dut.clock)
 
-        # readyは1クロックパルス
         dut.program_mem_read_ready.value = 0
         dut.program_mem_req_ready.value = 1
 
         if not bool(dut.reset_n.value):
             pending = False
             pending_address = 0
+            pending_burst = False
+            burst_index = 0
             delay_count = 0
             request_seen = False
 
@@ -437,7 +448,6 @@ async def program_memory_model(
             dut.program_mem_read_valid.value
         )
 
-        # validが下がったら次の要求を受付可能にする
         if not read_valid:
             request_seen = False
 
@@ -446,15 +456,27 @@ async def program_memory_model(
         # ------------------------------------------------
         if pending:
             if delay_count == 0:
+                read_address = (
+                    pending_address + burst_index * 4
+                ) & 0xFFFF_FFFF
+
                 read_data = read_word(
                     memory,
-                    pending_address,
+                    read_address,
                 )
 
                 dut.program_mem_read_data.value = read_data
                 dut.program_mem_read_ready.value = 1
 
-                pending = False
+                if pending_burst:
+                    if burst_index == 3:
+                        pending = False
+                        pending_burst = False
+                        burst_index = 0
+                    else:
+                        burst_index += 1
+                else:
+                    pending = False
             else:
                 delay_count -= 1
 
@@ -470,6 +492,14 @@ async def program_memory_model(
                 dut.program_mem_read_address.value
             ) & 0xFFFF_FFFF
 
+            if hasattr(dut, "program_mem_burst_mode"):
+                pending_burst = bool(
+                    dut.program_mem_burst_mode.value
+                )
+            else:
+                pending_burst = False
+
+            burst_index = 0
             request_seen = True
 
             if read_delay_cycles <= 0:
@@ -480,9 +510,14 @@ async def program_memory_model(
 
                 dut.program_mem_read_data.value = read_data
                 dut.program_mem_read_ready.value = 1
+
+                if pending_burst:
+                    pending = True
+                    burst_index = 1
+                    delay_count = 0
+                else:
+                    pending = False
             else:
-                # 1〜read_delay_cyclesの範囲で、
-                # 要求ごとにランダムな応答遅延を選択
                 selected_delay = random.randint(
                     1,
                     read_delay_cycles,

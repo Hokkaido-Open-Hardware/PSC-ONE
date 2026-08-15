@@ -98,10 +98,15 @@ module Fetch_Fifo #(
 
 `ifdef COCOTB_SIM
     logic [WIDTH-1:0] mem_0, mem_1, mem_2, mem_3;
+    logic [WIDTH-1:0] mem_4, mem_5, mem_6, mem_7;
     assign mem_0 = mem[0];
     assign mem_1 = mem[1];
     assign mem_2 = mem[2];
     assign mem_3 = mem[3];
+    assign mem_4 = mem[4];
+    assign mem_5 = mem[5];
+    assign mem_6 = mem[6];
+    assign mem_7 = mem[7];
 `endif
 
 endmodule

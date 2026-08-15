@@ -182,6 +182,7 @@ module PSC_ONE_RV32ISP_core #(
     // --------------------------------
     // CORE <-> I/D メモリIF
     // --------------------------------
+    wire         program_mem_burst_mode;
     wire         program_mem_read_valid;
     wire         program_mem_read_ready;
     wire [31:0]  program_mem_read_address;
@@ -221,6 +222,7 @@ module PSC_ONE_RV32ISP_core #(
         .cpu_stop                   (cpu_stop),
         .irq_ext                    (1'b0),
 
+        .program_mem_burst_mode     (program_mem_burst_mode),
         .program_mem_read_valid     (program_mem_read_valid),
         .program_mem_read_ready     (program_mem_read_ready),
         .program_mem_read_address   (program_mem_read_address),
@@ -389,7 +391,7 @@ module PSC_ONE_RV32ISP_core #(
         .cpu_rw             (1'b0),
         .cpu_addr           (program_mem_read_address),
         .cpu_data           (32'd0),            // 未使用
-        .burst_mode         (1'b0),
+        .burst_mode         (program_mem_burst_mode),
         .cpu_ready          (program_mem_read_ready),
         .cpu_data_out       (program_mem_read_data),
         .cpu_req_ready      (program_mem_req_ready),

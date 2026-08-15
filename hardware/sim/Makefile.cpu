@@ -148,7 +148,8 @@ LED_DIR		= ../rtl/mmio/LED
 # CPUコアの切り替え（v1 / legacy）
 # ============================================================
 # デフォルトはV1
-CPU_VERSION ?= v1
+#CPU_VERSION ?= v1
+CPU_VERSION ?= v2
 
 ifeq ($(CPU_VERSION),v1)
 SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)
@@ -250,7 +251,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	voice_test2:RV32ISP_chip_test:./mem/voice_test2.mem:0x00001215 \
+	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
 
 # ============================================================
 # 複数テスト定義

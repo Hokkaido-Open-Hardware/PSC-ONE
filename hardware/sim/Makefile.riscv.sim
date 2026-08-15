@@ -119,7 +119,8 @@ CPU_V2_CORE_FILES = \
 # CPUコアの切り替え（v1 / legacy）
 # ============================================================
 # デフォルトはV1
-CPU_VERSION ?= v1
+#CPU_VERSION ?= v1
+CPU_VERSION ?= v2
 
 ifeq ($(CPU_VERSION),v1)
 SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)

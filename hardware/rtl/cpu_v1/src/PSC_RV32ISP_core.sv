@@ -13,6 +13,7 @@ module PSC_RV32ISP_core #(
     input logic              cpu_stop,
     input logic              irq_ext,     // TBD
     // Program
+    output logic             program_mem_burst_mode,
     output logic             program_mem_read_valid,
     input  logic             program_mem_read_ready,
     output logic [31:0]      program_mem_read_address,
@@ -343,6 +344,7 @@ module PSC_RV32ISP_core #(
         // MMU fault sig.
         .i_pf                       (i_pf),
         // to memory
+        .program_mem_burst_mode     (program_mem_burst_mode),
         .program_mem_read_valid     (program_mem_read_valid),
         .program_mem_read_ready     (program_mem_read_ready),
         .program_mem_read_address   (program_mem_read_address),
