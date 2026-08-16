@@ -347,6 +347,17 @@ PSCONE_VOICE_TESTS = \
 	voice_test3:RV32ISP_chip_test:./mem/voice_test3.mem:0x00001216 \
 
 # ============================================================
+# Rust test settings
+# ============================================================
+# hardware/sim/rust/*.rs を自動検出して順番に実行する。
+# 例: RUST_TESTS="add_test1 add_test2" と指定して絞り込み可能。
+RUST_DIR            ?= ./rust
+RUST_MAKEFILE       ?= Makefile.rust
+RUST_TESTS          ?= $(basename $(notdir $(wildcard $(RUST_DIR)/*.rs)))
+RUST_COCOTB_MODULE  ?= RV32ISP_chip_test
+RUST_EXPECTED       ?= 0x12345678
+
+# ============================================================
 # テストプログラムの切り替え（basic / long / voice / single）
 # ============================================================
 # デフォルトはbasic
@@ -411,5 +422,89 @@ simulate_PSC_ONE_TESTS:
 	echo ""; \
 	echo "========================================"; \
 	echo "✅ All PSC-ONE tests completed"; \
+	echo "📄 Log : $$run_log"; \
+	echo "========================================"
+
+
+
+
+# ============================================================
+# Rust tests
+#
+# rust/ 内の *.rs を
+#   Rust -> ELF -> BIN -> MEM
+# に変換し、その MEM を既存の PSC-ONE cocotb テストで実行する。
+#
+# Usage:
+#   make -f Makefile.cpu simulate_PSC_ONE_RUST CPU_VERSION=v2
+#
+# 1本だけ実行:
+#   make -f Makefile.cpu simulate_PSC_ONE_RUST \
+#       CPU_VERSION=v2 RUST_TESTS=add_test1
+#
+# 期待値を変更:
+#   make -f Makefile.cpu simulate_PSC_ONE_RUST \
+#       CPU_VERSION=v2 RUST_TESTS=add_test1 RUST_EXPECTED=0x12345678
+# ============================================================
+.PHONY: simulate_PSC_ONE_RUST
+simulate_PSC_ONE_RUST:
+	@mkdir -p ./wave ./log ./mem
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "RUST_TESTS=$(RUST_TESTS)"
+	@echo "RUST_EXPECTED=$(RUST_EXPECTED)"
+	@set -e; \
+	if [ -z "$(strip $(RUST_TESTS))" ]; then \
+		echo "[ERROR] $(RUST_DIR) に *.rs がありません"; \
+		exit 1; \
+	fi; \
+	run_log=log/rust_test_result_$$(date +%Y%m%d_%H%M%S).log; \
+	echo "[INFO] LOG FILE = $$run_log"; \
+	for name in $(RUST_TESTS); do \
+		echo ""; \
+		echo "========================================"; \
+		echo "[RUST TEST] $$name"; \
+		echo "[SRC ] $(RUST_DIR)/$$name.rs"; \
+		echo "[MEM ] ./mem/$$name.mem"; \
+		echo "[EXP ] $(RUST_EXPECTED)"; \
+		echo "[LOG ] $$run_log"; \
+		echo "========================================"; \
+		if [ ! -f "$(RUST_DIR)/$$name.rs" ]; then \
+			echo "[ERROR] Rust source not found: $(RUST_DIR)/$$name.rs"; \
+			exit 1; \
+		fi; \
+		if [ ! -f "$(RUST_DIR)/$$name.x" ]; then \
+			echo "[ERROR] Linker script not found: $(RUST_DIR)/$$name.x"; \
+			exit 1; \
+		fi; \
+		$(MAKE) -C $(RUST_DIR) -f $(RUST_MAKEFILE) clean TARGET=$$name; \
+		$(MAKE) -C $(RUST_DIR) -f $(RUST_MAKEFILE) mem TARGET=$$name; \
+		mem_file=./mem/$$name.mem; \
+		if [ ! -f "$$mem_file" ]; then \
+			echo "[ERROR] MEM file was not generated: $$mem_file"; \
+			exit 1; \
+		fi; \
+		tmp=$$(mktemp); \
+		head -n 4096 "$$mem_file" > $$tmp; \
+		cp $$tmp ./mem/test_program.mem; \
+		rm -f $$tmp; \
+		$(MAKE) clean; \
+		COCOTB_TEST_MODULES=cocotb_tb.cpu.$(RUST_COCOTB_MODULE) \
+		TEST_NAME=$$name \
+		PSC_LOGFILE=$$run_log \
+		PROGRAM_FILE=$$mem_file \
+		EXPECTED_RESULT=$(RUST_EXPECTED) \
+		TOPLEVEL=$(PSCONE_TOP) \
+		TOPLEVEL_LANG=verilog \
+		SIM=$(SIM) \
+		VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
+		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+		make --silent -f $(COCOTB_MAKEFILE); \
+	done; \
+	printf '\a'; \
+	echo ""; \
+	echo "========================================"; \
+	echo "✅ All PSC-ONE Rust tests completed"; \
 	echo "📄 Log : $$run_log"; \
 	echo "========================================"

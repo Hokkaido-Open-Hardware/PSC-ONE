@@ -65,7 +65,12 @@ SIM_SRC = $(SRC_SIMTOP) $(SRC_CASHE) $(SRC_BRIDGE) $(SRC_AXI_SDRAM_CNT) $(GW2AR_
 # ============================================================
 #  Cocotb simulation targets
 # ============================================================
-simulate_CACHE:
+.PHONY: simulate_CACHE simulate_IDCACHE simulate_ICACHE
+
+simulate_CACHE: simulate_IDCACHE simulate_ICACHE
+
+# cache test
+simulate_IDCACHE:
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_DM_CACHE test)"
 	@echo EXTRA_ARGS=$(EXTRA_ARGS)
 	$(MAKE) clean
@@ -79,6 +84,8 @@ simulate_CACHE:
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
 	make -f $(COCOTB_MAKEFILE)
 
+# I-cache test
+# burstt mode
 simulate_ICACHE:
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_DM_CACHE test)"
 	@echo EXTRA_ARGS=$(EXTRA_ARGS)

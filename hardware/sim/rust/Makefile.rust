@@ -1,0 +1,130 @@
+# ============================================================
+# PSC-ONE Rust Test Makefile
+#
+# Usage:
+#   make -f Makefile.rust
+#   make -f Makefile.rust dump
+#   make -f Makefile.rust mem
+#   make -f Makefile.rust clean
+# ============================================================
+
+TARGET          ?= add_test1
+
+RUST_SRC        := $(TARGET).rs
+LINKER_SCRIPT   := $(TARGET).x
+
+RUST_TARGET     := riscv32i-unknown-none-elf
+
+RUSTC           := rustc
+OBJDUMP         := llvm-objdump
+OBJCOPY         := llvm-objcopy
+PYTHON          := python3
+
+ELF             := $(TARGET).elf
+BIN             := $(TARGET).bin
+DUMP            := $(TARGET).dump
+MEM             := $(TARGET).mem
+
+PSC_MEM_DIR     := ../mem
+PSC_MEM         := $(PSC_MEM_DIR)/$(TARGET).mem
+
+RUSTFLAGS = \
+	--target $(RUST_TARGET) \
+	-C panic=abort \
+	-C opt-level=2 \
+	-C link-arg=-T$(LINKER_SCRIPT)
+
+.PHONY: all elf bin dump mem install clean info
+
+# ============================================================
+# Default
+# ============================================================
+
+all: mem dump
+	@echo ""
+	@echo "========================================"
+	@echo " Rust build completed"
+	@echo " TARGET : $(TARGET)"
+	@echo " ELF    : $(ELF)"
+	@echo " MEM    : $(PSC_MEM)"
+	@echo "========================================"
+
+# ============================================================
+# Rust -> ELF
+# ============================================================
+
+elf: $(ELF)
+
+$(ELF): $(RUST_SRC) $(LINKER_SCRIPT)
+	$(RUSTC) \
+		$(RUSTFLAGS) \
+		$(RUST_SRC) \
+		-o $(ELF)
+
+# ============================================================
+# ELF -> BIN
+# ============================================================
+
+bin: $(BIN)
+
+$(BIN): $(ELF)
+	$(OBJCOPY) -O binary $(ELF) $(BIN)
+
+# ============================================================
+# Disassemble
+# ============================================================
+
+dump: $(DUMP)
+
+$(DUMP): $(ELF)
+	$(OBJDUMP) -d $(ELF) > $(DUMP)
+	@cat $(DUMP)
+
+# ============================================================
+# BIN -> PSC .mem
+#
+# 32bit little endian
+# one 32bit word per line
+# ============================================================
+
+mem: $(PSC_MEM)
+
+$(PSC_MEM): $(BIN)
+	@mkdir -p $(PSC_MEM_DIR)
+	$(PYTHON) -c '\
+import pathlib; \
+data = pathlib.Path("$(BIN)").read_bytes(); \
+data += bytes((-len(data)) % 4); \
+words = [int.from_bytes(data[i:i+4], "little") for i in range(0, len(data), 4)]; \
+pathlib.Path("$(MEM)").write_text("".join(f"{w:08x}\n" for w in words)); \
+'
+	cp $(MEM) $(PSC_MEM)
+	@echo "[MEM] $(PSC_MEM)"
+
+# ============================================================
+# Information
+# ============================================================
+
+info:
+	@echo "TARGET        = $(TARGET)"
+	@echo "RUST_TARGET   = $(RUST_TARGET)"
+	@echo "RUST_SRC      = $(RUST_SRC)"
+	@echo "LINKER_SCRIPT = $(LINKER_SCRIPT)"
+	@echo "ELF           = $(ELF)"
+	@echo "BIN           = $(BIN)"
+	@echo "MEM           = $(MEM)"
+	@echo "PSC_MEM       = $(PSC_MEM)"
+
+# ============================================================
+# Clean
+# ============================================================
+
+clean:
+	rm -f \
+		$(ELF) \
+		$(BIN) \
+		$(DUMP) \
+		$(MEM)
+
+clean-all: clean
+	rm -f $(PSC_MEM)
