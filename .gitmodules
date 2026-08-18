@@ -1,3 +1,7 @@
 [submodule "hardware/sim/riscv_tests"]
 	path = hardware/sim/riscv_tests
 	url = https://github.com/riscv-software-src/riscv-tests.git
+
+[submodule "software/micropython/micropython"]
+	path = software/micropython/micropython
+	url = https://github.com/micropython/micropython.git

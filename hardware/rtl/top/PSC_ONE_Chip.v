@@ -38,6 +38,8 @@
 // ============================================================================
 `timescale 1ns / 1ps
 
+`define PFE_OFF
+
 module PSC_ONE_Chip #(
     parameter integer CLK_FREQ     = 80,
     parameter integer ADDR_WIDTH   = 32,
@@ -902,7 +904,11 @@ module PSC_ONE_Chip #(
         .PFE_IF_CTRL      (PSC_PFE_IF_CTRL)
     ) u_pfe (
         .clock            (clock_100MHz),
+        `ifdef PFE_OFF
+        .reset_n          (1'b0),
+        `else
         .reset_n          (reset_n),
+        `endif
 
         // CPU read IF（1clkパルス）
         .cpu_rvalid       (mmio_valid & ~mmio_rw),

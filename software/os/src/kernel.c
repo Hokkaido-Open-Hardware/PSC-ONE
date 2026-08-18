@@ -847,14 +847,14 @@ void kernel_main(void) {
     s_printf("--- memset done ---\n");
 
     // compline number.
-    s_printf("Test Ver: test_1.4.8\n");
+    s_printf("Test Ver: test_1.5.0\n");
 
 #if 0
     s_printf("Draw PSC Logo\n");
     lcd_draw_boot_logo();
 #endif
 
-#if 1
+#if 0
     s_printf("Draw Test test\n");
     lcd_draw_text();
 
@@ -896,6 +896,7 @@ void kernel_main(void) {
         __DATE__, __TIME__
     );
 
+#if 0
     lcd_printf(
         "\n"
         "+----------------------+\n"
@@ -935,6 +936,8 @@ void kernel_main(void) {
     lcd_printf("\n");
     lcd_printf("\n");
     lcd_printf("\n");
+#endif
+
     /*
     printf("ADDR kernel_base=%x free_ram=%x free_ram_end=%x\n",
        (uint32_t)__kernel_base,
