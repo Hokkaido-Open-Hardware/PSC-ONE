@@ -250,14 +250,6 @@ simulate_PSCOS:
 	@tmp=$$(mktemp); \
 	head -n 128 ./mem/bootrom.mem > $$tmp; \
 	mv $$tmp ./mem/bootrom.mem
-
-	@tmp=$$(mktemp); \
-	head -n 100000 ./mem/kernel.mem > $$tmp; \
-	mv $$tmp ./mem/kernel.mem
-
-	@tmp=$$(mktemp); \
-	head -n 100000 ./mem/user.mem > $$tmp; \
-	mv $$tmp ./mem/user.mem
 	
 	@mkdir -p ./wave
 	@mkdir -p ./log_uart
@@ -311,14 +303,6 @@ simulate_SD_PSCOS:
 	@tmp=$$(mktemp); \
 	head -n 128 ./mem/bootrom.mem > $$tmp; \
 	mv $$tmp ./mem/bootrom.mem
-
-	@tmp=$$(mktemp); \
-	head -n 100000 ./mem/kernel.mem > $$tmp; \
-	mv $$tmp ./mem/kernel.mem
-
-	@tmp=$$(mktemp); \
-	head -n 5000 ./mem/user.mem > $$tmp; \
-	mv $$tmp ./mem/user.mem
 
 	@tmp=$$(mktemp); \
 	head -n 4500 ./mem/bootloader.mem > $$tmp; \

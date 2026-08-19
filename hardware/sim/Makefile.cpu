@@ -148,8 +148,7 @@ LED_DIR		= ../rtl/mmio/LED
 # CPUコアの切り替え（v1 / legacy）
 # ============================================================
 # デフォルトはV1
-#CPU_VERSION ?= v1
-CPU_VERSION ?= v2
+CPU_VERSION ?= v1
 
 ifeq ($(CPU_VERSION),v1)
 SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)

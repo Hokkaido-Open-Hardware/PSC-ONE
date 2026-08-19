@@ -25,8 +25,7 @@ ARCH = \
 	-march=rv32im_zicsr_zifencei \
 	-mabi=ilp32 \
 	-mno-relax \
-	-mstrict-align \
-    --sysroot=/usr/lib/picolibc/riscv64-unknown-elf
+	--sysroot=/usr/lib/picolibc/riscv64-unknown-elf
 
 CFLAGS += \
 	$(INC) \
@@ -39,11 +38,20 @@ CFLAGS += \
 	-fno-stack-protector \
 	-fomit-frame-pointer \
 	-fdata-sections \
-	-ffunction-sections
+	-ffunction-sections \
+	-mstrict-align
 
 CSUPEROPT = -Os
 
-LIBS =
+# ------------------------------------------------------------
+# Picolibc libraries
+#
+# PSC-RV32ISP は RV32IM。
+# rv32i/ilp32 版なら A/C/F/D 命令を要求しないため安全。
+# ------------------------------------------------------------
+
+LIBM := /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32i/ilp32/libm.a
+LIBC := /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32i/ilp32/libc.a
 
 # ------------------------------------------------------------
 # PSC port sources
@@ -60,7 +68,7 @@ SRC_C = \
 	shared/readline/readline.c \
 	shared/runtime/pyexec.c \
 	shared/runtime/stdout_helpers.c \
-	$(BUILD)/_frozen_mpy.c \
+	$(BUILD)/_frozen_mpy.c
 
 SRC_QSTR += \
 	shared/readline/readline.c \
@@ -71,10 +79,17 @@ OBJ += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
 OBJ += $(addprefix $(BUILD)/, $(SRC_S:.S=.o))
 
 # ------------------------------------------------------------
+# libgcc
+# ------------------------------------------------------------
+
 LIBGCC := $(shell riscv64-unknown-elf-gcc \
 	-march=rv32im \
 	-mabi=ilp32 \
 	-print-libgcc-file-name)
+
+# ------------------------------------------------------------
+# MicroPython ELF
+# ------------------------------------------------------------
 
 MICROPY_ELF := build/micropython.elf
 
@@ -84,11 +99,20 @@ $(MICROPY_ELF): $(OBJ)
 		-march=rv32im_zicsr_zifencei \
 		-mabi=ilp32 \
 		-mno-relax \
+		--sysroot=/usr/lib/picolibc/riscv64-unknown-elf \
 		-nostdlib \
 		-Wl,-Tpsc.ld \
 		-Wl,--no-relax \
 		-Wl,-e,_start \
-		-o $@ $(OBJ) $(LIBGCC)
+		-o $@ \
+		$(OBJ) \
+		$(LIBM) \
+		$(LIBC) \
+		$(LIBGCC)
+
+# ------------------------------------------------------------
+# MicroPython BIN
+# ------------------------------------------------------------
 
 MICROPY_BIN := build/micropython.bin
 
@@ -106,12 +130,23 @@ all: $(OBJ)
 	@echo
 	@echo "PSC MicroPython core build OK"
 
-$(BUILD)/_frozen_mpy.c: $(TOP)/tests/assets/frozentest.mpy $(BUILD)/genhdr/qstrdefs.generated.h
+# ------------------------------------------------------------
+# Frozen MPY
+# ------------------------------------------------------------
+
+$(BUILD)/_frozen_mpy.c: \
+	$(TOP)/tests/assets/frozentest.mpy \
+	$(BUILD)/genhdr/qstrdefs.generated.h
+
 	$(ECHO) "MISC freezing bytecode"
 	$(Q)$(TOP)/tools/mpy-tool.py \
 		-f \
 		-q $(BUILD)/genhdr/qstrdefs.preprocessed.h \
 		-mlongint-impl=none \
 		$< > $@
+
+# ------------------------------------------------------------
+# MicroPython common rules
+# ------------------------------------------------------------
 
 include $(TOP)/py/mkrules.mk

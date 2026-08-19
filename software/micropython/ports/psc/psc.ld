@@ -26,6 +26,7 @@ SECTIONS
         *(COMMON);
 
         . = ALIGN(16);
+
         __user_stack_bottom = .;
         . += 4K;              /* guard page */
         __user_stack_start = .;

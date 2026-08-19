@@ -21,8 +21,8 @@ PROGRAM_FILE   = (MEM_FILE_ENV if MEM_FILE_ENV else
 
 EXPECTED_STR = os.getenv("EXPECTED_RESULT", "").strip()
 CLK_PERIOD_NS = int(os.getenv("CLK_PERIOD_NS", "10"))     # 100 MHz
-#RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "2_0000_0000"))
-RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "1000_0000"))   # lcd test
+#RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "1000_0000"))   # lcd test
+RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "2_0000_0000"))
 SDRAM_INIT_TIMEOUT = int(os.getenv("SDRAM_INIT_TIMEOUT", "500000"))  # cycles
 BOOT_ROM_TIMEOUT   = int(os.getenv("BOOT_ROM_TIMEOUT", "5000000"))  # cycles
 # ======================
@@ -242,9 +242,10 @@ async def RV32IS_chip_test1(dut):
     timeout_cycles = RUN_CYCLES
     waited = 0
 
-    #dump_sdram_mem(dut, "GW2AR", 0x0000_0000, 24)
-    #dump_sdram_mem(dut, 0x0010_0000, 24)
-    #dump_sdram_mem(dut, 0x0010_4440, 24)
+    dump_sdram_mem(dut, "GW2AR", 0x0000_0000, 24)
+    dump_sdram_mem(dut, "GW2AR", 0x0010_0000, 24)
+    dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
+    #dump_sdram_mem(dut, "GW2AR", 0x0010_4440, 24)
     
     #dump_sdram_mem(dut, "GW2AR", 0x0020_0000, 24)
     #dump_sdram_mem(dut, 0x0020_1400, 84)
@@ -262,11 +263,11 @@ async def RV32IS_chip_test1(dut):
         if page_fault_i or page_fault_d:
             dut._log.info("==============================================================")
             dut._log.info(f"Page Fault detected: I={page_fault_i}, D={page_fault_d}")
-            dump_sdram_mem(dut, 0x0020_0000, 64)
-            dump_sdram_mem(dut, 0x0040_0000, 64)
-            dump_sdram_mem(dut, 0x0025_B000, 64)
+            dump_sdram_mem(dut, "GW2AR", 0x0020_0000, 64)
+            dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 64)
+            dump_sdram_mem(dut, "GW2AR", 0x0025_B000, 64)
             # SP
-            dump_sdram_mem(dut, 0x0027_E000, 1024)
+            dump_sdram_mem(dut, "GW2AR", 0x0027_E000, 1024)
 
             # 正しい page table の物理アドレスを取得
             satp_val = int(dut.u_chip.u_core_axi.u_core.u_csr.csr_satp.value)

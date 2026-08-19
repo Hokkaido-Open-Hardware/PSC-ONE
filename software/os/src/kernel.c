@@ -808,11 +808,13 @@ void boot(void) {
 // kernel main
 // -------------------------------------------
 
+#if 0
 static inline void tiny_delay(unsigned n){
     while (n--) {
         __asm__ __volatile__("nop");
     }
 }
+#endif
 
 extern char __kernel_base[];
 
@@ -891,6 +893,7 @@ void kernel_main(void) {
         "| CMD   : fat32_info, fat32_ls, fat32_cat\n"
         "| CMD   : fat32_touch\n"
         "| CMD   : speech\n"
+        "| CMD   : microPython\n"
         "| quit  : Ctl+A C. q.\n"
         "+--------------------------------------------------+\n",
         __DATE__, __TIME__
@@ -954,9 +957,9 @@ void kernel_main(void) {
     idle_proc->pid = 0; // idle
     current_proc = idle_proc;
 
-    //printf("DBG: _binary_shell_bin_start=%x _binary_shell_bin_end=%x\n",
-    //   (uint32_t)_binary_shell_bin_start,
-    //   (uint32_t)_binary_shell_bin_end);
+    s_printf("DBG: _binary_shell_bin_start=%x _binary_shell_bin_end=%x\n",
+        (uint32_t)_binary_shell_bin_start,
+        (uint32_t)_binary_shell_bin_end);
 
     size_t shell_size = _binary_shell_bin_end - _binary_shell_bin_start;
     //printf("================================================\n");
@@ -971,7 +974,7 @@ void kernel_main(void) {
     yield();
 
     //uint32_t satp_now = READ_CSR(satp);
-    //printf("satp after yield = %x\n", satp_now);
+    //s_printf("satp after yield = %x\n", satp_now);
 
     s_printf("--- yield end ---\n");
     PANIC("switched to idle process");

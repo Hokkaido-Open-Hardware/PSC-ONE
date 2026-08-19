@@ -361,6 +361,93 @@ Current PSC-OS features include:
 
 PSC-OS serves both as the runtime environment for the PSC-ONE SoC and as an experimental platform for operating-system, CPU, and hardware/software co-design research.
 
+## MicroPython on PSC-OS
+
+MicroPython has been ported to PSC-OS and can run as a user-space application on the custom PSC_RV32ISP CPU.
+The following console output is an excerpt from an actual execution on PSC-ONE.
+
+```text
+PSC_OS Boot Start.........
+--- memset done ---
+Test Ver: test_1.5.0
+
++--------------------------------------------------+
+|                    PSC_OS                        |
+|            Minimal RISC-V Kernel Boot            |
++--------------------------------------------------+
+| CPU   : RV32 (Supervisor mode)
+| MMU   : SV32
+| UART  : SBI console or
+| UART  : MMIO console
+| CMD   : hello, primes, dump
+| CMD   : sa_start
+| CMD   : sd_read, sd_write
+| CMD   : mic_read, mic_write
+| CMD   : fat32_info, fat32_ls, fat32_cat
+| CMD   : fat32_touch
+| CMD   : speech
++--------------------------------------------------+
+...
+MicroPython v1.29.0-preview.727.g7de32aa1ae on 2026-08-18; minimal with unknown-cpu
+
+>>> a = 10
+>>> a * 20
+200
+
+>>> p = [n for n in range(10)]
+>>> print(p)
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+
+>>> print(sum(p))
+45
+
+>>> print(sum(((i%1000)*(i%1000)//((i%97)+1) for i in range(1,5000))))
+88859578
+
+>>> import math
+>>> print(sum(math.sin(i) for i in range(100)))
+0.37919468
+
+>>> [print(" "*int(20+15*math.sin(i/4))+"*") for i in range(40)]
+                    *
+                       *
+                           *
+                              *
+                                *
+                                  *
+                                  *
+                                 *
+                               *
+                            *
+                         *
+                      *
+                  *
+              *
+           *
+        *
+      *
+     *
+       *
+         *
+            *
+               *
+                   *
+                       *
+                          *
+                             *
+                                *
+                                  *
+                                 *
+                               *
+                             *
+                          *
+                      *
+                  *
+               *
+```
+
+This demonstrates that the PSC-ONE software stack can execute an interactive Python environment directly on the custom RISC-V processor, including integer arithmetic, list comprehensions, generators, and floating-point math functions provided by MicroPython.
+
 ---
 
 # Demo

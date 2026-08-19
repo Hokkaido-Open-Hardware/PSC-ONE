@@ -11,6 +11,7 @@ clean:
 	$(RM) sim.vvp results.xml ./dump.fst ./dump.fst.hier
 	$(RM) -rf ./wave/*.vcd
 	$(RM) -rf ./wave/*.fst
+	$(MAKE) -f Makefile.riscv clean
 
 log_clean:
 	$(RM) ./log/test*.log

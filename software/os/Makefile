@@ -156,7 +156,6 @@ SRCS_MBIOS := $(Src)/psc_mbios.S
 # ★ 名前は従来通り shell.bin / shell.bin.o を維持する。
 # ★ 中身だけ MicroPython にする。
 USER_BIN  := $(Build)/shell.bin
-USER_BINO := $(Build)/shell.bin.o
 USER_MEM  := $(Build)/user.mem
 
 KERNEL_ELF := $(Build)/kernel.elf
@@ -337,31 +336,11 @@ endif
 # Common USER outputs
 # ------------------------------------------------------------
 #
-# shell / MicroPython のどちらでも最終形は同じ:
+# shell / MicroPython は kernel.elf へ埋め込まない。
+# USER image は user.mem として PA=USER_BASE_VAL に配置する。
+# kernel.c が使う _binary_shell_bin_start/_end は、
+# kernel link 時に absolute symbol として定義する。
 #
-#   build/shell.bin
-#        |
-#        +--> build/shell.bin.o -> kernel.elf
-#        |
-#        +--> build/user.mem    -> RTL
-#
-# kernel.c は従来通り
-#
-#   _binary_shell_bin_start
-#   _binary_shell_bin_end
-#
-# を使用できる。
-#
-
-$(USER_BINO): $(USER_BIN) | $(Build)
-	cd $(Build) && \
-	$(OBJCOPY) \
-		--binary-architecture=riscv \
-		-I binary \
-		-O elf32-littleriscv \
-		shell.bin \
-		shell.bin.o \
-		--rename-section .data=.rodata,alloc,load,readonly,data
 
 $(USER_MEM): $(USER_BIN) | $(Build)
 	hexdump -v -e '1/4 "%08x\n"' $(USER_BIN) > $(USER_MEM)
@@ -391,23 +370,25 @@ endif
 # Kernel
 # ========================
 #
-# ★ shell.bin.o を従来通りkernelへリンクする。
-# ★ ただし shell.bin の中身は MicroPython。
-#
-# これにより kernel.c は変更不要。
+# USER image は kernel.elf へ埋め込まない。
+# user.mem は PA=USER_BASE_VAL に別ロードする。
+# kernel.c の _binary_shell_bin_start/_end は absolute symbol で与える。
 #
 $(KERNEL_ELF): \
 	$(Build) \
 	$(SRCS_KERNEL) \
-	$(USER_BINO) \
+	$(USER_BIN) \
 	$(Build)/divmodsi3.o
 
+	@USER_SIZE=$$(stat -c%s $(USER_BIN)); \
+	echo "[USER] external image PA=$(USER_BASE_VAL) size=$$USER_SIZE"; \
 	$(CC) $(CFLAGS) $(KCPPFLAGS) $(DUSERBASE) \
 		-Wl,-T$(KERNEL_LD) \
 		$(LDFLAGS_KERNEL) \
+		-Wl,--defsym,_binary_shell_bin_start=$(USER_BASE_VAL) \
+		-Wl,--defsym,_binary_shell_bin_end=$(USER_BASE_VAL)+$$USER_SIZE \
 		-o $@ \
 		$(SRCS_KERNEL) \
-		$(USER_BINO) \
 		$(Build)/divmodsi3.o
 
 kernel_mem: $(KERNEL_ELF)
