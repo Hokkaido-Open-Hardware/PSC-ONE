@@ -444,6 +444,33 @@ MicroPython v1.29.0-preview.727.g7de32aa1ae on 2026-08-18; minimal with unknown-
                       *
                   *
                *
+
+>>> import psc
+
+>>> psc.run("TEST1.PY")
+
+Hello from SD card
+
+10
+
+20
+
+2000
+
+>>> psc.run("TEST2.PY")
+
+=== PSC-ONE MicroPython SD Test ===
+
+1 sin= 0.32719472 cos= 0.9800666 mix= 0.32067264
+
+2 sin= 0.6183698 cos= 0.921061 mix= 0.5695563
+
+3 sin= 0.841471 cos= 0.8253356 mix= 0.694496
+
+4 sin= 0.9719379 cos= 0.6967067 mix= 0.6771557
+
+5 sin= 0.99540792 cos= 0.5403023 mix= 0.5378212
+
 ```
 
 This demonstrates that the PSC-ONE software stack can execute an interactive Python environment directly on the custom RISC-V processor, including integer arithmetic, list comprehensions, generators, and floating-point math functions provided by MicroPython.
