@@ -127,9 +127,8 @@ endif
 # Sources
 # ========================
 
-# 旧shellソース。
-# MicroPythonモードでは直接ビルドしないが、
-# 将来戻せるよう定義だけ残す。
+# PSC-OS user shell sources.
+# MicroPython is linked as an embedded static library.
 SRCS_USER := \
 	$(Src)/shell.c \
 	$(Src)/user.c \
@@ -153,8 +152,7 @@ SRCS_MBIOS := $(Src)/psc_mbios.S
 # File names
 # ========================
 
-# ★ 名前は従来通り shell.bin / shell.bin.o を維持する。
-# ★ 中身だけ MicroPython にする。
+# USER image name remains shell.bin; it contains shell + MicroPython.
 USER_BIN  := $(Build)/shell.bin
 USER_MEM  := $(Build)/user.mem
 
@@ -272,79 +270,66 @@ $(BOOTLOADER_FAT32_MEM): $(BOOTLOADER_FAT32_BIN)
 	@echo "[BOOTLOADER] $@ generated."
 
 # ============================================================
-# USER image selection
+# USER image: PSC-OS shell + embedded MicroPython
 # ============================================================
 #
-# 使い方:
+# The USER image is always the normal PSC-OS shell.
+# MicroPython is linked into shell.elf as libmicropython_psc.a and
+# entered by calling:
 #
-#   make USER_MODE=shell sim_mem
-#   make USER_MODE=micropython sim_mem
+#     int psc_micropython_run(void);
 #
-# デフォルトは MicroPython
+# from shell.c.  user.mem therefore contains both shell and
+# MicroPython in one user image.
 #
-USER_MODE ?= micropython
-#USER_MODE ?= shell
-
-# ------------------------------------------------------------
-# MicroPython source
-# ------------------------------------------------------------
-MICROPY_DIR := ../micropython/ports/psc
-MICROPY_BIN := $(MICROPY_DIR)/build/micropython.bin
-
-$(MICROPY_BIN):
-	$(MAKE) -C $(MICROPY_DIR) build/micropython.bin
-
-# ------------------------------------------------------------
-# USER_MODE = shell
-# ------------------------------------------------------------
-ifeq ($(USER_MODE),shell)
 
 USER_ELF := $(Build)/shell.elf
 
-$(USER_ELF): $(Build) $(SRCS_USER) $(Build)/divmodsi3.o
+# ------------------------------------------------------------
+# MicroPython embedded library
+# ------------------------------------------------------------
+MICROPY_DIR := ../micropython/ports/psc
+MICROPY_LIB := $(MICROPY_DIR)/build/libmicropython_psc.a
+
+PICOLIBC_BASE := /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32i/ilp32
+LIBM := $(PICOLIBC_BASE)/libm.a
+LIBC := $(PICOLIBC_BASE)/libc.a
+
+$(MICROPY_LIB):
+	$(MAKE) -C $(MICROPY_DIR) embedded
+
+# ------------------------------------------------------------
+# PSC-OS shell + MicroPython -> shell.elf
+# ------------------------------------------------------------
+$(USER_ELF): \
+	$(Build) \
+	$(SRCS_USER) \
+	$(Build)/divmodsi3.o \
+	$(MICROPY_LIB)
+
 	$(CC) $(CFLAGS) $(DUSERBASE) $(DEFUSERBASE) \
 		$(LDFLAGS_USER) \
 		-o $@ \
 		$(SRCS_USER) \
-		$(Build)/divmodsi3.o
+		$(Build)/divmodsi3.o \
+		$(MICROPY_LIB) \
+		$(LIBM) \
+		$(LIBC) \
+		$(BUILTINS_LIB)
 
 $(USER_BIN): $(USER_ELF)
 	$(OBJCOPY) \
 		--set-section-flags .bss=alloc,contents \
 		-O binary \
 		$< $@
-	@echo "[USER] PSC-OS shell -> $(USER_BIN)"
+	@echo "[USER] PSC-OS shell + MicroPython -> $(USER_BIN)"
 
 # ------------------------------------------------------------
-# USER_MODE = micropython
+# Common USER output
 # ------------------------------------------------------------
-else ifeq ($(USER_MODE),micropython)
-
-# shell.bin という名前は維持する。
-# 中身だけ MicroPython に置き換える。
-$(USER_BIN): $(MICROPY_BIN) | $(Build)
-	cp $(MICROPY_BIN) $(USER_BIN)
-	@echo "[USER] MicroPython -> $(USER_BIN)"
-
-else
-
-$(error USER_MODE=$(USER_MODE) is invalid. Use shell or micropython)
-
-endif
-
-# ------------------------------------------------------------
-# Common USER outputs
-# ------------------------------------------------------------
-#
-# shell / MicroPython は kernel.elf へ埋め込まない。
-# USER image は user.mem として PA=USER_BASE_VAL に配置する。
-# kernel.c が使う _binary_shell_bin_start/_end は、
-# kernel link 時に absolute symbol として定義する。
-#
-
 $(USER_MEM): $(USER_BIN) | $(Build)
 	hexdump -v -e '1/4 "%08x\n"' $(USER_BIN) > $(USER_MEM)
-	@echo "[USER] USER_MODE=$(USER_MODE) -> $(USER_MEM)"
+	@echo "[USER] shell + MicroPython -> $(USER_MEM)"
 
 # ========================
 # Kernel linker selection
@@ -415,16 +400,16 @@ kernel_mem: $(KERNEL_ELF)
 .PHONY: sim_mem fpga_mem fpga_boot fpga_fat32_boot
 
 sim_mem:
-	@echo "[SIM] BootROM + Kernel + USER_MODE=$(USER_MODE)"
-	$(MAKE) MODE=sim USER_MODE=$(USER_MODE) $(BOOT_MEM)
-	$(MAKE) MODE=sim USER_MODE=$(USER_MODE) kernel_mem
-	$(MAKE) MODE=sim USER_MODE=$(USER_MODE) $(USER_MEM)
+	@echo "[SIM] BootROM + Kernel + shell + MicroPython"
+	$(MAKE) MODE=sim $(BOOT_MEM)
+	$(MAKE) MODE=sim kernel_mem
+	$(MAKE) MODE=sim $(USER_MEM)
 
 fpga_mem:
-	@echo "[FPGA_MEM] BootROM + Kernel + USER_MODE=$(USER_MODE)"
-	$(MAKE) MODE=fpga_mem USER_MODE=$(USER_MODE) $(BOOT_MEM)
-	$(MAKE) MODE=fpga_mem USER_MODE=$(USER_MODE) kernel_mem
-	$(MAKE) MODE=fpga_mem USER_MODE=$(USER_MODE) $(USER_MEM)
+	@echo "[FPGA_MEM] BootROM + Kernel + shell + MicroPython"
+	$(MAKE) MODE=fpga_mem $(BOOT_MEM)
+	$(MAKE) MODE=fpga_mem kernel_mem
+	$(MAKE) MODE=fpga_mem $(USER_MEM)
 
 fpga_boot:
 	@echo "[FPGA] BootROM + Bootloader"

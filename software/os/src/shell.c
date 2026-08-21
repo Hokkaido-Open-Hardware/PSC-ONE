@@ -2,6 +2,8 @@
 #include "user.h"
 #include "fat32.h"
 
+extern int psc_micropython_run(void);
+
 void main(void) {
 
     //SA API call
@@ -277,6 +279,31 @@ prompt:
             }
 
             fat32_cat(argv[1]);
+            fat32_cat(argv[1]);
+
+        // ---- FAT32 read ----
+        } else if (strcmp(argv[0], "fat32_read") == 0) {
+
+            if (argc < 2) {
+                printf("usage: fat32_read <file>\n");
+                goto prompt;
+            }
+
+            uint8_t read_buf[512];
+            uint32_t read_size = 0;
+
+            if (fat32_read(argv[1], read_buf, sizeof(read_buf), &read_size) != 0) {
+                printf("fat32_read failed\n");
+                goto prompt;
+            }
+
+            printf("read size=%d\n", (int)read_size);
+
+            for (uint32_t i = 0; i < read_size; i++) {
+                putchar(read_buf[i]);
+            }
+
+            putchar('\n');
 
         // ---- FAT32 touch ----
         } else if (strcmp(argv[0], "fat32_touch") == 0) {
@@ -292,9 +319,18 @@ prompt:
         } else if (strcmp(argv[0], "speech") == 0) {
             cmd_speech();
                     
+        // ---- MicroPython REPL ----
+        } else if (strcmp(argv[0], "microPython") == 0 ||
+                   strcmp(argv[0], "micropython") == 0) {
+
+            printf("\n--- MicroPython start ---\n");
+            int mp_ret = psc_micropython_run();
+            printf("\n--- return to PSC-OS shell (ret=%d) ---\n", mp_ret);
+
         // ---- Helps出力 ----
         } else if (strcmp(argv[0], "help") == 0) {
             printf("commands:\n");
+            printf("  microPython | micropython\n");
             /*
             printf("  hello\n");
             printf("  dump [addr] [len]\n");

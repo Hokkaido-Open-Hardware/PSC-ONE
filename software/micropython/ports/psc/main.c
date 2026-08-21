@@ -32,7 +32,7 @@ static char *stack_top;
 static char heap[MICROPY_HEAP_SIZE];
 #endif
 
-int main(int argc, char **argv) {
+int psc_micropython_run(void) {
     int stack_dummy;
     stack_top = (char *)&stack_dummy;
 
@@ -60,6 +60,14 @@ int main(int argc, char **argv) {
     mp_deinit();
     return 0;
 }
+
+#ifndef PSC_MICROPY_EMBEDDED
+int main(int argc, char **argv) {
+    (void)argc;
+    (void)argv;
+    return psc_micropython_run();
+}
+#endif
 
 #if MICROPY_ENABLE_GC
 void gc_collect(void) {

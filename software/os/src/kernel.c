@@ -894,7 +894,8 @@ void kernel_main(void) {
         "| CMD   : fat32_touch\n"
         "| CMD   : speech\n"
         "| CMD   : microPython\n"
-        "| quit  : Ctl+A C. q.\n"
+        "| microPython exit: Ctl+D.\n"
+        "| SBI quit : Ctl+A C. q.\n"
         "+--------------------------------------------------+\n",
         __DATE__, __TIME__
     );

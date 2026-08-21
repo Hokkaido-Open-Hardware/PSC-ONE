@@ -63,6 +63,7 @@ SRC_S = \
 SRC_C = \
 	main.c \
 	mphalport.c \
+	modpsc.c \
 	shared/libc/printf.c \
 	shared/libc/string0.c \
 	shared/readline/readline.c \
@@ -72,7 +73,8 @@ SRC_C = \
 
 SRC_QSTR += \
 	shared/readline/readline.c \
-	shared/runtime/pyexec.c
+	shared/runtime/pyexec.c \
+	modpsc.c
 
 OBJ += $(PY_CORE_O)
 OBJ += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
@@ -121,6 +123,38 @@ $(MICROPY_BIN): $(MICROPY_ELF)
 		--set-section-flags .bss=alloc,contents \
 		-O binary \
 		$< $@
+
+# ------------------------------------------------------------
+# PSC-OS embedded library
+#
+# start.S / normal main() are not linked into PSC-OS.
+# main.c is compiled again with PSC_MICROPY_EMBEDDED so that
+# psc_micropython_run() remains but standalone main() disappears.
+#
+# PSC-OS already provides strcmp/strcpy/printf/putchar, so the
+# MicroPython minimal-libc objects that define them are excluded.
+# ------------------------------------------------------------
+
+MICROPY_EMBED_MAIN := $(BUILD)/main_embedded.o
+MICROPY_LIB := $(BUILD)/libmicropython_psc.a
+
+MICROPY_EMBED_OBJ := $(filter-out \
+	$(BUILD)/start.o \
+	$(BUILD)/main.o \
+	$(BUILD)/shared/libc/string0.o \
+	$(BUILD)/shared/libc/printf.o, \
+	$(OBJ))
+
+$(MICROPY_EMBED_MAIN): main.c $(BUILD)/genhdr/qstrdefs.generated.h
+	$(CC) $(CFLAGS) -DPSC_MICROPY_EMBEDDED=1 -c $< -o $@
+
+$(MICROPY_LIB): $(OBJ) $(MICROPY_EMBED_MAIN)
+	@rm -f $@
+	$(AR) rcs $@ $(MICROPY_EMBED_OBJ) $(MICROPY_EMBED_MAIN)
+	@echo "[MP] embedded library generated: $@"
+
+.PHONY: embedded
+embedded: $(MICROPY_LIB)
 
 # ------------------------------------------------------------
 # First target: compile objects only

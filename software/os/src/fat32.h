@@ -16,6 +16,7 @@ int fat32_find(const char *name, uint32_t *cluster, uint32_t *size);
 int fat32_mount(void);
 void fat32_ls(void);
 int fat32_touch(const char *name);
+int fat32_read(const char *name, uint8_t *dst, uint32_t max_size, uint32_t *read_size);
 
 extern fat32_info_t g_fat32;
 

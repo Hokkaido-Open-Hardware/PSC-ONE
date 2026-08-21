@@ -16,6 +16,8 @@
 #define MICROPY_MODULE_FROZEN_MPY         (1)
 #define MICROPY_ENABLE_EXTERNAL_IMPORT    (1)
 
+#define MICROPY_PY_BUILTINS_DIR (1)
+
 // sin, cos support
 #define MICROPY_PY_MATH     (1)
 #define MICROPY_FLOAT_IMPL  MICROPY_FLOAT_IMPL_FLOAT

@@ -349,3 +349,99 @@ int fat32_touch(const char *name)
 
     return -1;
 }
+
+static int fat32_next_cluster(uint32_t cluster, uint32_t *next)
+{
+    uint8_t buf[512];
+
+    uint32_t fat_offset = cluster * 4;
+    uint32_t fat_sector = g_fat32.fat_begin + (fat_offset / 512);
+    uint32_t ent_offset = fat_offset % 512;
+
+    if (call_sd_read_buf_api(fat_sector, buf))
+        return -1;
+
+    uint32_t value =
+        ((uint32_t)buf[ent_offset + 0]) |
+        ((uint32_t)buf[ent_offset + 1] << 8) |
+        ((uint32_t)buf[ent_offset + 2] << 16) |
+        ((uint32_t)buf[ent_offset + 3] << 24);
+
+    value &= 0x0FFFFFFF;
+
+    *next = value;
+    return 0;
+}
+
+int fat32_read(
+    const char *name,
+    uint8_t *dst,
+    uint32_t max_size,
+    uint32_t *read_size)
+{
+    uint8_t buf[512];
+
+    uint32_t cluster;
+    uint32_t file_size;
+
+    if (read_size)
+        *read_size = 0;
+
+    if (fat32_mount())
+        return -1;
+
+    if (fat32_find(name, &cluster, &file_size)) {
+        printf("file not found\n");
+        return -1;
+    }
+
+    uint32_t remaining = file_size;
+
+    if (remaining > max_size)
+        remaining = max_size;
+
+    uint32_t total = 0;
+
+    while (remaining > 0) {
+
+        uint32_t first_lba = cluster_to_lba(cluster);
+
+        for (uint32_t s = 0;
+             s < g_fat32.sectors_per_cluster && remaining > 0;
+             s++) {
+
+            if (call_sd_read_buf_api(first_lba + s, buf))
+                return -1;
+
+            uint32_t n = remaining;
+
+            if (n > 512)
+                n = 512;
+
+            for (uint32_t i = 0; i < n; i++)
+                dst[total + i] = buf[i];
+
+            total += n;
+            remaining -= n;
+        }
+
+        if (remaining == 0)
+            break;
+
+        uint32_t next;
+
+        if (fat32_next_cluster(cluster, &next))
+            return -1;
+
+        // FAT32 end-of-chain
+        if (next >= 0x0FFFFFF8)
+            break;
+
+        cluster = next;
+    }
+
+    if (read_size)
+        *read_size = total;
+
+    return 0;
+}
