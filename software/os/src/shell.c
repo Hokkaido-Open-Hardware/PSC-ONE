@@ -279,7 +279,6 @@ prompt:
             }
 
             fat32_cat(argv[1]);
-            fat32_cat(argv[1]);
 
         // ---- FAT32 read ----
         } else if (strcmp(argv[0], "fat32_read") == 0) {
