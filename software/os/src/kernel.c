@@ -2,6 +2,7 @@
 #include "syscall.h"
 #include "synap_api.h"
 #include "sdcard_api.h"
+#include "timer_api.h"
 #include "mic_api.h"
 #include "lcd_api.h"
 #include "fft_api.h"
@@ -708,6 +709,48 @@ void handle_syscall(struct trap_frame *f) {
             }
 
             f->a0 = ret;
+            break;
+        }
+
+        // -------------------------------------------
+        // TIMER API
+        case SYS_TIMER_START: {
+            timer_start(f->a0);
+            break;
+        }
+
+        case SYS_TIMER_START_AUTO: {
+            timer_start_auto(f->a0);
+            break;
+        }
+
+        case SYS_TIMER_STOP: {
+            timer_stop();
+            break;
+        }
+
+        case SYS_TIMER_GET_COUNT: {
+            f->a0 = timer_get_count();
+            break;
+        }
+
+        case SYS_TIMER_GET_STATUS: {
+            f->a0 = timer_get_status();
+            break;
+        }
+
+        case SYS_TIMER_IS_RUNNING: {
+            f->a0 = (uint32_t)timer_is_running();
+            break;
+        }
+
+        case SYS_TIMER_WAIT_US: {
+            timer_wait_us(f->a0);
+            break;
+        }
+
+        case SYS_TIMER_WAIT_MS: {
+            timer_wait_ms(f->a0);
             break;
         }
         

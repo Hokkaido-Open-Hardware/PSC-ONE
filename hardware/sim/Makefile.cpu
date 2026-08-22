@@ -250,7 +250,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
+	timer_test1:RV32ISP_chip_test:./mem/timer_test1.mem:0x00000123 \
 
 # ============================================================
 # 複数テスト定義
@@ -260,6 +260,8 @@ PSCONE_SINGLE_TEST = \
 # List
 
 PSCONE_BASIC_TESTS = \
+	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
+	add_test2:RV32ISP_chip_test:./mem/add_test2.mem:0x00000000 \
 	pfe_test1:RV32ISP_chip_test:./mem/pfe_test1.mem:0x00000000 \
 	fetch_test1:RV32ISP_chip_test:./mem/fetch_test1.mem:0xcd1023bb \
 	csr_test1:RV32ISP_chip_test:./mem/csr_test1.mem:0x00000022 \
@@ -277,8 +279,6 @@ PSCONE_BASIC_TESTS = \
 	fft_test1:RV32ISP_chip_test:./mem/fft_test1.mem:0x0000beef \
 	q15_fft_test1:RV32ISP_chip_test:./mem/q15_fft_test1.mem:0x0000beef \
 	fft_N8_test1:RV32ISP_chip_test:./mem/fft_N8_test1.mem:0x0000beef \
-	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
-	add_test2:RV32ISP_chip_test:./mem/add_test2.mem:0x00000000 \
 	sbwrite_test1:RV32ISP_chip_test:./mem/sbwrite_test1.mem:0xE500000F \
 	jal_test1:RV32ISP_chip_test:./mem/jal_test1.mem:0x12345678 \
 	jalr_test1:RV32ISP_chip_test:./mem/jalr_test1.mem:0x00005AA5 \

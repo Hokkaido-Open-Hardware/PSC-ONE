@@ -32,6 +32,16 @@
 // --- SPEECH_RECOGNITION ---
 #define SYS_SPEECH_RECOGNITION 60
 
+// --- TIMER ---
+#define SYS_TIMER_START           70
+#define SYS_TIMER_START_AUTO      71
+#define SYS_TIMER_STOP            72
+#define SYS_TIMER_GET_COUNT       73
+#define SYS_TIMER_GET_STATUS      74
+#define SYS_TIMER_IS_RUNNING      75
+#define SYS_TIMER_WAIT_US         76
+#define SYS_TIMER_WAIT_MS         77
+
 // --- SYSTEM ---
 #define SYS_EXIT            90
 #define SYS_PRINT_INT       91

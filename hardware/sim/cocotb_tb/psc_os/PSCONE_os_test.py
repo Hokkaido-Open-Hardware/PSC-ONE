@@ -242,9 +242,9 @@ async def RV32IS_chip_test1(dut):
     timeout_cycles = RUN_CYCLES
     waited = 0
 
-    dump_sdram_mem(dut, "GW2AR", 0x0000_0000, 24)
-    dump_sdram_mem(dut, "GW2AR", 0x0010_0000, 24)
-    dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
+    #dump_sdram_mem(dut, "GW2AR", 0x0000_0000, 24)
+    #dump_sdram_mem(dut, "GW2AR", 0x0010_0000, 24)
+    #dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
     #dump_sdram_mem(dut, "GW2AR", 0x0010_4440, 24)
     
     #dump_sdram_mem(dut, "GW2AR", 0x0020_0000, 24)

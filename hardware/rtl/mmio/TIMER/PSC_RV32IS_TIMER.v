@@ -11,9 +11,9 @@ module PSC_RV32IS_TIMER #(
 
     // MMIO base (word addressed)
     parameter integer ADDR_WIDTH                 = 32,
-    parameter [ADDR_WIDTH-1:0] TIMER_WRITE_ADDR  = 32'h000F_0000, // BASE+0 (W)
-    parameter [ADDR_WIDTH-1:0] TIMER_READ_ADDR   = 32'h000F_0004, // BASE+4 (R: counter)
-    parameter [ADDR_WIDTH-1:0] TIMER_ST_ADDR     = 32'h000F_0008  // BASE+8 (R: status)
+    parameter [ADDR_WIDTH-1:0] TIMER_WRITE_ADDR  = 32'h1000_2000, // BASE+0 (W)
+    parameter [ADDR_WIDTH-1:0] TIMER_READ_ADDR   = 32'h1000_2004, // BASE+4 (R: counter)
+    parameter [ADDR_WIDTH-1:0] TIMER_ST_ADDR     = 32'h1000_2008  // BASE+8 (R: status)
 )(
     input  wire                     clock,
     input  wire                     reset_n,

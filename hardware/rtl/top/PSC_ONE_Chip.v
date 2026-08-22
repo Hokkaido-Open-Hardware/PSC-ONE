@@ -38,7 +38,8 @@
 // ============================================================================
 `timescale 1ns / 1ps
 
-`define PFE_OFF
+// Phase Flow Engine OFF mode
+//`define PFE_OFF
 
 module PSC_ONE_Chip #(
     parameter integer CLK_FREQ     = 80,
@@ -201,20 +202,21 @@ module PSC_ONE_Chip #(
 
     always @(*) begin
         case(mmio_addr)    // byte address.
-            PIO_ADDRESS:        mmio_rdata <= mmio_rdata_pio;
-            UART_ADDRESS_TX:    mmio_rdata <= mmio_rdata_uart;
-            UART_ADDRESS_RX:    mmio_rdata <= mmio_rdata_uart;
-            UART_ADDRESS_ST:    mmio_rdata <= mmio_rdata_uart;
-            UART_ADDRESS_CT:    mmio_rdata <= mmio_rdata_uart;
-            LCD_PIXS_ST:        mmio_rdata <= mmio_rdata_lcd;
-            PSC_SD_IF_READ_DATA: mmio_rdata <= mmio_rdata_sd;
-            PSC_SD_IF_CTRL:      mmio_rdata <= mmio_rdata_sd;
-            PSC_I2S_ADDR_RX:     mmio_rdata <= mmio_rdata_i2s;
-            PSC_I2S_ADDR_ST:     mmio_rdata <= mmio_rdata_i2s;
-            TIMER_READ_ADDR:     mmio_rdata <= mmio_rdata_timer;
-            PSC_PFE_IF_DATA:     mmio_rdata <= mmio_rdata_pfe;
-            PSC_PFE_IF_CTRL:     mmio_rdata <= mmio_rdata_pfe;
-            default: mmio_rdata <= 32'd0;
+            PIO_ADDRESS:         mmio_rdata = mmio_rdata_pio;
+            UART_ADDRESS_TX:     mmio_rdata = mmio_rdata_uart;
+            UART_ADDRESS_RX:     mmio_rdata = mmio_rdata_uart;
+            UART_ADDRESS_ST:     mmio_rdata = mmio_rdata_uart;
+            UART_ADDRESS_CT:     mmio_rdata = mmio_rdata_uart;
+            LCD_PIXS_ST:         mmio_rdata = mmio_rdata_lcd;
+            PSC_SD_IF_READ_DATA: mmio_rdata = mmio_rdata_sd;
+            PSC_SD_IF_CTRL:      mmio_rdata = mmio_rdata_sd;
+            PSC_I2S_ADDR_RX:     mmio_rdata = mmio_rdata_i2s;
+            PSC_I2S_ADDR_ST:     mmio_rdata = mmio_rdata_i2s;
+            TIMER_READ_ADDR:     mmio_rdata = mmio_rdata_timer;
+            TIMER_ST_ADDR:       mmio_rdata = mmio_rdata_timer;
+            PSC_PFE_IF_DATA:     mmio_rdata = mmio_rdata_pfe;
+            PSC_PFE_IF_CTRL:     mmio_rdata = mmio_rdata_pfe;
+            default: mmio_rdata = 32'd0;
         endcase
     end
 
@@ -446,6 +448,7 @@ module PSC_ONE_Chip #(
         .PIO_ADDRESS         (PIO_ADDRESS),
         .TIMER_WRITE_ADDR    (TIMER_WRITE_ADDR),
         .TIMER_READ_ADDR     (TIMER_READ_ADDR),
+        .TIMER_ST_ADDR       (TIMER_ST_ADDR),
         .LCD_PIXS_DATA       (LCD_PIXS_DATA),
         .LCD_PIXS_ST         (LCD_PIXS_ST),
         .LED_ADDRESS         (LED_ADDRESS),

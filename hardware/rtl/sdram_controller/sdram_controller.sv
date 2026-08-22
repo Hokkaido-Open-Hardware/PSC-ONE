@@ -59,10 +59,6 @@ module sdram_controller #(
     inout  wire  [DQ_BUS_WIDTH-1:0]  sdram_dq
 );
 
-    localparam int ROW_BITS = RW;
-    localparam int COL_BITS = CW;
-    localparam int BA_BITS  = BW;
-
     logic cs_r, ras_r, cas_r, we_r;
     logic init_cs_r, init_ras_r, init_cas_r, init_we_r;
     logic [SDAW-1:0] init_adr_r, adr_r;
@@ -322,6 +318,9 @@ module sdram_controller #(
                     end
                 end
                 READ_CMD: begin
+                    `ifdef COCOTB_SIM
+                    assert(rw_length == 1 || rw_length == 4 || rw_length == 8);
+                    `endif
                     if (rw_index == rw_length) begin
                         cs_r  <= 1'b0;
                         ras_r <= 1'b1;
@@ -415,6 +414,9 @@ module sdram_controller #(
                 end
                 WRITE_CMD: begin
                     dqm_r <= '0;
+                    `ifdef COCOTB_SIM
+                    assert(rw_length == 1 || rw_length == 4 || rw_length == 8);
+                    `endif
                     if (rw_index == rw_length) begin
                         cs_r  <= 1'b0;
                         ras_r <= 1'b1;

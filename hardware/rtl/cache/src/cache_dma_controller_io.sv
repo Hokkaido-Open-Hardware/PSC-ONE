@@ -30,6 +30,7 @@ module cache_dma_controller_io #(
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_CT     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  TIMER_WRITE_ADDR    = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  TIMER_READ_ADDR     = {ADDR_WIDTH{1'b0}},
+    parameter [ADDR_WIDTH-1:0]  TIMER_ST_ADDR       = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  LCD_PIXS_DATA       = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  LCD_PIXS_ST         = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  LED_ADDRESS         = {ADDR_WIDTH{1'b0}},
@@ -308,6 +309,7 @@ module cache_dma_controller_io #(
                  ((UART_ADDRESS_CT      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == UART_ADDRESS_CT  )) |
                  ((TIMER_WRITE_ADDR     != {ADDR_WIDTH{1'b0}}) && (addr_mmio == TIMER_WRITE_ADDR )) |
                  ((TIMER_READ_ADDR      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == TIMER_READ_ADDR  )) |
+                 ((TIMER_ST_ADDR        != {ADDR_WIDTH{1'b0}}) && (addr_mmio == TIMER_ST_ADDR    )) |
                  ((LCD_PIXS_DATA        != {ADDR_WIDTH{1'b0}}) && (addr_mmio == LCD_PIXS_DATA    )) |
                  ((LCD_PIXS_ST          != {ADDR_WIDTH{1'b0}}) && (addr_mmio == LCD_PIXS_ST      )) |
                  ((LED_ADDRESS          != {ADDR_WIDTH{1'b0}}) && (addr_mmio == LED_ADDRESS      )) |

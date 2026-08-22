@@ -4,20 +4,31 @@
 #include "py/repl.h"
 #include "py/mperrno.h"
 
-/*
- * PSC-OS側にある関数。
- * 最終的に shell.elf へ一緒にリンクされるので、
- * MicroPython側から外部関数として呼び出す。
- */
+#include "mphalport.h"
+
+
+/* ------------------------------------------------------------
+ * PSC-OS側関数
+ * ------------------------------------------------------------ */
+
 extern void fat32_ls(void);
+
 extern int fat32_read(
     const char *name,
     uint8_t *dst,
     uint32_t max_size,
     uint32_t *read_size
 );
-extern void do_str(const char *src, mp_parse_input_kind_t input_kind);
 
+extern void do_str(
+    const char *src,
+    mp_parse_input_kind_t input_kind
+);
+
+
+/* ------------------------------------------------------------
+ * FAT32
+ * ------------------------------------------------------------ */
 
 /* Python: psc.fat32_ls() */
 static mp_obj_t psc_fat32_ls(void)
@@ -33,19 +44,23 @@ static MP_DEFINE_CONST_FUN_OBJ_0(
 );
 
 
-#define PSC_PY_MAX_SIZE (4 * 1024)
+/* ------------------------------------------------------------
+ * Pythonスクリプト実行
+ * ------------------------------------------------------------ */
+
+#define PSC_PY_MAX_SIZE (4u * 1024u)
 
 /* Python: psc.run("TEST.PY") */
 static mp_obj_t psc_run(mp_obj_t filename_obj)
 {
-    const char *filename = mp_obj_str_get_str(filename_obj);
+    const char *filename =
+        mp_obj_str_get_str(filename_obj);
 
     /*
-     * staticにしてuser stackを消費しないようにする。
-     * fat32_read()側が複数sector/FAT chain対応なら、
-     * 最大4KBのPython scriptを読み込める。
+     * user stackを消費しないようstatic領域を使用する。
+     * 最大4KBのPythonスクリプトを読み込む。
      */
-    static uint8_t buf[PSC_PY_MAX_SIZE + 1];
+    static uint8_t buf[PSC_PY_MAX_SIZE + 1u];
     uint32_t size = 0;
 
     if (fat32_read(
@@ -53,11 +68,14 @@ static mp_obj_t psc_run(mp_obj_t filename_obj)
             buf,
             PSC_PY_MAX_SIZE,
             &size) != 0) {
+
         mp_raise_OSError(MP_ENOENT);
     }
 
     if (size > PSC_PY_MAX_SIZE) {
-        mp_raise_ValueError(MP_ERROR_TEXT("script too large"));
+        mp_raise_ValueError(
+            MP_ERROR_TEXT("script too large")
+        );
     }
 
     buf[size] = '\0';
@@ -76,21 +94,206 @@ static MP_DEFINE_CONST_FUN_OBJ_1(
 );
 
 
-/* psc module globals */
+/* ------------------------------------------------------------
+ * TIMER
+ * ------------------------------------------------------------ */
+
+/* Python: psc.timer_start(count) */
+static mp_obj_t psc_timer_start(mp_obj_t count_obj)
+{
+    uint32_t count =
+        (uint32_t)mp_obj_get_int(count_obj);
+
+    psc_timer_start_api(count);
+
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_1(
+    psc_timer_start_obj,
+    psc_timer_start
+);
+
+
+/* Python: psc.timer_start_auto(count) */
+static mp_obj_t psc_timer_start_auto(mp_obj_t count_obj)
+{
+    uint32_t count =
+        (uint32_t)mp_obj_get_int(count_obj);
+
+    psc_timer_start_auto_api(count);
+
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_1(
+    psc_timer_start_auto_obj,
+    psc_timer_start_auto
+);
+
+/* Python: psc.timer_stop() */
+static mp_obj_t psc_timer_stop(void)
+{
+    psc_timer_stop_api();
+
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_0(
+    psc_timer_stop_obj,
+    psc_timer_stop
+);
+
+
+/* Python: psc.timer_count() */
+static mp_obj_t psc_timer_count(void)
+{
+    return mp_obj_new_int_from_uint(
+        psc_timer_get_count_api()
+    );
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_0(
+    psc_timer_count_obj,
+    psc_timer_count
+);
+
+
+/* Python: psc.timer_status() */
+static mp_obj_t psc_timer_status(void)
+{
+    return mp_obj_new_int_from_uint(
+        psc_timer_get_status_api()
+    );
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_0(
+    psc_timer_status_obj,
+    psc_timer_status
+);
+
+
+/* Python: psc.timer_running() */
+static mp_obj_t psc_timer_running(void)
+{
+    return mp_obj_new_bool(
+        psc_timer_is_running_api() != 0
+    );
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_0(
+    psc_timer_running_obj,
+    psc_timer_running
+);
+
+
+
+
+/* Python: psc.wait_us(us) */
+static mp_obj_t psc_wait_us(mp_obj_t us_obj)
+{
+    uint32_t us =
+        (uint32_t)mp_obj_get_int(us_obj);
+
+    psc_timer_wait_us_api(us);
+
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_1(
+    psc_wait_us_obj,
+    psc_wait_us
+);
+
+
+/* Python: psc.wait_ms(ms) */
+static mp_obj_t psc_wait_ms(mp_obj_t ms_obj)
+{
+    uint32_t ms =
+        (uint32_t)mp_obj_get_int(ms_obj);
+
+    psc_timer_wait_ms_api(ms);
+
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_1(
+    psc_wait_ms_obj,
+    psc_wait_ms
+);
+
+
+/* ------------------------------------------------------------
+ * psc module globals
+ * ------------------------------------------------------------ */
+
 static const mp_rom_map_elem_t psc_module_globals_table[] = {
+
     {
         MP_ROM_QSTR(MP_QSTR___name__),
         MP_ROM_QSTR(MP_QSTR_psc)
     },
+
+    /* FAT32 */
     {
         MP_ROM_QSTR(MP_QSTR_fat32_ls),
         MP_ROM_PTR(&psc_fat32_ls_obj)
     },
+
+    /* Python script */
     {
         MP_ROM_QSTR(MP_QSTR_run),
         MP_ROM_PTR(&psc_run_obj)
     },
+
+    /* TIMER */
+    {
+        MP_ROM_QSTR(MP_QSTR_timer_start),
+        MP_ROM_PTR(&psc_timer_start_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_timer_start_auto),
+        MP_ROM_PTR(&psc_timer_start_auto_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_timer_stop),
+        MP_ROM_PTR(&psc_timer_stop_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_timer_count),
+        MP_ROM_PTR(&psc_timer_count_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_timer_status),
+        MP_ROM_PTR(&psc_timer_status_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_timer_running),
+        MP_ROM_PTR(&psc_timer_running_obj)
+    },
+
+
+    {
+        MP_ROM_QSTR(MP_QSTR_wait_us),
+        MP_ROM_PTR(&psc_wait_us_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_wait_ms),
+        MP_ROM_PTR(&psc_wait_ms_obj)
+    },
+
 };
+
+
+/* ------------------------------------------------------------
+ * module dictionary
+ * ------------------------------------------------------------ */
 
 static MP_DEFINE_CONST_DICT(
     psc_module_globals,
@@ -98,12 +301,18 @@ static MP_DEFINE_CONST_DICT(
 );
 
 
-/* module definition */
+/* ------------------------------------------------------------
+ * module definition
+ * ------------------------------------------------------------ */
+
 const mp_obj_module_t psc_module = {
     .base = { &mp_type_module },
     .globals = (mp_obj_dict_t *)&psc_module_globals,
 };
 
 
-/* import psc で使えるように登録 */
+/* ------------------------------------------------------------
+ * import psc
+ * ------------------------------------------------------------ */
+
 MP_REGISTER_MODULE(MP_QSTR_psc, psc_module);

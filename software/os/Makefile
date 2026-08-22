@@ -140,6 +140,7 @@ SRCS_KERNEL := \
 	$(Src)/dma.c \
 	$(Src)/synap_api.c \
 	$(Src)/sdcard_api.c \
+	$(Src)/timer_api.c \
 	$(Src)/mic_api.c \
 	$(Src)/lcd_api.c \
 	$(Src)/fft_api.c \
