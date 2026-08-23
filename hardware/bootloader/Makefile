@@ -1,35 +1,8 @@
-
 # ============================================================
 # Makefile for bootloader.mem
 # SDカードからのOSブート
-
-bootloader:
-	$(MAKE) -C ../../software/os fpga_mem
-	$(MAKE) -C ../../software/os fpga_boot
-	$(MAKE) -C ../../software/os disasm
-	$(MAKE) -C ../../software/os disasm_bootloader
-	mkdir -p ./mem
-	mkdir -p ./S_file
-
-	cp ../../software/os/build/bootrom.mem    ./mem/
-	cp ../../software/os/build/kernel.mem     ./mem/
-	cp ../../software/os/build/user.mem       ./mem/
-	cp ../../software/os/build/bootloader.mem ./mem/
-
-	@tmp=$$(mktemp); \
-	head -n 4500 ./mem/bootloader.mem > $$tmp; \
-	mv $$tmp ./mem/bootloader.mem
-
-	cp ../../software/os/build/bootrom.S 	./S_file/
-	cp ../../software/os/build/kernel.S 	./S_file/
-	cp ../../software/os/build/shell.S 		./S_file/
-	cp ../../software/os/build/bootloader.S ./S_file/
-
-	$(MAKE) -C ../../software/os clean
-
+# bootloader_fat32.memをPSC_ONE_Boot_axiのboot_loader_romに゙指定する
 # ============================================================
-# Makefile for bootloader.mem
-# SDカードからのOSブート
 
 bootloader_fat32:
 	$(MAKE) -C ../../software/os fpga_mem
@@ -55,7 +28,38 @@ bootloader_fat32:
 	$(MAKE) -C ../../software/os clean
 
 # ============================================================
+# Makefile for bootloader.mem
+# SDカードからのOSブート
+# ============================================================
+
+bootloader:
+	$(MAKE) -C ../../software/os fpga_mem
+	$(MAKE) -C ../../software/os fpga_boot
+	$(MAKE) -C ../../software/os disasm
+	$(MAKE) -C ../../software/os disasm_bootloader
+	mkdir -p ./mem
+	mkdir -p ./S_file
+
+	cp ../../software/os/build/bootrom.mem    ./mem/
+	cp ../../software/os/build/kernel.mem     ./mem/
+	cp ../../software/os/build/user.mem       ./mem/
+	cp ../../software/os/build/bootloader.mem ./mem/
+
+	@tmp=$$(mktemp); \
+	head -n 4500 ./mem/bootloader.mem > $$tmp; \
+	mv $$tmp ./mem/bootloader.mem
+
+	cp ../../software/os/build/bootrom.S 	./S_file/
+	cp ../../software/os/build/kernel.S 	./S_file/
+	cp ../../software/os/build/shell.S 		./S_file/
+	cp ../../software/os/build/bootloader.S ./S_file/
+
+	$(MAKE) -C ../../software/os clean
+
+
+# ============================================================
 # SDカード用 .img ファイル生成
+# 固定セクタブート時のコード（現在は使用しない）
 # ============================================================
 SD_IMG_DIR = ./sd_img
 
