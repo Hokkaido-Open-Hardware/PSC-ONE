@@ -223,6 +223,107 @@ static MP_DEFINE_CONST_FUN_OBJ_1(
 );
 
 
+
+/* ------------------------------------------------------------
+ * LED
+ * ------------------------------------------------------------ */
+
+/* Python: psc.led_write(value) */
+static mp_obj_t psc_led_write(mp_obj_t value_obj)
+{
+    uint32_t value = (uint32_t)mp_obj_get_int(value_obj);
+    psc_led_write_api(value);
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_1(
+    psc_led_write_obj,
+    psc_led_write
+);
+
+
+/* Python: psc.led_on(led) */
+static mp_obj_t psc_led_on(mp_obj_t led_obj)
+{
+    uint32_t led = (uint32_t)mp_obj_get_int(led_obj);
+    psc_led_on_api(led);
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_1(
+    psc_led_on_obj,
+    psc_led_on
+);
+
+
+/* Python: psc.led_off(led) */
+static mp_obj_t psc_led_off(mp_obj_t led_obj)
+{
+    uint32_t led = (uint32_t)mp_obj_get_int(led_obj);
+    psc_led_off_api(led);
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_1(
+    psc_led_off_obj,
+    psc_led_off
+);
+
+
+/* Python: psc.led_toggle(led) */
+static mp_obj_t psc_led_toggle(mp_obj_t led_obj)
+{
+    uint32_t led = (uint32_t)mp_obj_get_int(led_obj);
+    psc_led_toggle_api(led);
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_1(
+    psc_led_toggle_obj,
+    psc_led_toggle
+);
+
+
+/* Python: psc.led_all_on() */
+static mp_obj_t psc_led_all_on(void)
+{
+    psc_led_all_on_api();
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_0(
+    psc_led_all_on_obj,
+    psc_led_all_on
+);
+
+
+/* Python: psc.led_all_off() */
+static mp_obj_t psc_led_all_off(void)
+{
+    psc_led_all_off_api();
+    return mp_const_none;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_0(
+    psc_led_all_off_obj,
+    psc_led_all_off
+);
+
+
+/* Python: psc.led_state() */
+static mp_obj_t psc_led_state(void)
+{
+    return mp_obj_new_int_from_uint(
+        psc_led_get_state_api()
+    );
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_0(
+    psc_led_state_obj,
+    psc_led_state
+);
+
+
 /* ------------------------------------------------------------
  * psc module globals
  * ------------------------------------------------------------ */
@@ -286,6 +387,43 @@ static const mp_rom_map_elem_t psc_module_globals_table[] = {
     {
         MP_ROM_QSTR(MP_QSTR_wait_ms),
         MP_ROM_PTR(&psc_wait_ms_obj)
+    },
+
+
+    /* LED */
+    {
+        MP_ROM_QSTR(MP_QSTR_led_write),
+        MP_ROM_PTR(&psc_led_write_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_led_on),
+        MP_ROM_PTR(&psc_led_on_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_led_off),
+        MP_ROM_PTR(&psc_led_off_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_led_toggle),
+        MP_ROM_PTR(&psc_led_toggle_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_led_all_on),
+        MP_ROM_PTR(&psc_led_all_on_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_led_all_off),
+        MP_ROM_PTR(&psc_led_all_off_obj)
+    },
+
+    {
+        MP_ROM_QSTR(MP_QSTR_led_state),
+        MP_ROM_PTR(&psc_led_state_obj)
     },
 
 };

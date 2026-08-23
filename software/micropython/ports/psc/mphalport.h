@@ -48,4 +48,17 @@ void psc_timer_wait_us_api(uint32_t us);
 
 void psc_timer_wait_ms_api(uint32_t ms);
 
+
+/* ------------------------------------------------------------
+ * PSC LED API
+ * ------------------------------------------------------------ */
+
+void psc_led_write_api(uint32_t value);
+void psc_led_on_api(uint32_t led);
+void psc_led_off_api(uint32_t led);
+void psc_led_toggle_api(uint32_t led);
+void psc_led_all_on_api(void);
+void psc_led_all_off_api(void);
+uint32_t psc_led_get_state_api(void);
+
 #endif

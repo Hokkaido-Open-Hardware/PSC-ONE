@@ -185,26 +185,46 @@ Current system-call services include:
 
 | Number | Service |
 | -----: | ------- |
-| 1 | Character output |
-| 2 | Character input |
-| 3 | Character input with timeout |
-| 4 | SynapEngine execution |
-| 5 | I2S microphone read |
-| 6 | SD-card sector read |
-| 7 | SD-card sector write |
-| 8 | SD-card buffered read |
-| 9 | Memory dump |
-| 10 | Switch input read |
-| 11 | File read |
-| 12 | File write |
-| 13 | User-program exit |
-| 14 | Integer output |
+| 1  | Character output |
+| 2  | Character input |
+| 3  | Character input with timeout |
+| 10 | SynapEngine execution |
+| 20 | I2S microphone read |
+| 21 | I2S microphone write |
+| 30 | SD-card sector read |
+| 31 | SD-card write test |
+| 32 | SD-card sector write |
+| 33 | SD-card buffered read |
+| 40 | Memory dump |
+| 50 | Switch input read |
+| 51 | File read |
+| 52 | File write |
+| 60 | Speech recognition |
+| 90 | User-program exit |
+| 91 | Integer output |
 
 The system-call interface allows user applications to use hardware and filesystem services without directly accessing privileged kernel resources.
 
 ---
 
-### 6. Command Shell
+### 6. MicroPython Support
+
+PSC-ONE supports **MicroPython** running as a user-mode application on the custom PSC_RV32ISP CPU.
+
+MicroPython communicates with PSC-OS through the `ECALL` system-call interface for services such as UART character input and output.
+
+The current implementation supports the interactive MicroPython REPL.
+
+```text
+MicroPython v1.29.0-preview
+>>> a = 10
+>>> a * 20
+200
+```
+
+---
+
+### 7. Command Shell
 
 PSC-OS includes an interactive command shell.
 
@@ -239,7 +259,7 @@ The shell communicates through the PSC-ONE UART console.
 
 ---
 
-### 7. FAT32 Filesystem
+### 8. FAT32 Filesystem
 
 PSC-OS includes native FAT32 filesystem support.
 
@@ -261,7 +281,7 @@ The filesystem is implemented directly for PSC-OS and does not use an external F
 
 ---
 
-### 8. SD-Card Support
+### 9. SD-Card Support
 
 PSC-OS controls the PSC-ONE SPI-mode SD-card controller.
 
@@ -280,7 +300,7 @@ The SD card acts as both boot storage and a general-purpose filesystem device.
 
 ---
 
-### 9. Hardware-Accelerator Support
+### 10. Hardware-Accelerator Support
 
 PSC-OS provides software interfaces for custom PSC-ONE accelerators.
 
@@ -306,6 +326,8 @@ The current SynapEngine configuration uses:
 - 32-bit partial sums
 - Shared external multipliers
 - Virtualized PE execution
+
+---
 
 #### PFE QUBO Engine
 

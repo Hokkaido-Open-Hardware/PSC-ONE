@@ -13,14 +13,15 @@ extern "C" volatile uint32_t result_wr;
 extern "C" volatile uint32_t result_rd;
 
 extern "C" void run() {
-    const uint32_t patterns[] = { 0x51u, 0xA2u, 0x3Eu, 0x05u, 0xF7u };
+    const uint32_t patterns[] = { 0x01u, 0x02u, 0x04u, 0x08u, 0x10u, 0x20u};
 
     // 観察用に現 result を一発出力
     //PIO32 = result;
 
-    for (uint32_t i = 0; i < 5; ++i) {       
+    for (uint32_t i = 0; i < 6; ++i) {       
         const uint32_t v = patterns[i];
-        PSC_LED_ADDR = v;
+        // LEDは6bit
+        PSC_LED_ADDR = v & 0x3F;
         result_wr = v;
         tiny_delay(2);
     }

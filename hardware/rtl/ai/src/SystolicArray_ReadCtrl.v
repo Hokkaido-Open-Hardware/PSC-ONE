@@ -62,6 +62,13 @@ module SystolicArray_ReadCtrl #(
     reg [7:0] matrix_size_x_r;
     reg [7:0] matrix_size_y_r;
 
+    // Sequential address cursors.  The first address of each tile is
+    // calculated once when the request is accepted; subsequent rows are
+    // reached by adding the matrix row stride.  This keeps matrix_size_*
+    // out of the rd_read_addr critical path.
+    reg [31:0] a_addr_cur;
+    reg [31:0] b_addr_cur;
+
     /*
      * tile_row_offset
      *
@@ -239,6 +246,8 @@ module SystolicArray_ReadCtrl #(
 
             matrix_size_x_r   <= 8'd0;
             matrix_size_y_r   <= 8'd0;
+            a_addr_cur         <= 32'd0;
+            b_addr_cur         <= 32'd0;
 
             rd_read_addr      <= 32'd0;
             rd_read_valid     <= 1'b0;
@@ -263,6 +272,22 @@ module SystolicArray_ReadCtrl #(
                         matrix_size_x_r <= matrix_size_x;
                         matrix_size_y_r <= matrix_size_y;
 
+                        // First row of A[i_idx][k_idx] and B[k_idx][j_idx].
+                        // Only this request-capture cycle contains the tile
+                        // offset arithmetic; the memory issue path below is
+                        // just a registered cursor.
+                        a_addr_cur <= RADDR_MASK & (
+                            BASE_ADDR_A
+                            + tile_row_offset(i_idx, matrix_size_x)
+                            + ({24'd0, k_idx} << 2)
+                        );
+
+                        b_addr_cur <= RADDR_MASK & (
+                            BASE_ADDR_B
+                            + tile_row_offset(k_idx, matrix_size_y)
+                            + ({24'd0, j_idx} << 2)
+                        );
+
                         read_idx        <= 2'd0;
                         a_data_out      <= 128'd0;
                         b_data_out      <= 128'd0;
@@ -275,7 +300,7 @@ module SystolicArray_ReadCtrl #(
                 // Read A[i_idx][k_idx] 4x4 tile
                 // ========================================
                 R_A_START: begin
-                    rd_read_addr  <= matrix_addr_A(read_idx);
+                    rd_read_addr  <= a_addr_cur;
                     rd_read_valid <= 1'b1;
                     state         <= R_A_WAIT;
                 end
@@ -303,8 +328,9 @@ module SystolicArray_ReadCtrl #(
                             read_idx <= 2'd0;
                             state    <= R_B_START;
                         end else begin
-                            read_idx <= read_idx + 2'd1;
-                            state    <= R_A_START;
+                            a_addr_cur <= a_addr_cur + {24'd0, matrix_size_x_r};
+                            read_idx    <= read_idx + 2'd1;
+                            state       <= R_A_START;
                         end
                     end
                 end
@@ -313,7 +339,7 @@ module SystolicArray_ReadCtrl #(
                 // Read B[k_idx][j_idx] 4x4 tile
                 // ========================================
                 R_B_START: begin
-                    rd_read_addr  <= matrix_addr_B(read_idx);
+                    rd_read_addr  <= b_addr_cur;
                     rd_read_valid <= 1'b1;
                     state         <= R_B_WAIT;
                 end
@@ -342,8 +368,9 @@ module SystolicArray_ReadCtrl #(
                             read_ready <= 1'b1;
                             state      <= R_IDLE;
                         end else begin
-                            read_idx <= read_idx + 2'd1;
-                            state    <= R_B_START;
+                            b_addr_cur <= b_addr_cur + {24'd0, matrix_size_y_r};
+                            read_idx   <= read_idx + 2'd1;
+                            state      <= R_B_START;
                         end
                     end
                 end

@@ -42,6 +42,16 @@
 #define SYS_TIMER_WAIT_US         76
 #define SYS_TIMER_WAIT_MS         77
 
+// --- LED ---
+
+#define SYS_LED_WRITE             80
+#define SYS_LED_ON                81
+#define SYS_LED_OFF               82
+#define SYS_LED_TOGGLE            83
+#define SYS_LED_ALL_ON            84
+#define SYS_LED_ALL_OFF           85
+#define SYS_LED_GET_STATE         86
+
 // --- SYSTEM ---
 #define SYS_EXIT            90
 #define SYS_PRINT_INT       91

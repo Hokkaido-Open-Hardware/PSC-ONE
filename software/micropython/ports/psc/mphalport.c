@@ -132,3 +132,63 @@ void psc_timer_wait_ms_api(uint32_t ms)
         (long)ms
     );
 }
+
+/* ------------------------------------------------------------
+ * LED API
+ * ------------------------------------------------------------ */
+
+void psc_led_write_api(uint32_t value)
+{
+    (void)psc_syscall1(
+        SYS_LED_WRITE,
+        (long)value
+    );
+}
+
+void psc_led_on_api(uint32_t led)
+{
+    (void)psc_syscall1(
+        SYS_LED_ON,
+        (long)led
+    );
+}
+
+void psc_led_off_api(uint32_t led)
+{
+    (void)psc_syscall1(
+        SYS_LED_OFF,
+        (long)led
+    );
+}
+
+void psc_led_toggle_api(uint32_t led)
+{
+    (void)psc_syscall1(
+        SYS_LED_TOGGLE,
+        (long)led
+    );
+}
+
+void psc_led_all_on_api(void)
+{
+    (void)psc_syscall1(
+        SYS_LED_ALL_ON,
+        0
+    );
+}
+
+void psc_led_all_off_api(void)
+{
+    (void)psc_syscall1(
+        SYS_LED_ALL_OFF,
+        0
+    );
+}
+
+uint32_t psc_led_get_state_api(void)
+{
+    return (uint32_t)psc_syscall1(
+        SYS_LED_GET_STATE,
+        0
+    );
+}

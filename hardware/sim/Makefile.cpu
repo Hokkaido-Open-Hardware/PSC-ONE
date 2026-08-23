@@ -250,7 +250,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	timer_test1:RV32ISP_chip_test:./mem/timer_test1.mem:0x00000123 \
+	led_test1:RV32ISP_chip_test:./mem/led_test1.mem:0x00000022 \
 
 # ============================================================
 # 複数テスト定義

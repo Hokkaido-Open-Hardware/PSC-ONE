@@ -50,7 +50,6 @@ bootloader_fat32:
 
 	cp ../../software/os/build/bootrom.S 			./S_file/
 	cp ../../software/os/build/kernel.S 			./S_file/
-	cp ../../software/os/build/shell.S 				./S_file/
 	cp ../../software/os/build/bootloader_fat32.S 	./S_file/
 
 	$(MAKE) -C ../../software/os clean

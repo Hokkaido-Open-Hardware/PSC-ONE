@@ -143,6 +143,7 @@ SRCS_KERNEL := \
 	$(Src)/timer_api.c \
 	$(Src)/mic_api.c \
 	$(Src)/lcd_api.c \
+	$(Src)/led_api.c \
 	$(Src)/fft_api.c \
 	$(Src)/mem_test.c \
 	$(Src)/speech_recognition_api.c
@@ -296,7 +297,13 @@ PICOLIBC_BASE := /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32i/ilp32
 LIBM := $(PICOLIBC_BASE)/libm.a
 LIBC := $(PICOLIBC_BASE)/libc.a
 
-$(MICROPY_LIB):
+MICROPY_DEPS := \
+	$(MICROPY_DIR)/modpsc.c \
+	$(MICROPY_DIR)/mphalport.c \
+	$(MICROPY_DIR)/mphalport.h \
+	$(MICROPY_DIR)/Makefile
+
+$(MICROPY_LIB): $(MICROPY_DEPS)
 	$(MAKE) -C $(MICROPY_DIR) embedded
 
 # ------------------------------------------------------------

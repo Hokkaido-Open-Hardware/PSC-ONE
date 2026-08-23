@@ -183,7 +183,8 @@ module PSC_ONE_Chip #(
 
     // LED（MMIO）
     wire [7:0] LED_external_out;
-	assign  PSCONE_LED_OUT = {LED_external_out[2:0], PSCONE_TP_PEN, PSCONE_SW1, PSCONE_SW2};  
+	//assign  PSCONE_LED_OUT = {LED_external_out[2:0], PSCONE_TP_PEN, PSCONE_SW1, PSCONE_SW2};
+	assign  PSCONE_LED_OUT = ~LED_external_out[5:0];
 
     // --------------------------------
     // MMIO bus
@@ -967,7 +968,7 @@ module PSC_ONE_Chip #(
     PSC_RV32IS_LED #(
         .LED_NUMBER     (8),
         .LED_ADDRESS    (LED_ADDRESS)
-    ) u_mmap_led (
+    ) u_led (
         .clock          (clock_100MHz),
         .reset_n        (reset_n),
 

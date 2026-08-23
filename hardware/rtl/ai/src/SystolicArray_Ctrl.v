@@ -78,9 +78,13 @@ module SystolicArray4x4_Ctrl #(
     reg [7:0] k_idx;
 
     //--------------------------------------------
-    // C address helper
+    // C address helpers
     //
-    // C is uint32_t C[matrix_size_y][matrix_size_y].
+    // Timing note:
+    //   Do not generate the complete C address from row_s for every write.
+    //   The tile base is calculated once before writeback, then c_write_addr
+    //   is advanced by a small adder.  This removes the long
+    //   row_s -> c_write_addr combinational path.
     //--------------------------------------------
     function automatic [31:0] matrix_row_elements;
         input [7:0] row_idx;
@@ -89,60 +93,49 @@ module SystolicArray4x4_Ctrl #(
         begin
             case (size)
                 8'd4:
-                    matrix_row_elements =
-                        {24'd0, row_idx} << 2;
-
+                    matrix_row_elements = {24'd0, row_idx} << 2;
                 8'd8:
-                    matrix_row_elements =
-                        {24'd0, row_idx} << 3;
-
+                    matrix_row_elements = {24'd0, row_idx} << 3;
                 8'd12:
                     matrix_row_elements =
                         ({24'd0, row_idx} << 3)
-                    + ({24'd0, row_idx} << 2);
-
+                      + ({24'd0, row_idx} << 2);
                 8'd16:
-                    matrix_row_elements =
-                        {24'd0, row_idx} << 4;
-
+                    matrix_row_elements = {24'd0, row_idx} << 4;
                 8'd32:
-                    matrix_row_elements =
-                        {24'd0, row_idx} << 5;
-
+                    matrix_row_elements = {24'd0, row_idx} << 5;
                 8'd64:
-                    matrix_row_elements =
-                        {24'd0, row_idx} << 6;
-
+                    matrix_row_elements = {24'd0, row_idx} << 6;
                 default:
                     matrix_row_elements =
-                        {24'd0, row_idx}
-                    * {24'd0, size};
+                        {24'd0, row_idx} * {24'd0, size};
             endcase
         end
     endfunction
 
-    function [31:0] matrix_addr_C;
-        input [5:0] pe_idx;
-        reg [7:0] local_row;
-        reg [7:0] local_col;
-        reg [7:0] global_row;
-        reg [7:0] global_col;
+    // Address of C[i_idx*4][j_idx*4].  This is evaluated only once per
+    // completed output tile, not once per PE result.
+    function automatic [31:0] matrix_tile_base_C;
+        reg [7:0]  global_row_base;
+        reg [7:0]  global_col_base;
         reg [31:0] element_idx;
         begin
-            // PE_N is fixed at four.
-            local_row = {2'd0, pe_idx[5:2]};
-            local_col = {6'd0, pe_idx[1:0]};
-
-            global_row = (i_idx << 2) + local_row;
-            global_col = (j_idx << 2) + local_col;
+            global_row_base = i_idx << 2;
+            global_col_base = j_idx << 2;
 
             element_idx =
-                matrix_row_elements(global_row, matrix_size_y)
-                + {24'd0, global_col};
+                matrix_row_elements(global_row_base, matrix_size_y)
+                + {24'd0, global_col_base};
 
-            matrix_addr_C = BASE_ADDR_C + (element_idx << 2);
+            matrix_tile_base_C = BASE_ADDR_C + (element_idx << 2);
         end
     endfunction
+
+    // C is uint32_t, therefore one matrix row occupies matrix_size_y * 4
+    // bytes.  After writing column 3 of a 4-wide tile, advance from
+    // current col3 to next-row col0: row_stride_bytes - 12.
+    wire [31:0] c_row_stride_bytes = {22'd0, matrix_size_y, 2'b00};
+    wire [31:0] c_next_row_delta   = c_row_stride_bytes - 32'd12;
 
     //--------------------------------------------
     // SA signals
@@ -506,6 +499,9 @@ module SystolicArray4x4_Ctrl #(
 
                             if (k_idx == tile_count_k - 8'd1) begin
                                 // All K tiles for this C tile are complete.
+                                // Preload the first write address here so
+                                // row_s is not on the c_write_addr timing path.
+                                c_write_addr <= matrix_tile_base_C();
                                 state <= S_OUTPUT_MEMORY;
                             end else begin
                                 // Keep ps_acc and process the next K tile.
@@ -525,7 +521,6 @@ module SystolicArray4x4_Ctrl #(
                 S_OUTPUT_MEMORY: begin
                     if (sa_req_ready) begin
                         c_write_valid <= 1'b1;
-                        c_write_addr  <= matrix_addr_C(row_s);
                         c_write_wdata <= ps_acc_out;
                         state         <= S_OUTPUT_MEMORY_W;
                     end
@@ -551,6 +546,14 @@ module SystolicArray4x4_Ctrl #(
                                 state <= S_DONE;
                             end
                         end else begin
+                            // Advance within the 4x4 output tile.
+                            // Columns 0..2 are contiguous uint32_t words.
+                            // After column 3, jump to the next matrix row.
+                            if (row_s[1:0] == 2'd3)
+                                c_write_addr <= c_write_addr + c_next_row_delta;
+                            else
+                                c_write_addr <= c_write_addr + 32'd4;
+
                             row_s <= row_s + 6'd1;
                             state <= S_OUTPUT_MEMORY;
                         end

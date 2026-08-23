@@ -5,6 +5,7 @@
 #include "timer_api.h"
 #include "mic_api.h"
 #include "lcd_api.h"
+#include "led_api.h"
 #include "fft_api.h"
 #include "mem_test.h"
 #include "speech_recognition_api.h"
@@ -751,6 +752,43 @@ void handle_syscall(struct trap_frame *f) {
 
         case SYS_TIMER_WAIT_MS: {
             timer_wait_ms(f->a0);
+            break;
+        }
+
+        // -------------------------------------------
+        // LED API
+        case SYS_LED_WRITE: {
+            led_write(f->a0);
+            break;
+        }
+
+        case SYS_LED_ON: {
+            led_on(f->a0);
+            break;
+        }
+
+        case SYS_LED_OFF: {
+            led_off(f->a0);
+            break;
+        }
+
+        case SYS_LED_TOGGLE: {
+            led_toggle(f->a0);
+            break;
+        }
+
+        case SYS_LED_ALL_ON: {
+            led_all_on();
+            break;
+        }
+
+        case SYS_LED_ALL_OFF: {
+            led_all_off();
+            break;
+        }
+
+        case SYS_LED_GET_STATE: {
+            f->a0 = led_get_state();
             break;
         }
         
