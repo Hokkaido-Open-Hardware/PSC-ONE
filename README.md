@@ -11,7 +11,7 @@ PSC-ONE integrates a custom CPU, memory subsystem, peripherals,
 operating system, and AI accelerator into a unified architecture,
 enabling end-to-end hardware/software co-design.
 
-The SynapEngine accelerator is controlled directly through custom
+The PSC-NPU(SynapEngine) accelerator is controlled directly through custom
 RISC-V CSR registers and accesses matrix data through the shared
 cache/memory subsystem. This reduces explicit data transfers and
 redundant memory copies during matrix operations and future neural-network workloads.
@@ -70,7 +70,7 @@ The hardware side of PSC-ONE currently includes:
 - SDRAM controller
 - SD card interface (SPI mode)
 - Memory-mapped peripheral system
-- SynapEngine AI accelerator
+- PSC-TPU(SynapEngine) AI accelerator
 
 ---
 
@@ -91,14 +91,14 @@ The software side of PSC-ONE currently includes:
 This diagram presents the top-level architecture of the PSC system.  
 It shows how the PSC_RV32ISP CPU core is integrated with memory and peripheral components, including UART, SDRAM, and the SD card interface.  
 Most peripherals are connected through memory-mapped interfaces.
-The SynapEngine accelerator is controlled directly through custom RISC-V
+The PSC-TPU accelerator is controlled directly through custom RISC-V
 CSR registers and accesses matrix data through the shared cache/memory subsystem.
   
-A key feature of the PSC architecture is the tightly coupled integration of the SynapEngine accelerator with the CPU.  
-Both the PSC_RV32ISP core and the SynapEngine access memory through
+A key feature of the PSC architecture is the tightly coupled integration of the PSC-TPU accelerator with the CPU.  
+Both the PSC_RV32ISP core and the PSC-TPU access memory through
 the shared cache and memory subsystem.
 Unlike loosely coupled accelerator designs that require explicit DMA transfers
-for every operation, SynapEngine can directly access data through the shared
+for every operation, PSC-TPU can directly access data through the shared
 cache/memory subsystem, reducing redundant memory copies.
   
 This tightly coupled architecture improves overall efficiency by reducing memory access overhead and is particularly suitable for data-intensive workloads such as matrix operations and future neural-network inference.
@@ -248,9 +248,9 @@ under constrained memory bandwidth for edge AI systems.
 
 ## PSC-ONE AI Architecture
 
-<img src="docs/images/PSC_SynapEngine.jpg" width="800">
+<img src="docs/images/PSC_TPU.jpg" width="800">
 
-The system integrates the SynapEngine systolic array
+The system integrates the PSC-TPU systolic array
 with the PSC-ONE SoC platform.
 
 ---
@@ -290,11 +290,11 @@ These results demonstrate that both instruction-fetch optimization and R/I-Type 
 
 ---
 
-## Systolic Array and PicoRV32 Resource Scale Comparison
+## PSC-TPU and PicoRV32 Resource Scale Comparison
 
 ### Resource Comparison
 
-| Metric         | Systolic Array (4×4) | PicoRV32 |
+| Metric         | PSC-TPU (4×4)        | PicoRV32 |
 | -------------- | -------------------: | -------: |
 | Cells          |                  555 |      515 |
 | Multipliers    |                **2** |    **0** |
