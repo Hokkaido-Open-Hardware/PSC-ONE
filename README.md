@@ -11,7 +11,7 @@ PSC-ONE integrates a custom CPU, memory subsystem, peripherals,
 operating system, and AI accelerator into a unified architecture,
 enabling end-to-end hardware/software co-design.
 
-The PSC-NPU(SynapEngine) accelerator is controlled directly through custom
+The PSC-NPU (SynapEngine) accelerator is controlled directly through custom
 RISC-V CSR registers and accesses matrix data through the shared
 cache/memory subsystem. This reduces explicit data transfers and
 redundant memory copies during matrix operations and future neural-network workloads.
@@ -38,7 +38,7 @@ It aims to build a fully custom edge computing platform from the ground up, incl
 - A memory subsystem, including an SDRAM controller, caches, and an Sv32 MMU
 - An SD card boot and storage interface
 - Memory-mapped peripheral interfaces
-- An AI acceleration engine, SynapEngine, based on a systolic array architecture
+- An AI acceleration engine, PSC-NPU, based on a systolic array architecture
 - A custom operating system, PSC-OS
 
 PSC-ONE is not just a CPU core, but a complete experimental SoC platform for research, edge AI development, and architectural exploration.
@@ -70,7 +70,7 @@ The hardware side of PSC-ONE currently includes:
 - SDRAM controller
 - SD card interface (SPI mode)
 - Memory-mapped peripheral system
-- PSC-TPU(SynapEngine) AI accelerator
+- PSC-NPU (SynapEngine) AI accelerator
 
 ---
 
@@ -91,14 +91,14 @@ The software side of PSC-ONE currently includes:
 This diagram presents the top-level architecture of the PSC system.  
 It shows how the PSC_RV32ISP CPU core is integrated with memory and peripheral components, including UART, SDRAM, and the SD card interface.  
 Most peripherals are connected through memory-mapped interfaces.
-The PSC-TPU accelerator is controlled directly through custom RISC-V
+The PSC-NPU accelerator is controlled directly through custom RISC-V
 CSR registers and accesses matrix data through the shared cache/memory subsystem.
   
-A key feature of the PSC architecture is the tightly coupled integration of the PSC-TPU accelerator with the CPU.  
-Both the PSC_RV32ISP core and the PSC-TPU access memory through
+A key feature of the PSC architecture is the tightly coupled integration of the PSC-NPU accelerator with the CPU.  
+Both the PSC_RV32ISP core and the PSC-NPU access memory through
 the shared cache and memory subsystem.
 Unlike loosely coupled accelerator designs that require explicit DMA transfers
-for every operation, PSC-TPU can directly access data through the shared
+for every operation, PSC-NPU can directly access data through the shared
 cache/memory subsystem, reducing redundant memory copies.
   
 This tightly coupled architecture improves overall efficiency by reducing memory access overhead and is particularly suitable for data-intensive workloads such as matrix operations and future neural-network inference.
@@ -250,7 +250,7 @@ under constrained memory bandwidth for edge AI systems.
 
 <img src="docs/images/PSC_TPU.jpg" width="800">
 
-The system integrates the PSC-TPU systolic array
+The system integrates the PSC-NPU systolic array
 with the PSC-ONE SoC platform.
 
 ---
@@ -290,11 +290,11 @@ These results demonstrate that both instruction-fetch optimization and R/I-Type 
 
 ---
 
-## PSC-TPU and PicoRV32 Resource Scale Comparison
+## PSC-NPU and PicoRV32 Resource Scale Comparison
 
 ### Resource Comparison
 
-| Metric         | PSC-TPU (4×4)        | PicoRV32 |
+| Metric         | PSC-NPU (4×4)        | PicoRV32 |
 | -------------- | -------------------: | -------: |
 | Cells          |                  555 |      515 |
 | Multipliers    |                **2** |    **0** |
@@ -357,7 +357,7 @@ Current PSC-OS features include:
 - SD-card boot and storage
 - User-program loading and execution
 - Device drivers for UART, LCD, I2S microphone, and SD card
-- Native support for the SynapEngine and PFE hardware accelerators
+- Native support for the PSC-NPU and PFE hardware accelerators
 
 PSC-OS serves both as the runtime environment for the PSC-ONE SoC and as an experimental platform for operating-system, CPU, and hardware/software co-design research.
 
@@ -538,7 +538,7 @@ If an error is detected, the system automatically retries the read operation, en
 - [x] DMA Engine
 
 ### AI Accelerator
-- [x] SynapEngine Architecture
+- [x] PSC-NPU Architecture
 - [x] 4×4 INT8 Systolic Array
 - [x] Matrix Multiplication API
 - [x] Shared Memory Integration
@@ -606,7 +606,7 @@ If an error is detected, the system automatically retries the read operation, en
 - [x] PSC-OS Boot
 - [x] UART Console
 - [x] SD Card Boot
-- [x] SynapEngine Execution
+- [x] PSC-NPU Execution
 - [ ] Long-Term Stability Test
 
 ## Documentation
@@ -622,7 +622,7 @@ If an error is detected, the system automatically retries the read operation, en
 ## Future Goals
 
 - [ ] PSC-ONE v1.0 Release
-- [ ] Neural Network Inference on SynapEngine
+- [ ] Neural Network Inference on PSC-NPU
 - [ ] Audio Recognition Demo
 - [ ] Self-Balancing Robot Demo
 - [ ] Custom ASIC Prototype
@@ -641,7 +641,7 @@ Future work includes speech recognition and robotic control using the AI acceler
 ## Speech Recognition Demo
 
 This demo showcases real-time speech recognition running on the PSC-ONE platform.  
-An external microphone captures voice input, which is processed by the onboard SynapEngine AI accelerator. The recognized text is then displayed directly on the LCD screen in real time.  
+An external microphone captures voice input, which is processed by the onboard PSC-NPU AI accelerator. The recognized text is then displayed directly on the LCD screen in real time.  
 
 <img src="docs/images/PSC_ONE_voice_anime_en.png" width="700">
 
