@@ -193,7 +193,7 @@ prompt:
             //TBD
             //cmd_primes(max);
 
-        // ---- SynapEngine ----
+        // ---- PSC-NPU (SynapEngine) ----
         } else if (strcmp(argv[0], "sa_start") == 0) {
             uint32_t matrix_max = 4;
             if (argc >= 2) {

@@ -619,23 +619,27 @@ void handle_syscall(struct trap_frame *f) {
 
             uint32_t n = f->a4;
 
+            if (n == 0 ||
+                n > SA_MAT_MAX ||
+                (n & 3u) != 0u) {
+                f->a0 = (uint32_t)-1;
+                break;
+            }
+
             static uint8_t kernel_A[SA_MAT_MAX * SA_MAT_MAX];
             static uint8_t kernel_B[SA_MAT_MAX * SA_MAT_MAX];
             static uint32_t kernel_C[SA_MAT_MAX * SA_MAT_MAX];
 
             uint32_t elements = n * n;
 
-            /* ユーザー領域からカーネル領域へコピー */
             for (uint32_t i = 0; i < elements; ++i) {
                 kernel_A[i] = user_A[i];
                 kernel_B[i] = user_B[i];
                 kernel_C[i] = 0;
             }
 
-            /* SAにはカーネル側の物理的に有効なアドレスを渡す */
             sa_run(kernel_A, kernel_B, (uint8_t)n, kernel_C);
 
-            /* 結果をユーザー領域へ返す */
             for (uint32_t i = 0; i < elements; ++i) {
                 user_C[i] = kernel_C[i];
             }

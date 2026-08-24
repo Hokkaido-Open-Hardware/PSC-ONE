@@ -1,4 +1,5 @@
 #include "py/obj.h"
+#include "py/objlist.h"
 #include "py/runtime.h"
 #include "py/compile.h"
 #include "py/repl.h"
@@ -324,6 +325,138 @@ static MP_DEFINE_CONST_FUN_OBJ_0(
 );
 
 
+
+
+/* ------------------------------------------------------------
+ * SynapEngine
+ * ------------------------------------------------------------ */
+
+#ifndef PSC_SA_MAT_MAX
+#define PSC_SA_MAT_MAX 16u
+#endif
+
+extern int psc_sa_run_api(
+    const uint8_t *A,
+    const uint8_t *B,
+    uint32_t *C,
+    uint32_t n
+);
+
+/* Python: psc.sa_run(A, B) */
+static mp_obj_t psc_sa_run(mp_obj_t A_obj, mp_obj_t B_obj)
+{
+    size_t n = 0;
+    size_t bn = 0;
+    mp_obj_t *A_rows = NULL;
+    mp_obj_t *B_rows = NULL;
+
+    mp_obj_get_array(A_obj, &n, &A_rows);
+    mp_obj_get_array(B_obj, &bn, &B_rows);
+
+    if ((n == 0u) ||
+        (n > PSC_SA_MAT_MAX) ||
+        ((n & 3u) != 0u)) {
+        mp_raise_ValueError(
+            MP_ERROR_TEXT("invalid matrix size")
+        );
+    }
+
+    if (bn != n) {
+        mp_raise_ValueError(
+            MP_ERROR_TEXT("matrix size mismatch")
+        );
+    }
+
+    static uint8_t A_buf[PSC_SA_MAT_MAX * PSC_SA_MAT_MAX];
+    static uint8_t B_buf[PSC_SA_MAT_MAX * PSC_SA_MAT_MAX];
+    static uint32_t C_buf[PSC_SA_MAT_MAX * PSC_SA_MAT_MAX];
+
+    for (size_t i = 0; i < n; ++i) {
+        size_t cols = 0;
+        mp_obj_t *row = NULL;
+
+        mp_obj_get_array(A_rows[i], &cols, &row);
+
+        if (cols != n) {
+            mp_raise_ValueError(
+                MP_ERROR_TEXT("A must be square")
+            );
+        }
+
+        for (size_t j = 0; j < n; ++j) {
+            mp_int_t value = mp_obj_get_int(row[j]);
+
+            if ((value < 0) || (value > 255)) {
+                mp_raise_ValueError(
+                    MP_ERROR_TEXT("A value out of range")
+                );
+            }
+
+            A_buf[i * n + j] = (uint8_t)value;
+        }
+    }
+
+    for (size_t i = 0; i < n; ++i) {
+        size_t cols = 0;
+        mp_obj_t *row = NULL;
+
+        mp_obj_get_array(B_rows[i], &cols, &row);
+
+        if (cols != n) {
+            mp_raise_ValueError(
+                MP_ERROR_TEXT("B must be square")
+            );
+        }
+
+        for (size_t j = 0; j < n; ++j) {
+            mp_int_t value = mp_obj_get_int(row[j]);
+
+            if ((value < 0) || (value > 255)) {
+                mp_raise_ValueError(
+                    MP_ERROR_TEXT("B value out of range")
+                );
+            }
+
+            B_buf[i * n + j] = (uint8_t)value;
+        }
+    }
+
+    int ret = psc_sa_run_api(
+        A_buf,
+        B_buf,
+        C_buf,
+        (uint32_t)n
+    );
+
+    if (ret != 0) {
+        mp_raise_OSError(ret);
+    }
+
+    mp_obj_t result = mp_obj_new_list(n, NULL);
+    mp_obj_list_t *result_list = MP_OBJ_TO_PTR(result);
+
+    for (size_t i = 0; i < n; ++i) {
+        mp_obj_t row_obj = mp_obj_new_list(n, NULL);
+        mp_obj_list_t *row_list = MP_OBJ_TO_PTR(row_obj);
+
+        for (size_t j = 0; j < n; ++j) {
+            row_list->items[j] = mp_obj_new_int_from_uint(
+                C_buf[i * n + j]
+            );
+        }
+
+        result_list->items[i] = row_obj;
+    }
+
+    return result;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_2(
+    psc_sa_run_obj,
+    psc_sa_run
+);
+
+
 /* ------------------------------------------------------------
  * psc module globals
  * ------------------------------------------------------------ */
@@ -424,6 +557,12 @@ static const mp_rom_map_elem_t psc_module_globals_table[] = {
     {
         MP_ROM_QSTR(MP_QSTR_led_state),
         MP_ROM_PTR(&psc_led_state_obj)
+    },
+
+    /* SynapEngine */
+    {
+        MP_ROM_QSTR(MP_QSTR_sa_run),
+        MP_ROM_PTR(&psc_sa_run_obj)
     },
 
 };

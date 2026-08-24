@@ -29,6 +29,35 @@ static inline long psc_syscall1(
 }
 
 
+
+
+static inline long psc_syscall_sa_run(
+    const uint8_t *A,
+    const uint8_t *B,
+    uint32_t *C,
+    uint32_t n
+)
+{
+    register long a0 __asm__("a0") = (long)(uintptr_t)A;
+    register long a1 __asm__("a1") = (long)(uintptr_t)B;
+    register long a2 __asm__("a2") = (long)(uintptr_t)C;
+    register long a3 __asm__("a3") = SYS_SA_RUN;
+    register long a4 __asm__("a4") = (long)n;
+
+    __asm__ volatile (
+        "ecall"
+        : "+r"(a0)
+        : "r"(a1),
+          "r"(a2),
+          "r"(a3),
+          "r"(a4)
+        : "memory"
+    );
+
+    return a0;
+}
+
+
 /* ------------------------------------------------------------
  * UART
  * ------------------------------------------------------------ */
@@ -191,4 +220,19 @@ uint32_t psc_led_get_state_api(void)
         SYS_LED_GET_STATE,
         0
     );
+}
+
+
+/* ------------------------------------------------------------
+ * SynapEngine API
+ * ------------------------------------------------------------ */
+
+int psc_sa_run_api(
+    const uint8_t *A,
+    const uint8_t *B,
+    uint32_t *C,
+    uint32_t n
+)
+{
+    return (int)psc_syscall_sa_run(A, B, C, n);
 }
