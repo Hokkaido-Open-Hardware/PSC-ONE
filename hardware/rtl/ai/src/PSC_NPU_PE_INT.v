@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module PE_INT #(
+module PSC_NPU_PE_INT #(
     parameter integer DW       = 8,
     parameter integer PW       = 32,
     parameter integer SW       = 32,

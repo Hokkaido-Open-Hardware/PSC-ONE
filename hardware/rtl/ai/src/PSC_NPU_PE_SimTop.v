@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module sim_PE_top #(
+module PSC_NPU_PE_SimTop #(
     parameter integer DW       = 8,
     parameter integer PW       = 32,
     parameter integer SW       = PW,
@@ -37,11 +37,11 @@ module sim_PE_top #(
         `ifdef DUMP_VCD
             $display("COCOTB_SIM PE DUMP_VCD ENABLE");
             $dumpfile("./wave/PE_INT_test.vcd");
-            $dumpvars(0, sim_PE_top);
+            $dumpvars(0, PSC_NPU_PE_SimTop);
         `else
             $display("COCOTB_SIM PE verilator FST ENABLE");
             $dumpfile("./wave/PE_INT_test.fst");
-            $dumpvars(0, sim_PE_top);
+            $dumpvars(0, PSC_NPU_PE_SimTop);
         `endif
     end
     `endif
@@ -62,7 +62,7 @@ module sim_PE_top #(
     // PE with shared FSM and two thread contexts
     // ========================================================
 
-    PE_INT #(
+    PSC_NPU_PE_INT #(
         .DW       (DW),
         .PW       (PW),
         .SW       (SW),
@@ -99,7 +99,7 @@ module sim_PE_top #(
     // Two parallel multipliers
     // ========================================================
 
-    PE_mult #(
+    PSC_NPU_PE_Mult #(
         .DW       (DW),
         .PW       (PW),
         .SW       (SW),

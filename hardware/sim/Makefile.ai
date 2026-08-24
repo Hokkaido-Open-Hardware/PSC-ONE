@@ -71,18 +71,22 @@ COCOTB_MAKEFILE := $(shell cocotb-config --makefiles)/Makefile.sim
 # Variables
 #--------------------------------------------------
 
-# Variables
 SRC_DIR = ../rtl/ai/src
-PE_FILE = $(SRC_DIR)/PE_INT.v \
-		  $(SRC_DIR)/PE_mult.v \
-		  $(SRC_DIR)/sim_PE_top.v
 
-VERILOG_FILE_SA 	= $(SRC_DIR)/SystolicArray2x2.v $(PE_FILE)
-VERILOG_FILE_SA_4x4 = $(SRC_DIR)/SystolicArray4x4.v $(PE_FILE)
-VERILOG_FILE_CTRL 	= $(SRC_DIR)/SystolicArray_Ctrl.v \
-					  $(SRC_DIR)/SystolicArray_ReadCtrl.v \
-					  $(SRC_DIR)/SystolicArray4x4.v \
-					  $(PE_FILE) 
+PE_FILE = $(SRC_DIR)/PSC_NPU_PE_INT.v \
+          $(SRC_DIR)/PSC_NPU_PE_Mult.v \
+          $(SRC_DIR)/PSC_NPU_PE_SimTop.v
+
+VERILOG_FILE_SA = $(SRC_DIR)/PSC_NPU_SystolicArray2x2.v \
+                  $(PE_FILE)
+
+VERILOG_FILE_SA_4x4 = $(SRC_DIR)/PSC_NPU_SystolicArray4x4.v \
+                      $(PE_FILE)
+
+VERILOG_FILE_CTRL = $(SRC_DIR)/PSC_NPU_Controller.v \
+                    $(SRC_DIR)/PSC_NPU_ReadController.v \
+                    $(SRC_DIR)/PSC_NPU_SystolicArray4x4.v \
+                    $(PE_FILE)
 
 COCOTB_FILE_SA_Ctrl		= int8_SA_Ctrl_test
 COCOTB_FILE_SA 			= int8_SA_test
@@ -109,7 +113,7 @@ simulate_SA_Ctrl:
 	make -f $(COCOTB_MAKEFILE) \
 	    SIM=$(SIM) \
 	    COCOTB_TEST_MODULES=cocotb_tb.ai.$(COCOTB_FILE_SA_Ctrl) \
-	    TOPLEVEL=SystolicArray4x4_Ctrl \
+	    TOPLEVEL=PSC_NPU_Controller \
 	    TOPLEVEL_LANG=verilog \
 	    VERILOG_SOURCES="$(VERILOG_FILE_CTRL)"
 
@@ -121,7 +125,7 @@ simulate_SA:
 	make -f $(COCOTB_MAKEFILE) \
 	    SIM=$(SIM) \
 	    COCOTB_TEST_MODULES=cocotb_tb.ai.$(COCOTB_FILE_SA) \
-	    TOPLEVEL=SystolicArray2x2 \
+	    TOPLEVEL=PSC_NPU_SystolicArray2x2 \
 	    TOPLEVEL_LANG=verilog \
 	    VERILOG_SOURCES="$(VERILOG_FILE_SA)"
 
@@ -133,7 +137,7 @@ simulate_SA_4x4:
 	make -f $(COCOTB_MAKEFILE) \
 	    SIM=$(SIM) \
 	    COCOTB_TEST_MODULES=cocotb_tb.ai.$(COCOTB_FILE_SA_4x4) \
-	    TOPLEVEL=SystolicArray4x4 \
+	    TOPLEVEL=PSC_NPU_SystolicArray4x4 \
 	    TOPLEVEL_LANG=verilog \
 	    VERILOG_SOURCES="$(VERILOG_FILE_SA_4x4)"
 
@@ -143,7 +147,7 @@ simulate_PE:
 	make -f $(COCOTB_MAKEFILE) \
 	    SIM=$(SIM) \
 	    COCOTB_TEST_MODULES=cocotb_tb.ai.$(COCOTB_FILE_PE) \
-	    TOPLEVEL=sim_PE_top \
+	    TOPLEVEL=PSC_NPU_PE_SimTop \
 	    TOPLEVEL_LANG=verilog \
 	    VERILOG_SOURCES="$(PE_FILE)"
 

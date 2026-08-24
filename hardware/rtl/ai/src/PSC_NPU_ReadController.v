@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module SystolicArray_ReadCtrl #(
+module PSC_NPU_ReadController #(
     parameter integer PE_N = 4,
     parameter RADDR_MASK   = 32'h000F_FFFF
 )(

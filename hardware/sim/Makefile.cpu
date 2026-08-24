@@ -190,11 +190,11 @@ PSC_ONE_DMA_FILE =  $(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
 # Systolic Array (not use)
 SA_DIR   = ../rtl/ai/src
 SA_FILE  = \
-	$(SA_DIR)/SystolicArray_Ctrl.v \
-	$(SA_DIR)/SystolicArray_ReadCtrl.v \
-	$(SA_DIR)/SystolicArray4x4.v \
-	$(SA_DIR)/PE_INT.v \
-	$(SA_DIR)/PE_mult.v
+	$(SA_DIR)/PSC_NPU_Controller.v \
+	$(SA_DIR)/PSC_NPU_ReadController.v \
+	$(SA_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(SA_DIR)/PSC_NPU_PE_INT.v \
+	$(SA_DIR)/PSC_NPU_PE_Mult.v
 
 MMIO_BASE_DIR	= ../rtl/mmio
 

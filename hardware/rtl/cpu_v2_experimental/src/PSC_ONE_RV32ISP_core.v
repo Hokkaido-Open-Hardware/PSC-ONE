@@ -317,8 +317,8 @@ module PSC_ONE_RV32ISP_core #(
     wire sa_rw = sa_write_valid;
     wire sa_req_ready;
 
-    //SystolicArray2x2_Ctrl u_systolic (
-    SystolicArray4x4_Ctrl u_systolic (
+    //PSC_NPU_Controller u_systolic (
+    PSC_NPU_Controller u_systolic (
         .clock              (clock),
         `ifdef SystolicArray_OFF
         .reset_n            (1'b0),

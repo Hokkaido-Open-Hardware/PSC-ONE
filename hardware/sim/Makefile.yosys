@@ -3,7 +3,7 @@
 # ============================================================
 
 # make -f Makefile.cpu -f Makefile.yosys yosys_cpu
-# make -f Makefile.cpu -f Makefile.yosys yosys_se
+# make -f Makefile.cpu -f Makefile.yosys yosys_npu
 
 # ============================================================
 # yosys：合成可否チェック（プロジェクト一括）
@@ -59,11 +59,11 @@ yosys_cpu:
 # SynapEngineファイル
 SE_YOSYS_INPUT := $(SA_FILE)
 
-SE_YOSYS_TOP := SystolicArray4x4_Ctrl
+SE_YOSYS_TOP := PSC_NPU_Controller
 SE_YOSYS_LOG := ./log_yosys/yosys_$(SE_YOSYS_TOP).log
 
-# SystolicArray4x4_Ctrl.v内部のバス表記がyosysエラー
-yosys_se:
+# PSC_NPU_Controller.v内部のバス表記がyosysエラー
+yosys_npu:
 	@mkdir -p ./log_yosys
 	yosys -l $(SE_YOSYS_LOG) -p "\
 		read_verilog -sv $(SE_YOSYS_INPUT); \

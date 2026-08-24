@@ -1,4 +1,4 @@
-module PE_mult #(
+module PSC_NPU_PE_Mult #(
     parameter integer DW      = 8,
     parameter integer PW      = 32,
     parameter integer SW      = PW,

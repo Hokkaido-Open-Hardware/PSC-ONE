@@ -1,7 +1,7 @@
 // SystolicArray2x2.v
 `timescale 1ns/1ps
 
-module SystolicArray2x2 #(
+module PSC_NPU_SystolicArray2x2 #(
     parameter integer DW      = 8,
     parameter integer PW      = 32,
     parameter integer SW      = 32,
@@ -44,11 +44,11 @@ module SystolicArray2x2 #(
         `ifdef DUMP_VCD
             $display("COCOTB_SIM SA DUMP_VCD ENABLE");
             $dumpfile("./wave/SystolicArray2x2_test.vcd");
-            $dumpvars(0, SystolicArray2x2);
+            $dumpvars(0, PSC_NPU_SystolicArray2x2);
         `else
             $display("COCOTB_SIM SA verilator FST ENABLE");
             $dumpfile("./wave/SystolicArray2x2_test.fst");
-            $dumpvars(0, SystolicArray2x2);
+            $dumpvars(0, PSC_NPU_SystolicArray2x2);
         `endif
     end
     `endif
@@ -175,7 +175,7 @@ module SystolicArray2x2 #(
     // Datapath : 4 thread contexts
     // ========================================================
 
-    PE_INT #(
+    PSC_NPU_PE_INT #(
         .DW      (DW),
         .PW      (PW),
         .SW      (SW),
@@ -221,7 +221,7 @@ module SystolicArray2x2 #(
     //   1個の乗算器で4論理PEを順次処理
     // ========================================================
 
-    PE_mult #(
+    PSC_NPU_PE_Mult #(
         .DW      (DW),
         .PW      (PW),
         .SW      (SW),

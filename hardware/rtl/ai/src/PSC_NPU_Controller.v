@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module SystolicArray4x4_Ctrl #(
+module PSC_NPU_Controller #(
     parameter integer PE_N     = 4,     // Physical SA size: 4x4 fixed
     parameter integer MATRIX_N = 4,     // Default matrix size
     parameter integer MUL_NUM  = 4      // Number of physical multipliers
@@ -159,7 +159,7 @@ module SystolicArray4x4_Ctrl #(
     //======================================================
     // SA instance
     //======================================================
-    SystolicArray4x4 #(
+    PSC_NPU_SystolicArray4x4 #(
         .DW                     (DW),
         .PW                     (PW),
         .SW                     (SW),
@@ -192,7 +192,7 @@ module SystolicArray4x4_Ctrl #(
     wire [127:0] a_data_out_cur;
     wire [127:0] b_data_out_cur;
 
-    SystolicArray_ReadCtrl #(
+    PSC_NPU_ReadController #(
         .PE_N               (PE_N),
         .RADDR_MASK         (32'h00FF_FFFF)
     ) u_systolic_array_read_ctrl (

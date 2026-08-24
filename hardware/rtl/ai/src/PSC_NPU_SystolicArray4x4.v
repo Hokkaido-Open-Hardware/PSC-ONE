@@ -1,7 +1,7 @@
 // SystolicArray4x4.v
 `timescale 1ns/1ps
 
-module SystolicArray4x4 #(
+module PSC_NPU_SystolicArray4x4 #(
     parameter integer DW      = 8,
     parameter integer PW      = 32,
     parameter integer SW      = 32,
@@ -187,7 +187,7 @@ module SystolicArray4x4 #(
     // Datapath : 16 thread contexts
     // ========================================================
 
-    PE_INT #(
+    PSC_NPU_PE_INT #(
         .DW      (DW),
         .PW      (PW),
         .SW      (SW),
@@ -236,7 +236,7 @@ module SystolicArray4x4 #(
     //   1個の乗算器で16論理PEを順次処理
     // ========================================================
 
-    PE_mult #(
+    PSC_NPU_PE_Mult #(
         .DW      (DW),
         .PW      (PW),
         .SW      (SW),
