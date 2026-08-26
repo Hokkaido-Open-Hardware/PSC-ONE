@@ -150,6 +150,11 @@ module PSC_InstructionUnit (
     logic fsm_task_busy;
     logic fsm_task_done;
 
+    logic IDLE_st;
+    logic FIFO_READ_st;
+    logic DECODE_st;
+    logic REGISTER_READ_st;
+
     PSC_InstructionFSM u_PSC_inst_fsm (
         .clock                (clock),
         .reset_n              (reset_n),
@@ -177,11 +182,6 @@ module PSC_InstructionUnit (
         .fsm_task_busy        (fsm_task_busy),
         .fsm_task_done        (fsm_task_done)
     );
-
-    logic IDLE_st;
-    logic FIFO_READ_st;
-    logic DECODE_st;
-    logic REGISTER_READ_st;
 
     // ============================================================
     // Instruction state registers
