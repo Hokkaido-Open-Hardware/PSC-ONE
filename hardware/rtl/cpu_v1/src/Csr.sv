@@ -327,13 +327,11 @@ module Csr (
     //reg [31:0] oldv, newv;
     logic [31:0] oldv, newv;
 
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            csr_rdata <= 32'd0;
-        end else begin
-            if (csr_wr & csr_enb)
-                csr_rdata <= csr_read_mux(csr_addr);
-        end
+    // The old CSR value is part of the commit-stage writeback data.  Keep the
+    // read port combinational; the actual CSR update still occurs only when
+    // csr_enb is asserted at commit.
+    always_comb begin
+        csr_rdata = csr_read_mux(csr_addr);
     end
 
     assign  oldv = csr_read_mux(csr_addr);
@@ -435,10 +433,9 @@ module Csr (
                 endcase
             end
 
-            if (csr_enb) begin
-                // set_trap = is_ecall || illegal_instruction || i_pf || d_pf;
-                if (set_trap) begin
-                    if (set_trap) begin
+            // Faults are not normal commits.  Accept the trap event directly;
+            // ecall and illegal-instruction still arrive with csr_enb asserted.
+            if (set_trap) begin
                         if (trap_to_s) begin
                             // ---- S trap ----
                             csr_priv_mode  <= PRIV_S;
@@ -463,8 +460,9 @@ module Csr (
                             csr_mstatus[3]     <= 1'b0;             // MIE  <- 0
                             csr_mstatus[12:11] <= priv_mode;        // MPP  <- 元のモード
                         end
-                    end
-                end
+            end
+
+            if (csr_enb) begin
                 // ---- Supervisor trap in/out (SRET) ----
                 if (do_sret) begin
                     csr_priv_mode <= {1'b0, csr_sstatus[S_SPP_BIT]}; // 0 or 1

@@ -119,8 +119,7 @@ module PSC_RV32ISP_core #(
                 end
                 // CPU Trap.
                 CPU_TRAP: begin
-                    if(execute_task_done)
-                        cpu_state <= CPU_RUN;
+                    cpu_state <= CPU_RUN;
                 end
                 // CPU Halt.
                 CPU_HALT: begin
@@ -152,14 +151,33 @@ module PSC_RV32ISP_core #(
     logic        ecall_m;
     logic        set_trap;
     logic [31:0] trap_sepc;
+    logic        fault_seen;
+    logic        d_pf_event;
+    logic        i_pf_event;
 
     assign ecall_u   = decoder_ctrl.is_ecall && (priv_mode == PRIV_U);
     assign ecall_s   = decoder_ctrl.is_ecall && (priv_mode == PRIV_S);
     assign ecall_m   = decoder_ctrl.is_ecall && (priv_mode == PRIV_M);
+    assign d_pf_event = d_pf && !fault_seen;
+    assign i_pf_event = i_pf && !fault_seen;
+
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n)
+            fault_seen <= 1'b0;
+        else if (!d_pf && !i_pf)
+            fault_seen <= 1'b0;
+        else
+            fault_seen <= 1'b1;
+    end
+
     assign set_trap  = decoder_ctrl.is_ecall ||
                        decoder_ctrl.raise_illegal_instruction ||
-                       i_pf || d_pf;
-    assign trap_sepc = pc;
+                       i_pf_event || d_pf_event;
+    logic [31:0] data_fault_pc;
+    logic [31:0] data_fault_vaddr;
+    logic        data_fault_is_store;
+
+    assign trap_sepc = d_pf_event ? data_fault_pc : pc;
 
     logic [31:0] execute_vaddr;
     logic [31:0] trap_stval;
@@ -168,17 +186,17 @@ module PSC_RV32ISP_core #(
     logic [31:0] trap_mepc;
     logic [31:0] trap_mcause;
 
-    assign trap_stval = i_pf ? pc :
-                        d_pf ? execute_vaddr :
+    assign trap_stval = i_pf_event ? pc :
+                        d_pf_event ? data_fault_vaddr :
                                32'h0;
 
     assign trap_scause =
         ecall_u                                ? 32'd8  :
         ecall_s                                ? 32'd9  :
         decoder_ctrl.raise_illegal_instruction ? 32'd2  :
-        i_pf                                   ? 32'd12 :
-        d_pf                                   ?
-            (decoder_ctrl.is_store ? 32'd15 : 32'd13) :
+        i_pf_event                             ? 32'd12 :
+        d_pf_event                             ?
+            (data_fault_is_store ? 32'd15 : 32'd13) :
                                                  32'd0;
 
     assign set_mtrap   = ecall_m;
@@ -414,6 +432,11 @@ module PSC_RV32ISP_core #(
         // MMU fault sig.
         .i_pf                       (i_pf),
         .d_pf                       (d_pf),
+        .i_pf_event                 (i_pf_event),
+        .d_pf_event                 (d_pf_event),
+        .data_fault_pc              (data_fault_pc),
+        .data_fault_vaddr           (data_fault_vaddr),
+        .data_fault_is_store        (data_fault_is_store),
         .trap_scause                (trap_scause[4:0]),
         // to memory
         .data_mem_read_valid        (data_mem_read_valid),

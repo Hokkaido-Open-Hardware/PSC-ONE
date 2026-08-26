@@ -25,10 +25,10 @@ module PSC_RV32ISP_Monitor #(
     // ----------------------------------------------------
     always @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            program_cache_hit_count  <= 32'd0;
-            program_cache_miss_count <= 32'd0;
-            data_cache_hit_count     <= 32'd0;
-            data_cache_miss_count    <= 32'd0;
+            program_cache_hit_count  <= '0;
+            program_cache_miss_count <= '0;
+            data_cache_hit_count     <= '0;
+            data_cache_miss_count    <= '0;
         end
         else begin
             if (program_cache_hit_pulse)
@@ -48,14 +48,19 @@ module PSC_RV32ISP_Monitor #(
     // ----------------------------------------------------
     // Read Mux
     // ----------------------------------------------------
-    always @(*) begin
-        case (PSC_CPU_MON_CTRL)
-            32'd0: PSC_CPU_MON_CYCLE = program_cache_hit_count;
-            32'd1: PSC_CPU_MON_CYCLE = program_cache_miss_count;
-            32'd2: PSC_CPU_MON_CYCLE = data_cache_hit_count;
-            32'd3: PSC_CPU_MON_CYCLE = data_cache_miss_count;
-            default: PSC_CPU_MON_CYCLE = 32'd0;
-        endcase
+    always @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            PSC_CPU_MON_CYCLE <= '0;
+        end
+        else begin
+            case (PSC_CPU_MON_CTRL)
+                32'd0: PSC_CPU_MON_CYCLE    <= program_cache_hit_count;
+                32'd1: PSC_CPU_MON_CYCLE    <= program_cache_miss_count;
+                32'd2: PSC_CPU_MON_CYCLE    <= data_cache_hit_count;
+                32'd3: PSC_CPU_MON_CYCLE    <= data_cache_miss_count;
+                default: PSC_CPU_MON_CYCLE  <= '0;
+            endcase
+        end
     end
 
 endmodule

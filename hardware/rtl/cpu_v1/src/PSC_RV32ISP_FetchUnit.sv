@@ -3,6 +3,7 @@
 //`define fifo_pipeline_off
 
 module PSC_RV32ISP_FetchUnit #(
+    parameter logic BURST_MODE = 1'b1,
     parameter int   FIFO_DEPTH = 16
 )(
     input  logic        clock,
@@ -49,8 +50,6 @@ module PSC_RV32ISP_FetchUnit #(
     output logic [31:0] out_fetch_pc
 );
 
-    assign  program_mem_burst_mode = 1'b0;
-
     typedef enum logic [3:0] {
         IDLE, 
         FETCH_PC, 
@@ -66,6 +65,7 @@ module PSC_RV32ISP_FetchUnit #(
     logic [31:0] fetch_pc, next_pc;
     logic fetch_state_fifo_flush;
     logic next_ready;
+    logic initial_fetch;
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
@@ -73,6 +73,7 @@ module PSC_RV32ISP_FetchUnit #(
             fetch_wakeup_timer <= 16'd0;
             fetch_pc    <= 32'd0;
             fetch_ready <= 1'b0;
+            initial_fetch <= 1'b1;
         end else if (cpu_stop) begin
             fetch_state <= IDLE;
             fetch_wakeup_timer <= 16'd0;
@@ -83,6 +84,9 @@ module PSC_RV32ISP_FetchUnit #(
             fetch_state <= next_state;
             fetch_pc    <= next_pc;
             fetch_ready <= next_ready;
+            if (initial_fetch && (fetch_state == IDLE) &&
+                fetch_valid && (fetch_wakeup_timer > 16'h300))
+                initial_fetch <= 1'b0;
         end
     end
 
@@ -102,15 +106,31 @@ module PSC_RV32ISP_FetchUnit #(
             case (fetch_state)
                 // ----------------------------------------
                 IDLE:
-                    if (fetch_valid && (fetch_wakeup_timer > 16'h300)) 
-                        next_state = FETCH_PC;
+                    if (fetch_valid && (fetch_wakeup_timer > 16'h300)) begin
+                        // Hide the one-time fill latency of the v2 ID/ISSUE
+                        // register.  Redirect refills still use FETCH_PC.
+                        if (initial_fetch &&
+                            ((BURST_MODE && (count <= FIFO_DEPTH - 4)) ||
+                             (!BURST_MODE && !full))) begin
+                            `ifdef fifo_pipeline_off
+                            next_pc = pc;
+                            `endif
+                            next_state = FETCH;
+                        end else begin
+                            next_state = FETCH_PC;
+                        end
+                    end
 
                 FETCH_PC:
-                    if (!full) begin
-                        `ifdef fifo_pipeline_off
-                        next_pc    = pc;
-                        `endif
-                        next_state = FETCH;
+                    if (BURST_MODE) begin
+                        if (count <= FIFO_DEPTH - 4)
+                            next_state = FETCH;
+                    end else begin
+                        if (!full)
+                            `ifdef fifo_pipeline_off
+                            next_pc    = pc;
+                            `endif
+                            next_state = FETCH;
                     end
 
                 FETCH:
@@ -128,7 +148,11 @@ module PSC_RV32ISP_FetchUnit #(
                         next_state = FETCH_PC;
                     end
                     `else
-                    next_pc    = fetch_pc + 32'd4;      // fetch_pc + 4
+                    if (BURST_MODE)
+                        next_pc = {fetch_pc[31:4], 4'b0000} + 32'd16;
+                        //next_pc    = fetch_pc + 32'd16;      // fetch_pc + 16
+                    else
+                        next_pc    = fetch_pc + 32'd4;      // fetch_pc + 4
                     next_state = FETCH_PC;
                     `endif
                 end
@@ -163,9 +187,12 @@ module PSC_RV32ISP_FetchUnit #(
     logic mmu_valid, i_mmu_done;
     logic [31:0] vaddr, i_paddr;
     logic fetch_enb;
+    logic [31:0] opcode_read_pc;
     assign fetch_enb = (fetch_state == FETCH);
 
-    Fetch u_fetch(
+    Fetch #(
+        .BURST_MODE               (BURST_MODE)
+    ) u_fetch(
         .clock                    (clock),
         .reset_n                  (reset_n),
         .fetch_enb                (fetch_enb),
@@ -175,6 +202,7 @@ module PSC_RV32ISP_FetchUnit #(
         .mmu_ready                (i_mmu_done),
         .vaddr                    (vaddr),
         .paddr                    (i_paddr),
+        .program_mem_burst_mode   (program_mem_burst_mode),
         .program_mem_read_valid   (program_mem_read_valid),
         .program_mem_read_ready   (program_mem_read_ready),
         .program_mem_read_address (program_mem_read_address),
@@ -182,6 +210,7 @@ module PSC_RV32ISP_FetchUnit #(
         .program_mem_req_ready    (program_mem_req_ready),
         .fifo_read_valid          (opcode_read_valid),
         .fifo_read_data           (opcode_read_data),
+        .fifo_read_pc             (opcode_read_pc),
         .done                     (fetch_done),
         .busy                     (fetch_busy),
         .opcode                   (opcode)
@@ -204,7 +233,7 @@ module PSC_RV32ISP_FetchUnit #(
         .reset_n                  (reset_n),
         .in_valid                 (opcode_read_valid),
         .in_data                  (opcode_read_data),
-        .in_pc_data               (fetch_pc),
+        .in_pc_data               (opcode_read_pc),
         .in_ready                 (in_ready),
         .out_req_ready            (fifo_ready),
         .out_valid                (fifo_read_valid),

@@ -3848,6 +3848,6 @@ Optimizing module Register.
      $xor                            2
 
 Warnings: 3 unique messages, 5 total
-End of script. Logfile hash: 752bd2f65b, CPU: user 0.46s system 0.01s, MEM: 30.07 MB peak
+End of script. Logfile hash: 752bd2f65b, CPU: user 0.46s system 0.01s, MEM: 28.79 MB peak
 Yosys 0.52 (git sha1 fee39a3284c90249e1d9684cf6944ffbbcbb8f90)
-Time spent: 19% 4x opt_dff (0 sec), 17% 4x opt_clean (0 sec), ...
+Time spent: 19% 4x opt_dff (0 sec), 18% 4x opt_clean (0 sec), ...

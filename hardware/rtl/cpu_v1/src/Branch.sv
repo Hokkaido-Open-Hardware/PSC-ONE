@@ -17,6 +17,7 @@ module Branch (
     output logic        mmu_valid,
     output logic [31:0] vaddr,
     input  logic        mmu_ready,
+    input  logic        access_fault,
     input  logic [31:0] d_paddr,
 
     // Memory
@@ -143,8 +144,12 @@ module Branch (
 
                 BRANCH_MMU_W: begin
                     if (mmu_ready) begin
-                        data_mem_read_address <= d_paddr;
-                        state                 <= BRANCH_ACCESS;
+                        if (access_fault) begin
+                            state <= BRANCH_DONE;
+                        end else begin
+                            data_mem_read_address <= d_paddr;
+                            state                 <= BRANCH_ACCESS;
+                        end
                     end
                 end
 
@@ -177,5 +182,17 @@ module Branch (
             endcase
         end
     end
+
+`ifdef PIPELINE_TRACE
+    always_ff @(posedge clock) begin
+        if (reset_n && branch_enb && (state == IDLE)) begin
+            $display("SLOW-BRANCH clock=%0t pc=%08x sel=%0d take=%0b r1=%08x r2=%08x target=%08x",
+                     $time, decoder_ctrl.out_pc, decoder_ctrl.pc_sel,
+                     branch_exec(decoder_ctrl.funct3, r_data1, r_data2,
+                                 decoder_ctrl.pc_sel),
+                     r_data1, r_data2, in_vaddr);
+        end
+    end
+`endif
 
 endmodule

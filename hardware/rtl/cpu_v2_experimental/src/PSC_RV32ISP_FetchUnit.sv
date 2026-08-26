@@ -65,6 +65,7 @@ module PSC_RV32ISP_FetchUnit #(
     logic [31:0] fetch_pc, next_pc;
     logic fetch_state_fifo_flush;
     logic next_ready;
+    logic initial_fetch;
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
@@ -72,6 +73,7 @@ module PSC_RV32ISP_FetchUnit #(
             fetch_wakeup_timer <= 16'd0;
             fetch_pc    <= 32'd0;
             fetch_ready <= 1'b0;
+            initial_fetch <= 1'b1;
         end else if (cpu_stop) begin
             fetch_state <= IDLE;
             fetch_wakeup_timer <= 16'd0;
@@ -82,6 +84,9 @@ module PSC_RV32ISP_FetchUnit #(
             fetch_state <= next_state;
             fetch_pc    <= next_pc;
             fetch_ready <= next_ready;
+            if (initial_fetch && (fetch_state == IDLE) &&
+                fetch_valid && (fetch_wakeup_timer > 16'h300))
+                initial_fetch <= 1'b0;
         end
     end
 
@@ -101,8 +106,20 @@ module PSC_RV32ISP_FetchUnit #(
             case (fetch_state)
                 // ----------------------------------------
                 IDLE:
-                    if (fetch_valid && (fetch_wakeup_timer > 16'h300)) 
-                        next_state = FETCH_PC;
+                    if (fetch_valid && (fetch_wakeup_timer > 16'h300)) begin
+                        // Hide the one-time fill latency of the v2 ID/ISSUE
+                        // register.  Redirect refills still use FETCH_PC.
+                        if (initial_fetch &&
+                            ((BURST_MODE && (count <= FIFO_DEPTH - 4)) ||
+                             (!BURST_MODE && !full))) begin
+                            `ifdef fifo_pipeline_off
+                            next_pc = pc;
+                            `endif
+                            next_state = FETCH;
+                        end else begin
+                            next_state = FETCH_PC;
+                        end
+                    end
 
                 FETCH_PC:
                     if (BURST_MODE) begin

@@ -369,20 +369,12 @@ module Decorder (
                                     raise_illegal_instruction_alu;
     end
 
-    // =============================================================================
-    // パイプラインレジスタ
-    // =============================================================================
-    always @(posedge clock or negedge reset_n) begin
-        if(!reset_n) begin
-            decoder_ctrl <= '0;
-            decode_done  <= 1'b0;
-        end else if (decode_enb) begin
-            decoder_ctrl <= decoder_ctrl_next;
-            decode_done  <= 1'b1;
-        end else begin
-            // decode_doneだけ1クロックのパルスにし、ほかの結果は保持する。
-            decode_done  <= 1'b0;
-        end
+    // The v2 issue stage consumes the FIFO head directly.  Keep decode
+    // combinational so a new independent R/I instruction can be dispatched
+    // on every clock; the issue/slow-path registers provide the state hold.
+    always_comb begin
+        decoder_ctrl = decoder_ctrl_next;
+        decode_done  = decode_enb;
     end
 
 endmodule

@@ -79,27 +79,6 @@ module PSC_PC #(
         csr_state.sepc;
 
     // =====================================
-    // TRAP PC LATCH
-    // =====================================
-
-    logic [31:0] trap_pc_latch;
-
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            trap_pc_latch <= 32'd0;
-        end else if (cpu_stop) begin
-            trap_pc_latch <= 32'd0;
-        end else if (execute_task_done) begin
-            trap_pc_latch <= 32'd0;
-        end else if (trap) begin
-            if (trap_deleg_to_s)
-                trap_pc_latch <= csr_state.stvec;
-            else
-                trap_pc_latch <= csr_state.mtvec;
-        end
-    end
-
-    // =====================================
     // NEXT PC SELECT
     // =====================================
 
@@ -108,9 +87,7 @@ module PSC_PC #(
     assign next_pc =
         decoder_ctrl.is_mret ? csr_state.mepc :
         decoder_ctrl.is_sret ? csr_state.sepc :
-        trap                 ? trap_pc_latch :
-        cpu_trap
-                             ? trap_pc_latch :
+        trap                 ? trap_pc :
         pc_sel2              ? branch_target_pc :
                                seq_pc;
 
@@ -125,6 +102,9 @@ module PSC_PC #(
         end else if (cpu_stop) begin
             pc      <= 32'd0;
             counter <= 32'd0;
+        end else if (trap) begin
+            pc      <= trap_pc;
+            counter <= counter + 32'd1;
         end else if (execute_task_done) begin
             pc      <= next_pc;
             counter <= counter + 32'd1;
