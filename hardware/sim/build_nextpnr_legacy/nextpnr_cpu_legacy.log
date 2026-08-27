@@ -1,0 +1,218 @@
+Info: Using uarch 'gowin' for device 'GW2AR-LV18QN88C8/I7'
+
+Info: Cell O_sdram_clk not found
+Info: Cell O_sdram_cke not found
+Info: Cell O_sdram_cs_n not found
+Info: Cell O_sdram_cas_n not found
+Info: Cell O_sdram_ras_n not found
+Info: Cell O_sdram_wen_n not found
+Info: Cell O_sdram_dqm[0] not found
+Info: Cell O_sdram_dqm[1] not found
+Info: Cell O_sdram_dqm[2] not found
+Info: Cell O_sdram_dqm[3] not found
+Info: Cell O_sdram_addr[0] not found
+Info: Cell O_sdram_addr[1] not found
+Info: Cell O_sdram_addr[2] not found
+Info: Cell O_sdram_addr[3] not found
+Info: Cell O_sdram_addr[4] not found
+Info: Cell O_sdram_addr[5] not found
+Info: Cell O_sdram_addr[6] not found
+Info: Cell O_sdram_addr[7] not found
+Info: Cell O_sdram_addr[8] not found
+Info: Cell O_sdram_addr[9] not found
+Info: Cell O_sdram_addr[10] not found
+Info: Cell O_sdram_ba[0] not found
+Info: Cell O_sdram_ba[1] not found
+Info: Cell IO_sdram_dq[0] not found
+Info: Cell IO_sdram_dq[1] not found
+Info: Cell IO_sdram_dq[2] not found
+Info: Cell IO_sdram_dq[3] not found
+Info: Cell IO_sdram_dq[4] not found
+Info: Cell IO_sdram_dq[5] not found
+Info: Cell IO_sdram_dq[6] not found
+Info: Cell IO_sdram_dq[7] not found
+Info: Cell IO_sdram_dq[8] not found
+Info: Cell IO_sdram_dq[9] not found
+Info: Cell IO_sdram_dq[10] not found
+Info: Cell IO_sdram_dq[11] not found
+Info: Cell IO_sdram_dq[12] not found
+Info: Cell IO_sdram_dq[13] not found
+Info: Cell IO_sdram_dq[14] not found
+Info: Cell IO_sdram_dq[15] not found
+Info: Cell IO_sdram_dq[16] not found
+Info: Cell IO_sdram_dq[17] not found
+Info: Cell IO_sdram_dq[18] not found
+Info: Cell IO_sdram_dq[19] not found
+Info: Cell IO_sdram_dq[20] not found
+Info: Cell IO_sdram_dq[21] not found
+Info: Cell IO_sdram_dq[22] not found
+Info: Cell IO_sdram_dq[23] not found
+Info: Cell IO_sdram_dq[24] not found
+Info: Cell IO_sdram_dq[25] not found
+Info: Cell IO_sdram_dq[26] not found
+Info: Cell IO_sdram_dq[27] not found
+Info: Cell IO_sdram_dq[28] not found
+Info: Cell IO_sdram_dq[29] not found
+Info: Cell IO_sdram_dq[30] not found
+Info: Cell IO_sdram_dq[31] not found
+Info: Reading constraints...
+Info: Create constant nets...
+Info: Modify LUTs...
+Info: Pack IOBs...
+Info: Pack I3C IOs...
+Info: Pack MIPI IOs...
+Info: Pack diff IOBs...
+Info: Pack FFs into IO cells...
+Info: Pack IODELAY...
+Info: Pack Input Edge Monitors...
+Info: Pack IO logic...
+Info: Pack DESER16 logic...
+Info: Pack GSR...
+Info: Pack HCLK cells...
+Info: Pack DLLDLYs...
+Info: Pack wide LUTs...
+Info: Packed MUX2_LUT8:41, MUX2_LU7:30, MUX2_LUT6:118, MUX2_LUT5:659
+Info: Pack ALUs...
+Info: Pack SSRAMs...
+Info: Constrained 744 LUTFF pairs.
+Info: Pack PLL...
+Info: Pack ADC...
+Info: Pack BSRAMs...
+Info: Pack DSP...
+Info: Pack INV...
+Info: Pack buffered nets...
+Info: Pack EMCU and UserFlash cells...
+Info: Pack UserFlash cells...
+Info: Pack DQCE cells...
+Info: Pack DCS cells...
+Info: Checksum: 0xbe411535
+
+Info: Device utilisation:
+Info: 	                 VCC:       1/      1   100%
+Info: 	                 IOB:       3/    384     0%
+Info: 	                LUT4:    6638/  20736    32%
+Info: 	            IOLOGICI:       0/    384     0%
+Info: 	            IOLOGICO:       0/    384     0%
+Info: 	           MUX2_LUT5:    1343/  10368    12%
+Info: 	           MUX2_LUT6:     342/   5184     6%
+Info: 	           MUX2_LUT7:     112/   2592     4%
+Info: 	           MUX2_LUT8:      41/   2592     1%
+Info: 	                 ALU:     428/  15552     2%
+Info: 	                 GND:       1/      1   100%
+Info: 	                 DFF:    3719/  15552    23%
+Info: 	           RAM16SDP4:       0/    648     0%
+Info: 	               BSRAM:       0/     46     0%
+Info: 	              ALU54D:       0/     24     0%
+Info: 	     MULTADDALU18X18:       0/     24     0%
+Info: 	        MULTALU18X18:       0/     24     0%
+Info: 	        MULTALU36X18:       0/     24     0%
+Info: 	           MULT36X36:       1/     12     8%
+Info: 	           MULT18X18:       0/     48     0%
+Info: 	             MULT9X9:       0/     96     0%
+Info: 	              PADD18:       0/     48     0%
+Info: 	               PADD9:       0/     96     0%
+Info: 	                 GSR:       1/      1   100%
+Info: 	                 OSC:       0/      1     0%
+Info: 	                rPLL:       0/      2     0%
+Info: 	                BUFG:       1/     24     4%
+Info: 	                DQCE:       0/     24     0%
+Info: 	                 DCS:       0/      8     0%
+Info: 	               DHCEN:       0/     24     0%
+Info: 	              CLKDIV:       0/      8     0%
+Info: 	             CLKDIV2:       0/     16     0%
+
+Info: Running custom HCLK placer...
+Info: Placed 0 cells based on constraints.
+Info: Creating initial analytic placement for 7366 cells, random placement wirelen = 342182.
+Info:     at initial placer iter 0, wirelen = 1758
+Info:     at initial placer iter 1, wirelen = 1707
+Info:     at initial placer iter 2, wirelen = 1728
+Info:     at initial placer iter 3, wirelen = 1709
+Info: Running main analytical placer, max placement attempts per cell = 19993326.
+Info:     at iteration #1, type ALL: wirelen solved = 1740, spread = 65552, legal = 139191; time = 1.56s
+Info:     at iteration #2, type ALL: wirelen solved = 7861, spread = 55328, legal = 117331; time = 1.80s
+Info:     at iteration #3, type ALL: wirelen solved = 14086, spread = 51065, legal = 117893; time = 1.78s
+Info:     at iteration #4, type ALL: wirelen solved = 16655, spread = 43896, legal = 101007; time = 1.28s
+Info:     at iteration #5, type ALL: wirelen solved = 20385, spread = 53994, legal = 96869; time = 1.73s
+Info:     at iteration #6, type ALL: wirelen solved = 21803, spread = 48645, legal = 94755; time = 1.91s
+Info:     at iteration #7, type ALL: wirelen solved = 23287, spread = 40415, legal = 83666; time = 1.98s
+Info:     at iteration #8, type ALL: wirelen solved = 24306, spread = 54290, legal = 91664; time = 1.55s
+Info:     at iteration #9, type ALL: wirelen solved = 25227, spread = 53649, legal = 92422; time = 1.72s
+Info:     at iteration #10, type ALL: wirelen solved = 25458, spread = 52937, legal = 91499; time = 1.32s
+Info:     at iteration #11, type ALL: wirelen solved = 27392, spread = 50374, legal = 90620; time = 1.63s
+Info:     at iteration #12, type ALL: wirelen solved = 29215, spread = 51799, legal = 87499; time = 1.55s
+Info: HeAP Placer Time: 20.84s
+Info:   of which solving equations: 1.99s
+Info:   of which spreading cells: 0.29s
+Info:   of which strict legalisation: 18.03s
+
+Info: Running simulated annealing placer for refinement.
+Info:   at iteration #1: temp = 0.000000, timing cost = 255, wirelen = 83666
+Info:   at iteration #5: temp = 0.000000, timing cost = 308, wirelen = 60268
+Info:   at iteration #10: temp = 0.000000, timing cost = 294, wirelen = 55084
+Info:   at iteration #15: temp = 0.000000, timing cost = 253, wirelen = 52786
+Info:   at iteration #20: temp = 0.000000, timing cost = 228, wirelen = 51355
+Info:   at iteration #25: temp = 0.000000, timing cost = 216, wirelen = 50290
+Info:   at iteration #30: temp = 0.000000, timing cost = 214, wirelen = 50040
+Info:   at iteration #35: temp = 0.000000, timing cost = 213, wirelen = 49872
+Info:   at iteration #37: temp = 0.000000, timing cost = 212, wirelen = 49841 
+Info: SA placement time 18.05s
+
+Info: Max frequency for clock 'u_cpu.clock': 87.42 MHz (PASS at 81.00 MHz)
+
+Info: Slack histogram:
+Info:  legend: * represents 16 endpoint(s)
+Info:          + represents [1,16) endpoint(s)
+Info: [   906,   1465) |*+
+Info: [  1465,   2024) |+
+Info: [  2024,   2583) |**+
+Info: [  2583,   3142) |+
+Info: [  3142,   3701) |**+
+Info: [  3701,   4260) |*****+
+Info: [  4260,   4819) |********+
+Info: [  4819,   5378) |******+
+Info: [  5378,   5937) |*********+
+Info: [  5937,   6496) |*******************+
+Info: [  6496,   7055) |**************+
+Info: [  7055,   7614) |**************************+
+Info: [  7614,   8173) |*************+
+Info: [  8173,   8732) |***************+
+Info: [  8732,   9291) |************+
+Info: [  9291,   9850) |******+
+Info: [  9850,  10409) |*********+
+Info: [ 10409,  10968) |***************+
+Info: [ 10968,  11527) |************************************************************ 
+Info: [ 11527,  12086) |*******************************************+
+Info: Checksum: 0x7a7d47d5
+Info: Routing globals...
+Info:     'u_cpu.clock' net was routed.
+Info:     'u_cpu.u_execute_state.next_state_LUT4_F_1_I2_LUT2_I0_F_DFFC_Q_D_MUX2_LUT8_O_I0_MUX2_LUT7_O_S0[1]' is routed using segments.
+Info:     'u_cpu.u_csr.csr_read_mux$func$../rtl/cpu/src/Csr.v:328$797.$result_LUT4_F_7_I3_LUT3_F_I0_LUT4_I0_1_F_LUT4_F_1_I0_LUT4_I3_F_LUT4_F_I1_LUT4_I1_1_F_LUT4_F_I0_LUT4_I1_F_LUT4_I3_F[0]' is routed using segments.
+Info:     'u_cpu.u_csr.csr_DMA_DST_DFFCE_Q_CE_LUT2_F_I1[0]' is routed using segments.
+Info:     'u_cpu.u_execute_state.next_state_LUT4_F_1_I2_LUT2_I0_F_DFFC_Q_D_MUX2_LUT8_O_I0_MUX2_LUT7_O_S0[2]' is routed using segments.
+Info:     'u_cpu.u_csr.csr_read_mux$func$../rtl/cpu/src/Csr.v:328$797.$result_LUT4_F_7_I3_LUT3_F_I0_LUT4_I0_1_F_LUT4_F_1_I0_LUT4_I3_F_LUT4_F_I1_LUT4_I1_1_F_LUT4_F_I0_LUT4_I1_F_LUT4_I3_F_LUT4_I3_F_LUT4_F_11_I3_LUT4_F_2_I3_LUT4_F_I1_LUT4_I0_F_LUT4_F_I0[3]' is routed using segments.
+Info:     'u_cpu.u_fetch_state.next_flush_DFFC_D_Q_LUT2_I0_F[4]' is routed using segments.
+Info:     'u_cpu.u_csr.csr_apply$func$../rtl/cpu/src/Csr.v:329$798.$result_LUT3_F_3_I2_LUT4_F_I1_LUT4_I0_I3_LUT3_I1_F_LUT3_I1_F_LUT4_F_1_I0_LUT4_I1_F_LUT3_I2_F_LUT4_F_4_I0[3]' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.rf_wen_w_DFFCE_D_Q_LUT3_I1_F_LUT2_F_I1_LUT2_I1_F_LUT3_I0_1_I1_LUT3_I0_F' is routed using segments.
+Info:     'data_mem_read_ready_LUT2_I0_F[1]' is routed using segments.
+Info:     'u_cpu.u_csr.csr_DMA_DST_DFFCE_Q_CE_LUT2_F_I1_LUT4_F_I2_LUT4_I2_F' is routed using segments.
+Info:     'u_cpu.reset_n_LUT2_I0_F' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.rf_wen_w_DFFCE_D_Q_LUT3_I1_F_LUT2_F_I1_LUT2_I1_1_F_LUT3_I0_1_F' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.rf_wen_w_DFFCE_D_Q_LUT3_I1_F_LUT2_F_I1_LUT2_I1_F_LUT3_I1_I0_LUT3_I0_4_F' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.rf_wen_w_DFFCE_D_Q_LUT3_I1_F_LUT2_F_I1_LUT2_I1_F_LUT3_I0_1_F' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_execute.u_divider.state_DFFC_Q_D_LUT3_F_I0_DFFP_Q_D_LUT4_F_I0_LUT4_I1_F_DFFC_D_Q_LUT4_F_I3_LUT3_I2_F_LUT4_I2_F_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM[2]' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.op2sel_w_DFFCE_D_Q[3]' is routed using segments.
+Info:     'u_cpu.u_csr.csr_apply$func$../rtl/cpu/src/Csr.v:329$798.$result_LUT3_F_3_I2_LUT4_F_I1_LUT4_I0_I3_LUT3_I1_F_LUT2_I1_F_LUT3_F_I2_LUT4_I2_F[0]' is routed using segments.
+Info:     'u_cpu.u_csr.csr_apply$func$../rtl/cpu/src/Csr.v:329$798.$result_LUT3_F_3_I2_LUT4_F_I1_LUT4_I0_I3_LUT3_I1_F_LUT3_I1_F_LUT4_F_1_I0_LUT4_I1_F_LUT3_I2_I0_LUT2_I0_F_LUT2_F_I0_LUT2_I0_F[3]' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.rf_wen_w_DFFCE_D_Q_LUT3_I1_F_LUT2_F_I1_LUT2_I1_F_LUT3_I1_I0_LUT3_I0_2_F' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.rf_wen_w_DFFCE_D_Q_LUT3_I1_F_LUT2_F_I1_LUT2_I1_F_LUT3_I0_1_I1_LUT3_I0_1_F' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.is_csri_DFFCE_D_Q[1]' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_branch.state[0]' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_execute.u_divider.state[3]' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_execute.u_divider.state_DFFC_Q_D_LUT3_F_I0_DFFP_Q_D_LUT4_F_I0_LUT4_I1_F_DFFC_D_Q_LUT4_F_I3_LUT3_I2_F_LUT2_I1_F[2]' is routed using segments.
+Info:     'u_cpu.u_csr.csr_read_mux$func$../rtl/cpu/src/Csr.v:328$797.$result_LUT4_F_3_I1_LUT4_F_I0_DFFCE_Q_CE' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.rf_wen_w_DFFCE_D_Q_LUT3_I1_F_LUT2_F_I1_LUT2_I1_F_LUT3_I1_I0_LUT3_I0_1_F' is routed using segments.
+Info:     'u_cpu.u_csr.csr_read_mux$func$../rtl/cpu/src/Csr.v:328$797.$result_LUT4_F_7_I3_LUT3_F_I0_LUT4_I0_1_F_LUT4_F_1_I0_LUT4_I3_F_LUT4_F_I1_LUT4_I1_1_F_LUT4_F_I0_LUT4_I1_F_LUT4_I3_F_LUT4_I3_F_LUT4_F_11_I3_LUT4_F_2_I3_LUT4_F_I1_LUT4_I0_F_LUT4_I3_F_LUT4_I3_F[0]' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_execute.u_divider.state_DFFC_Q_D_LUT3_F_I0_DFFP_Q_D_LUT4_F_I0_LUT4_I1_1_I0_LUT2_I0_F_DFFC_D_Q_LUT3_F_I1[2]' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.alucon_w_DFFCE_D_Q_LUT2_I0_F[0]' is routed using segments.
+Info:     'u_cpu.u_execute_state.u_decorder.is_csr_any_DFFCE_D_Q_LUT2_I1_F[1]' is routed using segments.

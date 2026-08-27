@@ -1,0 +1,88 @@
+test_slangdiag -expect "hierarchical reference across preserved module boundary"
+read_slang --keep-hierarchy <<EOF
+module submod();
+	wire w = 1;
+endmodule
+
+module top();
+	submod i1();
+	wire g = i1.w;
+endmodule
+EOF
+
+design -reset
+test_slangdiag -expect "hierarchical reference across preserved module boundary"
+read_slang --keep-hierarchy <<EOF
+module submod();
+	wire w = $root.top.g;
+endmodule
+
+module top();
+	submod i1();
+	wire g = 1;
+endmodule
+EOF
+
+design -reset
+test_slangdiag -expect "hierarchical reference across preserved module boundary"
+read_slang <<EOF
+(* blackbox *)
+module submod();
+	wire w = 1;
+endmodule
+
+module top();
+	submod i1();
+	wire g = i1.w;
+endmodule
+EOF
+
+design -reset
+test_slangdiag -expect "hierarchical reference across preserved module boundary"
+read_slang --empty-blackboxes <<EOF
+module submod(output w);
+endmodule
+
+module top();
+	submod i1();
+	wire g = i1.w;
+endmodule
+EOF
+
+design -reset
+test_slangdiag -expect "hierarchical reference across preserved module boundary"
+read_slang --keep-hierarchy <<EOF
+module submod(inout pad, output out);
+	assign out = pad;
+	wire w = pad;
+endmodule
+
+module top(inout pad, output out);
+	submod i1(.pad(pad), .out(out));
+	wire g = i1.w;
+endmodule
+EOF
+
+design -reset
+test_slangdiag -expect "hierarchical reference outside module hierarchy unsupported"
+read_slang <<EOF
+package p;
+   struct { int x; } s1;
+   struct { int x; } s2;
+   function void f();
+      int x;
+   endfunction
+endpackage
+
+module m;
+   import p::*;
+   if (1) begin : s1
+      initial begin
+         s1.x = 1;
+         s2.x = 1;
+         f.x = 1;
+      end
+      int x;
+   end
+endmodule
+EOF

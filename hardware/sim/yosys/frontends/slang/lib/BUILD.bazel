@@ -1,0 +1,56 @@
+"""sv-elab as a yosys plugin: builds slang.so against @yosys//:hdrs.
+"""
+
+load("@bazel_skylib//rules:expand_template.bzl", "expand_template")
+load("@rules_license//rules:license.bzl", "license")
+load(
+    "//:dependency_support/slang_ext.bzl",
+    "SLANG_VERSION_MAJOR",
+    "SLANG_VERSION_MINOR",
+    "SLANG_VERSION_PATCH",
+)
+
+package(
+    default_applicable_licenses = [":license"],
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+)
+
+license(
+    name = "license",
+    package_name = "sv-elab",
+    license_kinds = ["@rules_license//licenses/spdx:ISC"],
+    license_text = "LICENSE",
+)
+
+# sv-elab's own revision string is taken from MODULE.bazel's
+# version field (set by the BCR submitter at release time).
+SV_ELAB_REVISION = module_version() or "unknown"
+
+expand_template(
+    name = "version_h",
+    out = "version.h",
+    substitutions = {
+        "@SV_ELAB_REVISION@": SV_ELAB_REVISION,
+        "@SLANG_REVISION@": "{}.{}.{}".format(
+            SLANG_VERSION_MAJOR,
+            SLANG_VERSION_MINOR,
+            SLANG_VERSION_PATCH,
+        ),
+    },
+    template = "src/version.h.in",
+)
+
+# --- sv-elab yosys plugin (shared library) ---
+
+# The plugin sources live here, but the rules that consume them live in
+# //src/yosys_plugin, so that the intermediate cc_library can be private to
+# that package. Only the loadable slang.so is a public target.
+filegroup(
+    name = "plugin_srcs",
+    srcs = glob([
+        "src/*.cc",
+        "src/*.h",
+    ]) + [":version.h"],
+    visibility = ["//src/yosys_plugin:__pkg__"],
+)

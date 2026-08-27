@@ -248,7 +248,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	cpu_monitor_test1:RV32ISP_chip_test:./mem/cpu_monitor_test1.mem:0x00000022 \
+	divmod_test1:RV32ISP_chip_test:./mem/divmod_test1.mem:0x00000e02 \
 
 # ============================================================
 # 複数テスト定義

@@ -222,6 +222,7 @@ module PSC_ONE_RV32ISP_core #(
         .cpu_stop                   (cpu_stop),
         .irq_ext                    (1'b0),
 
+        .program_mem_burst_mode     (),
         .program_mem_read_valid     (program_mem_read_valid),
         .program_mem_read_ready     (program_mem_read_ready),
         .program_mem_read_address   (program_mem_read_address),

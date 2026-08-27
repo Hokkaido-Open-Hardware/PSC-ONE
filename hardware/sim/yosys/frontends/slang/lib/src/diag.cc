@@ -1,0 +1,367 @@
+//
+// Yosys slang frontend
+//
+// Copyright Martin Povišer <povik@cutebit.org>
+// Distributed under the terms of the ISC license, see LICENSE
+//
+#include "diag.h"
+#include "slang/diagnostics/Diagnostics.h"
+#include "slang/text/SourceLocation.h"
+#include "slang_frontend.h"
+
+namespace slang_frontend {
+
+using DiagCode = slang::DiagCode;
+using DiagGroup = slang::DiagGroup;
+using DiagSubsystem = slang::DiagSubsystem;
+using Diagnostic = slang::Diagnostic;
+using Diagnostics = slang::Diagnostics;
+using DiagnosticEngine = slang::DiagnosticEngine;
+using DiagnosticSeverity = slang::DiagnosticSeverity;
+using SourceRange = slang::SourceRange;
+using SourceLocation = slang::SourceLocation;
+
+Diagnostic &DiagnosticIssuer::add_diag(DiagCode code, SourceLocation location)
+{
+	issued_diagnostics.emplace_back(code, location);
+	return issued_diagnostics.back();
+}
+
+Diagnostic &DiagnosticIssuer::add_diag(DiagCode code, SourceRange sourceRange)
+{
+	Diagnostic &diag = add_diag(code, sourceRange.start());
+	diag << sourceRange;
+	return diag;
+}
+
+void DiagnosticIssuer::add_diag(Diagnostic diag)
+{
+	issued_diagnostics.push_back(diag);
+}
+
+void DiagnosticIssuer::add_diagnostics(const Diagnostics &diagnostics)
+{
+	for (const Diagnostic &diag : diagnostics)
+		add_diag(diag);
+}
+
+void DiagnosticIssuer::report_into(DiagnosticEngine &engine)
+{
+	for (auto &diag : issued_diagnostics)
+		engine.issue(diag);
+}
+
+namespace diag {
+DiagCode IffUnsupported(DiagSubsystem::Netlist, 1000);
+DiagCode SignalSensitivityAmbiguous(DiagSubsystem::Netlist, 1001);
+DiagCode EdgeImplicitMixing(DiagSubsystem::Netlist, 1002);
+DiagCode GenericTimingUnsyn(DiagSubsystem::Netlist, 1003);
+DiagCode BothEdgesUnsupported(DiagSubsystem::Netlist, 1004);
+DiagCode WaitStatementUnsupported(DiagSubsystem::Netlist, 1011);
+DiagCode NoteSignalEvent(DiagSubsystem::Netlist, 1005);
+DiagCode ExpectingIfElseAload(DiagSubsystem::Netlist, 1006);
+DiagCode NoteDuplicateEdgeSense(DiagSubsystem::Netlist, 1007);
+DiagCode IfElseAloadPolarity(DiagSubsystem::Netlist, 1008);
+DiagCode IfElseAloadMismatch(DiagSubsystem::Netlist, 1009);
+DiagCode LatchNotInferred(DiagSubsystem::Netlist, 1010);
+DiagCode MissingAload(DiagSubsystem::Netlist, 1012);
+DiagCode NoteProcessDriver(DiagSubsystem::Netlist, 1013);
+DiagCode AlwaysFFBadTiming(DiagSubsystem::Netlist, 1014);
+
+DiagCode MissingStopCondition(DiagSubsystem::Netlist, 1017);
+
+DiagCode BadMemoryExpr(DiagSubsystem::Netlist, 1019);
+DiagCode MemoryNotInferred(DiagSubsystem::Netlist, 1020);
+DiagCode NoteUsageBlame(DiagSubsystem::Netlist, 1021);
+
+DiagCode UnrollLimitExhausted(DiagSubsystem::Netlist, 1022);
+DiagCode NoteLoopContributes(DiagSubsystem::Netlist, 1023);
+
+DiagCode NonconstWildcardEq(DiagSubsystem::Netlist, 1024);
+
+DiagCode AssertionUnsupported(DiagSubsystem::Netlist, 1025);
+DiagCode LangFeatureUnsupported(DiagSubsystem::Netlist, 1026);
+DiagCode UnsupportedLhs(DiagSubsystem::Netlist, 1027);
+DiagCode ArgumentTypeUnsupported(DiagSubsystem::Netlist, 1028);
+DiagCode MultiportUnsupported(DiagSubsystem::Netlist, 1029);
+DiagCode UnsupportedBlackboxConnection(DiagSubsystem::Netlist, 1030);
+DiagCode UnsupportedPortDirection(DiagSubsystem::Netlist, 1031);
+DiagCode ModportRequired(DiagSubsystem::Netlist, 1032);
+DiagCode FixedSizeRequired(DiagSubsystem::Netlist, 1033);
+DiagCode AloadOne(DiagSubsystem::Netlist, 1034);
+DiagCode BadInlinedPortConnection(DiagSubsystem::Netlist, 1035);
+DiagCode NoParamsOnUnkBboxes(DiagSubsystem::Netlist, 1037);
+DiagCode BboxTypeParameter(DiagSubsystem::Netlist, 1039);
+DiagCode BboxExportPortWidths(DiagSubsystem::Netlist, 1040);
+DiagCode NoteIgnoreInitial(DiagSubsystem::Netlist, 1041);
+DiagCode PortCorrespondence(DiagSubsystem::Netlist, 1042);
+DiagCode UnsynthesizableFeature(DiagSubsystem::Netlist, 1043);
+DiagCode SVAUnsupported(DiagSubsystem::Netlist, 1044);
+DiagCode ExpectStatementUnsupported(DiagSubsystem::Netlist, 1045);
+DiagCode ProgramUnsupported(DiagSubsystem::Netlist, 1046);
+DiagCode ForbiddenDemotion(DiagSubsystem::Netlist, 1047);
+DiagCode UdpUnsupported(DiagSubsystem::Netlist, 1048);
+DiagCode PrimTypeUnsupported(DiagSubsystem::Netlist, 1049);
+DiagCode ReferenceAcrossKeptHierBoundary(DiagSubsystem::Netlist, 1050);
+DiagCode NoteModuleBlackboxBecauseAttribute(DiagSubsystem::Netlist, 1051);
+DiagCode NoteModuleBlackboxBecauseEmpty(DiagSubsystem::Netlist, 1052);
+DiagCode NoteModuleNotDissolvedBecauseBlackbox(DiagSubsystem::Netlist, 1053);
+DiagCode NoteModuleNotDissolvedBecauseKeepHierarchy(DiagSubsystem::Netlist, 1054);
+DiagCode NoteModuleNotDissolvedBecauseInOut(DiagSubsystem::Netlist, 1084);
+DiagCode BlockingAssignmentAfterNonblocking(DiagSubsystem::Netlist, 1055);
+DiagCode NonblockingAssignmentAfterBlocking(DiagSubsystem::Netlist, 1056);
+DiagCode NotePreviousAssignment(DiagSubsystem::Netlist, 1057);
+DiagCode NetTypeUnsupported(DiagSubsystem::Netlist, 1058);
+DiagCode RefUnsupported(DiagSubsystem::Netlist, 1061);
+DiagCode InlinedInOutUnsupported(DiagSubsystem::Netlist, 1062);
+DiagCode PastGatingClockingUnsupported(DiagSubsystem::Netlist, 1063);
+DiagCode SystemFunctionRequireClockedBlock(DiagSubsystem::Netlist, 1064);
+DiagCode UnsupportedBitConversion(DiagSubsystem::Netlist, 1065);
+DiagCode MultiPortConversion(DiagSubsystem::Netlist, 1066);
+DiagCode InputPortCannotBeSpecialNet(DiagSubsystem::Netlist, 1067);
+DiagCode ReadingNetStateFromInitialBlockUnsupported(DiagSubsystem::Netlist, 1068);
+DiagCode NonblockingAssignInInitialUnsupported(DiagSubsystem::Netlist, 1070);
+DiagCode ErrorNonconstantInitialEval(DiagSubsystem::Netlist, 1071);
+DiagCode DeprecatedOption(DiagSubsystem::Netlist, 1072);
+DiagCode GuessingInputPort(DiagSubsystem::Netlist, 1073);
+DiagCode UnsupportedSystemTask(DiagSubsystem::Netlist, 1074);
+DiagCode UnsupportedSVAFeature(DiagSubsystem::Netlist, 1075);
+DiagCode RepetitionsUnsupported(DiagSubsystem::Netlist, 1076);
+DiagCode SVAClockingRequiresEdge(DiagSubsystem::Netlist, 1077);
+DiagCode ErrorNonconstantArgument(DiagSubsystem::Netlist, 1078);
+DiagCode ReadmemFileNotFound(DiagSubsystem::Netlist, 1079);
+DiagCode ReadmemInvalidAddress(DiagSubsystem::Netlist, 1080);
+DiagCode ReadmemAddressOutsideOfRange(DiagSubsystem::Netlist, 1081);
+DiagCode ReadmemWordsRangeMismatch(DiagSubsystem::Netlist, 1082);
+DiagCode ReadmemBadBinaryDigit(DiagSubsystem::Netlist, 1083);
+DiagCode NoIgnoreUnknownModules(DiagSubsystem::Netlist, 1084);
+DiagCode HierarchicalRefOutsideModulesUnsupported(DiagSubsystem::Netlist, 1085);
+
+DiagGroup unsynthesizable("unsynthesizable",
+		{IffUnsupported, GenericTimingUnsyn, BothEdgesUnsupported, ExpectingIfElseAload,
+				IfElseAloadPolarity, IfElseAloadMismatch, UnsynthesizableFeature});
+DiagGroup sanity("sanity", {EdgeImplicitMixing});
+
+void setup_messages(slang::DiagnosticEngine &engine)
+{
+	// clang-format off
+	engine.setMessage(IffUnsupported, "iff qualifier not supported in combination with this event");
+	engine.setMessage(SignalSensitivityAmbiguous, "non-edge sensitivity on a signal will be synthesized as @* sensitivity");
+	engine.setSeverity(SignalSensitivityAmbiguous, DiagnosticSeverity::Warning);
+	engine.setMessage(EdgeImplicitMixing, "mixing of implicit and edge sensitivity");
+	engine.setMessage(GenericTimingUnsyn, "unsynthesizable timing control (ignore with '--ignore-timing')");
+	engine.setMessage(BothEdgesUnsupported, "@(edge) will not be synthesized (override with '--allow-dual-edge-ff')");
+	engine.setMessage(WaitStatementUnsupported, "wait statement will not be synthesized");
+	engine.setSeverity(WaitStatementUnsupported, DiagnosticSeverity::Warning);
+	engine.setMessage(NoteSignalEvent, "signal event specified here");
+	engine.setSeverity(NoteSignalEvent, DiagnosticSeverity::Note);
+
+	engine.setMessage(ExpectingIfElseAload, "simple if-else pattern expected in modeling an asynchronous load on a flip-flop");
+	engine.setMessage(NoteDuplicateEdgeSense, "asynchronous load pattern implied by edge sensitivity on multiple signals");
+	engine.setSeverity(NoteDuplicateEdgeSense, DiagnosticSeverity::Note);
+
+	engine.setMessage(IfElseAloadPolarity, "polarity of condition doesn't match edge sensitivity");
+	engine.setMessage(IfElseAloadMismatch, "condition cannot be matched to any signal from the event list");
+
+	engine.setMessage(LatchNotInferred, "latch not inferred for variable '{}' driven from always_latch procedure");
+	engine.setSeverity(LatchNotInferred, DiagnosticSeverity::Warning);
+
+	engine.setMessage(MissingAload, "asynchronous load value missing for variable '{}'");
+	engine.setSeverity(MissingAload, DiagnosticSeverity::Warning);
+	engine.setMessage(NoteProcessDriver, "variable driven from this procedure");
+	engine.setSeverity(NoteProcessDriver, DiagnosticSeverity::Note);
+
+	engine.setMessage(AlwaysFFBadTiming, "timing control does not model a flip-flop");
+	engine.setSeverity(AlwaysFFBadTiming, DiagnosticSeverity::Error);
+
+	engine.setMessage(MissingStopCondition, "stop condition is missing; loop cannot be unrolled");
+	engine.setSeverity(MissingStopCondition, DiagnosticSeverity::Error);
+
+	engine.setMessage(BadMemoryExpr, "unsupported operation on a memory variable");
+	engine.setSeverity(BadMemoryExpr, DiagnosticSeverity::Error);
+
+	engine.setMessage(MemoryNotInferred, "cannot infer memory from a variable despite '{}' attribute");
+	engine.setSeverity(MemoryNotInferred, DiagnosticSeverity::Error);
+	engine.setMessage(NoteUsageBlame, "inference prevented by variable usage here");
+	engine.setSeverity(NoteUsageBlame, DiagnosticSeverity::Note);
+
+	for (auto code : unsynthesizable.getDiags())
+		engine.setSeverity(code, DiagnosticSeverity::Error);
+	for (auto code : sanity.getDiags())
+		engine.setSeverity(code, DiagnosticSeverity::Error);
+
+	engine.setMessage(UnrollLimitExhausted, "unroll limit of {} exhausted [--unroll-limit=]");
+	engine.setSeverity(UnrollLimitExhausted, DiagnosticSeverity::Error);
+
+	engine.setMessage(NoteLoopContributes, "loop contributes to unroll tally");
+	engine.setSeverity(NoteLoopContributes, DiagnosticSeverity::Note);
+
+	engine.setMessage(NonconstWildcardEq, "wildcard equality unsynthesizable with non-constant right-hand operand");
+	engine.setSeverity(NonconstWildcardEq, DiagnosticSeverity::Error);
+
+	engine.setMessage(AssertionUnsupported, "unsupported assertion statement");
+	engine.setSeverity(AssertionUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(LangFeatureUnsupported, "unsupported language feature");
+	engine.setSeverity(LangFeatureUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(UnsupportedLhs, "unsupported assignment target expression");
+	engine.setSeverity(UnsupportedLhs, DiagnosticSeverity::Error);
+
+	engine.setMessage(ArgumentTypeUnsupported, "unsupported argument type: {}");
+	engine.setSeverity(ArgumentTypeUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(MultiportUnsupported, "multiports unsupported on kept module boundary");
+	engine.setSeverity(MultiportUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(UnsupportedBlackboxConnection, "{} port on blackbox instance unsupported");
+	engine.setSeverity(UnsupportedBlackboxConnection, DiagnosticSeverity::Error);
+
+	engine.setMessage(UnsupportedPortDirection, "port direction '{}' on kept module boundary unsupported");
+	engine.setSeverity(UnsupportedPortDirection, DiagnosticSeverity::Error);
+
+	engine.setMessage(ModportRequired, "interface port on kept module boundary must be a modport");
+	engine.setSeverity(ModportRequired, DiagnosticSeverity::Error);
+
+	engine.setMessage(FixedSizeRequired, "expression of type {} with dynamic size unsupported for synthesis");
+	engine.setSeverity(FixedSizeRequired, DiagnosticSeverity::Error);
+
+	engine.setMessage(AloadOne, "multiple asynchronous loads unsupported");
+	engine.setSeverity(AloadOne, DiagnosticSeverity::Error);
+
+	engine.setMessage(BadInlinedPortConnection, "direction '{}' on inlined port connection unsupported");
+	engine.setSeverity(BadInlinedPortConnection, DiagnosticSeverity::Error);
+
+	engine.setMessage(NoParamsOnUnkBboxes, "parameters on unknown blackboxes unsupported");
+	engine.setSeverity(NoParamsOnUnkBboxes, DiagnosticSeverity::Error);
+
+	engine.setMessage(BboxTypeParameter, "blackbox cannot have a type parameter");
+	engine.setSeverity(BboxTypeParameter, DiagnosticSeverity::Error);
+
+	engine.setMessage(BboxExportPortWidths, "cannot export a blackbox definition with non-constant port widths");
+	engine.setSeverity(BboxExportPortWidths, DiagnosticSeverity::Error);
+
+	engine.setMessage(NoteIgnoreInitial, "use option '--ignore-initial' to ignore initial procedures");
+	engine.setSeverity(NoteIgnoreInitial, DiagnosticSeverity::Note);
+
+	engine.setMessage(PortCorrespondence, "ports without direct correspondence to an internal net/variable unsupported");
+	engine.setSeverity(PortCorrespondence, DiagnosticSeverity::Error);
+
+	engine.setMessage(UnsynthesizableFeature, "unsynthesizable feature");
+
+	engine.setMessage(SVAUnsupported, "SVA unsupported (ignore all assertions with '--ignore-assertions')");
+	engine.setSeverity(SVAUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(ExpectStatementUnsupported, "expect statement will not be synthesized");
+	engine.setSeverity(ExpectStatementUnsupported, DiagnosticSeverity::Warning);
+
+	engine.setMessage(ProgramUnsupported, "program block will not be synthesized");
+	engine.setSeverity(ProgramUnsupported, DiagnosticSeverity::Warning);
+
+	engine.setMessage(ForbiddenDemotion, "disabling error '{}' is unsupported with sv-elab");
+	engine.setSeverity(ForbiddenDemotion, DiagnosticSeverity::Error);
+
+	engine.setMessage(UdpUnsupported, "user-defined primitives unsupported, set '--udp-handling=blackboxes' option to treat it as blackboxes");
+	engine.setSeverity(UdpUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(PrimTypeUnsupported, "primitives of type '{}' unsupported");
+	engine.setSeverity(PrimTypeUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(ReferenceAcrossKeptHierBoundary, "hierarchical reference across preserved module boundary");
+	engine.setSeverity(ReferenceAcrossKeptHierBoundary, DiagnosticSeverity::Error);
+	engine.setMessage(NoteModuleBlackboxBecauseAttribute, "module '{}' is a blackbox because of attribute");
+	engine.setSeverity(NoteModuleBlackboxBecauseAttribute, DiagnosticSeverity::Note);
+	engine.setMessage(NoteModuleBlackboxBecauseEmpty, "module '{}'' is a blackbox because of empty body");
+	engine.setSeverity(NoteModuleBlackboxBecauseEmpty, DiagnosticSeverity::Note);
+	engine.setMessage(NoteModuleNotDissolvedBecauseBlackbox, "instance of module '{}' will not dissolve because the module is a blackbox");
+	engine.setSeverity(NoteModuleNotDissolvedBecauseBlackbox, DiagnosticSeverity::Note);
+	engine.setMessage(NoteModuleNotDissolvedBecauseKeepHierarchy, "instance of module '{}' will not dissolve because of '--keep-hierarchy' option");
+	engine.setSeverity(NoteModuleNotDissolvedBecauseKeepHierarchy, DiagnosticSeverity::Note);
+	engine.setMessage(NoteModuleNotDissolvedBecauseInOut, "instance of module '{}' will not dissolve because the module has an inout port");
+	engine.setSeverity(NoteModuleNotDissolvedBecauseInOut, DiagnosticSeverity::Note);
+
+	engine.setMessage(BlockingAssignmentAfterNonblocking, "blocking assignment to variable '{}' is not supported after previous non-blocking assignment");
+	engine.setSeverity(BlockingAssignmentAfterNonblocking, DiagnosticSeverity::Error);
+	engine.setMessage(NonblockingAssignmentAfterBlocking, "non-blocking assignment to variable '{}' is not supported after previous blocking assignment");
+	engine.setSeverity(NonblockingAssignmentAfterBlocking, DiagnosticSeverity::Error);
+	engine.setMessage(NotePreviousAssignment, "previous assignment here");
+	engine.setSeverity(NotePreviousAssignment, DiagnosticSeverity::Note);
+
+	engine.setMessage(NetTypeUnsupported, "net type '{}' unsupported");
+	engine.setSeverity(NetTypeUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(RefUnsupported, "direction 'ref' found on port '{}' unsupported for synthesis");
+	engine.setSeverity(RefUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(InlinedInOutUnsupported, "connection on port '{}' with direction 'inout' cannot be inlined; see sv-elab issue #143");
+	engine.setSeverity(InlinedInOutUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(PastGatingClockingUnsupported, "$past gating_expr (3rd argument) and clocking_event (4th argument) are not supported");
+	engine.setSeverity(PastGatingClockingUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(SystemFunctionRequireClockedBlock, "system function '{}' can only be called within a clocked procedural block with explicit timing");
+	engine.setSeverity(SystemFunctionRequireClockedBlock, DiagnosticSeverity::Error);
+
+	engine.setMessage(UnsupportedBitConversion, "value of type '{}' is unsupported for conversion to bits in this context");
+	engine.setSeverity(UnsupportedBitConversion, DiagnosticSeverity::Error);
+
+	engine.setMessage(MultiPortConversion, "implicit conversion in multiport connection unsupported");
+	engine.setSeverity(MultiPortConversion, DiagnosticSeverity::Error);
+
+	engine.setMessage(InputPortCannotBeSpecialNet, "'input' or 'inout' port of special type '{}' is not supported on preserved module boundary");
+	engine.setSeverity(InputPortCannotBeSpecialNet, DiagnosticSeverity::Error);
+
+	engine.setMessage(ReadingNetStateFromInitialBlockUnsupported, "reading net state during design initialization unsupported");
+	engine.setSeverity(ReadingNetStateFromInitialBlockUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(NonblockingAssignInInitialUnsupported, "non-blocking assignments unsupported in design initialization");
+	engine.setSeverity(NonblockingAssignInInitialUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(ErrorNonconstantInitialEval, "internal error: evaluation does not resolve to a constant in design initialization");
+	engine.setSeverity(ErrorNonconstantInitialEval, DiagnosticSeverity::Error);
+
+	engine.setMessage(DeprecatedOption, "option '{}' is deprecated and without effect");
+	engine.setSeverity(DeprecatedOption, DiagnosticSeverity::Warning);
+
+	engine.setMessage(GuessingInputPort, "guessing port '{}' on unknown module '{}' for input based on connected expression");
+	engine.setSeverity(GuessingInputPort, DiagnosticSeverity::Note);
+
+	engine.setMessage(UnsupportedSystemTask, "unsupported system task '{}'");
+	engine.setSeverity(UnsupportedSystemTask, DiagnosticSeverity::Error);
+
+	engine.setMessage(UnsupportedSVAFeature, "encountered unsupported SVA feature");
+	engine.setSeverity(UnsupportedSVAFeature, DiagnosticSeverity::Error);
+
+	engine.setMessage(RepetitionsUnsupported, "repetitions unsupported");
+	engine.setSeverity(RepetitionsUnsupported, DiagnosticSeverity::Error);
+
+	engine.setMessage(SVAClockingRequiresEdge, "SVA clocking requires a signal edge");
+	engine.setSeverity(SVAClockingRequiresEdge, DiagnosticSeverity::Error);
+
+	engine.setMessage(ErrorNonconstantArgument, "failed to evaluate system function with non-constant argument");
+	engine.setSeverity(ErrorNonconstantArgument, DiagnosticSeverity::Error);
+
+	engine.setMessage(ReadmemFileNotFound, "failed to open file '{}'");
+	engine.setSeverity(ReadmemFileNotFound, DiagnosticSeverity::Error);
+
+	engine.setMessage(ReadmemInvalidAddress, "cannot parse address '{}' in '{}'");
+	engine.setSeverity(ReadmemInvalidAddress, DiagnosticSeverity::Error);
+
+	engine.setMessage(ReadmemAddressOutsideOfRange, "address '{}' (hexadecimal) is out of range");
+	engine.setSeverity(ReadmemAddressOutsideOfRange, DiagnosticSeverity::Error);
+
+	engine.setMessage(ReadmemWordsRangeMismatch, "number of words in '{}' doesn't match the range");
+	engine.setSeverity(ReadmemWordsRangeMismatch, DiagnosticSeverity::Warning);
+
+	engine.setMessage(ReadmemBadBinaryDigit, "digit larger than 1 is used in '{}'");
+	engine.setSeverity(ReadmemBadBinaryDigit, DiagnosticSeverity::Error);
+
+	engine.setMessage(NoIgnoreUnknownModules, "'--ignore-unknown-modules' no longer supported with sv-elab; visit https://github.com/povik/sv-elab/wiki/No-unknown-modules");
+	engine.setSeverity(NoIgnoreUnknownModules, DiagnosticSeverity::Error);
+
+	engine.setMessage(HierarchicalRefOutsideModulesUnsupported, "hierarchical reference outside module hierarchy unsupported");
+	engine.setSeverity(HierarchicalRefOutsideModulesUnsupported, DiagnosticSeverity::Error);
+	// clang-format on
+}
+}; // namespace diag
+}; // namespace slang_frontend

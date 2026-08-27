@@ -1,0 +1,312 @@
+name: Build and run tests
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  pre_job:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.set_output.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        if: ${{ github.event_name != 'merge_group' }}
+        uses: fkirc/skip-duplicate-actions@v5.3.2
+        with:
+          # don't run on documentation changes
+          paths_ignore: '["**/README.md", "docs/**", "guidelines/**"]'
+          # cancel previous builds if a new commit is pushed
+          # but never cancel main
+          cancel_others: ${{ github.ref != 'refs/heads/main' }}
+
+      - id: set_output
+        run: |
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_skip=${{ steps.skip_check.outputs.should_skip }}" >> $GITHUB_OUTPUT
+          fi
+
+  pre_docs_job:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.set_output.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        if: ${{ github.event_name != 'merge_group' }}
+        uses: fkirc/skip-duplicate-actions@v5.3.2
+        with:
+          # don't run on readme changes
+          paths_ignore: '["**/README.md"]'
+          # cancel previous builds if a new commit is pushed
+          # but never cancel main
+          cancel_others: ${{ github.ref != 'refs/heads/main' }}
+
+      - id: set_output
+        run: |
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "should_skip=true" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            should_skip=false
+          else
+            echo "should_skip=${{ steps.skip_check.outputs.should_skip }}" >> $GITHUB_OUTPUT
+          fi
+
+  build-yosys:
+    name: Reusable build
+    runs-on: ${{ matrix.os }}
+    # pre_job is a subset of pre_docs_job, so we can always build for pre_docs_job
+    needs: pre_docs_job
+    if: needs.pre_docs_job.outputs.should_skip != 'true'
+    env:
+      CC: clang
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
+    steps:
+      - name: Checkout Yosys
+        uses: actions/checkout@v7
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          runs-on: ${{ matrix.os }}
+          get-build-deps: true
+
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2.23
+        with:
+          key: test-build-${{ matrix.os }}
+          save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          restore-keys: |
+            test-build-${{ matrix.os }}-
+
+      - name: Build
+        shell: bash
+        run: |
+          rm -rf build
+          cmake -B build . -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DYOSYS_COMPILER_LAUNCHER=ccache -DYOSYS_USE_BUNDLED_LIBS=ON
+          cmake --build build -j$procs
+          ctest --test-dir build/tests/unit
+
+      - name: Log yosys-config output
+        run: |
+          ./build/yosys-config || true
+
+      - name: Compress build
+        shell: bash
+        run: |
+          cd build
+          tar -cvf ../build.tar share/ yosys yosys-*
+
+      - name: Store build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: build-${{ matrix.os }}
+          path: build.tar
+          retention-days: 1
+
+  test-yosys:
+    name: Run tests
+    runs-on: ${{ matrix.os }}
+    needs: [build-yosys, pre_job]
+    if: github.event_name != 'push' && needs.pre_job.outputs.should_skip != 'true'
+    env:
+      CC: clang
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
+    steps:
+      - name: Checkout Yosys
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          runs-on: ${{ matrix.os }}
+          get-test-deps: true
+          get-iverilog: true
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: build-${{ matrix.os }}
+
+      - name: Uncompress build
+        shell: bash
+        run: |
+          mkdir -p build
+          tar -xvf build.tar -C build
+
+      - name: Log yosys-config output
+        run: |
+          ./build/yosys-config || true
+
+      - name: Run tests
+        shell: bash
+        run: |
+          make -C tests -j$procs vanilla-test
+
+      - name: Report errors
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          find tests/**/*.err -print -exec cat {} \;
+
+  test-cells:
+    name: Run test_cell
+    runs-on: ${{ matrix.os }}
+    needs: [build-yosys, pre_job]
+    if: github.event_name != 'push' && needs.pre_job.outputs.should_skip != 'true'
+    env:
+      CC: clang
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: Checkout Yosys
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          runs-on: ${{ matrix.os }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: build-${{ matrix.os }}
+
+      - name: Uncompress build
+        shell: bash
+        run:
+          tar -xvf build.tar
+
+      - name: test_cell
+        shell: bash
+        run: |
+          ./yosys -p 'test_cell -n 20 -s 1 all'
+          ./yosys -p 'test_cell -n 20 -s 1 -nosat -aigmap $pow $pmux'
+          ./yosys -p 'test_cell -n 20 -s 1 -nosat -aigmap $eqx $nex $bweqx'
+          ./yosys -p 'test_cell -n 20 -s 1 -aigmap $buf'
+
+  test-docs:
+    name: Run docs tests
+    runs-on: ${{ matrix.os }}
+    needs: [build-yosys, pre_docs_job]
+    if: github.event_name != 'push' && needs.pre_job.outputs.should_skip != 'true'
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: false
+    steps:
+      - name: Checkout Yosys
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup environment
+        uses: ./.github/actions/setup-build-env
+        with:
+          runs-on: ${{ matrix.os }}
+          get-build-deps: true
+          get-docs-deps: true
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: build-${{ matrix.os }}
+
+      - name: Uncompress build
+        shell: bash
+        run: |
+          mkdir -p build
+          tar -xvf build.tar -C build
+
+      - name: Log yosys-config output
+        run: |
+          ./build/yosys-config || true
+
+      - name: Run tests
+        shell: bash
+        run: |
+          make -C docs test -j$procs
+
+  test-docs-build:
+    name: Try build docs
+    runs-on: [self-hosted, linux, x64, fast]
+    needs: [pre_docs_job]
+    if: ${{ github.event_name != 'push' && needs.pre_docs_job.outputs.should_skip != 'true' && github.repository_owner == 'YosysHQ' }}
+    strategy:
+      matrix:
+        docs-target: [html, latexpdf]
+      fail-fast: false
+    steps:
+      - name: Checkout Yosys
+        uses: actions/checkout@v7
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: Runtime environment
+        run: |
+          echo "procs=$(nproc)" >> $GITHUB_ENV
+
+      - name: Build Yosys
+        run: |
+          rm -rf build Configuration.cmake
+          echo 'set(CMAKE_C_COMPILER clang CACHE STRING "")' >> Configuration.cmake
+          echo 'set(CMAKE_CXX_COMPILER clang++ CACHE STRING "")' >> Configuration.cmake
+          echo 'set(YOSYS_COMPILER_LAUNCHER ccache CACHE STRING "")' >> Configuration.cmake
+
+          cmake -C Configuration.cmake -B build .
+          cmake --build build -j$procs
+
+      - name: Install doc prereqs
+        shell: bash
+        run: |
+          make -C docs reqs
+
+      - name: Build docs
+        shell: bash
+        run: |
+          cmake --build build --target docs-${{ matrix.docs-target }} -j$procs
+
+      - name: Store docs build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: docs-build-${{ matrix.docs-target }}
+          path: docs/build/
+          retention-days: 7
+
+  test-build-result:
+    runs-on: ubuntu-latest
+    needs:
+      - test-yosys
+      - test-cells
+      - test-docs
+      - test-docs-build
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "Needs results: ${{ join(needs.*.result, ',') }}"
+          if [[ "${{ join(needs.*.result, ',') }}" == *failure* ]] || \
+            [[ "${{ join(needs.*.result, ',') }}" == *cancelled* ]]; then
+            echo "Some jobs failed or were cancelled"
+            exit 1
+          fi
+      - run: echo "All good"

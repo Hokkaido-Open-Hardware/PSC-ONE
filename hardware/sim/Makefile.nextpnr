@@ -1,0 +1,225 @@
+# ============================================================
+# PSC-ONE CPU timing flow with nextpnr / Himbaechel
+#
+# Usage:
+#   make -f Makefile.nextpnr timing CPU_VERSION=v1
+#   make -f Makefile.nextpnr timing CPU_VERSION=v2
+#   make -f Makefile.nextpnr timing CPU_VERSION=legacy
+#
+# Optional:
+#   make -f Makefile.nextpnr timing CPU_VERSION=v1 FREQ=81
+#
+# Target FPGA:
+#   Tang Nano 20K
+#   GW2AR-LV18QN88C8/I7
+#   family = GW2A-18C
+#
+# Notes:
+#   - Gowin IDE is not used.
+#   - v1/v2 SystemVerilog is converted by sv2v before Yosys.
+#   - legacy is read directly by Yosys.
+#   - PSC_CPU_TimingTop.sv is used as a timing-only wrapper.
+# ============================================================
+
+SHELL := /bin/bash
+
+YOSYS   ?= ./yosys/build/yosys
+NEXTPNR ?= nextpnr-himbaechel
+SV2V    ?= sv2v
+
+DEVICE ?= GW2AR-LV18QN88C8/I7
+FAMILY ?= GW2A-18C
+FREQ   ?= 81
+
+CPU_SRC_DIR := ../rtl/cpu/src
+
+CPU_CORE_FILES := \
+	$(CPU_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Execute.v \
+	$(CPU_SRC_DIR)/Fetch_Fifo.v \
+	$(CPU_SRC_DIR)/Fetch.v \
+	$(CPU_SRC_DIR)/Decorder.v \
+	$(CPU_SRC_DIR)/Execute.v \
+	$(CPU_SRC_DIR)/Execute_Divider.v \
+	$(CPU_SRC_DIR)/Execute_Mul.v \
+	$(CPU_SRC_DIR)/Branch.v \
+	$(CPU_SRC_DIR)/MemoryStore.v \
+	$(CPU_SRC_DIR)/Register.v \
+	$(CPU_SRC_DIR)/MMU.v \
+	$(CPU_SRC_DIR)/Csr.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+CPU_V1_SRC_DIR := ../rtl/cpu_v1/src
+
+CPU_V1_CORE_FILES := \
+	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V1_SRC_DIR)/Fetch.sv \
+	$(CPU_V1_SRC_DIR)/Decorder.sv \
+	$(CPU_V1_SRC_DIR)/Execute.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V1_SRC_DIR)/Branch.sv \
+	$(CPU_V1_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V1_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V1_SRC_DIR)/MMU.sv \
+	$(CPU_V1_SRC_DIR)/Csr.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+CPU_V2_SRC_DIR := ../rtl/cpu_v2_experimental/src
+
+CPU_V2_CORE_FILES := \
+	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_core.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch.sv \
+	$(CPU_V2_SRC_DIR)/Decorder.sv \
+	$(CPU_V2_SRC_DIR)/Execute.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V2_SRC_DIR)/Branch.sv \
+	$(CPU_V2_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V2_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V2_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V2_SRC_DIR)/MMU.sv \
+	$(CPU_V2_SRC_DIR)/Csr.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+CPU_VERSION ?= v1
+
+ifeq ($(CPU_VERSION),v1)
+SELECTED_CPU_CORE_FILES := $(CPU_V1_CORE_FILES)
+USE_SV2V := 1
+else ifeq ($(CPU_VERSION),v2)
+SELECTED_CPU_CORE_FILES := $(CPU_V2_CORE_FILES)
+USE_SV2V := 1
+else ifeq ($(CPU_VERSION),legacy)
+SELECTED_CPU_CORE_FILES := $(CPU_CORE_FILES)
+USE_SV2V := 0
+else
+$(error CPU_VERSION=$(CPU_VERSION) is invalid. Use v1 / v2 / legacy)
+endif
+
+TIMING_DIR     := ../rtl/timing
+TIMING_WRAPPER := $(TIMING_DIR)/PSC_CPU_TimingTop.sv
+TIMING_CST     := $(TIMING_DIR)/PSC_CPU_TimingTop.cst
+
+TOP := PSC_CPU_TimingTop
+
+BUILD_DIR    ?= build_nextpnr_$(CPU_VERSION)
+CONVERTED_V  := $(BUILD_DIR)/cpu_$(CPU_VERSION)_converted.v
+JSON         := $(BUILD_DIR)/cpu_$(CPU_VERSION).json
+PNR_JSON     := $(BUILD_DIR)/cpu_$(CPU_VERSION)_pnr.json
+YOSYS_LOG    := $(BUILD_DIR)/yosys_cpu_$(CPU_VERSION).log
+NEXTPNR_LOG  := $(BUILD_DIR)/nextpnr_cpu_$(CPU_VERSION).log
+REPORT       := $(BUILD_DIR)/timing_cpu_$(CPU_VERSION).json
+
+.PHONY: all check-tools check-files synth pnr timing report clean
+
+all: timing
+
+check-tools:
+	@command -v $(YOSYS) >/dev/null 2>&1 || { \
+		echo "[ERROR] yosys not found"; exit 1; }
+	@command -v $(NEXTPNR) >/dev/null 2>&1 || { \
+		echo "[ERROR] nextpnr-himbaechel not found"; exit 1; }
+	@echo "[OK] yosys   : $$(command -v $(YOSYS))"
+	@echo "[OK] nextpnr : $$(command -v $(NEXTPNR))"
+	@$(NEXTPNR) --version
+ifeq ($(USE_SV2V),1)
+	@command -v $(SV2V) >/dev/null 2>&1 || { \
+		echo "[ERROR] sv2v not found"; exit 1; }
+	@echo "[OK] sv2v    : $$(command -v $(SV2V))"
+	@$(SV2V) --version
+endif
+
+check-files:
+	@test -f "$(TIMING_WRAPPER)" || { \
+		echo "[ERROR] timing wrapper not found: $(TIMING_WRAPPER)"; exit 1; }
+	@test -f "$(TIMING_CST)" || { \
+		echo "[ERROR] timing CST not found: $(TIMING_CST)"; exit 1; }
+	@for f in $(SELECTED_CPU_CORE_FILES); do \
+		test -f "$$f" || { echo "[ERROR] source file not found: $$f"; exit 1; }; \
+	done
+	@echo "[OK] timing wrapper: $(TIMING_WRAPPER)"
+	@echo "[OK] timing CST    : $(TIMING_CST)"
+
+synth: check-tools check-files
+	@mkdir -p $(BUILD_DIR)
+	@echo "============================================================"
+	@echo " CPU_VERSION : $(CPU_VERSION)"
+	@echo " USE_SV2V    : $(USE_SV2V)"
+	@echo " TOP         : $(TOP)"
+	@echo " WRAPPER     : $(TIMING_WRAPPER)"
+	@echo " CST         : $(TIMING_CST)"
+	@echo " DEVICE      : $(DEVICE)"
+	@echo " FAMILY      : $(FAMILY)"
+	@echo " TARGET FREQ : $(FREQ) MHz"
+	@echo "============================================================"
+ifeq ($(USE_SV2V),1)
+	$(SV2V) \
+		$(SELECTED_CPU_CORE_FILES) \
+		$(TIMING_WRAPPER) \
+		> $(CONVERTED_V)
+	$(YOSYS) -l $(YOSYS_LOG) -p "read_verilog $(CONVERTED_V); \
+		hierarchy -check -top $(TOP); flatten; \
+		synth_gowin -top $(TOP) -family gw2a -json $(JSON); \
+		stat"
+else
+	$(YOSYS) -l $(YOSYS_LOG) -p "read_verilog -sv $(SELECTED_CPU_CORE_FILES) $(TIMING_WRAPPER); \
+		hierarchy -check -top $(TOP); flatten; \
+		synth_gowin -top $(TOP) -family gw2a -json $(JSON); \
+		stat"
+endif
+	@echo "[OK] JSON : $(JSON)"
+	@echo "[OK] LOG  : $(YOSYS_LOG)"
+
+pnr: synth
+	@mkdir -p $(BUILD_DIR)
+	@set -o pipefail; \
+	$(NEXTPNR) \
+		--json $(JSON) \
+		--write $(PNR_JSON) \
+		--device $(DEVICE) \
+		--vopt family=$(FAMILY) \
+		--vopt cst=$(TIMING_CST) \
+		--freq $(FREQ) \
+		--report $(REPORT) \
+		2>&1 | tee $(NEXTPNR_LOG)
+	@echo "[OK] P&R JSON : $(PNR_JSON)"
+	@echo "[OK] REPORT   : $(REPORT)"
+	@echo "[OK] LOG      : $(NEXTPNR_LOG)"
+
+timing: pnr
+	@echo "============================================================"
+	@echo " CPU $(CPU_VERSION) nextpnr timing summary"
+	@echo "============================================================"
+	@grep -Ei \
+		'Max frequency|MHz|critical path|slack|timing|logic utilisation|utilization|Device utilisation' \
+		$(NEXTPNR_LOG) | tail -n 200 || true
+	@echo "Full log:    $(NEXTPNR_LOG)"
+	@echo "JSON report: $(REPORT)"
+
+report:
+	@if [ ! -f "$(NEXTPNR_LOG)" ]; then \
+		echo "[ERROR] $(NEXTPNR_LOG) not found. Run timing first."; \
+		exit 1; \
+	fi
+	@grep -Ei \
+		'Max frequency|MHz|critical path|slack|timing|logic utilisation|utilization|Device utilisation' \
+		$(NEXTPNR_LOG) | tail -n 240 || true
+
+clean:
+	rm -rf build_nextpnr_v1 build_nextpnr_v2 build_nextpnr_legacy

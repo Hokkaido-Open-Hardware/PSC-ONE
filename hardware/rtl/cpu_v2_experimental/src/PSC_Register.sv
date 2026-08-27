@@ -1,46 +1,95 @@
-// NISHIHARU
-
+// CPU_V2 physical register file.
+// Parameterized entries x 32 bits, two asynchronous read ports and four WB ports.
+// p0 is hard-wired to zero and is never allocated.
 module PSC_Register #(
-    parameter int THREADS_NUM = 1
+    parameter int ENTRIES = 64,
+    parameter int TAG_W   = $clog2(ENTRIES)
 )(
-    input  logic        clock,
-    input  logic        reset_n,
-    input  logic        register_wenb,
-    input  logic        rf_wen,
-    input  logic [4:0]  w_addr,
-    input  logic [31:0] w_data,
-    input  logic [4:0]  r_addr1,
-    input  logic [4:0]  r_addr2,
+    input  logic             clock,
+    input  logic             reset_n,
+    input  logic             cpu_stop,
 
-    output logic [31:0] reg_data_1,
-    output logic [31:0] reg_data_2
+    input  logic [TAG_W-1:0] read_addr1,
+    input  logic [TAG_W-1:0] read_addr2,
+    output logic [31:0]      read_data1,
+    output logic [31:0]      read_data2,
+    output logic             read_ready1,
+    output logic             read_ready2,
+
+    input  logic             allocate_valid,
+    input  logic [TAG_W-1:0] allocate_addr,
+    input  logic             release_valid,
+    input  logic [TAG_W-1:0] release_addr,
+
+    input  logic             wb0_valid,
+    input  logic [TAG_W-1:0] wb0_addr,
+    input  logic [31:0]      wb0_data,
+    input  logic             wb1_valid,
+    input  logic [TAG_W-1:0] wb1_addr,
+    input  logic [31:0]      wb1_data,
+    input  logic             wb2_valid,
+    input  logic [TAG_W-1:0] wb2_addr,
+    input  logic [31:0]      wb2_data,
+    input  logic             wb3_valid,
+    input  logic [TAG_W-1:0] wb3_addr,
+    input  logic [31:0]      wb3_data
 );
 
-    // 32-bit × 32 general-purpose registers
-    logic [31:0] registers [0:31];
+    logic [31:0] registers [0:ENTRIES-1];
+    logic        ready     [0:ENTRIES-1];
 
-    integer i;
-
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            for (i = 0; i < 32; i++)
-                registers[i] <= 32'd0;
-                
-        end else begin
-            // WB
-            if (register_wenb && rf_wen && (w_addr != 5'd0))
-                registers[w_addr] <= w_data;
-        end
-    end
-
-    // Combinational read ports let the v2 issue stage consume the current
-    // FIFO head without adding a register-read bubble.  A same-cycle commit
-    // dependency is interlocked in PSC_InstructionUnit; keeping that bypass
-    // out of the register file prevents commit write data from feeding the
-    // issue operand path combinationally.
     always_comb begin
-        reg_data_1 = (r_addr1 == 5'd0) ? 32'd0 : registers[r_addr1];
-        reg_data_2 = (r_addr2 == 5'd0) ? 32'd0 : registers[r_addr2];
+        read_data1  = (read_addr1 == '0) ? 32'd0 : registers[read_addr1];
+        read_data2  = (read_addr2 == '0) ? 32'd0 : registers[read_addr2];
+        read_ready1 = (read_addr1 < 32) ? 1'b1 : ready[read_addr1];
+        read_ready2 = (read_addr2 < 32) ? 1'b1 : ready[read_addr2];
     end
+
+    generate
+        for (genvar entry = 1; entry < 32; entry = entry + 1) begin : g_arch_entry
+            localparam logic [TAG_W-1:0] ENTRY_TAG = entry[TAG_W-1:0];
+            wire wb3_hit = wb3_valid && (wb3_addr == ENTRY_TAG);
+
+            always_ff @(posedge clock or negedge reset_n) begin
+                if (!reset_n)
+                    registers[entry] <= 32'd0;
+                else if (cpu_stop)
+                    registers[entry] <= 32'd0;
+                else if (wb3_hit)
+                    registers[entry] <= wb3_data;
+            end
+        end
+
+        for (genvar entry = 32; entry < ENTRIES; entry = entry + 1) begin : g_spec_entry
+            localparam logic [TAG_W-1:0] ENTRY_TAG = entry[TAG_W-1:0];
+            wire wb0_hit = wb0_valid && (wb0_addr == ENTRY_TAG);
+            wire wb1_hit = wb1_valid && (wb1_addr == ENTRY_TAG);
+            wire wb2_hit = wb2_valid && (wb2_addr == ENTRY_TAG);
+            wire allocate_hit = allocate_valid && (allocate_addr == ENTRY_TAG);
+            wire release_hit = release_valid && (release_addr == ENTRY_TAG);
+
+            always_ff @(posedge clock or negedge reset_n) begin
+                if (!reset_n) begin
+                    registers[entry] <= 32'd0;
+                    ready[entry]     <= 1'b0;
+                end else if (cpu_stop) begin
+                    registers[entry] <= 32'd0;
+                    ready[entry]     <= 1'b0;
+                end else begin
+                    if (wb2_hit)
+                        registers[entry] <= wb2_data;
+                    else if (wb1_hit)
+                        registers[entry] <= wb1_data;
+                    else if (wb0_hit)
+                        registers[entry] <= wb0_data;
+
+                    if (wb2_hit || wb1_hit || wb0_hit)
+                        ready[entry] <= 1'b1;
+                    else if (allocate_hit || release_hit)
+                        ready[entry] <= 1'b0;
+                end
+            end
+        end
+    endgenerate
 
 endmodule

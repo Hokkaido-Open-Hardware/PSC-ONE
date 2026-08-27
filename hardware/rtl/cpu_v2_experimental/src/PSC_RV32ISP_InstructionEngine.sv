@@ -67,12 +67,19 @@ module PSC_RV32ISP_InstructionEngine #(
     logic       decode_done;
     dec_ctrl_t  decoded_ctrl;
 
-    logic       execute_valid;
-    dec_ctrl_t  execute_ctrl;
-    logic [31:0] execute_reg_data_1;
-    logic [31:0] execute_reg_data_2;
-    logic [31:0] execute_alu_data;
-    logic       execute_done;
+    logic       alu_execute_valid;
+    dec_ctrl_t  alu_execute_ctrl;
+    logic [31:0] alu_execute_reg_data_1;
+    logic [31:0] alu_execute_reg_data_2;
+    logic [31:0] alu_execute_data;
+    logic       alu_execute_done;
+
+    logic       md_execute_valid;
+    dec_ctrl_t  md_execute_ctrl;
+    logic [31:0] md_execute_reg_data_1;
+    logic [31:0] md_execute_reg_data_2;
+    logic [31:0] md_execute_data;
+    logic       md_execute_done;
 
     dec_ctrl_t  memory_ctrl;
     logic [31:0] memory_alu_data;
@@ -112,7 +119,7 @@ module PSC_RV32ISP_InstructionEngine #(
     logic        is_counter_load;
     logic        is_uart_flag_load;
 
-    assign execute_state_sig = execute_valid;
+    assign execute_state_sig = alu_execute_valid || md_execute_valid;
     assign decoder_ctrl      = commit_ctrl;
     assign alu_data          = commit_alu_data;
     assign pc_sel2           = commit_branch_taken;
@@ -160,12 +167,18 @@ module PSC_RV32ISP_InstructionEngine #(
         .decoded_ctrl           (decoded_ctrl),
         .decode_enb             (decode_enb),
         .decode_done            (decode_done),
-        .execute_valid          (execute_valid),
-        .execute_ctrl           (execute_ctrl),
-        .execute_reg_data_1     (execute_reg_data_1),
-        .execute_reg_data_2     (execute_reg_data_2),
-        .execute_alu_data       (execute_alu_data),
-        .execute_done           (execute_done),
+        .alu_execute_valid      (alu_execute_valid),
+        .alu_execute_ctrl       (alu_execute_ctrl),
+        .alu_execute_reg_data_1 (alu_execute_reg_data_1),
+        .alu_execute_reg_data_2 (alu_execute_reg_data_2),
+        .alu_execute_data       (alu_execute_data),
+        .alu_execute_done       (alu_execute_done),
+        .md_execute_valid       (md_execute_valid),
+        .md_execute_ctrl        (md_execute_ctrl),
+        .md_execute_reg_data_1  (md_execute_reg_data_1),
+        .md_execute_reg_data_2  (md_execute_reg_data_2),
+        .md_execute_data        (md_execute_data),
+        .md_execute_done        (md_execute_done),
         .memory_ctrl            (memory_ctrl),
         .memory_alu_data        (memory_alu_data),
         .memory_reg_data_1      (memory_reg_data_1),
@@ -205,21 +218,39 @@ module PSC_RV32ISP_InstructionEngine #(
     );
 
     Execute #(
-        .ENABLE_MUL (1'b1),
-        .ENABLE_DIV (1'b1)
-    ) u_execute (
+        .ENABLE_MUL (1'b0),
+        .ENABLE_DIV (1'b0)
+    ) u_execute_alu (
         .clock          (clock),
         .reset_n        (reset_n),
-        .execute_enb    (execute_valid),
-        .decoder_ctrl   (execute_ctrl),
-        .reg_data_addr1 (execute_reg_data_1),
-        .reg_data_addr2 (execute_reg_data_2),
-        .alu_data       (execute_alu_data),
+        .execute_enb    (alu_execute_valid),
+        .decoder_ctrl   (alu_execute_ctrl),
+        .reg_data_addr1 (alu_execute_reg_data_1),
+        .reg_data_addr2 (alu_execute_reg_data_2),
+        .alu_data       (alu_execute_data),
         .r_data1        (),
         .r_data2        (),
         .out_pc         (),
         .busy           (),
-        .done           (execute_done)
+        .done           (alu_execute_done)
+    );
+
+    Execute #(
+        .ENABLE_MUL (1'b1),
+        .ENABLE_DIV (1'b1)
+    ) u_execute_mul_div (
+        .clock          (clock),
+        .reset_n        (reset_n),
+        .execute_enb    (md_execute_valid),
+        .decoder_ctrl   (md_execute_ctrl),
+        .reg_data_addr1 (md_execute_reg_data_1),
+        .reg_data_addr2 (md_execute_reg_data_2),
+        .alu_data       (md_execute_data),
+        .r_data1        (),
+        .r_data2        (),
+        .out_pc         (),
+        .busy           (),
+        .done           (md_execute_done)
     );
 
     // The load engine owns only the variable-latency read transaction.

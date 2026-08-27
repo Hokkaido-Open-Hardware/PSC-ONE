@@ -1,0 +1,94 @@
+## user config
+/Makefile.conf
+/Configuration.cmake
+/CMakeUserPresets.json
+
+## homebrew
+/Brewfile.lock.json
+
+## build artifacts
+/.git-abc-submodule-hash
+# compiler intermediate files
+*.o
+*.d
+*.dwo
+*.gch
+*.gcda
+*.gcno
+*.so.dSYM/
+
+## test artifacts
+**/run-test.mk
+*.err
+*.log
+*.tmp
+
+# compiler output files
+/kernel/version_*.cc
+/share
+/yosys
+/yosys.exe
+/yosys.js
+/yosys.wasm
+/yosys-abc
+/yosys-abc.exe
+/yosys-config
+/yosys-smtbmc
+/yosys-smtbmc.exe
+/yosys-smtbmc-script.py
+/yosys-witness
+/yosys-witness.exe
+/yosys-witness-script.py
+/yosys-filterlib
+/yosys-filterlib.exe
+/yosys-win32-mxebin-*
+/yosys-win32-vcxsrc-*
+/yosysjs-*
+/libyosys.so
+
+# build directories
+/tests/unit/bintest/
+/tests/unit/objtest/
+/tests/ystests
+/build
+/build-*
+/result
+/result-*
+/dist
+
+# pyosys
+/kernel/*.pyh
+/kernel/python_wrappers.cc
+/ffi
+/bison
+/venv
+/*.whl
+/*.egg-info
+
+# yosysjs dependency
+/viz.js
+
+# other
+/yosys.profdata
+/coverage
+/coverage_html
+
+# these really belong in global gitignore since they're not specific to this project but rather to user tool choice
+# but too many people don't have a global gitignore configured:
+# https://docs.github.com/en/get-started/git-basics/ignoring-files#configuring-ignored-files-for-all-repositories-on-your-computer
+__pycache__
+*~
+.*.swp
+/.cache
+/.vscode
+/.cproject
+/.project
+/.settings
+/qtcreator.files
+/qtcreator.includes
+/qtcreator.config
+/qtcreator.creator
+/qtcreator.creator.user
+/compile_commands.json
+/.direnv
+/.envrc

@@ -323,8 +323,9 @@ module Decorder (
 
     // 通常のR-typeとI-Typeだけパイプライン対象
     wire pipeline_type_w =
-        (is_R_type_w || is_op_imm_w) &&
-        !is_mul_div_w;
+        (is_R_type_w || is_op_imm_w);
+        // MUL,DIVも追加
+        //!is_mul_div_w;
 
     // =============================================================================
     // 構造体へまとめた次段デコード結果

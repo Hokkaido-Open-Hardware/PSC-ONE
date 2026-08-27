@@ -1,0 +1,55 @@
+read_slang <<EOF
+module latch01_gate(input logic en,
+					input logic [3:0] d, output logic [3:0] q);
+	always @(*) begin
+		if (en)
+			q = d;
+	end
+endmodule
+EOF
+
+read_rtlil <<EOF
+module \latch01_gold
+  wire width 4 input 2 \d
+  wire input 1 \en
+  wire width 4 output 3 \q
+
+  cell $dlatch $1
+    parameter \EN_POLARITY 1
+    parameter \WIDTH 4
+    connect \D \d
+    connect \EN \en
+    connect \Q \q
+  end
+end
+EOF
+
+async2sync
+equiv_make latch01_gold latch01_gate latch01_equiv
+equiv_induct latch01_equiv
+equiv_status -assert
+
+design -reset
+read_slang <<EOF
+module latch02_gate(input logic [3:0] d, output logic [3:0] q,
+					input logic [2:0] idx);
+	always @(*) begin
+		q[idx+:4] = d;
+	end
+endmodule
+EOF
+
+read_slang <<EOF
+module latch02_gold(input logic [3:0] d, output logic [3:0] q,
+					input logic [2:0] idx);
+	always @(*) begin
+		for (int i = 0; i < 4; i++)
+			q[idx + i] = d[i];
+	end
+endmodule
+EOF
+
+async2sync
+equiv_make latch02_gold latch02_gate latch02_equiv
+equiv_induct latch02_equiv
+equiv_status -assert

@@ -14,6 +14,7 @@ module PSC_RV32ISP_core #(
     input wire              cpu_stop,
     input wire              irq_ext,     // TBD
     // Program
+    output wire             program_mem_burst_mode,
     output wire             program_mem_read_valid,
     input wire              program_mem_read_ready,
     output wire [31:0]      program_mem_read_address,
@@ -59,6 +60,8 @@ module PSC_RV32ISP_core #(
     input  wire [31:0]      csr_CPU_MON_CYCLE,
     output wire  [8:0]      uart_out    // not used
 );
+
+    assign  program_mem_burst_mode = 1'b0;
 
     `ifdef COCOTB_SIM
     `ifdef CPU_CORE_SIM

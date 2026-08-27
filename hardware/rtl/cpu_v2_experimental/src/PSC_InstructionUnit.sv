@@ -2,20 +2,31 @@
 
 import PSC_Types::*;
 
-module PSC_InstructionUnit (
+// Small FPGA-oriented out-of-order backend.
+//
+// Rename uses p0-p31 as the committed architectural bank and p32-p33 as
+// speculative slots.  The RAT stores only a valid bit and a ROB-sized slot index;
+// precise recovery therefore resets the mapping checkpoint without copying a
+// second register file.  Architectural effects occur only at the ROB head.
+module PSC_InstructionUnit #(
+    parameter int ROB_DEPTH = 2,
+    parameter int IQ_DEPTH  = 2,
+    parameter int PRF_DEPTH = 32 + ROB_DEPTH,
+    parameter int ROB_TAG_W = $clog2(ROB_DEPTH),
+    parameter int IQ_IDX_W  = $clog2(IQ_DEPTH),
+    parameter int PHY_TAG_W = $clog2(PRF_DEPTH)
+)(
     input  logic        clock,
     input  logic        reset_n,
     input  logic        cpu_stop,
     input  logic        cpu_trap,
     input  logic [1:0]  priv_mode,
 
-    // PC / current FIFO head
     output logic [31:0] pc,
     output logic [31:0] counter,
     input  logic [31:0] opcode,
     input  logic [31:0] pc_now,
 
-    // FIFO / decode handshake
     input  logic        fifo_req_ready,
     input  logic        fifo_read_ready,
     output logic        fifo_read_valid,
@@ -24,15 +35,20 @@ module PSC_InstructionUnit (
     output logic        decode_enb,
     input  logic        decode_done,
 
-    // Execute handshake
-    output logic        execute_valid,
-    output dec_ctrl_t   execute_ctrl,
-    output logic [31:0] execute_reg_data_1,
-    output logic [31:0] execute_reg_data_2,
-    input  logic [31:0] execute_alu_data,
-    input  logic        execute_done,
+    output logic        alu_execute_valid,
+    output dec_ctrl_t   alu_execute_ctrl,
+    output logic [31:0] alu_execute_reg_data_1,
+    output logic [31:0] alu_execute_reg_data_2,
+    input  logic [31:0] alu_execute_data,
+    input  logic        alu_execute_done,
 
-    // Memory-stage request and response
+    output logic        md_execute_valid,
+    output dec_ctrl_t   md_execute_ctrl,
+    output logic [31:0] md_execute_reg_data_1,
+    output logic [31:0] md_execute_reg_data_2,
+    input  logic [31:0] md_execute_data,
+    input  logic        md_execute_done,
+
     output dec_ctrl_t   memory_ctrl,
     output logic [31:0] memory_alu_data,
     output logic [31:0] memory_reg_data_1,
@@ -44,7 +60,6 @@ module PSC_InstructionUnit (
     input  logic        store_done,
     input  logic [31:0] load_read_data,
 
-    // Commit / CSR interface
     input  csr_state_t  csr_state,
     input  logic [31:0] csr_rdata,
     output logic [31:0] csr_reg_data_1,
@@ -54,7 +69,6 @@ module PSC_InstructionUnit (
     output logic [31:0] commit_alu_data,
     output logic        commit_branch_taken,
 
-    // Fault information
     input  logic        d_pf,
     input  logic        i_pf,
     input  logic        d_pf_event,
@@ -66,82 +80,165 @@ module PSC_InstructionUnit (
 );
 
     typedef struct packed {
-        logic        valid;
-        dec_ctrl_t   ctrl;
-        logic [31:0] pc;
-    } id_issue_t;
+        logic                 valid;
+        logic                 completed;
+        logic                 address_ready;
+        logic [31:0]          instruction;
+        dec_ctrl_t            ctrl;
+        // Store data or CSR rs1 value.  These instruction classes are
+        // mutually exclusive, so commit never needs two source operands.
+        logic [31:0]          side_effect_value;
+        logic                 dest_valid;
+        logic [PHY_TAG_W-1:0] dest_phys;
+        logic [31:0]          result;
+        logic                 branch_taken;
+        logic [31:0]          branch_target;
+        logic                 exception_valid;
+        logic [4:0]           exception_cause;
+        logic [31:0]          exception_tval;
+    } rob_entry_t;
 
     typedef struct packed {
-        logic        valid;
-        dec_ctrl_t   ctrl;
-        logic [31:0] pc;
-        logic [31:0] reg_data_1;
-        logic [31:0] reg_data_2;
-    } issue_ex_t;
+        logic                 valid;
+        logic [ROB_TAG_W-1:0] rob_tag;
+        logic                 src1_ready;
+        logic [31:0]          src1_value;
+        logic [PHY_TAG_W-1:0] src1_tag;
+        logic                 src2_ready;
+        logic [31:0]          src2_value;
+        logic [PHY_TAG_W-1:0] src2_tag;
+    } iq_entry_t;
 
-    typedef struct packed {
-        logic        valid;
-        dec_ctrl_t   ctrl;
-        logic [31:0] pc;
-        logic [31:0] reg_data_1;
-        logic [31:0] reg_data_2;
-        logic [31:0] alu_data;
-    } ex_mem_t;
+    rob_entry_t rob [0:ROB_DEPTH-1];
+    iq_entry_t  iq  [0:IQ_DEPTH-1];
 
-    typedef struct packed {
-        logic        valid;
-        dec_ctrl_t   ctrl;
-        logic [31:0] pc;
-        logic [31:0] reg_data_1;
-        logic [31:0] alu_data;
-        logic        branch_taken;
-        logic [31:0] w_data;
-    } wb_t;
+    // FIFO/Decode -> Rename/Dispatch timing boundary.  The FIFO is popped
+    // when this one-entry elastic stage accepts an instruction, not when the
+    // backend eventually dispatches it.
+    logic                 decode_stage_valid;
+    dec_ctrl_t            decode_stage_ctrl;
+    logic [31:0]          decode_stage_opcode;
+    logic                 decode_stage_ready;
+    logic                 decode_capture_fire;
+    logic [PHY_TAG_W-1:0] decode_stage_src1_tag;
+    logic [PHY_TAG_W-1:0] decode_stage_src2_tag;
+    logic [PHY_TAG_W-1:0] capture_src1_tag;
+    logic [PHY_TAG_W-1:0] capture_src2_tag;
 
-    id_issue_t id_issue;
-    issue_ex_t issue_ex;
-    ex_mem_t   ex_mem;
-    wb_t       mem_wb;
-    wb_t       commit;
+    logic [ROB_TAG_W-1:0] rob_head;
+    logic [ROB_TAG_W-1:0] rob_tail;
+    logic [ROB_TAG_W:0]   rob_count;
 
-    logic [31:0] regfile_rdata_1;
-    logic [31:0] regfile_rdata_2;
-    logic        regfile_wen;
-    logic [31:0] regfile_wdata;
+    // p0-p31 hold committed architectural state.  RAT entries point either
+    // to that identity mapping or to an in-flight destination above p31.
+    // The number of speculative mappings cannot exceed the ROB depth.
+    logic [31:0]          rat_spec_valid;
+    logic [ROB_TAG_W-1:0] rat_spec_slot       [0:31];
+    logic [PRF_DEPTH-1:0] free_list;
+    logic [31:0]          prf_read_data1;
+    logic [31:0]          prf_read_data2;
+    logic                 prf_read_ready1;
+    logic                 prf_read_ready2;
 
-    logic decode_fire;
-    logic issue_fire;
-    logic ex_fire;
-    logic mem_fire;
-    logic id_issue_ready;
-    logic issue_ex_ready;
-    logic ex_mem_ready;
-    logic mem_wb_ready;
-    logic memory_complete;
-    logic branch_taken_now;
-    logic raw_hazard;
-    logic raw_hazard_rs1;
-    logic raw_hazard_rs2;
-    logic [31:0] issue_reg_data_1;
-    logic [31:0] issue_reg_data_2;
-    logic [2:0] forward_sel_rs1;
-    logic [2:0] forward_sel_rs2;
-    logic issue_ex_forwardable;
-    logic ex_mem_forwardable;
-    logic mem_wb_forwardable;
-    logic [31:0] issue_ex_forward_data;
-    logic [31:0] ex_mem_forward_data;
-    logic backend_serial;
-    logic backend_empty;
-    logic pipeline_empty;
-    logic issue_serial;
-    logic issue_forwarding_consumer;
-    logic early_branch_valid;
-    logic commit_branch_redirected;
-    logic pc_update_valid;
-    dec_ctrl_t pc_update_ctrl;
-    logic [31:0] pc_update_alu_data;
-    logic pc_update_branch_taken;
+    logic                 has_free_phys;
+    logic [PHY_TAG_W-1:0] alloc_phys;
+    logic                 dispatch_needs_dest;
+    logic                 dispatch_fire;
+    logic                 rob_full;
+    logic                 iq_has_free;
+    logic [IQ_IDX_W-1:0]  iq_free_idx;
+    logic                 dispatch_blocked;
+
+    logic                 dispatch_src1_ready;
+    logic [31:0]          dispatch_src1_value;
+    logic [PHY_TAG_W-1:0] dispatch_src1_tag;
+    logic                 dispatch_src2_ready;
+    logic [31:0]          dispatch_src2_value;
+    logic [PHY_TAG_W-1:0] dispatch_src2_tag;
+
+    logic                 alu_select_valid;
+    logic [IQ_IDX_W-1:0]  alu_select_idx;
+    logic                 md_select_valid;
+    logic [IQ_IDX_W-1:0]  md_select_idx;
+    logic                 iq0_ready;
+    logic                 iq1_ready;
+    logic                 iq0_md_candidate;
+    logic                 iq1_md_candidate;
+    logic                 iq0_alu_candidate;
+    logic                 iq1_alu_candidate;
+
+    // Registered integer issue boundary.  IQ/ROB selection and operand muxing
+    // finish here; the ALU and ROB write-back run in the following cycle.
+    // This intentionally trades issue throughput for FPGA Fmax.
+    logic                 alu_active;
+    logic [ROB_TAG_W-1:0] alu_active_rob_tag;
+    logic [PHY_TAG_W-1:0] alu_active_dest_phys;
+    logic                 alu_active_dest_valid;
+    dec_ctrl_t            alu_active_ctrl;
+    logic [31:0]          alu_active_src1;
+    logic [31:0]          alu_active_src2;
+
+    logic                 md_active;
+    logic [ROB_TAG_W-1:0] md_active_rob_tag;
+    logic [PHY_TAG_W-1:0] md_active_dest_phys;
+    logic                 md_active_dest_valid;
+    dec_ctrl_t            md_active_ctrl;
+    logic [31:0]          md_active_src1;
+    logic [31:0]          md_active_src2;
+
+    logic                 alu_wb_valid;
+    logic [ROB_TAG_W-1:0] alu_wb_rob_tag;
+    logic [PHY_TAG_W-1:0] alu_wb_phys_tag;
+    logic                 alu_wb_has_dest;
+    logic [31:0]          alu_wb_value;
+    logic                 md_wb_valid;
+    logic                 load_wb_valid;
+    logic [31:0]          load_wb_value;
+    logic                 commit_fire;
+    logic [31:0]          commit_result;
+    logic                 branch_redirect;
+    logic [63:0]          ooo_cycle;
+    integer i;
+    integer scan_free;
+
+    PSC_Register #(
+        .ENTRIES (PRF_DEPTH),
+        .TAG_W   (PHY_TAG_W)
+    ) u_physical_register_file (
+        .clock              (clock),
+        .reset_n            (reset_n),
+        .cpu_stop           (cpu_stop),
+        .read_addr1         (dispatch_src1_tag),
+        .read_addr2         (dispatch_src2_tag),
+        .read_data1         (prf_read_data1),
+        .read_data2         (prf_read_data2),
+        .read_ready1        (prf_read_ready1),
+        .read_ready2        (prf_read_ready2),
+        .allocate_valid     (dispatch_fire && dispatch_needs_dest),
+        .allocate_addr      (alloc_phys),
+        .release_valid      (commit_fire && rob[rob_head].dest_valid &&
+                             !rob[rob_head].exception_valid),
+        .release_addr       (rob[rob_head].dest_phys),
+        .wb0_valid          (alu_wb_valid && alu_wb_has_dest &&
+                             (rob[iq[alu_select_idx].rob_tag].ctrl.wb_sel != 2'b11)),
+        .wb0_addr           (alu_wb_phys_tag),
+        .wb0_data           (alu_wb_value),
+        .wb1_valid          (md_wb_valid && md_active_dest_valid),
+        .wb1_addr           (md_active_dest_phys),
+        .wb1_data           (md_execute_data),
+        .wb2_valid          (load_wb_valid && rob[rob_head].dest_valid),
+        .wb2_addr           (rob[rob_head].dest_phys),
+        .wb2_data           (load_wb_value),
+        .wb3_valid          (commit_fire && rob[rob_head].dest_valid &&
+                             !rob[rob_head].exception_valid),
+        .wb3_addr           (rob[rob_head].ctrl.w_addr),
+        .wb3_data           (commit_result)
+    );
+
+    function automatic logic is_mul_div(input dec_ctrl_t ctrl);
+        is_mul_div = (ctrl.alucon[4:2] == 3'b110) ||
+                     (ctrl.alucon[4:2] == 3'b111);
+    endfunction
 
     function automatic logic serializing_instruction(input dec_ctrl_t ctrl);
         serializing_instruction =
@@ -158,38 +255,27 @@ module PSC_InstructionUnit (
             ctrl.raise_illegal_instruction;
     endfunction
 
-    function automatic logic early_redirect_instruction(input dec_ctrl_t ctrl);
-        early_redirect_instruction =
-            (ctrl.pc_sel != 2'b00)             &&
-            !ctrl.is_ecall                     &&
-            !ctrl.is_mret                      &&
-            !ctrl.is_sret                      &&
-            !ctrl.raise_illegal_instruction;
-    endfunction
-
     function automatic logic branch_exec(
         input logic [1:0]  pc_sel,
         input logic [2:0]  funct3,
         input logic [31:0] data1,
         input logic [31:0] data2
     );
-        begin
-            case (pc_sel)
-                2'b01: begin
-                    case (funct3)
-                        3'b000: branch_exec = (data1 == data2);
-                        3'b001: branch_exec = (data1 != data2);
-                        3'b100: branch_exec = ($signed(data1) < $signed(data2));
-                        3'b101: branch_exec = ($signed(data1) >= $signed(data2));
-                        3'b110: branch_exec = (data1 < data2);
-                        3'b111: branch_exec = (data1 >= data2);
-                        default: branch_exec = 1'b0;
-                    endcase
-                end
-                2'b10: branch_exec = 1'b1;
-                default: branch_exec = 1'b0;
-            endcase
-        end
+        case (pc_sel)
+            2'b01: begin
+                case (funct3)
+                    3'b000: branch_exec = (data1 == data2);
+                    3'b001: branch_exec = (data1 != data2);
+                    3'b100: branch_exec = ($signed(data1) < $signed(data2));
+                    3'b101: branch_exec = ($signed(data1) >= $signed(data2));
+                    3'b110: branch_exec = (data1 < data2);
+                    3'b111: branch_exec = (data1 >= data2);
+                    default: branch_exec = 1'b0;
+                endcase
+            end
+            2'b10: branch_exec = 1'b1;
+            default: branch_exec = 1'b0;
+        endcase
     endfunction
 
     function automatic logic [31:0] load_result(
@@ -207,7 +293,6 @@ module PSC_InstructionUnit (
                 default: byte_data = raw_data[31:24];
             endcase
             half_data = low2[1] ? raw_data[31:16] : raw_data[15:0];
-
             case (funct3)
                 3'b000: load_result = {{24{byte_data[7]}}, byte_data};
                 3'b001: load_result = {{16{half_data[15]}}, half_data};
@@ -218,342 +303,512 @@ module PSC_InstructionUnit (
         end
     endfunction
 
-    // ============================================================
-    // Register file and hazard interlock
-    // ============================================================
-    assign regfile_wen = commit.valid && commit.ctrl.rf_wen &&
-                         (commit.ctrl.w_addr != 5'd0);
-    assign regfile_wdata = (commit.ctrl.wb_sel == 2'b11)
-                         ? csr_rdata : commit.w_data;
-
-    PSC_Register u_regfile (
-        .clock         (clock),
-        .reset_n       (reset_n),
-        .register_wenb (regfile_wen),
-        .rf_wen        (regfile_wen),
-        .w_addr        (commit.ctrl.w_addr),
-        .w_data        (regfile_wdata),
-        .r_addr1       (id_issue.ctrl.r_addr1),
-        .r_addr2       (id_issue.ctrl.r_addr2),
-        .reg_data_1    (regfile_rdata_1),
-        .reg_data_2    (regfile_rdata_2)
-    );
-
-    // Results are selected at issue and stored with the consumer.  The
-    // youngest matching producer wins; an unavailable young value must stall
-    // instead of falling through to an older value for the same register.
+    // Only ROB_DEPTH speculative rename slots are required: every live
+    // destination belongs to exactly one live ROB entry.
     always_comb begin
-        issue_ex_forwardable = execute_done &&
-                               ((issue_ex.ctrl.wb_sel == 2'b00) ||
-                                (issue_ex.ctrl.wb_sel == 2'b10));
-        issue_ex_forward_data = (issue_ex.ctrl.wb_sel == 2'b10)
-                              ? issue_ex.pc + 32'd4
-                              : execute_alu_data;
-
-        ex_mem_forwardable = (ex_mem.ctrl.wb_sel == 2'b00) ||
-                             (ex_mem.ctrl.wb_sel == 2'b10) ||
-                             ((ex_mem.ctrl.wb_sel == 2'b01) &&
-                              ex_mem.ctrl.is_load && load_done);
-        case (ex_mem.ctrl.wb_sel)
-            2'b01: ex_mem_forward_data = load_result(
-                                               load_read_data,
-                                               ex_mem.alu_data[1:0],
-                                               ex_mem.ctrl.funct3);
-            2'b10: ex_mem_forward_data = ex_mem.pc + 32'd4;
-            default: ex_mem_forward_data = ex_mem.alu_data;
-        endcase
-
-        mem_wb_forwardable = (mem_wb.ctrl.wb_sel != 2'b11);
-
-        issue_reg_data_1 = regfile_rdata_1;
-        raw_hazard_rs1   = 1'b0;
-        forward_sel_rs1  = 3'd0;
-        if (id_issue.ctrl.use_rs1 && (id_issue.ctrl.r_addr1 != 5'd0)) begin
-            if (issue_ex.valid && issue_ex.ctrl.rf_wen &&
-                (issue_ex.ctrl.w_addr != 5'd0) &&
-                (id_issue.ctrl.r_addr1 == issue_ex.ctrl.w_addr)) begin
-                issue_reg_data_1 = issue_ex_forward_data;
-                raw_hazard_rs1   = !issue_ex_forwardable;
-                forward_sel_rs1  = 3'd1;
-            end else if (ex_mem.valid && ex_mem.ctrl.rf_wen &&
-                         (ex_mem.ctrl.w_addr != 5'd0) &&
-                         (id_issue.ctrl.r_addr1 == ex_mem.ctrl.w_addr)) begin
-                issue_reg_data_1 = ex_mem_forward_data;
-                raw_hazard_rs1   = !ex_mem_forwardable;
-                forward_sel_rs1  = 3'd2;
-            end else if (mem_wb.valid && mem_wb.ctrl.rf_wen &&
-                         (mem_wb.ctrl.w_addr != 5'd0) &&
-                         (id_issue.ctrl.r_addr1 == mem_wb.ctrl.w_addr)) begin
-                issue_reg_data_1 = mem_wb.w_data;
-                raw_hazard_rs1   = !mem_wb_forwardable;
-                forward_sel_rs1  = 3'd3;
-            end else if (commit.valid && commit.ctrl.rf_wen &&
-                         (commit.ctrl.w_addr != 5'd0) &&
-                         (id_issue.ctrl.r_addr1 == commit.ctrl.w_addr)) begin
-                // The register file is written on this edge.  Interlock for
-                // one cycle so the next read uses the registered value; do
-                // not put commit/CSR write data on the issue operand path.
-                raw_hazard_rs1   = 1'b1;
-                forward_sel_rs1  = 3'd4;
+        has_free_phys = 1'b0;
+        alloc_phys    = '0;
+        for (scan_free = 32; scan_free < PRF_DEPTH; scan_free = scan_free + 1) begin
+            if (free_list[scan_free] && !has_free_phys) begin
+                has_free_phys = 1'b1;
+                alloc_phys    = scan_free[PHY_TAG_W-1:0];
             end
         end
-
-        issue_reg_data_2 = regfile_rdata_2;
-        raw_hazard_rs2   = 1'b0;
-        forward_sel_rs2  = 3'd0;
-        if (id_issue.ctrl.use_rs2 && (id_issue.ctrl.r_addr2 != 5'd0)) begin
-            if (issue_ex.valid && issue_ex.ctrl.rf_wen &&
-                (issue_ex.ctrl.w_addr != 5'd0) &&
-                (id_issue.ctrl.r_addr2 == issue_ex.ctrl.w_addr)) begin
-                issue_reg_data_2 = issue_ex_forward_data;
-                raw_hazard_rs2   = !issue_ex_forwardable;
-                forward_sel_rs2  = 3'd1;
-            end else if (ex_mem.valid && ex_mem.ctrl.rf_wen &&
-                         (ex_mem.ctrl.w_addr != 5'd0) &&
-                         (id_issue.ctrl.r_addr2 == ex_mem.ctrl.w_addr)) begin
-                issue_reg_data_2 = ex_mem_forward_data;
-                raw_hazard_rs2   = !ex_mem_forwardable;
-                forward_sel_rs2  = 3'd2;
-            end else if (mem_wb.valid && mem_wb.ctrl.rf_wen &&
-                         (mem_wb.ctrl.w_addr != 5'd0) &&
-                         (id_issue.ctrl.r_addr2 == mem_wb.ctrl.w_addr)) begin
-                issue_reg_data_2 = mem_wb.w_data;
-                raw_hazard_rs2   = !mem_wb_forwardable;
-                forward_sel_rs2  = 3'd3;
-            end else if (commit.valid && commit.ctrl.rf_wen &&
-                         (commit.ctrl.w_addr != 5'd0) &&
-                         (id_issue.ctrl.r_addr2 == commit.ctrl.w_addr)) begin
-                raw_hazard_rs2   = 1'b1;
-                forward_sel_rs2  = 3'd4;
-            end
-        end
-
-        raw_hazard = raw_hazard_rs1 || raw_hazard_rs2;
     end
 
-    // ============================================================
-    // Per-stage valid/ready flow control
-    // ============================================================
-    assign memory_complete = ex_mem.ctrl.is_load  ? load_done  :
-                             ex_mem.ctrl.is_store ? store_done : 1'b1;
+    assign dispatch_needs_dest = decode_stage_ctrl.rf_wen &&
+                                 (decode_stage_ctrl.w_addr != 5'd0);
+    // Resolve RAT lookups before the PRF-read cycle.  This register boundary
+    // keeps the 32-way RAT mux out of the PRF-read/bypass/IQ-write path.
+    // Same-cycle dispatch and commit are folded into the lookup so adjacent
+    // producer/consumer instructions retain correct rename semantics.
+    always_comb begin
+        capture_src1_tag = decoded_ctrl.r_addr1;
+        if (!decoded_ctrl.use_rs1)
+            capture_src1_tag = '0;
+        else if (dispatch_fire && dispatch_needs_dest &&
+                 (decode_stage_ctrl.w_addr == decoded_ctrl.r_addr1))
+            capture_src1_tag = alloc_phys;
+        else if (rat_spec_valid[decoded_ctrl.r_addr1]) begin
+            if (commit_fire && rob[rob_head].dest_valid &&
+                (rob[rob_head].ctrl.w_addr == decoded_ctrl.r_addr1) &&
+                (rat_spec_slot[decoded_ctrl.r_addr1] ==
+                 rob[rob_head].dest_phys[ROB_TAG_W-1:0]))
+                capture_src1_tag = decoded_ctrl.r_addr1;
+            else
+                capture_src1_tag = 6'd32 +
+                    rat_spec_slot[decoded_ctrl.r_addr1];
+        end
 
-    assign mem_wb_ready  = 1'b1;
-    assign mem_fire      = ex_mem.valid && memory_complete && mem_wb_ready;
-    assign ex_mem_ready  = !ex_mem.valid || mem_fire;
-    assign execute_valid = issue_ex.valid && ex_mem_ready;
-    assign ex_fire       = issue_ex.valid && execute_done && ex_mem_ready;
-    assign issue_ex_ready = !issue_ex.valid || ex_fire;
+        capture_src2_tag = decoded_ctrl.r_addr2;
+        if (!decoded_ctrl.use_rs2)
+            capture_src2_tag = '0;
+        else if (dispatch_fire && dispatch_needs_dest &&
+                 (decode_stage_ctrl.w_addr == decoded_ctrl.r_addr2))
+            capture_src2_tag = alloc_phys;
+        else if (rat_spec_valid[decoded_ctrl.r_addr2]) begin
+            if (commit_fire && rob[rob_head].dest_valid &&
+                (rob[rob_head].ctrl.w_addr == decoded_ctrl.r_addr2) &&
+                (rat_spec_slot[decoded_ctrl.r_addr2] ==
+                 rob[rob_head].dest_phys[ROB_TAG_W-1:0]))
+                capture_src2_tag = decoded_ctrl.r_addr2;
+            else
+                capture_src2_tag = 6'd32 +
+                    rat_spec_slot[decoded_ctrl.r_addr2];
+        end
+    end
 
-    assign backend_empty = !issue_ex.valid && !ex_mem.valid &&
-                           !mem_wb.valid && !commit.valid;
-    assign pipeline_empty = !id_issue.valid && backend_empty;
-    assign backend_serial =
-        (issue_ex.valid && serializing_instruction(issue_ex.ctrl)) ||
-        (ex_mem.valid   && serializing_instruction(ex_mem.ctrl))   ||
-        (mem_wb.valid   && serializing_instruction(mem_wb.ctrl))   ||
-        (commit.valid   && serializing_instruction(commit.ctrl));
-    assign issue_serial = serializing_instruction(id_issue.ctrl);
-    // A store or control-transfer may consume forwarded ALU operands behind
-    // older non-serial instructions.  Once issued, backend_serial still
-    // prevents any younger instruction from passing it.
-    assign issue_forwarding_consumer = id_issue.ctrl.is_store ||
-                                       (id_issue.ctrl.pc_sel != 2'b00);
+    assign dispatch_src1_tag = decode_stage_src1_tag;
+    assign dispatch_src2_tag = decode_stage_src2_tag;
 
-    assign id_issue_ready = !id_issue.valid || issue_fire;
-    assign decode_enb = fifo_req_ready && id_issue_ready &&
-                        !cpu_stop && !cpu_trap;
-    assign decode_fire = decode_done && fifo_req_ready && id_issue_ready;
-    assign issue_fire = id_issue.valid && issue_ex_ready &&
-                        !raw_hazard && !backend_serial &&
-                        (!issue_serial || backend_empty ||
-                         issue_forwarding_consumer);
-    assign fifo_read_valid = decode_fire;
+    // Current-cycle WB bypasses exist only into rename.  IQ wake-up remains
+    // registered, avoiding WB->wake-up->select->execute in one cycle.
+    always_comb begin
+        dispatch_src1_ready = !decode_stage_ctrl.use_rs1 ||
+                              (decode_stage_ctrl.r_addr1 == 5'd0) ||
+                              prf_read_ready1;
+        dispatch_src1_value = (!decode_stage_ctrl.use_rs1 ||
+                               (decode_stage_ctrl.r_addr1 == 5'd0))
+                            ? 32'd0 : prf_read_data1;
+        if (alu_wb_valid && alu_wb_has_dest &&
+            (dispatch_src1_tag == alu_wb_phys_tag)) begin
+            dispatch_src1_ready = 1'b1;
+            dispatch_src1_value = alu_wb_value;
+        end else if (md_wb_valid && md_active_dest_valid &&
+                     (dispatch_src1_tag == md_active_dest_phys)) begin
+            dispatch_src1_ready = 1'b1;
+            dispatch_src1_value = md_execute_data;
+        end else if (load_wb_valid && rob[rob_head].dest_valid &&
+                     (dispatch_src1_tag == rob[rob_head].dest_phys)) begin
+            dispatch_src1_ready = 1'b1;
+            dispatch_src1_value = load_wb_value;
+        end
 
-    assign execute_ctrl       = issue_ex.valid ? issue_ex.ctrl : '0;
-    assign execute_reg_data_1 = issue_ex.reg_data_1;
-    assign execute_reg_data_2 = issue_ex.reg_data_2;
+        dispatch_src2_ready = !decode_stage_ctrl.use_rs2 ||
+                              (decode_stage_ctrl.r_addr2 == 5'd0) ||
+                              prf_read_ready2;
+        dispatch_src2_value = (!decode_stage_ctrl.use_rs2 ||
+                               (decode_stage_ctrl.r_addr2 == 5'd0))
+                            ? 32'd0 : prf_read_data2;
+        if (alu_wb_valid && alu_wb_has_dest &&
+            (dispatch_src2_tag == alu_wb_phys_tag)) begin
+            dispatch_src2_ready = 1'b1;
+            dispatch_src2_value = alu_wb_value;
+        end else if (md_wb_valid && md_active_dest_valid &&
+                     (dispatch_src2_tag == md_active_dest_phys)) begin
+            dispatch_src2_ready = 1'b1;
+            dispatch_src2_value = md_execute_data;
+        end else if (load_wb_valid && rob[rob_head].dest_valid &&
+                     (dispatch_src2_tag == rob[rob_head].dest_phys)) begin
+            dispatch_src2_ready = 1'b1;
+            dispatch_src2_value = load_wb_value;
+        end
+    end
 
-    assign memory_ctrl       = ex_mem.valid ? ex_mem.ctrl : '0;
-    assign memory_alu_data   = ex_mem.alu_data;
-    assign memory_reg_data_1 = ex_mem.reg_data_1;
-    assign memory_reg_data_2 = ex_mem.reg_data_2;
-    assign memory_pc         = ex_mem.pc;
-    assign load_valid        = ex_mem.valid && ex_mem.ctrl.is_load;
-    assign store_valid       = ex_mem.valid && ex_mem.ctrl.is_store;
+    assign iq_has_free = !iq[0].valid || !iq[1].valid;
+    assign iq_free_idx = iq[0].valid;
+    assign dispatch_blocked =
+        (rob[0].valid && serializing_instruction(rob[0].ctrl)) ||
+        (rob[1].valid && serializing_instruction(rob[1].ctrl));
 
-    assign branch_taken_now = branch_exec(
-        ex_mem.ctrl.pc_sel,
-        ex_mem.ctrl.funct3,
-        ex_mem.reg_data_1,
-        ex_mem.reg_data_2
-    );
+    assign rob_full = (rob_count == ROB_DEPTH);
+    assign dispatch_fire = decode_stage_valid && !rob_full && iq_has_free &&
+                           (!dispatch_needs_dest || has_free_phys) &&
+                           !dispatch_blocked && !cpu_stop && !cpu_trap &&
+                           !d_pf && !i_pf && !fifo_flush;
+    assign decode_stage_ready = !decode_stage_valid || dispatch_fire;
+    assign decode_enb = fifo_req_ready && decode_stage_ready &&
+                        !cpu_stop && !cpu_trap && !d_pf && !i_pf &&
+                        !fifo_flush;
+    assign decode_capture_fire = decode_done && decode_enb;
+    assign fifo_read_valid = decode_capture_fire;
 
-    assign commit_ctrl         = commit.valid ? commit.ctrl : '0;
-    assign commit_alu_data     = commit.alu_data;
-    assign commit_branch_taken = commit.valid && commit.branch_taken;
-    assign csr_reg_data_1      = commit.reg_data_1;
-    assign csr_enb             = commit.valid;
+    // Two-entry oldest-ready selection, independently for the integer and M
+    // lanes.  A tag equal to rob_head is older than the other possible tag.
+    always_comb begin
+        iq0_ready = iq[0].valid && iq[0].src1_ready && iq[0].src2_ready;
+        iq1_ready = iq[1].valid && iq[1].src1_ready && iq[1].src2_ready;
+        iq0_md_candidate = iq0_ready && is_mul_div(rob[iq[0].rob_tag].ctrl) &&
+                           !md_active;
+        iq1_md_candidate = iq1_ready && is_mul_div(rob[iq[1].rob_tag].ctrl) &&
+                           !md_active;
+        iq0_alu_candidate = iq0_ready && !alu_active &&
+                            !is_mul_div(rob[iq[0].rob_tag].ctrl) &&
+            (!serializing_instruction(rob[iq[0].rob_tag].ctrl) ||
+             (iq[0].rob_tag == rob_head));
+        iq1_alu_candidate = iq1_ready && !alu_active &&
+                            !is_mul_div(rob[iq[1].rob_tag].ctrl) &&
+            (!serializing_instruction(rob[iq[1].rob_tag].ctrl) ||
+             (iq[1].rob_tag == rob_head));
 
-    // A normal taken branch has already redirected and flushed from MEM/WB.
-    // Exception and return instructions still wait for their commit effects.
-    assign commit_branch_redirected =
-        commit.valid && commit.branch_taken &&
-        early_redirect_instruction(commit.ctrl);
-    assign execute_task_busy = id_issue.valid || issue_ex.valid ||
-                               ex_mem.valid || mem_wb.valid ||
-                               (commit.valid && !commit_branch_redirected);
-    assign execute_task_done = commit.valid;
+        alu_select_valid = 1'b0;
+        alu_select_idx   = '0;
+        md_select_valid  = 1'b0;
+        md_select_idx    = '0;
 
-    // The added ID/ISSUE register must not add a taken-branch refill cycle.
-    // Resolve the redirect from MEM/WB, while architectural write-back and CSR
-    // side effects remain in the existing commit stage.
-    assign early_branch_valid =
-        mem_wb.valid && mem_wb.branch_taken &&
-        early_redirect_instruction(mem_wb.ctrl);
-    assign pc_update_valid = early_branch_valid ||
-                             (commit.valid && !commit_branch_redirected);
-    assign pc_update_ctrl = early_branch_valid ? mem_wb.ctrl : commit_ctrl;
-    assign pc_update_alu_data = early_branch_valid
-                              ? mem_wb.alu_data : commit_alu_data;
-    assign pc_update_branch_taken = early_branch_valid ||
-                                    (commit.valid && commit.branch_taken &&
-                                     !commit_branch_redirected);
+        if (iq0_alu_candidate || iq1_alu_candidate) begin
+            alu_select_valid = 1'b1;
+            if (!iq0_alu_candidate)
+                alu_select_idx = 1'b1;
+            else if (iq1_alu_candidate && (iq[1].rob_tag == rob_head) &&
+                     (iq[0].rob_tag != rob_head))
+                alu_select_idx = 1'b1;
+        end
 
-    assign fifo_flush = d_pf || i_pf ||
-                        early_branch_valid ||
-                        (commit.valid &&
-                        (commit.ctrl.is_fence_i              ||
-                         commit.ctrl.is_sfence_vma           ||
-                         commit.ctrl.is_ecall                ||
-                         commit.ctrl.is_mret                 ||
-                         commit.ctrl.is_sret                 ||
-                         commit.ctrl.raise_illegal_instruction ||
-                         cpu_trap));
+        if (iq0_md_candidate || iq1_md_candidate) begin
+            md_select_valid = 1'b1;
+            if (!iq0_md_candidate)
+                md_select_idx = 1'b1;
+            else if (iq1_md_candidate && (iq[1].rob_tag == rob_head) &&
+                     (iq[0].rob_tag != rob_head))
+                md_select_idx = 1'b1;
+        end
+    end
 
-    // CSR writes happen on commit.  The public CSR snapshot is updated on
-    // the following edge, after the internal CSR bank has accepted the write.
+    assign alu_execute_valid      = alu_active;
+    assign alu_execute_ctrl       = alu_active ? alu_active_ctrl : '0;
+    assign alu_execute_reg_data_1 = alu_active ? alu_active_src1 : 32'd0;
+    assign alu_execute_reg_data_2 = alu_active ? alu_active_src2 : 32'd0;
+
+    assign md_execute_valid      = md_active;
+    assign md_execute_ctrl       = md_active ? md_active_ctrl : '0;
+    assign md_execute_reg_data_1 = md_active_src1;
+    assign md_execute_reg_data_2 = md_active_src2;
+
+    assign alu_wb_valid = alu_active && alu_execute_done;
+    assign alu_wb_rob_tag = alu_active_rob_tag;
+    assign alu_wb_has_dest = alu_active_dest_valid;
+    assign alu_wb_phys_tag = alu_active_dest_phys;
+    assign alu_wb_value = (alu_active_ctrl.wb_sel == 2'b10)
+                        ? alu_active_ctrl.out_pc + 32'd4
+                        : alu_execute_data;
+    assign md_wb_valid = md_active && md_execute_done;
+    assign load_wb_valid = load_done && load_valid && !d_pf;
+    assign load_wb_value = load_result(load_read_data,
+                                       rob[rob_head].result[1:0],
+                                       rob[rob_head].ctrl.funct3);
+
+    // Loads and stores issue only at the ROB head.  A store cannot modify
+    // memory until all older instructions have committed.
+    assign memory_ctrl       = (rob_count != 0) ? rob[rob_head].ctrl : '0;
+    assign memory_alu_data   = rob[rob_head].result;
+    assign memory_reg_data_1 = 32'd0;
+    assign memory_reg_data_2 = rob[rob_head].side_effect_value;
+    assign memory_pc         = rob[rob_head].ctrl.out_pc;
+    assign load_valid  = (rob_count != 0) && rob[rob_head].valid &&
+                         rob[rob_head].address_ready &&
+                         !rob[rob_head].completed && rob[rob_head].ctrl.is_load;
+    assign store_valid = (rob_count != 0) && rob[rob_head].valid &&
+                         rob[rob_head].address_ready &&
+                         !rob[rob_head].completed && rob[rob_head].ctrl.is_store;
+
+    assign commit_fire = (rob_count != 0) && rob[rob_head].valid &&
+                         rob[rob_head].completed;
+    assign commit_result = (rob[rob_head].ctrl.wb_sel == 2'b11)
+                         ? csr_rdata : rob[rob_head].result;
+    // Only expose control when an instruction really commits.  This prevents
+    // illegal/ECALL side effects from firing while a head entry is still busy.
+    assign commit_ctrl = commit_fire ? rob[rob_head].ctrl : '0;
+    assign commit_alu_data = rob[rob_head].branch_target;
+    assign commit_branch_taken = commit_fire && rob[rob_head].branch_taken;
+    assign csr_reg_data_1 = rob[rob_head].side_effect_value;
+    assign csr_enb = commit_fire && !rob[rob_head].exception_valid;
+
+    assign branch_redirect = alu_wb_valid &&
+                             (alu_active_ctrl.pc_sel != 2'b00) &&
+                             branch_exec(alu_active_ctrl.pc_sel,
+                                         alu_active_ctrl.funct3,
+                                         alu_active_src1,
+                                         alu_active_src2);
+    assign fifo_flush = d_pf || i_pf || branch_redirect ||
+                        (commit_fire &&
+                         (rob[rob_head].ctrl.is_fence_i ||
+                          rob[rob_head].ctrl.is_sfence_vma ||
+                          rob[rob_head].ctrl.is_ecall ||
+                          rob[rob_head].ctrl.is_mret ||
+                          rob[rob_head].ctrl.is_sret ||
+                          rob[rob_head].ctrl.raise_illegal_instruction ||
+                          rob[rob_head].exception_valid || cpu_trap));
+
+    assign execute_task_busy = (rob_count != 0) || md_active;
+    assign execute_task_done = commit_fire;
+
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n)
             csr_valid <= 1'b0;
         else
-            csr_valid <= commit.valid;
+            csr_valid <= csr_enb;
     end
 
-    // ============================================================
-    // Unified stage registers
-    // ============================================================
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n)
+            ooo_cycle <= 64'd0;
+        else if (cpu_stop)
+            ooo_cycle <= 64'd0;
+        else
+            ooo_cycle <= ooo_cycle + 64'd1;
+    end
+
+    // Elastic decode/dispatch stage.  dispatch_fire may consume the current
+    // entry on the same edge that decode_capture_fire refills it.
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            id_issue <= '0;
-        end else if (cpu_stop || fifo_flush) begin
-            id_issue <= '0;
-        end else begin
-            if (decode_fire) begin
-                id_issue.valid <= 1'b1;
-                id_issue.ctrl  <= decoded_ctrl;
-                id_issue.pc    <= pc_now;
-            end else if (issue_fire) begin
-                id_issue.valid <= 1'b0;
-            end
+            decode_stage_valid  <= 1'b0;
+            decode_stage_ctrl   <= '0;
+            decode_stage_opcode <= 32'd0;
+            decode_stage_src1_tag <= '0;
+            decode_stage_src2_tag <= '0;
+        end else if (cpu_stop || cpu_trap || d_pf || i_pf || fifo_flush) begin
+            decode_stage_valid <= 1'b0;
+        end else if (decode_capture_fire) begin
+            decode_stage_valid  <= 1'b1;
+            decode_stage_ctrl   <= decoded_ctrl;
+            decode_stage_opcode <= opcode;
+            decode_stage_src1_tag <= capture_src1_tag;
+            decode_stage_src2_tag <= capture_src2_tag;
+        end else if (dispatch_fire) begin
+            decode_stage_valid <= 1'b0;
+        end else if (commit_fire && rob[rob_head].dest_valid &&
+                     !rob[rob_head].exception_valid) begin
+            // A decoded instruction may wait here while its producer commits.
+            // The speculative slot is released on that edge, so retarget any
+            // held operand to the newly updated architectural register bank.
+            if (decode_stage_ctrl.use_rs1 &&
+                (decode_stage_src1_tag == rob[rob_head].dest_phys))
+                decode_stage_src1_tag <= rob[rob_head].ctrl.w_addr;
+            if (decode_stage_ctrl.use_rs2 &&
+                (decode_stage_src2_tag == rob[rob_head].dest_phys))
+                decode_stage_src2_tag <= rob[rob_head].ctrl.w_addr;
         end
     end
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            issue_ex <= '0;
-        end else if (cpu_stop || d_pf) begin
-            issue_ex <= '0;
+            rob_head          <= '0;
+            rob_tail          <= '0;
+            rob_count         <= '0;
+            alu_active        <= 1'b0;
+            alu_active_rob_tag <= '0;
+            alu_active_dest_phys <= '0;
+            alu_active_dest_valid <= 1'b0;
+            alu_active_ctrl   <= '0;
+            alu_active_src1   <= 32'd0;
+            alu_active_src2   <= 32'd0;
+            md_active         <= 1'b0;
+            md_active_rob_tag <= '0;
+            md_active_dest_phys <= '0;
+            md_active_dest_valid <= 1'b0;
+            md_active_ctrl    <= '0;
+            md_active_src1    <= 32'd0;
+            md_active_src2    <= 32'd0;
+            free_list         <= '0;
+            rat_spec_valid    <= '0;
+            for (i = 32; i < PRF_DEPTH; i = i + 1)
+                free_list[i] <= 1'b1;
+            for (i = 0; i < ROB_DEPTH; i = i + 1)
+                rob[i] <= '0;
+            for (i = 0; i < IQ_DEPTH; i = i + 1)
+                iq[i] <= '0;
+        end else if (cpu_stop) begin
+            rob_head  <= '0;
+            rob_tail  <= '0;
+            rob_count <= '0;
+            alu_active <= 1'b0;
+            md_active <= 1'b0;
+            free_list <= '0;
+            rat_spec_valid <= '0;
+            for (i = 32; i < PRF_DEPTH; i = i + 1)
+                free_list[i] <= 1'b1;
+            for (i = 0; i < ROB_DEPTH; i = i + 1)
+                rob[i] <= '0;
+            for (i = 0; i < IQ_DEPTH; i = i + 1)
+                iq[i] <= '0;
+        end else if (cpu_trap || d_pf || i_pf) begin
+            // Precise recovery discards speculative mappings while retaining
+            // the committed p0-p31 architectural bank.
+            rob_head  <= '0;
+            rob_tail  <= '0;
+            rob_count <= '0;
+            alu_active <= 1'b0;
+            md_active <= 1'b0;
+            free_list <= '0;
+            rat_spec_valid <= '0;
+            for (i = 32; i < PRF_DEPTH; i = i + 1)
+                free_list[i] <= 1'b1;
+            for (i = 0; i < ROB_DEPTH; i = i + 1)
+                rob[i] <= '0;
+            for (i = 0; i < IQ_DEPTH; i = i + 1)
+                iq[i] <= '0;
         end else begin
-            if (issue_fire) begin
-                issue_ex.valid      <= 1'b1;
-                issue_ex.ctrl       <= id_issue.ctrl;
-                issue_ex.pc         <= id_issue.pc;
-                issue_ex.reg_data_1 <= issue_reg_data_1;
-                issue_ex.reg_data_2 <= issue_reg_data_2;
-            end else if (ex_fire) begin
-                issue_ex.valid <= 1'b0;
+            rat_spec_valid[0] <= 1'b0;
+
+            // In-order retirement updates the architectural bank and releases
+            // the speculative destination slot.
+            if (commit_fire) begin
+                rob[rob_head].valid <= 1'b0;
+                if (rob[rob_head].dest_valid &&
+                    !rob[rob_head].exception_valid) begin
+                    if (rat_spec_valid[rob[rob_head].ctrl.w_addr] &&
+                        (rat_spec_slot[rob[rob_head].ctrl.w_addr] ==
+                         rob[rob_head].dest_phys[ROB_TAG_W-1:0]))
+                        rat_spec_valid[rob[rob_head].ctrl.w_addr] <= 1'b0;
+                    free_list[rob[rob_head].dest_phys] <= 1'b1;
+                end
+                rob_head <= rob_head + 1'b1;
+            end
+
+            // Rename and dispatch one instruction per cycle.
+            if (dispatch_fire) begin
+                rob[rob_tail].valid           <= 1'b1;
+                rob[rob_tail].completed       <= 1'b0;
+                rob[rob_tail].address_ready   <= 1'b0;
+                rob[rob_tail].instruction     <= decode_stage_opcode;
+                rob[rob_tail].ctrl            <= decode_stage_ctrl;
+                rob[rob_tail].side_effect_value <= 32'd0;
+                rob[rob_tail].dest_valid      <= dispatch_needs_dest;
+                rob[rob_tail].dest_phys       <= dispatch_needs_dest ? alloc_phys : '0;
+                rob[rob_tail].result          <= 32'd0;
+                rob[rob_tail].branch_taken    <= 1'b0;
+                rob[rob_tail].branch_target   <= 32'd0;
+                rob[rob_tail].exception_valid <= decode_stage_ctrl.raise_illegal_instruction;
+                rob[rob_tail].exception_cause <= decode_stage_ctrl.raise_illegal_instruction
+                                               ? 5'd2 : 5'd0;
+                rob[rob_tail].exception_tval  <= decode_stage_ctrl.raise_illegal_instruction
+                                               ? decode_stage_opcode : 32'd0;
+
+                iq[iq_free_idx].valid      <= 1'b1;
+                iq[iq_free_idx].rob_tag    <= rob_tail;
+                iq[iq_free_idx].src1_ready <= dispatch_src1_ready;
+                iq[iq_free_idx].src1_value <= dispatch_src1_value;
+                iq[iq_free_idx].src1_tag   <= dispatch_src1_tag;
+                iq[iq_free_idx].src2_ready <= dispatch_src2_ready;
+                iq[iq_free_idx].src2_value <= dispatch_src2_value;
+                iq[iq_free_idx].src2_tag   <= dispatch_src2_tag;
+
+                if (dispatch_needs_dest) begin
+                    rat_spec_valid[decode_stage_ctrl.w_addr] <= 1'b1;
+                    rat_spec_slot[decode_stage_ctrl.w_addr] <=
+                        alloc_phys[ROB_TAG_W-1:0];
+                    free_list[alloc_phys] <= 1'b0;
+                end
+                rob_tail <= rob_tail + 1'b1;
+            end
+
+            case ({dispatch_fire, commit_fire})
+                2'b10: rob_count <= rob_count + 1'b1;
+                2'b01: rob_count <= rob_count - 1'b1;
+                default: rob_count <= rob_count;
+            endcase
+
+            // Register IQ selection before the integer ALU.  Selection cannot
+            // launch again until the current result has written back.
+            if (alu_select_valid && !alu_active) begin
+                iq[alu_select_idx].valid <= 1'b0;
+                alu_active              <= 1'b1;
+                alu_active_rob_tag      <= iq[alu_select_idx].rob_tag;
+                alu_active_dest_valid   <=
+                    rob[iq[alu_select_idx].rob_tag].dest_valid;
+                alu_active_dest_phys    <=
+                    rob[iq[alu_select_idx].rob_tag].dest_phys;
+                alu_active_ctrl         <=
+                    rob[iq[alu_select_idx].rob_tag].ctrl;
+                alu_active_src1         <= iq[alu_select_idx].src1_value;
+                alu_active_src2         <= iq[alu_select_idx].src2_value;
+            end
+
+            // Integer execution and physical-register write-back.
+            if (alu_wb_valid) begin
+                alu_active <= 1'b0;
+                // Only stores and CSR operations need a source value after
+                // execution.  Branch comparison consumes both values here.
+                if (alu_active_ctrl.is_store)
+                    rob[alu_wb_rob_tag].side_effect_value <=
+                        alu_active_src2;
+                else if (alu_active_ctrl.csr_wr)
+                    rob[alu_wb_rob_tag].side_effect_value <=
+                        alu_active_src1;
+                rob[alu_wb_rob_tag].result <= alu_wb_value;
+                rob[alu_wb_rob_tag].branch_taken <=
+                    branch_exec(alu_active_ctrl.pc_sel,
+                                alu_active_ctrl.funct3,
+                                alu_active_src1,
+                                alu_active_src2);
+                rob[alu_wb_rob_tag].branch_target <= alu_execute_data;
+                rob[alu_wb_rob_tag].address_ready <=
+                    alu_active_ctrl.is_load || alu_active_ctrl.is_store;
+                if (!alu_active_ctrl.is_load && !alu_active_ctrl.is_store)
+                    rob[alu_wb_rob_tag].completed <= 1'b1;
+            end
+
+            // Launch and complete the independent MUL/DIV lane.
+            if (md_select_valid && !md_active) begin
+                iq[md_select_idx].valid <= 1'b0;
+                md_active            <= 1'b1;
+                md_active_rob_tag    <= iq[md_select_idx].rob_tag;
+                md_active_dest_valid <= rob[iq[md_select_idx].rob_tag].dest_valid;
+                md_active_dest_phys  <= rob[iq[md_select_idx].rob_tag].dest_phys;
+                md_active_ctrl       <= rob[iq[md_select_idx].rob_tag].ctrl;
+                md_active_src1       <= iq[md_select_idx].src1_value;
+                md_active_src2       <= iq[md_select_idx].src2_value;
+            end
+            if (md_wb_valid) begin
+                rob[md_active_rob_tag].result <= md_execute_data;
+                rob[md_active_rob_tag].completed <= 1'b1;
+                md_active <= 1'b0;
+            end
+
+            // Head-only memory completion.
+            if (load_wb_valid) begin
+                rob[rob_head].result <= load_wb_value;
+                rob[rob_head].completed <= 1'b1;
+            end
+            if (store_done && store_valid && !d_pf)
+                rob[rob_head].completed <= 1'b1;
+
+            // Registered wake-up; selection observes these changes next cycle.
+            for (i = 0; i < IQ_DEPTH; i = i + 1) begin
+                if (iq[i].valid && !iq[i].src1_ready) begin
+                    if (alu_wb_valid && alu_wb_has_dest &&
+                        (iq[i].src1_tag == alu_wb_phys_tag)) begin
+                        iq[i].src1_ready <= 1'b1;
+                        iq[i].src1_value <= alu_wb_value;
+                    end else if (md_wb_valid && md_active_dest_valid &&
+                                 (iq[i].src1_tag == md_active_dest_phys)) begin
+                        iq[i].src1_ready <= 1'b1;
+                        iq[i].src1_value <= md_execute_data;
+                    end else if (load_wb_valid && rob[rob_head].dest_valid &&
+                                 (iq[i].src1_tag == rob[rob_head].dest_phys)) begin
+                        iq[i].src1_ready <= 1'b1;
+                        iq[i].src1_value <= load_wb_value;
+                    end
+                end
+                if (iq[i].valid && !iq[i].src2_ready) begin
+                    if (alu_wb_valid && alu_wb_has_dest &&
+                        (iq[i].src2_tag == alu_wb_phys_tag)) begin
+                        iq[i].src2_ready <= 1'b1;
+                        iq[i].src2_value <= alu_wb_value;
+                    end else if (md_wb_valid && md_active_dest_valid &&
+                                 (iq[i].src2_tag == md_active_dest_phys)) begin
+                        iq[i].src2_ready <= 1'b1;
+                        iq[i].src2_value <= md_execute_data;
+                    end else if (load_wb_valid && rob[rob_head].dest_valid &&
+                                 (iq[i].src2_tag == rob[rob_head].dest_phys)) begin
+                        iq[i].src2_ready <= 1'b1;
+                        iq[i].src2_value <= load_wb_value;
+                    end
+                end
             end
         end
     end
 
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            ex_mem <= '0;
-        end else if (cpu_stop || d_pf) begin
-            ex_mem <= '0;
-        end else begin
-            if (ex_fire) begin
-                ex_mem.valid      <= 1'b1;
-                ex_mem.ctrl       <= issue_ex.ctrl;
-                ex_mem.pc         <= issue_ex.pc;
-                ex_mem.reg_data_1 <= issue_ex.reg_data_1;
-                ex_mem.reg_data_2 <= issue_ex.reg_data_2;
-                ex_mem.alu_data   <= execute_alu_data;
-            end else if (mem_fire) begin
-                ex_mem.valid <= 1'b0;
-            end
-        end
-    end
-
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            mem_wb <= '0;
-        end else if (cpu_stop || d_pf) begin
-            mem_wb <= '0;
-        end else begin
-            if (mem_fire) begin
-                mem_wb.valid        <= 1'b1;
-                mem_wb.ctrl         <= ex_mem.ctrl;
-                mem_wb.pc           <= ex_mem.pc;
-                mem_wb.reg_data_1   <= ex_mem.reg_data_1;
-                mem_wb.alu_data     <= ex_mem.alu_data;
-                mem_wb.branch_taken <= branch_taken_now;
-                case (ex_mem.ctrl.wb_sel)
-                    2'b00: mem_wb.w_data <= ex_mem.alu_data;
-                    2'b01: mem_wb.w_data <= load_result(
-                                                load_read_data,
-                                                ex_mem.alu_data[1:0],
-                                                ex_mem.ctrl.funct3);
-                    2'b10: mem_wb.w_data <= ex_mem.pc + 32'd4;
-                    default: mem_wb.w_data <= 32'd0;
-                endcase
-            end else begin
-                mem_wb.valid <= 1'b0;
-            end
-        end
-    end
-
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            commit <= '0;
-        end else if (cpu_stop || d_pf) begin
-            commit <= '0;
-        end else begin
-            if (mem_wb.valid) begin
-                commit.valid        <= 1'b1;
-                commit.ctrl         <= mem_wb.ctrl;
-                commit.pc           <= mem_wb.pc;
-                commit.reg_data_1   <= mem_wb.reg_data_1;
-                commit.alu_data     <= mem_wb.alu_data;
-                commit.branch_taken <= mem_wb.branch_taken;
-                commit.w_data       <= mem_wb.w_data;
-            end else begin
-                commit.valid <= 1'b0;
-            end
-        end
-    end
-
-    // ============================================================
-    // Architectural PC advances only at in-order commit
-    // ============================================================
     PSC_PC u_PSC_PC (
         .clock             (clock),
         .reset_n           (reset_n),
         .cpu_stop          (cpu_stop),
-        .execute_task_done (pc_update_valid),
-        .alu_data          (pc_update_alu_data),
-        .pc_sel2           (pc_update_branch_taken),
-        .decoder_ctrl      (pc_update_ctrl),
+        .execute_task_done (commit_fire),
+        .alu_data          (rob[rob_head].branch_target),
+        .pc_sel2           (commit_fire && rob[rob_head].branch_taken),
+        .decoder_ctrl      (commit_ctrl),
         .cpu_trap          (cpu_trap),
         .priv_mode         (priv_mode),
         .d_pf              (d_pf_event),
@@ -564,32 +819,42 @@ module PSC_InstructionUnit (
         .counter           (counter)
     );
 
-`ifdef PIPELINE_TRACE
+`ifdef OOO_TRACE
     always_ff @(posedge clock) begin
-        if (reset_n && issue_fire &&
-            ((forward_sel_rs1 != 3'd0) || (forward_sel_rs2 != 3'd0))) begin
-            $display("FWD clock=%0t pc=%08x rs1=x%0d src=%0d data=%08x rs2=x%0d src=%0d data=%08x",
-                     $time, id_issue.pc,
-                     id_issue.ctrl.r_addr1, forward_sel_rs1, issue_reg_data_1,
-                     id_issue.ctrl.r_addr2, forward_sel_rs2, issue_reg_data_2);
+        if (reset_n && dispatch_fire) begin
+            $display("C%0d ROB_ALLOC #%0d PC=%08x INST=%08x RD=x%0d PD=p%0d", ooo_cycle,
+                     rob_tail, decode_stage_ctrl.out_pc, decode_stage_opcode,
+                     decode_stage_ctrl.w_addr,
+                     dispatch_needs_dest ? alloc_phys : 0);
+            $display("C%0d IQ_ENQ    #%0d ROB#%0d S1=%0b/p%0d S2=%0b/p%0d", ooo_cycle,
+                     iq_free_idx, rob_tail, dispatch_src1_ready,
+                     dispatch_src1_tag, dispatch_src2_ready, dispatch_src2_tag);
         end
-        if (reset_n && id_issue.valid && raw_hazard) begin
-            $display("RAW-STALL clock=%0t pc=%08x rs1=x%0d stall=%0b rs2=x%0d stall=%0b",
-                     $time, id_issue.pc,
-                     id_issue.ctrl.r_addr1, raw_hazard_rs1,
-                     id_issue.ctrl.r_addr2, raw_hazard_rs2);
-        end
-        if (reset_n && (id_issue.valid || issue_ex.valid || ex_mem.valid ||
-                        mem_wb.valid || commit.valid)) begin
-            $display("PIPE clock=%0t ID=%0b:%08x ISSUE=%0b:%08x EX=%0b:%08x MEM=%0b:%08x WB=%0b:%08x COMMIT=%0b:%08x",
-                     $time,
-                     id_issue.valid, id_issue.pc,
-                     issue_fire, id_issue.pc,
-                     issue_ex.valid, issue_ex.pc,
-                     ex_mem.valid, ex_mem.pc,
-                     mem_wb.valid, mem_wb.pc,
-                     commit.valid, commit.pc);
-        end
+        if (reset_n && alu_select_valid)
+            $display("C%0d ISSUE_ALU ROB#%0d PC=%08x", ooo_cycle,
+                     iq[alu_select_idx].rob_tag,
+                     rob[iq[alu_select_idx].rob_tag].ctrl.out_pc);
+        if (reset_n && alu_wb_valid)
+            $display("C%0d WB_ALU    ROB#%0d PC=%08x RESULT=%08x", ooo_cycle,
+                     alu_wb_rob_tag, rob[alu_wb_rob_tag].ctrl.out_pc, alu_wb_value);
+        if (reset_n && md_select_valid && !md_active)
+            $display("C%0d ISSUE_MD  ROB#%0d PC=%08x", ooo_cycle,
+                     iq[md_select_idx].rob_tag,
+                     rob[iq[md_select_idx].rob_tag].ctrl.out_pc);
+        if (reset_n && md_wb_valid)
+            $display("C%0d WB_MD     ROB#%0d PC=%08x RESULT=%08x", ooo_cycle,
+                     md_active_rob_tag, md_active_ctrl.out_pc, md_execute_data);
+        if (reset_n && branch_redirect)
+            $display("C%0d FLUSH     ROB#%0d PC=%08x TARGET=%08x", ooo_cycle,
+                     alu_wb_rob_tag, rob[alu_wb_rob_tag].ctrl.out_pc, alu_execute_data);
+        if (reset_n && commit_fire)
+            $display("C%0d COMMIT    ROB#%0d PC=%08x INST=%08x RESULT=%08x", ooo_cycle,
+                     rob_head, rob[rob_head].ctrl.out_pc,
+                     rob[rob_head].instruction,
+                     commit_result);
+        if (reset_n && (d_pf || i_pf))
+            $display("C%0d EXCEPTION PC=%08x CAUSE=%0d", ooo_cycle,
+                     rob[rob_head].ctrl.out_pc, trap_scause);
     end
 `endif
 

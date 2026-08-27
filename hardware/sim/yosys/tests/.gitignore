@@ -1,0 +1,6 @@
+*.log
+*.out
+*.err
+run-test.mk
+**/Makefile
+*.result

@@ -79,7 +79,6 @@ CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
 	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
 	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
-	$(CPU_V1_SRC_DIR)/PSC_InstructionFSM.sv \
 	$(CPU_V1_SRC_DIR)/Fetch.sv \
 	$(CPU_V1_SRC_DIR)/Decorder.sv \
 	$(CPU_V1_SRC_DIR)/Execute.sv \

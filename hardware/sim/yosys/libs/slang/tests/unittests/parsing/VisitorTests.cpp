@@ -1,0 +1,1266 @@
+// SPDX-FileCopyrightText: Michael Popoloski
+// SPDX-License-Identifier: MIT
+
+#include "Test.h"
+#include "catch2/catch_test_macros.hpp"
+#include <fmt/format.h>
+
+#include "slang/analysis/AnalysisManager.h"
+#include "slang/ast/ASTVisitor.h"
+#include "slang/parsing/ParserMetadata.h"
+#include "slang/syntax/AllSyntax.h"
+#include "slang/syntax/SyntaxNode.h"
+#include "slang/syntax/SyntaxPrinter.h"
+#include "slang/syntax/SyntaxRewriter.h"
+#include "slang/syntax/SyntaxTree.h"
+
+class SemanticModel {
+public:
+    explicit SemanticModel(Compilation& compilation) : compilation(compilation) {}
+
+    const Symbol* getDeclaredSymbol(const syntax::SyntaxNode& syntax) {
+        // If we've already cached this node, return that.
+        if (auto it = symbolCache.find(&syntax); it != symbolCache.end())
+            return it->second;
+
+        // If we hit the top of the syntax tree, look in the compilation for the correct symbol.
+        if (syntax.kind == SyntaxKind::CompilationUnit) {
+            auto result = compilation.getCompilationUnit(syntax.as<CompilationUnitSyntax>());
+            if (result)
+                symbolCache[&syntax] = result;
+            return result;
+        }
+        else if (syntax.kind == SyntaxKind::ModuleDeclaration ||
+                 syntax.kind == SyntaxKind::InterfaceDeclaration ||
+                 syntax.kind == SyntaxKind::ProgramDeclaration) {
+            auto [parentScope, parentSym] = getParent(syntax);
+            if (!parentScope)
+                parentScope = &compilation.getRoot();
+
+            auto def = compilation.getDefinition(*parentScope,
+                                                 syntax.as<ModuleDeclarationSyntax>());
+            if (!def)
+                return nullptr;
+
+            // There is no symbol to use here so create a placeholder instance.
+            auto result = &InstanceSymbol::createDefault(compilation, *def);
+            symbolCache[&syntax] = result;
+            return result;
+        }
+
+        // Otherwise try to find the parent symbol first.
+        auto [parentScope, parentSym] = getParent(syntax);
+        if (!parentSym)
+            return nullptr;
+
+        // If this is a type alias, unwrap its target type to look at the syntax node.
+        if (parentSym->kind == SymbolKind::TypeAlias) {
+            auto& target = parentSym->as<TypeAliasType>().targetType.getType();
+            if (target.getSyntax() == &syntax) {
+                symbolCache.emplace(&syntax, &target);
+                return &target;
+            }
+            return nullptr;
+        }
+
+        if (!parentScope)
+            return nullptr;
+
+        // Search among the parent's children to see if we can find ourself.
+        for (auto& child : parentScope->members()) {
+            if (child.getSyntax() == &syntax) {
+                // We found ourselves, hurray.
+                symbolCache.emplace(&syntax, &child);
+                return &child;
+            }
+        }
+
+        return nullptr;
+    }
+
+    const CompilationUnitSymbol* getDeclaredSymbol(const CompilationUnitSyntax& syntax) {
+        auto result = getDeclaredSymbol((const SyntaxNode&)syntax);
+        return result ? &result->as<CompilationUnitSymbol>() : nullptr;
+    }
+
+    const InstanceSymbol* getDeclaredSymbol(const HierarchyInstantiationSyntax& syntax) {
+        auto result = getDeclaredSymbol((const SyntaxNode&)syntax);
+        return result ? &result->as<InstanceSymbol>() : nullptr;
+    }
+
+    const StatementBlockSymbol* getDeclaredSymbol(const BlockStatementSyntax& syntax) {
+        auto result = getDeclaredSymbol((const SyntaxNode&)syntax);
+        return result ? &result->as<StatementBlockSymbol>() : nullptr;
+    }
+
+    const ProceduralBlockSymbol* getDeclaredSymbol(const ProceduralBlockSyntax& syntax) {
+        auto result = getDeclaredSymbol((const SyntaxNode&)syntax);
+        return result ? &result->as<ProceduralBlockSymbol>() : nullptr;
+    }
+
+    const GenerateBlockSymbol* getDeclaredSymbol(const IfGenerateSyntax& syntax) {
+        auto result = getDeclaredSymbol((const SyntaxNode&)syntax);
+        return result ? &result->as<GenerateBlockSymbol>() : nullptr;
+    }
+
+    const GenerateBlockArraySymbol* getDeclaredSymbol(const LoopGenerateSyntax& syntax) {
+        auto result = getDeclaredSymbol((const SyntaxNode&)syntax);
+        return result ? &result->as<GenerateBlockArraySymbol>() : nullptr;
+    }
+
+    const SubroutineSymbol* getDeclaredSymbol(const FunctionDeclarationSyntax& syntax) {
+        auto result = getDeclaredSymbol((const SyntaxNode&)syntax);
+        return result ? &result->as<SubroutineSymbol>() : nullptr;
+    }
+
+    const EnumType* getDeclaredSymbol(const EnumTypeSyntax& syntax) {
+        auto result = getDeclaredSymbol((const SyntaxNode&)syntax);
+        return result ? &result->as<EnumType>() : nullptr;
+    }
+
+    const TypeAliasType* getDeclaredSymbol(const TypedefDeclarationSyntax& syntax) {
+        auto result = getDeclaredSymbol((const SyntaxNode&)syntax);
+        return result ? &result->as<TypeAliasType>() : nullptr;
+    }
+
+private:
+    std::pair<const Scope*, const Symbol*> getParent(const SyntaxNode& syntax) {
+        auto parent = syntax.parent ? getDeclaredSymbol(*syntax.parent) : nullptr;
+        if (!parent)
+            return {nullptr, nullptr};
+
+        if (parent->kind == SymbolKind::Instance)
+            parent = &parent->as<InstanceSymbol>().body;
+        else if (!parent->isScope())
+            return {nullptr, parent};
+
+        return {&parent->as<Scope>(), parent};
+    }
+
+    Compilation& compilation;
+    flat_hash_map<const syntax::SyntaxNode*, const Symbol*> symbolCache;
+};
+
+template<typename T>
+class RewriterBase : public SyntaxRewriter<T> {
+public:
+    FunctionPortSyntax& makeArg(std::string_view name) {
+        return this->factory.functionPort(nullptr, {}, {}, {}, {}, nullptr,
+                                          this->factory.declarator(this->makeId(name), nullptr,
+                                                                   nullptr));
+    }
+};
+
+class TestRewriter : public RewriterBase<TestRewriter> {
+public:
+    Compilation compilation;
+    SemanticModel model;
+
+    TestRewriter(const std::shared_ptr<SyntaxTree>& tree) : model(compilation) {
+        compilation.addSyntaxTree(tree);
+    }
+
+    void handle(const TypedefDeclarationSyntax& decl) {
+        if (decl.type->kind != SyntaxKind::EnumType)
+            return;
+
+        // Create a new localparam hardcoded with the number of entries in the enum.
+        auto type = model.getDeclaredSymbol(decl.type->as<EnumTypeSyntax>());
+        REQUIRE(type);
+
+        size_t count = std::ranges::distance(type->as<EnumType>().members());
+        auto& newNode = parse(
+            fmt::format("\n    localparam int {}__count = {};", decl.name.valueText(), count));
+        insertAfter(decl, newNode);
+    }
+
+    void handle(const FunctionDeclarationSyntax& decl) {
+        auto portList = decl.prototype->portList;
+        if (!portList)
+            return;
+
+        insertAtFront(portList->ports, makeArg("argA"), makeComma());
+        insertAtBack(portList->ports, makeArg("argZ"), makeComma());
+    }
+};
+
+TEST_CASE("Basic rewriting") {
+    auto tree = SyntaxTree::fromText(R"(
+module M;
+    typedef enum int { FOO = 1, BAR = 2, BAZ = 3 } test_t;
+
+    function void foo(int i, output r);
+    endfunction
+endmodule
+)");
+
+    tree = TestRewriter(tree).transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module M;
+    typedef enum int { FOO = 1, BAR = 2, BAZ = 3 } test_t;
+    localparam int test_t__count = 3;
+
+    function void foo(argA,int i, output r,argZ);
+    endfunction
+endmodule
+)");
+}
+
+TEST_CASE("Rewriting around macros") {
+    auto tree = SyntaxTree::fromText(R"(
+`define ENUM_MACRO(asdf) \
+    typedef enum int {\
+        FOO = 1,\
+        BAR = 2,\
+        BAZ = 3\
+    } asdf;
+
+module M;
+    `ENUM_MACRO(test_t)
+endmodule
+)");
+
+    tree = TestRewriter(tree).transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+`define ENUM_MACRO(asdf) \
+    typedef enum int {\
+        FOO = 1,\
+        BAR = 2,\
+        BAZ = 3\
+    } asdf;
+
+module M;
+    `ENUM_MACRO(test_t)
+    localparam int test_t__count = 3;
+endmodule
+)");
+}
+
+TEST_CASE("Remove node from cloned object") {
+    auto tree = SyntaxTree::fromText(R"(
+module m #(parameter P = 8)();
+    reg tmp;
+endmodule
+)");
+
+    struct RemoveWriter : public SyntaxRewriter<RemoveWriter> {
+        void handle(const ParameterPortListSyntax& decl) { remove(decl); }
+    };
+
+    tree = RemoveWriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m();
+    reg tmp;
+endmodule
+)");
+}
+
+TEST_CASE("Remove node from comma-separated list") {
+    auto tree = SyntaxTree::fromText(R"(
+    // normal case
+    function void foo1(int a, int b, int c, int d, int e);
+    endfunction
+    // case with trailing comma
+    function void foo2(int a, int b, int c, int d, int e,);
+    endfunction
+    // case with duplicated comma
+    function void foo3(int a, int b,, int c, int d, int e);
+    endfunction
+)");
+
+    struct RemoveWriter : public SyntaxRewriter<RemoveWriter> {
+        void handle(const FunctionPortBaseSyntax& port) {
+            std::string str = port.toString();
+            str.erase(0, str.find_first_not_of(' ')); // trim left whitespace
+            if (str == "int a" or str == "int c" or str == "int e")
+                remove(port);
+        }
+    };
+
+    tree = RemoveWriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+    // normal case
+    function void foo1( int b, int d);
+    endfunction
+    // case with trailing comma
+    function void foo2( int b, int d,);
+    endfunction
+    // case with duplicated comma
+    function void foo3( int b,, int d);
+    endfunction
+)");
+}
+
+TEST_CASE("Advanced rewriting") {
+    SECTION("Insert multiple newNodes surrounding oldNodes") {
+        class MultipleRewriter : public RewriterBase<MultipleRewriter> {
+        public:
+            Compilation compilation;
+            SemanticModel model;
+
+            MultipleRewriter(const std::shared_ptr<SyntaxTree>& tree) : model(compilation) {
+                compilation.addSyntaxTree(tree);
+            }
+
+            void handle(const TypedefDeclarationSyntax& decl) {
+                if (decl.type->kind != SyntaxKind::EnumType)
+                    return;
+
+                // Create a new localparam hardcoded with the number of entries in the enum.
+                auto type = model.getDeclaredSymbol(decl.type->as<EnumTypeSyntax>());
+                REQUIRE(type);
+
+                size_t count = std::ranges::distance(type->as<EnumType>().members());
+                auto& newNode1 = parse(fmt::format("\n    localparam int {}__count1 = {};",
+                                                   decl.name.valueText(), count));
+                insertBefore(decl, newNode1);
+                auto& newNode2 = parse(fmt::format("\n    localparam int {}__count2 = {};",
+                                                   decl.name.valueText(), count));
+                insertBefore(decl, newNode2);
+                auto& newNode3 = parse(fmt::format("\n    localparam int {}__count3 = {};",
+                                                   decl.name.valueText(), count));
+                insertAfter(decl, newNode3);
+                auto& newNode4 = parse(fmt::format("\n    localparam int {}__count4 = {};",
+                                                   decl.name.valueText(), count));
+                insertAfter(decl, newNode4);
+            }
+
+            void handle(const FunctionDeclarationSyntax& decl) {
+                auto portList = decl.prototype->portList;
+                if (!portList)
+                    return;
+
+                insertAtFront(portList->ports, makeArg("argA"), makeComma());
+                insertAtBack(portList->ports, makeArg("argZ"), makeComma());
+            }
+        };
+
+        auto tree = SyntaxTree::fromText(R"(
+module M;
+    typedef enum int { FOO = 1, BAR = 2, BAZ = 3 } test_t;
+
+    function void foo(int i, output r);
+    endfunction
+endmodule
+)");
+
+        tree = MultipleRewriter(tree).transform(tree);
+        CHECK(tree->validate());
+
+        CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module M;
+    localparam int test_t__count1 = 3;
+    localparam int test_t__count2 = 3;
+    typedef enum int { FOO = 1, BAR = 2, BAZ = 3 } test_t;
+    localparam int test_t__count3 = 3;
+    localparam int test_t__count4 = 3;
+
+    function void foo(argA,int i, output r,argZ);
+    endfunction
+endmodule
+)");
+    }
+
+    SECTION("Combine insert and replace operation on oldNodes") {
+        class InterleavedRewriter : public RewriterBase<InterleavedRewriter> {
+        public:
+            Compilation compilation;
+            SemanticModel model;
+
+            InterleavedRewriter(const std::shared_ptr<SyntaxTree>& tree) : model(compilation) {
+                compilation.addSyntaxTree(tree);
+            }
+
+            void handle(const TypedefDeclarationSyntax& decl) {
+                if (decl.type->kind != SyntaxKind::EnumType)
+                    return;
+
+                // Create a new localparam hardcoded with the number of entries in the enum.
+                auto type = model.getDeclaredSymbol(decl.type->as<EnumTypeSyntax>());
+                REQUIRE(type);
+
+                size_t count = std::ranges::distance(type->as<EnumType>().members());
+                auto& newNode1 = parse(fmt::format("\n    localparam int {}__count1 = {};",
+                                                   decl.name.valueText(), count));
+                insertBefore(decl, newNode1);
+                auto& newNode2 = parse(fmt::format("\n    localparam int {}__count2 = {};",
+                                                   decl.name.valueText(), count));
+                replace(decl, newNode2);
+                auto& newNode3 = parse(fmt::format("\n    localparam int {}__count3 = {};",
+                                                   decl.name.valueText(), count));
+                insertAfter(decl, newNode3);
+            }
+
+            void handle(const FunctionDeclarationSyntax& decl) {
+                auto portList = decl.prototype->portList;
+                if (!portList)
+                    return;
+
+                insertAtFront(portList->ports, makeArg("argA"), makeComma());
+                insertAtBack(portList->ports, makeArg("argZ"), makeComma());
+            }
+        };
+
+        auto tree = SyntaxTree::fromText(R"(
+module M;
+    typedef enum int { FOO = 1, BAR = 2, BAZ = 3 } test_t;
+
+    function void foo(int i, output r);
+    endfunction
+endmodule
+)");
+
+        tree = InterleavedRewriter(tree).transform(tree);
+        CHECK(tree->validate());
+
+        CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module M;
+    localparam int test_t__count1 = 3;
+    localparam int test_t__count2 = 3;
+    localparam int test_t__count3 = 3;
+
+    function void foo(argA,int i, output r,argZ);
+    endfunction
+endmodule
+)");
+    }
+
+    SECTION("Combine insert and remove operation on oldNodes") {
+        class InterleavedRewriter : public RewriterBase<InterleavedRewriter> {
+        public:
+            Compilation compilation;
+            SemanticModel model;
+
+            InterleavedRewriter(const std::shared_ptr<SyntaxTree>& tree) : model(compilation) {
+                compilation.addSyntaxTree(tree);
+            }
+
+            void handle(const TypedefDeclarationSyntax& decl) {
+                if (decl.type->kind != SyntaxKind::EnumType)
+                    return;
+
+                // Create a new localparam hardcoded with the number of entries in the enum.
+                auto type = model.getDeclaredSymbol(decl.type->as<EnumTypeSyntax>());
+                REQUIRE(type);
+
+                size_t count = std::ranges::distance(type->as<EnumType>().members());
+                auto& newNode1 = parse(fmt::format("\n    localparam int {}__count1 = {};",
+                                                   decl.name.valueText(), count));
+                insertBefore(decl, newNode1);
+                auto& newNode2 = parse(fmt::format("\n    localparam int {}__count2 = {};",
+                                                   decl.name.valueText(), count));
+                insertAfter(decl, newNode2);
+                remove(decl);
+            }
+
+            void handle(const FunctionDeclarationSyntax& decl) {
+                auto portList = decl.prototype->portList;
+                if (!portList)
+                    return;
+
+                insertAtFront(portList->ports, makeArg("argA"), makeComma());
+                insertAtBack(portList->ports, makeArg("argZ"), makeComma());
+            }
+        };
+
+        auto tree = SyntaxTree::fromText(R"(
+module M;
+    typedef enum int { FOO = 1, BAR = 2, BAZ = 3 } test_t;
+
+    function void foo(int i, output r);
+    endfunction
+endmodule
+)");
+
+        tree = InterleavedRewriter(tree).transform(tree);
+        CHECK(tree->validate());
+
+        CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module M;
+    localparam int test_t__count1 = 3;
+    localparam int test_t__count2 = 3;
+
+    function void foo(argA,int i, output r,argZ);
+    endfunction
+endmodule
+)");
+    }
+
+    SECTION("Reuse same rewriter object") {
+        struct FirstTypedefRemover : public SyntaxRewriter<FirstTypedefRemover> {
+            int index;
+            void handle(const TypedefDeclarationSyntax& decl) {
+                if (index++ == 0)
+                    remove(decl);
+            }
+            std::shared_ptr<SyntaxTree> transform(const std::shared_ptr<SyntaxTree>& tree) {
+                index = 0;
+                return SyntaxRewriter<FirstTypedefRemover>::transform(tree);
+            }
+        };
+
+        auto tree = SyntaxTree::fromText(R"(
+module M;
+    typedef enum int { FOO = 1 } test_t_1;
+    typedef enum int { BAR = 2 } test_t_2;
+    typedef enum int { BAZ = 3 } test_t_3;
+endmodule
+)");
+
+        FirstTypedefRemover rewriter;
+        tree = rewriter.transform(tree);
+        tree = rewriter.transform(tree);
+        CHECK(tree->validate());
+
+        CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module M;
+    typedef enum int { BAZ = 3 } test_t_3;
+endmodule
+)");
+    }
+}
+
+TEST_CASE("Test AST visiting") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    initial begin
+        if (1) begin
+            int i = {1 + 2, 5 + 6};
+        end
+    end
+    int j = 3 + 4;
+endmodule
+)");
+
+    Compilation compilation;
+    compilation.addSyntaxTree(tree);
+
+    // Visit the whole tree and count the binary expressions.
+    int count = 0;
+    compilation.getRoot().visit(makeVisitor([&](auto& v, const BinaryExpression& expr) {
+        count++;
+        v.visitDefault(expr);
+    }));
+    CHECK(count == 3);
+}
+
+struct Visitor : public ASTVisitor<Visitor, VisitFlags::AllGood> {
+    int count = 0;
+    template<typename T>
+    void handle(const T& t) {
+        if constexpr (std::is_base_of_v<Statement, T>) {
+            count++;
+        }
+        visitDefault(t);
+    }
+};
+
+TEST_CASE("Test single counting of statements") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    int j;
+    initial begin : asdf
+        j = j + 3;
+        if (1) begin : baz
+            static int i;
+            i = i + 2;
+            if (1) begin : boz
+                i = i + 4;
+            end
+        end
+    end
+endmodule
+)");
+
+    Compilation compilation;
+    compilation.addSyntaxTree(tree);
+
+    // Visit the whole tree and count the statements.
+    Visitor visitor;
+    compilation.getRoot().visit(visitor);
+    CHECK(visitor.count == 11);
+}
+
+TEST_CASE("Clone and DeepClone") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    reg tmp;
+endmodule
+)");
+
+    SECTION("Shallow Clone") {
+        class CloneRewriter : public SyntaxRewriter<CloneRewriter> {
+        public:
+            void handle(const DataDeclarationSyntax& syntax) {
+                auto op = [this, &syntax](std::string_view str) {
+                    auto cloned = clone(syntax, alloc);
+                    cloned->declarators[0]->name = cloned->declarators[0]->name.withRawText(alloc,
+                                                                                            str);
+                    insertAfter(syntax, *cloned);
+                };
+                op("tmp1");
+                op("tmp2");
+                op("tmp3");
+            }
+        };
+
+        auto newTree = CloneRewriter().transform(tree);
+        CHECK(tree->validate());
+
+        CHECK(SyntaxPrinter::printFile(*newTree) == R"(
+module m;
+    reg tmp3;
+    reg tmp3;
+    reg tmp3;
+    reg tmp3;
+endmodule
+)");
+    }
+
+    SECTION("Deep Clone") {
+        class CloneRewriter : public SyntaxRewriter<CloneRewriter> {
+        public:
+            void handle(const DataDeclarationSyntax& syntax) {
+                auto op = [this, &syntax](std::string_view str) {
+                    auto cloned = deepClone(syntax, alloc);
+                    cloned->declarators[0]->name = cloned->declarators[0]->name.withRawText(alloc,
+                                                                                            str);
+                    insertAfter(syntax, *cloned);
+                };
+                op("tmp1");
+                op("tmp2");
+                op("tmp3");
+            }
+        };
+
+        tree = CloneRewriter().transform(tree);
+        CHECK(tree->validate());
+
+        CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m;
+    reg tmp;
+    reg tmp1;
+    reg tmp2;
+    reg tmp3;
+endmodule
+)");
+    }
+
+    SECTION("Deep Clone With different object life cycle") {
+        auto tree = SyntaxTree::fromText(R"(module m; reg tmp; endmodule)");
+        class CloneRewriter : public SyntaxVisitor<CloneRewriter> {
+            std::shared_ptr<SyntaxTree>& tree;
+
+        public:
+            CloneRewriter(std::shared_ptr<SyntaxTree>& tree) : tree(tree) {}
+            void handle(const ModuleDeclarationSyntax& decl) {
+                BumpAllocator newAlloc;
+                auto newModule = slang::syntax::deepClone(decl, newAlloc);
+                tree = std::make_shared<SyntaxTree>(newModule, tree->sourceManager(),
+                                                    std::move(newAlloc), nullptr);
+            }
+        };
+        CloneRewriter visitor(tree);
+        tree->root().visit(visitor);
+        CHECK(tree->validate());
+
+        CHECK(SyntaxPrinter::printFile(*tree) == R"(module m; reg tmp; endmodule)");
+    }
+}
+
+TEST_CASE("Syntax rewriting with metadata updates") {
+    auto tree = SyntaxTree::fromFileInMemory(R"(
+`default_nettype none
+`unconnected_drive pull0
+`celldefine
+`timescale 1ns/1ps
+`define FOO
+
+module m;
+    module n;
+    endmodule
+    reg tmp;
+    n n();
+    if (1) begin end
+endmodule
+
+module top;
+    import bar::*;
+    FooBar fooBar();
+    defparam a = 1;
+    bind A: Ainst Abind Abind_inst();
+
+    initial a::b = 1;
+endmodule
+
+class C; endclass
+
+`nounconnected_drive
+`resetall
+)",
+                                             SyntaxTree::getDefaultSourceManager());
+
+    CHECK(tree->diagnostics().empty());
+
+    class ModuleChanger : public SyntaxRewriter<ModuleChanger> {
+    public:
+        void handle(const ModuleDeclarationSyntax& syntax) {
+            if (syntax.header->name.valueText() == "m") {
+                auto newMod = clone(syntax, alloc);
+                newMod->header->name = makeId("FooBar", SingleSpace);
+                replace(syntax, *newMod);
+            }
+        }
+    };
+
+    auto newTree = ModuleChanger().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*newTree) == R"(
+`default_nettype none
+`unconnected_drive pull0
+`celldefine
+`timescale 1ns/1ps
+`define FOO
+
+module FooBar;
+    module n;
+    endmodule
+    reg tmp;
+    n n();
+    if (1) begin end
+endmodule
+
+module top;
+    import bar::*;
+    FooBar fooBar();
+    defparam a = 1;
+    bind A: Ainst Abind Abind_inst();
+
+    initial a::b = 1;
+endmodule
+
+class C; endclass
+
+`nounconnected_drive
+`resetall
+)");
+
+    auto& meta = tree->getMetadata();
+    CHECK(meta.nodeMeta.size() == 3);
+
+    for (auto& [key, node] : meta.nodeMeta) {
+        if (key->header->name.valueText() == "FooBar") {
+            CHECK(node.timeScale->base.unit == TimeUnit::Nanoseconds);
+            CHECK(node.unconnectedDrive == TokenKind::Pull0Keyword);
+            CHECK(node.cellDefine == true);
+        }
+    }
+}
+
+TEST_CASE("Syntax rewriter -- replace preserves trivia") {
+    auto tree = SyntaxTree::fromText(R"(
+module test(
+    input wire clock,
+    input wire reset,
+    output reg [3:0] o_signal
+);
+wire t;
+`ifndef SYNTHESIS
+initial begin
+    $display("hello");
+end
+`endif
+assign t = o_signal[1];
+
+endmodule
+)");
+
+    struct Rewriter : public SyntaxRewriter<Rewriter> {
+        void handle(const ContinuousAssignSyntax& syntax) {
+            replace(syntax, parse("assign t = 2;"), /* preserveTrivia */ true);
+        }
+    };
+
+    auto result = SyntaxPrinter::printFile(*Rewriter().transform(tree));
+    CHECK(result == R"(
+module test(
+    input wire clock,
+    input wire reset,
+    output reg [3:0] o_signal
+);
+wire t;
+`ifndef SYNTHESIS
+initial begin
+    $display("hello");
+end
+`endif
+assign t = 2;
+
+endmodule
+)");
+}
+
+TEST_CASE("Remove token from tree without preserving trivia") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    function void foo;
+        int x = 1;
+        logic     signed y;
+    endfunction
+endmodule
+)");
+
+    struct Rewriter : public SyntaxRewriter<Rewriter> {
+        void handle(const IntegerTypeSyntax& node) {
+            removeToken(node, 1, false); // remove signing token - don't preserve extra whitespace
+        }
+    };
+
+    tree = Rewriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m;
+    function void foo;
+        int x = 1;
+        logic y;
+    endfunction
+endmodule
+)");
+}
+
+TEST_CASE("Remove token from tree with preserving trivia") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    function void foo;
+        int x = 1;
+        logic     signed y;
+    endfunction
+endmodule
+)");
+
+    struct Rewriter : public SyntaxRewriter<Rewriter> {
+        void handle(const IntegerTypeSyntax& node) { removeToken(node, 1, true); }
+    };
+
+    tree = Rewriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m;
+    function void foo;
+        int x = 1;
+        logic     y;
+    endfunction
+endmodule
+)");
+}
+
+TEST_CASE("Remove token from TokenList without preserving trivia") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    function void foo;
+        static int x = 1;
+        automatic logic y;
+    endfunction
+endmodule
+)");
+
+    struct Rewriter : public SyntaxRewriter<Rewriter> {
+        void handle(const DataDeclarationSyntax& decl) {
+            // Remove the first modifier token (e.g. 'static' or 'automatic').
+            if (!decl.modifiers.empty())
+                removeToken(decl.modifiers, 0, false);
+        }
+    };
+
+    tree = Rewriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m;
+    function void foo; int x = 1; logic y;
+    endfunction
+endmodule
+)");
+}
+
+TEST_CASE("Remove token from TokenList while preserving trivia") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    function void foo;
+        static int x = 1;
+        automatic logic y;
+    endfunction
+endmodule
+)");
+
+    struct Rewriter : public SyntaxRewriter<Rewriter> {
+        void handle(const DataDeclarationSyntax& decl) {
+            // Remove the first modifier token (e.g. 'static' or 'automatic').
+            if (!decl.modifiers.empty())
+                removeToken(decl.modifiers, 0, true);
+        }
+    };
+
+    tree = Rewriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m;
+    function void foo;
+        int x = 1;
+        logic y;
+    endfunction
+endmodule
+)");
+}
+
+TEST_CASE("Replace token in tree without preserving trivia") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    function void foo;
+        logic   x;
+    endfunction
+endmodule
+)");
+
+    struct Rewriter : public SyntaxRewriter<Rewriter> {
+        void handle(const DeclaratorSyntax& node) {
+            // Replace the logic name with "y" and add a space to keep the tree parsable
+            replaceToken(node, 0,
+                         makeToken(TokenKind::Identifier, "y",
+                                   std::span(&this->SingleSpace, size_t(1))),
+                         false);
+        }
+    };
+
+    tree = Rewriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m;
+    function void foo;
+        logic y;
+    endfunction
+endmodule
+)");
+}
+
+TEST_CASE("Replace token in tree while preserving trivia") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    function void foo;
+        logic x;
+    endfunction
+endmodule
+)");
+
+    struct Rewriter : public SyntaxRewriter<Rewriter> {
+        void handle(const DeclaratorSyntax& node) {
+            // Replace the logic name with "y"
+            replaceToken(node, 0, makeToken(TokenKind::Identifier, "y"), true);
+        }
+    };
+
+    tree = Rewriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m;
+    function void foo;
+        logic y;
+    endfunction
+endmodule
+)");
+}
+
+TEST_CASE("Replace token in TokenList without trivia preservation") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    function void foo;
+        static int x = 1;
+    endfunction
+endmodule
+)");
+
+    struct Rewriter : public SyntaxRewriter<Rewriter> {
+        void handle(const DataDeclarationSyntax& decl) {
+            // Replace 'static' modifier with 'automatic'.
+            if (!decl.modifiers.empty() && decl.modifiers[0].kind == TokenKind::StaticKeyword) {
+                replaceToken(decl.modifiers, 0, makeToken(TokenKind::AutomaticKeyword, "automatic"),
+                             false);
+            }
+        }
+    };
+
+    tree = Rewriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m;
+    function void foo;automatic int x = 1;
+    endfunction
+endmodule
+)");
+}
+
+TEST_CASE("Replace token in TokenList with trivia preservation") {
+    auto tree = SyntaxTree::fromText(R"(
+module m;
+    function void foo;
+        static int x = 1;
+    endfunction
+endmodule
+)");
+
+    struct Rewriter : public SyntaxRewriter<Rewriter> {
+        void handle(const DataDeclarationSyntax& decl) {
+            // Replace 'static' modifier with 'automatic'.
+            if (!decl.modifiers.empty() && decl.modifiers[0].kind == TokenKind::StaticKeyword) {
+                replaceToken(decl.modifiers, 0, makeToken(TokenKind::AutomaticKeyword, "automatic"),
+                             true);
+            }
+        }
+    };
+
+    tree = Rewriter().transform(tree);
+    CHECK(tree->validate());
+
+    CHECK(SyntaxPrinter::printFile(*tree) == R"(
+module m;
+    function void foo;
+        automatic int x = 1;
+    endfunction
+endmodule
+)");
+}
+
+TEST_CASE("SyntaxTree/Compilation Invariant Checking") {
+    // Validates that the parent pointers in the syntax tree are correct,
+    // and provides debug info if not.
+    auto validateParents = [](const syntax::SyntaxTree& tree) {
+        bool valid = true;
+        tree.root().visit(AllSyntaxVisitor([&](const SyntaxNode& node) {
+            for (size_t i = 0; i < node.getChildCount(); i++) {
+                auto child = node.childNode(i);
+                if (!child)
+                    continue;
+
+                if (child->parent != &node) {
+                    valid = false;
+                    auto parentKind = toString(child->parent->kind);
+                    auto childKind = toString(child->kind);
+                    auto expectedParent = toString(node.kind);
+                    INFO(fmt::format("Parent pointer mismatch with `{}`. {}.parent should be {}, "
+                                     "but is instead {}\n",
+                                     node.toString(), childKind, expectedParent,
+                                     !parentKind.empty() ? parentKind : "<garbage memory>"));
+
+                    if (!parentKind.empty()) {
+                        INFO(fmt::format("Check for `comp.emplace<{}Syntax>` calls, and deep "
+                                         "clone the syntax nodes used to create it.",
+                                         parentKind));
+                    }
+                }
+            }
+        }));
+
+        return valid;
+    };
+
+    fs::path path = findTestDir();
+    path /= "../../regression/all.sv";
+    auto mTree = SyntaxTree::fromFile(path.string());
+    REQUIRE(mTree);
+
+    auto tree = *mTree;
+    REQUIRE(validateParents(*tree));
+
+    std::string originalSyntaxText = SyntaxPrinter::printFile(*tree);
+
+    Compilation compilation;
+    compilation.addSyntaxTree(tree);
+    auto& _root = compilation.getRoot();
+
+    // Check parent pointers after compilation
+    REQUIRE(validateParents(*tree));
+
+    // Check that the syntax text is the same after compilation
+    std::string syntaxTextAfterCompilation = SyntaxPrinter::printFile(*tree);
+    REQUIRE(originalSyntaxText == syntaxTextAfterCompilation);
+}
+
+// We don't try to reach these syntax kinds in the all.sv test because
+// they can't ever be visited when traversing a normal syntax tree.
+// Directives are removed by the preprocessor, library map syntax
+// nodes can only exist when parsing library map files, etc.
+static constexpr auto IgnoredSyntaxKinds = {
+    SyntaxKind::Unknown,
+    SyntaxKind::BadExpression,
+    SyntaxKind::CellDefineDirective,
+    SyntaxKind::NoUnconnectedDriveDirective,
+    SyntaxKind::EndCellDefineDirective,
+    SyntaxKind::EndKeywordsDirective,
+    SyntaxKind::ResetAllDirective,
+    SyntaxKind::UndefineAllDirective,
+    SyntaxKind::DelayModeDistributedDirective,
+    SyntaxKind::DelayModePathDirective,
+    SyntaxKind::DelayModeUnitDirective,
+    SyntaxKind::DelayModeZeroDirective,
+    SyntaxKind::ProtectDirective,
+    SyntaxKind::EndProtectDirective,
+    SyntaxKind::ProtectedDirective,
+    SyntaxKind::EndProtectedDirective,
+    SyntaxKind::IncludeDirective,
+    SyntaxKind::IncludeDirective,
+    SyntaxKind::NamedConditionalDirectiveExpression,
+    SyntaxKind::UnaryConditionalDirectiveExpression,
+    SyntaxKind::BinaryConditionalDirectiveExpression,
+    SyntaxKind::ParenthesizedConditionalDirectiveExpression,
+    SyntaxKind::ElsIfDirective,
+    SyntaxKind::IfDefDirective,
+    SyntaxKind::IfNDefDirective,
+    SyntaxKind::EndIfDirective,
+    SyntaxKind::ElseDirective,
+    SyntaxKind::MacroArgumentDefault,
+    SyntaxKind::MacroFormalArgument,
+    SyntaxKind::MacroFormalArgumentList,
+    SyntaxKind::DefineDirective,
+    SyntaxKind::MacroActualArgument,
+    SyntaxKind::MacroActualArgumentList,
+    SyntaxKind::MacroUsage,
+    SyntaxKind::TimeScaleDirective,
+    SyntaxKind::DefaultNetTypeDirective,
+    SyntaxKind::UnconnectedDriveDirective,
+    SyntaxKind::DefaultDecayTimeDirective,
+    SyntaxKind::DefaultTriregStrengthDirective,
+    SyntaxKind::LineDirective,
+    SyntaxKind::UndefDirective,
+    SyntaxKind::BeginKeywordsDirective,
+    SyntaxKind::SimplePragmaExpression,
+    SyntaxKind::NameValuePragmaExpression,
+    SyntaxKind::NumberPragmaExpression,
+    SyntaxKind::ParenPragmaExpression,
+    SyntaxKind::PragmaDirective,
+    SyntaxKind::FilePathSpec,
+    SyntaxKind::LibraryIncDirClause,
+    SyntaxKind::LibraryDeclaration,
+    SyntaxKind::LibraryIncludeStatement,
+    SyntaxKind::LibraryMap,
+};
+
+// Similarly, these kinds of symbols aren't visited by a normal visit of an AST.
+static constexpr auto IgnoredSymbolKinds = {SymbolKind::Unknown,     SymbolKind::DeferredMember,
+                                            SymbolKind::Attribute,   SymbolKind::Definition,
+                                            SymbolKind::ErrorType,   SymbolKind::Field,
+                                            SymbolKind::UntypedType, SymbolKind::LocalAssertionVar};
+
+TEST_CASE("Visit all file") {
+    // Load a file containing all the SystemVerilog constructs and visit them
+    // just to get coverage of all the visitor methods.
+    fs::path path = findTestDir();
+    path /= "../../regression/all.sv";
+
+    auto options = optionsFor(LanguageVersion::v1800_2023);
+    auto tree = SyntaxTree::fromFile(path.string(), SyntaxTree::getDefaultSourceManager(), options);
+    REQUIRE(tree);
+
+    Compilation compilation(options);
+    compilation.addSyntaxTree(*tree);
+    if (std::ranges::any_of(compilation.getAllDiagnostics(), [](auto& d) { return d.isError(); })) {
+        NO_COMPILATION_ERRORS;
+    }
+
+    flat_hash_set<SymbolKind> symKinds = IgnoredSymbolKinds;
+    flat_hash_set<ExpressionKind> exprKinds = {ExpressionKind::Invalid};
+    flat_hash_set<StatementKind> stmtKinds = {StatementKind::Invalid};
+    flat_hash_set<AssertionExprKind> assertionExprKinds = {AssertionExprKind::Invalid};
+    flat_hash_set<TimingControlKind> timingControlKinds = {TimingControlKind::Invalid};
+    flat_hash_set<ConstraintKind> constraintKinds = {ConstraintKind::Invalid};
+    flat_hash_set<PatternKind> patternKinds = {PatternKind::Invalid};
+    flat_hash_set<BinsSelectExprKind> binsSelectKinds = {BinsSelectExprKind::Invalid};
+    compilation.getRoot().visit(makeVisitor(
+        [&](auto& v, std::derived_from<Symbol> auto& node) {
+            symKinds.insert(node.kind);
+            if (node.isValue())
+                symKinds.insert(node.template as<ValueSymbol>().getType().kind);
+            v.visitDefault(node);
+        },
+        [&](auto& v, std::derived_from<Expression> auto& node) {
+            CHECK(node.isEquivalentTo(node));
+            exprKinds.insert(node.kind);
+            symKinds.insert(node.type->kind);
+            v.visitDefault(node);
+        },
+        [&](auto& v, std::derived_from<AssertionExpr> auto& node) {
+            CHECK(node.isEquivalentTo(node));
+            assertionExprKinds.insert(node.kind);
+            v.visitDefault(node);
+        },
+        [&](auto& v, std::derived_from<TimingControl> auto& node) {
+            CHECK(node.isEquivalentTo(node));
+            timingControlKinds.insert(node.kind);
+            v.visitDefault(node);
+        },
+        [&](auto& v, std::derived_from<Constraint> auto& node) {
+            CHECK(node.isEquivalentTo(node));
+            constraintKinds.insert(node.kind);
+            v.visitDefault(node);
+        },
+        [&](auto& v, std::derived_from<Pattern> auto& node) {
+            CHECK(node.isEquivalentTo(node));
+            patternKinds.insert(node.kind);
+            v.visitDefault(node);
+        },
+        [&](auto& v, std::derived_from<BinsSelectExpr> auto& node) {
+            binsSelectKinds.insert(node.kind);
+            v.visitDefault(node);
+        },
+        [&](auto& v, std::derived_from<Statement> auto& node) {
+            stmtKinds.insert(node.kind);
+            v.visitDefault(node);
+        },
+        [&](auto& v, const TransparentMemberSymbol& node) {
+            // AST visitation doesn't unwrap transparent members
+            // but we'd like to see e.g. enum values so do it here.
+            symKinds.insert(node.kind);
+            node.wrapped.visit(v);
+        }));
+
+    flat_hash_set<SyntaxKind> syntaxKinds = IgnoredSyntaxKinds;
+    (*tree)->root().visit(makeSyntaxVisitor([&](auto& v, const auto& node) {
+        syntaxKinds.insert(node.kind);
+        v.visitDefault(node);
+    }));
+
+    auto printMissing = [](const std::string_view name, const auto& kinds, const auto& visited) {
+        for (auto kind : kinds) {
+            if (!visited.contains(kind)) {
+                FAIL_CHECK(fmt::format("Did not visit {}: {}\n", name, toString(kind)));
+            }
+        }
+    };
+    printMissing("syntax", SyntaxKind_traits::values, syntaxKinds);
+    printMissing("symbol", SymbolKind_traits::values, symKinds);
+    printMissing("expression", ExpressionKind_traits::values, exprKinds);
+    printMissing("assertion expr", AssertionExprKind_traits::values, assertionExprKinds);
+    printMissing("timing control", TimingControlKind_traits::values, timingControlKinds);
+    printMissing("constraint", ConstraintKind_traits::values, constraintKinds);
+    printMissing("pattern", PatternKind_traits::values, patternKinds);
+    printMissing("bins select", BinsSelectExprKind_traits::values, binsSelectKinds);
+    printMissing("statement", StatementKind_traits::values, stmtKinds);
+
+    analysis::AnalysisManager analysisManager;
+    compilation.freeze();
+    analysisManager.analyze(compilation);
+}

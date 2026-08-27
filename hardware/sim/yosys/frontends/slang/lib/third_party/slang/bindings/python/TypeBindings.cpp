@@ -1,0 +1,332 @@
+//------------------------------------------------------------------------------
+// TypeBindings.cpp
+// SPDX-FileCopyrightText: Michael Popoloski
+// SPDX-License-Identifier: MIT
+//------------------------------------------------------------------------------
+#include "pyslang.h"
+
+#include "slang/ast/types/AllTypes.h"
+#include "slang/ast/types/DeclaredType.h"
+#include "slang/ast/types/NetType.h"
+#include "slang/ast/types/TypePrinter.h"
+#include "slang/syntax/AllSyntax.h"
+
+void registerTypes(py::module_& m) {
+    py::native_enum<IntegralFlags>(m, "IntegralFlags", "enum.Flag")
+        .value("Unsigned", IntegralFlags::Unsigned)
+        .value("TwoState", IntegralFlags::TwoState)
+        .value("Signed", IntegralFlags::Signed)
+        .value("FourState", IntegralFlags::FourState)
+        .value("Reg", IntegralFlags::Reg)
+        .finalize();
+
+    py::classh<Type, Symbol>(m, "Type")
+        .def_property_readonly("canonicalType", &Type::getCanonicalType)
+        .def_property_readonly("bitWidth", &Type::getBitWidth)
+        .def_property_readonly("bitstreamWidth", &Type::getBitstreamWidth)
+        .def_property_readonly("selectableWidth", &Type::getSelectableWidth)
+        .def_property_readonly("isSigned", &Type::isSigned)
+        .def_property_readonly("isFourState", &Type::isFourState)
+        .def_property_readonly("isAggregate", &Type::isAggregate)
+        .def_property_readonly("isSingular", &Type::isSingular)
+        .def_property_readonly("isIntegral", &Type::isIntegral)
+        .def_property_readonly("isScalar", &Type::isScalar)
+        .def_property_readonly("isPredefinedInteger", &Type::isPredefinedInteger)
+        .def_property_readonly("isSimpleBitVector", &Type::isSimpleBitVector)
+        .def_property_readonly("hasFixedRange", &Type::hasFixedRange)
+        .def_property_readonly("isBooleanConvertible", &Type::isBooleanConvertible)
+        .def_property_readonly("isArray", &Type::isArray)
+        .def_property_readonly("isStruct", &Type::isStruct)
+        .def_property_readonly("isFixedSize", &Type::isFixedSize)
+        .def_property_readonly("isSimpleType", &Type::isSimpleType)
+        .def_property_readonly("isByteArray", &Type::isByteArray)
+        .def_property_readonly("isNumeric", &Type::isNumeric)
+        .def_property_readonly("isPackedArray", &Type::isPackedArray)
+        .def_property_readonly("isUnpackedArray", &Type::isUnpackedArray)
+        .def_property_readonly("isDynamicallySizedArray", &Type::isDynamicallySizedArray)
+        .def_property_readonly("isTaggedUnion", &Type::isTaggedUnion)
+        .def_property_readonly("isUnpackedStruct", &Type::isUnpackedStruct)
+        .def_property_readonly("isPackedUnion", &Type::isPackedUnion)
+        .def_property_readonly("isUnpackedUnion", &Type::isUnpackedUnion)
+        .def_property_readonly("isAssociativeArray", &Type::isAssociativeArray)
+        .def_property_readonly("isQueue", &Type::isQueue)
+        .def_property_readonly("isEnum", &Type::isEnum)
+        .def_property_readonly("isClass", &Type::isClass)
+        .def_property_readonly("isCovergroup", &Type::isCovergroup)
+        .def_property_readonly("isFloating", &Type::isFloating)
+        .def_property_readonly("isVoid", &Type::isVoid)
+        .def_property_readonly("isNull", &Type::isNull)
+        .def_property_readonly("isCHandle", &Type::isCHandle)
+        .def_property_readonly("isString", &Type::isString)
+        .def_property_readonly("isEvent", &Type::isEvent)
+        .def_property_readonly("isUnbounded", &Type::isUnbounded)
+        .def_property_readonly("isTypeRefType", &Type::isTypeRefType)
+        .def_property_readonly("isUntypedType", &Type::isUntypedType)
+        .def_property_readonly("isSequenceType", &Type::isSequenceType)
+        .def_property_readonly("isPropertyType", &Type::isPropertyType)
+        .def_property_readonly("isVirtualInterface", &Type::isVirtualInterface)
+        .def_property_readonly("isHandleType", &Type::isHandleType)
+        .def_property_readonly("isObjectHandleType", &Type::isObjectHandleType)
+        .def_property_readonly("isAlias", &Type::isAlias)
+        .def_property_readonly("isError", &Type::isError)
+        .def("isMatching", &Type::isMatching, "rhs"_a)
+        .def("isEquivalent", &Type::isEquivalent, "rhs"_a)
+        .def("isAssignmentCompatible", &Type::isAssignmentCompatible, "rhs"_a)
+        .def("isCastCompatible", &Type::isCastCompatible, "rhs"_a)
+        .def("isBitstreamCastable", &Type::isBitstreamCastable, "rhs"_a)
+        .def("isBitstreamType", &Type::isBitstreamType, "destination"_a = false)
+        .def("isDerivedFrom", &Type::isDerivedFrom, "rhs"_a)
+        .def("implements", &Type::implements, "rhs"_a)
+        .def("isValidForRand", &Type::isValidForRand, "mode"_a, "languageVersion"_a)
+        .def("coerceValue", &Type::coerceValue, "value"_a)
+        .def_static("getCommonBase", &Type::getCommonBase, byrefint, "left"_a, "right"_a)
+        .def_property_readonly("integralFlags", &Type::getIntegralFlags)
+        .def_property_readonly("defaultValue", &Type::getDefaultValue)
+        .def_property_readonly("fixedRange", &Type::getFixedRange)
+        .def_property_readonly("arrayElementType", &Type::getArrayElementType)
+        .def_property_readonly("associativeIndexType", &Type::getAssociativeIndexType)
+        .def_property_readonly("canBeStringLike", &Type::canBeStringLike)
+        .def_property_readonly("isIterable", &Type::isIterable)
+        .def_property_readonly("isValidForDPIReturn", &Type::isValidForDPIReturn)
+        .def_property_readonly("isValidForDPIArg", &Type::isValidForDPIArg)
+        .def_property_readonly("isValidForSequence", &Type::isValidForSequence)
+        .def("__repr__", &Type::toString);
+
+    py::classh<NetType, Symbol> netType(m, "NetType");
+    netType.def_readonly("declaredType", &NetType::declaredType)
+        .def_readonly("netKind", &NetType::netKind)
+        .def_property_readonly("resolutionFunction", &NetType::getResolutionFunction)
+        .def_property_readonly("isError", &NetType::isError)
+        .def_property_readonly("isBuiltIn", &NetType::isBuiltIn)
+        .def_static("getSimulatedNetType", &NetType::getSimulatedNetType, byrefint, "internal"_a,
+                    "external"_a, "shouldWarn"_a);
+
+    py::native_enum<NetType::NetKind>(netType, "NetKind", "enum.Enum")
+        .value("Unknown", NetType::Unknown)
+        .value("Wire", NetType::Wire)
+        .value("WAnd", NetType::WAnd)
+        .value("WOr", NetType::WOr)
+        .value("Tri", NetType::Tri)
+        .value("TriAnd", NetType::TriAnd)
+        .value("TriOr", NetType::TriOr)
+        .value("Tri0", NetType::Tri0)
+        .value("Tri1", NetType::Tri1)
+        .value("TriReg", NetType::TriReg)
+        .value("Supply0", NetType::Supply0)
+        .value("Supply1", NetType::Supply1)
+        .value("UWire", NetType::UWire)
+        .value("Interconnect", NetType::Interconnect)
+        .value("UserDefined", NetType::UserDefined)
+        .export_values()
+        .finalize();
+
+    py::classh<TypePrintingOptions> typePrintingOptions(m, "TypePrintingOptions");
+    typePrintingOptions.def_readwrite("quoteChar", &TypePrintingOptions::quoteChar)
+        .def_readwrite("elideScopeNames", &TypePrintingOptions::elideScopeNames)
+        .def_readwrite("printAKA", &TypePrintingOptions::printAKA)
+        .def_readwrite("skipScopedTypeNames", &TypePrintingOptions::skipScopedTypeNames)
+        .def_readwrite("skipTypeDefs", &TypePrintingOptions::skipTypeDefs)
+        .def_readwrite("fullEnumType", &TypePrintingOptions::fullEnumType)
+        .def_readwrite("typedefsAsLinks", &TypePrintingOptions::typedefsAsLinks)
+        .def_readwrite("enumsAsLinks", &TypePrintingOptions::enumsAsLinks)
+        .def_readwrite("classesAsLinks", &TypePrintingOptions::classesAsLinks)
+        .def_readwrite("printIntegralRange", &TypePrintingOptions::printIntegralRange)
+        .def_readwrite("anonymousTypeStyle", &TypePrintingOptions::anonymousTypeStyle)
+        .def_readwrite("friendlyMemberCharLimit", &TypePrintingOptions::friendlyMemberCharLimit);
+
+    py::native_enum<TypePrintingOptions::AnonymousTypeStyle>(typePrintingOptions,
+                                                             "AnonymousTypeStyle", "enum.Enum")
+        .value("SystemName", TypePrintingOptions::SystemName)
+        .value("FriendlyName", TypePrintingOptions::FriendlyName)
+        .export_values()
+        .finalize();
+
+    py::classh<TypePrinter>(m, "TypePrinter")
+        .def(py::init<>())
+        .def_readwrite("options", &TypePrinter::options)
+        .def("append", &TypePrinter::append, "type"_a)
+        .def("clear", &TypePrinter::clear)
+        .def("toString", &TypePrinter::toString);
+
+    py::classh<DeclaredType>(m, "DeclaredType")
+        .def_property_readonly("type", &DeclaredType::getType)
+        .def_property_readonly("typeSyntax", &DeclaredType::getTypeSyntax)
+        .def_property_readonly("initializer", &DeclaredType::getInitializer)
+        .def_property_readonly("initializerSyntax", &DeclaredType::getInitializerSyntax)
+        .def_property_readonly("initializerLocation", &DeclaredType::getInitializerLocation)
+        .def_property_readonly("isEvaluating", &DeclaredType::isEvaluating)
+        .def_property_readonly("resolvedDimensions", &DeclaredType::getResolvedDimensions);
+
+    py::classh<IntegralType, Type>(m, "IntegralType")
+        .def("getBitVectorRange", &IntegralType::getBitVectorRange)
+        .def("isDeclaredReg", &IntegralType::isDeclaredReg);
+
+    py::classh<ScalarType, IntegralType> scalarType(m, "ScalarType");
+    scalarType.def_readonly("scalarKind", &ScalarType::scalarKind);
+
+    py::native_enum<ScalarType::Kind>(scalarType, "Kind", "enum.Enum")
+        .value("Bit", ScalarType::Bit)
+        .value("Logic", ScalarType::Logic)
+        .value("Reg", ScalarType::Reg)
+        .export_values()
+        .finalize();
+
+    py::classh<PredefinedIntegerType, IntegralType> pdit(m, "PredefinedIntegerType");
+    pdit.def_readonly("integerKind", &PredefinedIntegerType::integerKind);
+
+    py::native_enum<PredefinedIntegerType::Kind>(pdit, "Kind", "enum.Enum")
+        .value("ShortInt", PredefinedIntegerType::ShortInt)
+        .value("Int", PredefinedIntegerType::Int)
+        .value("LongInt", PredefinedIntegerType::LongInt)
+        .value("Byte", PredefinedIntegerType::Byte)
+        .value("Integer", PredefinedIntegerType::Integer)
+        .value("Time", PredefinedIntegerType::Time)
+        .export_values()
+        .finalize();
+
+    py::classh<FloatingType, Type> floating(m, "FloatingType");
+    floating.def_readonly("floatKind", &FloatingType::floatKind);
+
+    py::native_enum<FloatingType::Kind>(floating, "Kind", "enum.Enum")
+        .value("Real", FloatingType::Real)
+        .value("ShortReal", FloatingType::ShortReal)
+        .value("RealTime", FloatingType::RealTime)
+        .export_values()
+        .finalize();
+
+    py::classh<EnumType, IntegralType, Scope>(m, "EnumType")
+        .def_property_readonly("baseType", [](const EnumType& self) { return &self.baseType; })
+        .def_readonly("systemId", &EnumType::systemId);
+
+    py::classh<PackedArrayType, IntegralType>(m, "PackedArrayType")
+        .def_property_readonly("elementType",
+                               [](const PackedArrayType& self) { return &self.elementType; })
+        .def_readonly("range", &PackedArrayType::range);
+
+    py::classh<FixedSizeUnpackedArrayType, Type>(m, "FixedSizeUnpackedArrayType")
+        .def_property_readonly(
+            "elementType", [](const FixedSizeUnpackedArrayType& self) { return &self.elementType; })
+        .def_readonly("range", &FixedSizeUnpackedArrayType::range);
+
+    py::classh<DynamicArrayType, Type>(m, "DynamicArrayType")
+        .def_property_readonly("elementType",
+                               [](const DynamicArrayType& self) { return &self.elementType; });
+
+    py::classh<DPIOpenArrayType, Type>(m, "DPIOpenArrayType")
+        .def_readonly("isPacked", &DPIOpenArrayType::isPacked)
+        .def_property_readonly("elementType",
+                               [](const DPIOpenArrayType& self) { return &self.elementType; });
+
+    py::classh<AssociativeArrayType, Type>(m, "AssociativeArrayType")
+        .def_property_readonly("elementType",
+                               [](const AssociativeArrayType& self) { return &self.elementType; })
+        .def_property_readonly("indexType",
+                               [](const AssociativeArrayType& self) { return self.indexType; });
+
+    py::classh<QueueType, Type>(m, "QueueType")
+        .def_property_readonly("elementType",
+                               [](const QueueType& self) { return &self.elementType; })
+        .def_readonly("maxBound", &QueueType::maxBound);
+
+    py::classh<PackedStructType, IntegralType, Scope>(m, "PackedStructType")
+        .def_readonly("systemId", &PackedStructType::systemId);
+
+    py::classh<UnpackedStructType, Type, Scope>(m, "UnpackedStructType")
+        .def_readonly("systemId", &UnpackedStructType::systemId);
+
+    py::classh<PackedUnionType, IntegralType, Scope>(m, "PackedUnionType")
+        .def_readonly("systemId", &PackedUnionType::systemId)
+        .def_readonly("isTagged", &PackedUnionType::isTagged)
+        .def_readonly("isSoft", &PackedUnionType::isSoft)
+        .def_readonly("tagBits", &PackedUnionType::tagBits);
+
+    py::classh<UnpackedUnionType, Type, Scope>(m, "UnpackedUnionType")
+        .def_readonly("systemId", &UnpackedUnionType::systemId)
+        .def_readonly("isTagged", &UnpackedUnionType::isTagged);
+
+#define SIMPLE_TYPE(name) py::classh<name, Type>(m, #name)
+    SIMPLE_TYPE(VoidType);
+    SIMPLE_TYPE(NullType);
+    SIMPLE_TYPE(CHandleType);
+    SIMPLE_TYPE(StringType);
+    SIMPLE_TYPE(EventType);
+    SIMPLE_TYPE(UnboundedType);
+    SIMPLE_TYPE(TypeRefType);
+    SIMPLE_TYPE(UntypedType);
+    SIMPLE_TYPE(SequenceType);
+    SIMPLE_TYPE(PropertyType);
+    SIMPLE_TYPE(ErrorType);
+
+    py::classh<VirtualInterfaceType, Type>(m, "VirtualInterfaceType")
+        .def_property_readonly("iface",
+                               [](const VirtualInterfaceType& self) { return &self.iface; })
+        .def_property_readonly("modport",
+                               [](const VirtualInterfaceType& self) { return self.modport; });
+
+    EXPOSE_ENUM(m, ForwardTypeRestriction);
+
+    py::classh<ForwardingTypedefSymbol, Symbol>(m, "ForwardingTypedefSymbol")
+        .def_readonly("typeRestriction", &ForwardingTypedefSymbol::typeRestriction)
+        .def_readonly("visibility", &ForwardingTypedefSymbol::visibility)
+        .def_property_readonly("nextForwardDecl", [](const ForwardingTypedefSymbol& self) {
+            return self.getNextForwardDecl();
+        });
+
+    py::classh<TypeAliasType, Type>(m, "TypeAliasType")
+        .def_property_readonly("targetType",
+                               [](const TypeAliasType& self) { return &self.targetType; })
+        .def_readonly("visibility", &TypeAliasType::visibility)
+        .def_property_readonly("firstForwardDecl", [](const TypeAliasType& self) {
+            return self.getFirstForwardDecl();
+        });
+
+    py::classh<ClassType, Type, Scope>(m, "ClassType")
+        .def_readonly("genericClass", &ClassType::genericClass)
+        .def_readonly("isAbstract", &ClassType::isAbstract)
+        .def_readonly("isInterface", &ClassType::isInterface)
+        .def_readonly("isFinal", &ClassType::isFinal)
+        .def_readonly("thisVar", &ClassType::thisVar)
+        .def_property_readonly("baseClass", &ClassType::getBaseClass)
+        .def_property_readonly("implementedInterfaces", &ClassType::getImplementedInterfaces)
+        .def_property_readonly("baseConstructorCall", &ClassType::getBaseConstructorCall)
+        .def_property_readonly("constructor", &ClassType::getConstructor)
+        .def_property_readonly("firstForwardDecl", &ClassType::getFirstForwardDecl)
+        .def_property_readonly("properties", [](const ClassType& self) {
+            py::list result;
+            for (auto& prop : self.properties())
+                result.append(py::cast(&prop));
+            return result;
+        });
+
+    py::classh<GenericClassDefSymbol, Symbol>(m, "GenericClassDefSymbol")
+        .def_readonly("isInterface", &GenericClassDefSymbol::isInterface)
+        .def_property_readonly("defaultSpecialization",
+                               &GenericClassDefSymbol::getDefaultSpecialization)
+        .def_property_readonly("invalidSpecialization",
+                               &GenericClassDefSymbol::getInvalidSpecialization)
+        .def_property_readonly("defaultSpecialization",
+                               &GenericClassDefSymbol::getDefaultSpecialization)
+        .def_property_readonly("firstForwardDecl", &GenericClassDefSymbol::getFirstForwardDecl);
+
+    py::native_enum<ConstraintBlockFlags>(m, "ConstraintBlockFlags", "enum.Flag")
+        .value("None_", ConstraintBlockFlags::None)
+        .value("Pure", ConstraintBlockFlags::Pure)
+        .value("Static", ConstraintBlockFlags::Static)
+        .value("Extern", ConstraintBlockFlags::Extern)
+        .value("ExplicitExtern", ConstraintBlockFlags::ExplicitExtern)
+        .value("Initial", ConstraintBlockFlags::Initial)
+        .value("Extends", ConstraintBlockFlags::Extends)
+        .value("Final", ConstraintBlockFlags::Final)
+        .finalize();
+
+    py::classh<ConstraintBlockSymbol, Symbol, Scope>(m, "ConstraintBlockSymbol")
+        .def_readonly("thisVar", &ConstraintBlockSymbol::thisVar)
+        .def_readonly("flags", &ConstraintBlockSymbol::flags)
+        .def_property_readonly("constraints", &ConstraintBlockSymbol::getConstraints);
+
+    py::classh<CovergroupType, Type, Scope>(m, "CovergroupType")
+        .def_property_readonly("arguments", &CovergroupType::getArguments)
+        .def_property_readonly("body", [](const CovergroupType& self) { return &self.getBody(); })
+        .def_property_readonly("baseGroup", &CovergroupType::getBaseGroup)
+        .def_property_readonly("coverageEvent", &CovergroupType::getCoverageEvent);
+}

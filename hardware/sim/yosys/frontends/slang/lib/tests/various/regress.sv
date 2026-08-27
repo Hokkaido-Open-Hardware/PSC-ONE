@@ -1,0 +1,351 @@
+// To catch regressions around snippets which previously failed
+// to parse
+
+module r1;
+	logic a [0:1];
+	assign a[1'b0] = 1;
+endmodule
+
+module r2;
+	logic [1:0] a [0:1];
+	always_comb
+		a[1'b0-:1] = '{0};
+endmodule
+
+module r3;
+logic [7:0] m;
+always @(*) begin
+	m[4-:2] <= 0;
+end
+endmodule
+
+module r4(input [1:0] s);
+	logic [1:0] [31:0] data;
+
+	always_comb begin
+		data = 0;
+		for (int i = -10; i < 10; i++)
+			data[s][i+:8] = 0;
+	end
+endmodule
+
+module r5;
+	logic [1:0] [31:0] data;
+	logic [1:0] s;
+
+	always_comb begin
+		reg [31:0] acc;
+		for (int i = -10; i < 10; i++)
+			acc += data[s][i+:8];
+	end
+endmodule
+
+module r6;
+	logic a, b;
+	assign {>>{ a }} = b;
+endmodule
+
+`ifndef KEEP_HIERARCHY
+module r7submod(input logic [3:0] i);
+	logic [3:0] w;
+	assign w = i + 1;
+endmodule
+
+module r7(input logic [3:0] i, output logic [3:0] out);
+	r7submod submod(.i(i));
+	always_comb begin
+		automatic logic [3:0] w_fetched = submod.w;
+		out <= w_fetched;
+	end
+endmodule
+`endif
+
+module r8();
+// `bit` type memories have implicit initialization
+bit _bit [7:0];
+logic _logic [7:0];
+reg _reg [7:0];
+endmodule
+
+module r9_blackbox_inner(output w);
+endmodule
+
+(* blackbox *)
+module r9_blackbox(output w);
+	r9_blackbox_inner inner(.*);
+endmodule
+
+module r9();
+	r9_blackbox box();
+endmodule
+
+`ifndef KEEP_HIERARCHY
+// issue #129
+module r10n();
+wire n;
+assign n = 0;
+endmodule
+
+module r10a();
+wire t;
+assign t = n1.n;
+r10n n1();
+endmodule
+
+module r10b();
+wire t;
+r10n n1();
+assign t = n1.n;
+endmodule
+`endif
+
+module r11(input a, input b, input c, output y);
+	let andor(a, b, c) = a && b || c;
+	assign y = andor(a, b, c);
+endmodule
+
+module r12();
+	interface class c1#(type T = logic);
+	endclass
+endmodule
+
+module r13();
+	specparam delay = 50;
+endmodule
+
+module r14(input x);
+	assert #0 (x);
+endmodule
+
+module r15sub(input [7:0] allbits, input [1:0] onebit, output bitout);
+	assign bitout = allbits[onebit];
+endmodule
+
+module r15();
+	wire [17:10] bitout;
+	reg [7:0] allbits;
+	reg [15:0] onebit;
+	r15sub sub [7:0] (allbits, onebit, bitout);
+endmodule
+
+module r16(input [3:0] in, input invert);
+	wire [3:0] out;
+	xor X[3:0] (out, in, invert);
+endmodule
+
+// false memory inference on function argument
+module r17();
+	function f(int arg [1:0]);
+	endfunction
+	always_comb begin
+		int v [1:0];
+		f(v);
+	end
+endmodule
+
+// return out of task
+module r18(
+    input logic [7:0] a, input logic [7:0] b, output logic [8:0] out
+);
+	task sum(logic [7:0] a, logic [7:0] b, output logic [8:0] out);
+	    out = a + b;
+	    return;
+	endtask;
+    always_comb sum(a, b, out);
+endmodule
+
+// defparam
+module r19sub();
+	parameter s = 0;
+	initial begin
+		if (s == 0)
+			$error("bad");
+	end
+endmodule
+module r19();
+	r19sub inst();
+	defparam inst.s = 1;
+endmodule
+
+// recursion
+module r20(input [31:0] x, output [31:0] q);
+	function automatic [31:0] pow;
+		input [31:0] base;
+		input [31:0] exp;
+		begin
+			if (exp > 0)
+				pow = base * pow(base, exp - 1);
+			else
+				pow = 1;
+		end
+	endfunction
+	assign q = pow(x, 3);
+endmodule
+
+// $fatal with bad arg type
+module r21(input clk);
+    always @(posedge clk) begin
+        // ... long procedure
+        if (0)
+        	$fatal("foo");
+    end
+endmodule
+
+// propagate bounds through multiplication
+module r22(input clk, input [31:0] i, output reg [31:0] q,
+           input [1:0] a, input [1:0] b);
+    always @(posedge clk) begin
+        q = i;
+        for (int i = 1; i < a * b; i++)
+            q = q * i;
+    end
+endmodule
+
+// specify ignored
+module r23(input A, output B);
+assign B = A;
+specparam a = 1;
+
+specify
+endspecify
+
+specify
+    (A => B) = (1);
+    (A- => B) = (1,2);
+    (A+ => B) = (1,2,3);
+    (A => B) = (
+     1.1, 2, 3,
+     4, 5.5, 6.6
+    );
+    (A => B) = (
+     1.1, 2, 3,
+     4, 5.5, 6.6,
+     7.7, 8.8, 9,
+     10.1, 11, 12
+    );
+    specparam [1:2] b = 1;
+endspecify
+
+specify
+    specparam c = 1:2:3;
+endspecify
+endmodule
+
+// test for an edge case from way back
+module r24(input z, input [63:0] x);
+	reg [31:0] y[0:0];
+
+	always_comb begin
+		y = '{0};
+		for (int i = 0; i < 32; i++) begin
+			if(~z) begin
+			end else begin
+				y[0][i] = x[2*i+1];
+			end
+		end
+	end
+endmodule
+
+// issue 247 bug in order_symbols_within_scope
+module r25();
+    r25_if foo ();
+    r25_if bar ();
+
+    always_comb begin
+       foo.a = 0;
+       bar.a = 1;
+    end
+endmodule
+
+interface r25_if();
+   logic a;
+endinterface
+
+// issue 259 another bug in order_symbols_within_scope 
+typedef struct packed {
+    logic                       valid;
+  } r26_s_flit_req_t;
+
+typedef struct packed {
+    logic                       ready;
+  } r26_s_flit_resp_t;
+
+interface r26_router_if;
+   r26_s_flit_req_t  req;
+   r26_s_flit_resp_t resp;
+
+  modport send_flit (
+    output  req,
+    input   resp
+  );
+
+  modport recv_flit (
+    input   req,
+    output  resp
+  );
+
+endinterface // router_if
+module r26();
+   r26_router_if ns_con [2] ();
+   r26_router_if sn_con [2] ();
+   localparam int NorthIdx = 0;
+   r26_router u_router (
+        .north_send     (ns_con[NorthIdx]),
+        .north_recv     (sn_con[NorthIdx])
+      );
+endmodule // raven
+
+module r26_router
+  (
+  r26_router_if.send_flit   north_send,
+  r26_router_if.recv_flit   north_recv
+);
+  r26_s_flit_resp_t       [4:0] ext_resp_v_o;
+  r26_s_flit_req_t        [4:0] ext_req_v_o;
+  always_comb begin : mapping_input_ports
+    north_recv.resp = ext_resp_v_o[0];
+    north_send.req = ext_req_v_o[0];
+  end
+endmodule
+
+// pr 268 try cause name conflict
+module r27_submodule();
+    always_comb begin
+        foo: assert(1);
+    end
+endmodule
+
+module r27();
+    wire foo;
+    r27_submodule bar();
+endmodule
+
+// issue 160 async set/reset from a struct field
+module r28(input clk, input rst, input x, output q);
+    typedef struct packed {
+        logic x;
+        logic q;
+        logic clk;
+        logic rst;
+    } foo_t;
+    foo_t bar;
+
+    assign bar.clk = clk;
+    assign bar.rst = rst;
+    assign bar.x = x;
+    assign q = bar.q;
+
+    always_ff @(posedge bar.clk or negedge bar.rst) begin
+        if (~bar.rst)
+            bar.q <= 0;
+        else
+            bar.q <= bar.x;
+    end
+endmodule
+
+// pr 373 async pattern with size cast
+module r29(input clk, input rst, input d, output reg q);
+	always @(posedge clk or posedge rst)
+		if (rst == 1) q <= 1'b0;
+		else q <= d;
+endmodule
