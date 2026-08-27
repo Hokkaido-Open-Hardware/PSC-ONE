@@ -23,6 +23,15 @@ parallel_run/
 *.mem
 *.S
 
+# RUST
+*.dump
+
+# yosys
+PSC-ONE/hardware/sim/build_nextpnr_v1/
+PSC-ONE/hardware/sim/build_nextpnr_v2/
+PSC-ONE/hardware/sim/log/test_result_*.log
+PSC-ONE/hardware/sim/yosys/
+
 # Vosk models
 vosk-model*/
 
