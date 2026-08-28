@@ -370,12 +370,20 @@ module Decorder (
                                     raise_illegal_instruction_alu;
     end
 
-    // The v2 issue stage consumes the FIFO head directly.  Keep decode
-    // combinational so a new independent R/I instruction can be dispatched
-    // on every clock; the issue/slow-path registers provide the state hold.
-    always_comb begin
-        decoder_ctrl = decoder_ctrl_next;
-        decode_done  = decode_enb;
+    // Register the full decode result before rename.  This separates the
+    // Fetch FIFO read mux and opcode decode from the RAT lookup/rename path.
+    // decode_done remains asserted until the requester drops decode_enb, so
+    // the FIFO head is consumed exactly once.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            decoder_ctrl <= '0;
+            decode_done  <= 1'b0;
+        end else if (!decode_enb) begin
+            decode_done <= 1'b0;
+        end else if (!decode_done) begin
+            decoder_ctrl <= decoder_ctrl_next;
+            decode_done  <= 1'b1;
+        end
     end
 
 endmodule

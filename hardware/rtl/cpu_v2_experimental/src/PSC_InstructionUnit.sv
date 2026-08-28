@@ -196,6 +196,10 @@ module PSC_InstructionUnit #(
     logic [31:0]          load_wb_value;
     logic                 commit_fire;
     logic [31:0]          commit_result;
+    logic                 commit_prf_valid;
+    logic [4:0]           commit_prf_addr;
+    logic [31:0]          commit_prf_data;
+    logic                 commit_prf_csr;
     logic                 branch_redirect;
     logic [63:0]          ooo_cycle;
     integer i;
@@ -229,10 +233,9 @@ module PSC_InstructionUnit #(
         .wb2_valid          (load_wb_valid && rob[rob_head].dest_valid),
         .wb2_addr           (rob[rob_head].dest_phys),
         .wb2_data           (load_wb_value),
-        .wb3_valid          (commit_fire && rob[rob_head].dest_valid &&
-                             !rob[rob_head].exception_valid),
-        .wb3_addr           (rob[rob_head].ctrl.w_addr),
-        .wb3_data           (commit_result)
+        .wb3_valid          (commit_prf_valid),
+        .wb3_addr           (commit_prf_addr),
+        .wb3_data           (commit_prf_csr ? csr_rdata : commit_prf_data)
     );
 
     function automatic logic is_mul_div(input dec_ctrl_t ctrl);
@@ -415,12 +418,15 @@ module PSC_InstructionUnit #(
     assign dispatch_fire = decode_stage_valid && !rob_full && iq_has_free &&
                            (!dispatch_needs_dest || has_free_phys) &&
                            !dispatch_blocked && !cpu_stop && !cpu_trap &&
-                           !d_pf && !i_pf && !fifo_flush;
+                           !d_pf && !i_pf && !fifo_flush &&
+                           !commit_prf_valid;
     assign decode_stage_ready = !decode_stage_valid || dispatch_fire;
-    assign decode_enb = fifo_req_ready && decode_stage_ready &&
+    assign decode_enb = fifo_req_ready && decode_stage_ready && !decode_done &&
                         !cpu_stop && !cpu_trap && !d_pf && !i_pf &&
                         !fifo_flush;
-    assign decode_capture_fire = decode_done && decode_enb;
+    assign decode_capture_fire = decode_done && fifo_req_ready &&
+                                 decode_stage_ready && !cpu_stop &&
+                                 !cpu_trap && !d_pf && !i_pf && !fifo_flush;
     assign fifo_read_valid = decode_capture_fire;
 
     // Two-entry oldest-ready selection, independently for the integer and M
@@ -506,20 +512,20 @@ module PSC_InstructionUnit #(
                          rob[rob_head].completed;
     assign commit_result = (rob[rob_head].ctrl.wb_sel == 2'b11)
                          ? csr_rdata : rob[rob_head].result;
-    // Only expose control when an instruction really commits.  This prevents
-    // illegal/ECALL side effects from firing while a head entry is still busy.
-    assign commit_ctrl = commit_fire ? rob[rob_head].ctrl : '0;
+    // Only expose side-effecting control when an instruction really commits.
+    // The CSR read address is safe to present early and lets Csr register the
+    // old value without putting commit_fire in its read-mux data path.
+    always_comb begin
+        commit_ctrl = '0;
+        commit_ctrl.csr_addr = rob[rob_head].ctrl.csr_addr;
+        if (commit_fire)
+            commit_ctrl = rob[rob_head].ctrl;
+    end
     assign commit_alu_data = rob[rob_head].branch_target;
     assign commit_branch_taken = commit_fire && rob[rob_head].branch_taken;
     assign csr_reg_data_1 = rob[rob_head].side_effect_value;
     assign csr_enb = commit_fire && !rob[rob_head].exception_valid;
 
-    assign branch_redirect = alu_wb_valid &&
-                             (alu_active_ctrl.pc_sel != 2'b00) &&
-                             branch_exec(alu_active_ctrl.pc_sel,
-                                         alu_active_ctrl.funct3,
-                                         alu_active_src1,
-                                         alu_active_src2);
     assign fifo_flush = d_pf || i_pf || branch_redirect ||
                         (commit_fire &&
                          (rob[rob_head].ctrl.is_fence_i ||
@@ -532,6 +538,50 @@ module PSC_InstructionUnit #(
 
     assign execute_task_busy = (rob_count != 0) || md_active;
     assign execute_task_done = commit_fire;
+
+    // The architectural PRF has 31 independently decoded write destinations.
+    // Register the retiring value before that high-fanout write network so
+    // ROB completion/count, CSR read selection and PRF destination decoding
+    // are not part of one clock-to-clock path.  Dispatch pauses while this
+    // packet is written, ensuring a held consumer cannot observe the old
+    // architectural value after its speculative mapping is released.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            commit_prf_valid <= 1'b0;
+            commit_prf_addr  <= 5'd0;
+            commit_prf_data  <= 32'd0;
+            commit_prf_csr   <= 1'b0;
+        end else if (cpu_stop) begin
+            commit_prf_valid <= 1'b0;
+            commit_prf_addr  <= 5'd0;
+            commit_prf_data  <= 32'd0;
+            commit_prf_csr   <= 1'b0;
+        end else begin
+            commit_prf_valid <= commit_fire && rob[rob_head].dest_valid &&
+                                !rob[rob_head].exception_valid;
+            commit_prf_addr  <= rob[rob_head].ctrl.w_addr;
+            commit_prf_data  <= rob[rob_head].result;
+            commit_prf_csr   <= (rob[rob_head].ctrl.wb_sel == 2'b11);
+        end
+    end
+
+    // Branches are serializing in the ROB, so no younger instruction can
+    // dispatch while the comparison is pending.  Register the redirect pulse
+    // and apply the FIFO flush in the following commit cycle; this removes the
+    // comparator -> global flush/enable fanout from one timing path.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n)
+            branch_redirect <= 1'b0;
+        else if (cpu_stop || cpu_trap || d_pf || i_pf)
+            branch_redirect <= 1'b0;
+        else
+            branch_redirect <= alu_wb_valid &&
+                               (alu_active_ctrl.pc_sel != 2'b00) &&
+                               branch_exec(alu_active_ctrl.pc_sel,
+                                           alu_active_ctrl.funct3,
+                                           alu_active_src1,
+                                           alu_active_src2);
+    end
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n)

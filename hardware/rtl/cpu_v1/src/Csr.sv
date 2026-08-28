@@ -213,77 +213,47 @@ module Csr (
         (priv_mode != PRIV_M) && csr_medeleg[trap_scause];
 
     // ---------------- outputs ----------------
+    // The CSR registers are already the architectural state.  Driving a
+    // second bank of output flops duplicated hundreds of bits and created a
+    // global csr_valid clock-enable network.  Expose the state directly and
+    // retain registers only for status inputs that must be sampled.
+    always_comb begin
+        out_mstatus = csr_mstatus;
+        out_medeleg = csr_medeleg;
+        out_mie     = csr_mie;
+        out_mip     = csr_mip;
+        out_mtvec   = csr_mtvec;
+        out_mepc    = csr_mepc;
+        out_mcause  = csr_mcause;
+
+        out_sstatus = csr_sstatus;
+        out_stvec   = csr_stvec;
+        out_sepc    = csr_sepc;
+        out_scause  = csr_scause;
+        out_stval   = csr_stval;
+        out_satp    = csr_satp;
+        priv_mode   = csr_priv_mode;
+
+        out_DCACHE_CTRL = csr_DCACHE_CTRL;
+        out_DMA_CTRL    = csr_DMA_CTRL;
+        out_DMA_WORDS   = csr_DMA_WORDS;
+        out_DMA_SRC     = csr_DMA_SRC;
+        out_DMA_DST     = csr_DMA_DST;
+        out_SA_CTRL     = csr_SA_CTRL;
+        out_SA_MODE     = csr_SA_MODE;
+        out_SA_ADDR_A   = csr_SA_ADDR_A;
+        out_SA_ADDR_B   = csr_SA_ADDR_B;
+        out_SA_ADDR_C   = csr_SA_ADDR_C;
+        out_CPU_MON_CTRL = csr_CPU_MON_CTRL;
+    end
+
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            out_mstatus <= 32'd0;
-            out_medeleg <= 32'd0;
-            out_mie     <= 32'd0;
-            out_mip     <= 32'd0;
-            out_mtvec   <= 32'd0;
-            out_mepc    <= 32'd0;
-            out_mcause  <= 32'd0;
-
-            out_sstatus <= 32'd0;
-            out_stvec   <= 32'd0;
-            out_sepc    <= 32'd0;
-            out_scause  <= 32'd0;
-            out_stval   <= 32'd0;
-            out_satp    <= 32'd0;
-
-            priv_mode   <= 2'b0;
-
-            out_DCACHE_CTRL <= 32'd0;
-
-            out_DMA_CTRL    <= 32'd0;
-            out_DMA_WORDS   <= 32'd0;
-            out_DMA_SRC     <= 32'd0;
-            out_DMA_DST     <= 32'd0;
-
-            out_SA_CTRL     <= 32'd0;
-            out_SA_ADDR_A   <= 32'd0;
-            out_SA_ADDR_B   <= 32'd0;
-            out_SA_ADDR_C   <= 32'd0;
-
-            out_CPU_MON_CTRL <= 32'd0;
-            
-            csr_DMA_STATUS  <= 32'd0;
-            csr_SA_STATUS   <= 32'd0;
-        end else begin
-            if(csr_valid) begin
-                out_mstatus <= csr_mstatus;
-                out_medeleg <= csr_medeleg;
-                out_mie     <= csr_mie;
-                out_mip     <= csr_mip;
-                out_mtvec   <= csr_mtvec;
-                out_mepc    <= csr_mepc;
-                out_mcause  <= csr_mcause;
-
-                out_sstatus <= csr_sstatus;
-                out_stvec   <= csr_stvec;
-                out_sepc    <= csr_sepc;
-                out_scause  <= csr_scause;
-                out_stval   <= csr_stval;
-                out_satp    <= csr_satp;
-
-                out_DCACHE_CTRL  <= csr_DCACHE_CTRL;
-
-                out_DMA_CTRL  <= csr_DMA_CTRL;
-                out_DMA_WORDS <= csr_DMA_WORDS;
-                out_DMA_SRC   <= csr_DMA_SRC;
-                out_DMA_DST   <= csr_DMA_DST;
-
-                out_SA_CTRL   <= csr_SA_CTRL;
-                out_SA_MODE   <= csr_SA_MODE;
-                out_SA_ADDR_A <= csr_SA_ADDR_A;
-                out_SA_ADDR_B <= csr_SA_ADDR_B;
-                out_SA_ADDR_C <= csr_SA_ADDR_C;
-
-                out_CPU_MON_CTRL <= csr_CPU_MON_CTRL;
-
-                priv_mode     <= csr_priv_mode;
-                csr_DMA_STATUS <= in_DMA_STATUS;
-                csr_SA_STATUS  <= in_SA_STATUS;
-            end
+            csr_DMA_STATUS <= 32'd0;
+            csr_SA_STATUS  <= 32'd0;
+        end else if (csr_valid) begin
+            csr_DMA_STATUS <= in_DMA_STATUS;
+            csr_SA_STATUS  <= in_SA_STATUS;
         end
     end
 

@@ -23,66 +23,47 @@ module Execute_Mul (
 
     state_t state;
 
-    logic signed [63:0] mul_ss;
-    logic signed [64:0] mul_su;
-    logic        [63:0] mul_uu;
+    logic signed [32:0] multiplicand_q;
+    logic signed [32:0] multiplier_q;
+    logic signed [65:0] product;
+    logic               high_result_q;
 
     assign busy = (state != IDLE);
 
-    always_comb begin
-        // Signed × signed
-        mul_ss = $signed(data_1) * $signed(data_2);
-
-        // Signed × unsigned
-        mul_su = $signed({data_1[31], data_1})
-               * $signed({1'b0, data_2});
-
-        // Unsigned × unsigned
-        mul_uu = data_1 * data_2;
-    end
+    // One signed 33x33 multiplier covers all four RV32M multiply variants.
+    // Zero extension selects unsigned input interpretation; sign extension
+    // selects signed interpretation.  Registering these inputs also removes
+    // the issue/control muxes from the DSP-to-result critical path.
+    assign product = multiplicand_q * multiplier_q;
 
     always_ff @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
             state   <= IDLE;
             done    <= 1'b0;
             mul_out <= 32'd0;
+            multiplicand_q <= 33'sd0;
+            multiplier_q   <= 33'sd0;
+            high_result_q  <= 1'b0;
         end else begin
             done <= 1'b0;
 
             unique case (state)
                 IDLE: begin
                     if (start) begin
-                        state <= RUN;
+                        multiplicand_q <= (alucon == 2'b01 || alucon == 2'b10)
+                                          ? $signed({data_1[31], data_1})
+                                          : $signed({1'b0, data_1});
+                        multiplier_q <= (alucon == 2'b01)
+                                        ? $signed({data_2[31], data_2})
+                                        : $signed({1'b0, data_2});
+                        high_result_q <= (alucon != 2'b00);
+                        state         <= RUN;
                     end
                 end
 
                 RUN: begin
-                    unique case (alucon)
-                        2'b00: begin
-                            // MUL: lower 32 bits
-                            mul_out <= mul_uu[31:0];
-                        end
-
-                        2'b01: begin
-                            // MULH: signed × signed, upper 32 bits
-                            mul_out <= mul_ss[63:32];
-                        end
-
-                        2'b10: begin
-                            // MULHSU: signed × unsigned, upper 32 bits
-                            mul_out <= mul_su[63:32];
-                        end
-
-                        2'b11: begin
-                            // MULHU: unsigned × unsigned, upper 32 bits
-                            mul_out <= mul_uu[63:32];
-                        end
-
-                        default: begin
-                            mul_out <= 32'd0;
-                        end
-                    endcase
-
+                    mul_out <= high_result_q ? product[63:32]
+                                             : product[31:0];
                     done  <= 1'b1;
                     state <= IDLE;
                 end

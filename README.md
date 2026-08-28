@@ -155,6 +155,79 @@ The task-driven design provides:
 
 PSC_RV32ISP_V1 currently uses a state-controlled execution model. Future versions may hold multiple instruction tasks simultaneously and permit independent tasks to overlap when there are no register, memory, or control dependencies.
 
+---
+
+# CPU (PSC_RV32ISP_V2)
+
+## Experimental Dual-Issue / Out-of-Order Architecture
+
+<img src="docs/images/PSC_RV32ISP_V2.jpg" width="800">
+
+`PSC_RV32ISP_V2` is an experimental CPU architecture derived from `PSC_RV32ISP_V1`.
+
+While V1 uses a state-controlled execution model in which instruction processing is largely serialized, V2 explores overlapping instruction execution, dual instruction slots, register renaming, and limited out-of-order execution.
+
+The primary goal of V2 is not to build a large superscalar processor, but to investigate how much instruction-level parallelism can be introduced into a small FPGA-oriented RISC-V CPU with relatively simple hardware.
+
+The current development focuses on allowing Fetch, Decode, Execute, and Commit operations to overlap instead of waiting for each instruction to complete the entire execution sequence.
+
+### Architecture Goals
+
+The V2 architecture explores:
+
+* Dual instruction slots
+* Overlapped Fetch / Decode / Execute / Commit
+* Limited out-of-order execution
+* In-order retirement
+* Register renaming
+* Register dependency detection
+* RAW / WAR / WAW hazard handling
+* Independent execution of instructions without dependencies
+* Variable-latency execution units such as MUL / DIV / REM
+* Forwarding between pipeline stages
+* Pipeline stalls and bubbles when dependencies cannot be resolved
+
+A particularly important target is hiding the latency of long-running operations.
+
+For example, when a DIV or REM instruction is waiting for completion, an independent arithmetic instruction may be allowed to execute first. Architectural state is still committed in program order so that externally visible CPU behavior remains consistent with sequential RISC-V execution.
+
+### FPGA-Oriented Design
+
+Unlike large commercial out-of-order processors, PSC_RV32ISP_V2 intentionally keeps the scheduling window and execution resources small.
+
+The design is intended for FPGA implementation and therefore prioritizes:
+
+* Small scheduling logic
+* Limited instruction window
+* Simple dependency checking
+* Minimal register-renaming hardware
+* Low LUT and flip-flop overhead
+* Short timing-critical paths
+* Compatibility with the existing PSC-ONE cache, MMU, and memory subsystem
+
+Load/store, branch, CSR, exception, and other complex operations may still be serialized when required.
+
+The architecture is being developed incrementally: first overlapping simple R/I-type instructions, then extending parallel execution to MUL/DIV and other instruction classes while continuously verifying compatibility with the existing CPU.
+
+## Verification
+
+PSC_RV32ISP_V2 is verified using the same simulation infrastructure as V1, including Verilator, cocotb, and the official RISC-V ISA tests.
+
+The development requirement is that architectural optimizations must not break the existing instruction tests.
+
+The main regression tests are:
+
+```text
+make -f Makefile.riscv.sim simulate_RISCV_TESTS_PARALLEL CPU_VERSION=v2
+
+make -f Makefile.cpu.core simulate_CPU_CORE CPU_VERSION=v2
+```
+
+V2 remains an experimental architecture and is actively being refined.
+
+The long-term objective is to determine how far a relatively small FPGA RISC-V processor can move from a traditional multi-cycle CPU toward a lightweight superscalar / out-of-order architecture without introducing the complexity of a modern high-performance desktop CPU.
+
+
 ## RISC-V ISA Test Results
 
 The `PSC_RV32ISP_V1` processor has been verified using the official `riscv-tests` instruction test suite.

@@ -213,77 +213,47 @@ module Csr (
         (priv_mode != PRIV_M) && csr_medeleg[trap_scause];
 
     // ---------------- outputs ----------------
+    // The CSR registers are already the architectural state.  Driving a
+    // second bank of output flops duplicated hundreds of bits and created a
+    // global csr_valid clock-enable network.  Expose the state directly and
+    // retain registers only for status inputs that must be sampled.
+    always_comb begin
+        out_mstatus = csr_mstatus;
+        out_medeleg = csr_medeleg;
+        out_mie     = csr_mie;
+        out_mip     = csr_mip;
+        out_mtvec   = csr_mtvec;
+        out_mepc    = csr_mepc;
+        out_mcause  = csr_mcause;
+
+        out_sstatus = csr_sstatus;
+        out_stvec   = csr_stvec;
+        out_sepc    = csr_sepc;
+        out_scause  = csr_scause;
+        out_stval   = csr_stval;
+        out_satp    = csr_satp;
+        priv_mode   = csr_priv_mode;
+
+        out_DCACHE_CTRL = csr_DCACHE_CTRL;
+        out_DMA_CTRL    = csr_DMA_CTRL;
+        out_DMA_WORDS   = csr_DMA_WORDS;
+        out_DMA_SRC     = csr_DMA_SRC;
+        out_DMA_DST     = csr_DMA_DST;
+        out_SA_CTRL     = csr_SA_CTRL;
+        out_SA_MODE     = csr_SA_MODE;
+        out_SA_ADDR_A   = csr_SA_ADDR_A;
+        out_SA_ADDR_B   = csr_SA_ADDR_B;
+        out_SA_ADDR_C   = csr_SA_ADDR_C;
+        out_CPU_MON_CTRL = csr_CPU_MON_CTRL;
+    end
+
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            out_mstatus <= 32'd0;
-            out_medeleg <= 32'd0;
-            out_mie     <= 32'd0;
-            out_mip     <= 32'd0;
-            out_mtvec   <= 32'd0;
-            out_mepc    <= 32'd0;
-            out_mcause  <= 32'd0;
-
-            out_sstatus <= 32'd0;
-            out_stvec   <= 32'd0;
-            out_sepc    <= 32'd0;
-            out_scause  <= 32'd0;
-            out_stval   <= 32'd0;
-            out_satp    <= 32'd0;
-
-            priv_mode   <= 2'b0;
-
-            out_DCACHE_CTRL <= 32'd0;
-
-            out_DMA_CTRL    <= 32'd0;
-            out_DMA_WORDS   <= 32'd0;
-            out_DMA_SRC     <= 32'd0;
-            out_DMA_DST     <= 32'd0;
-
-            out_SA_CTRL     <= 32'd0;
-            out_SA_ADDR_A   <= 32'd0;
-            out_SA_ADDR_B   <= 32'd0;
-            out_SA_ADDR_C   <= 32'd0;
-
-            out_CPU_MON_CTRL <= 32'd0;
-            
-            csr_DMA_STATUS  <= 32'd0;
-            csr_SA_STATUS   <= 32'd0;
-        end else begin
-            if(csr_valid) begin
-                out_mstatus <= csr_mstatus;
-                out_medeleg <= csr_medeleg;
-                out_mie     <= csr_mie;
-                out_mip     <= csr_mip;
-                out_mtvec   <= csr_mtvec;
-                out_mepc    <= csr_mepc;
-                out_mcause  <= csr_mcause;
-
-                out_sstatus <= csr_sstatus;
-                out_stvec   <= csr_stvec;
-                out_sepc    <= csr_sepc;
-                out_scause  <= csr_scause;
-                out_stval   <= csr_stval;
-                out_satp    <= csr_satp;
-
-                out_DCACHE_CTRL  <= csr_DCACHE_CTRL;
-
-                out_DMA_CTRL  <= csr_DMA_CTRL;
-                out_DMA_WORDS <= csr_DMA_WORDS;
-                out_DMA_SRC   <= csr_DMA_SRC;
-                out_DMA_DST   <= csr_DMA_DST;
-
-                out_SA_CTRL   <= csr_SA_CTRL;
-                out_SA_MODE   <= csr_SA_MODE;
-                out_SA_ADDR_A <= csr_SA_ADDR_A;
-                out_SA_ADDR_B <= csr_SA_ADDR_B;
-                out_SA_ADDR_C <= csr_SA_ADDR_C;
-
-                out_CPU_MON_CTRL <= csr_CPU_MON_CTRL;
-
-                priv_mode     <= csr_priv_mode;
-                csr_DMA_STATUS <= in_DMA_STATUS;
-                csr_SA_STATUS  <= in_SA_STATUS;
-            end
+            csr_DMA_STATUS <= 32'd0;
+            csr_SA_STATUS  <= 32'd0;
+        end else if (csr_valid) begin
+            csr_DMA_STATUS <= in_DMA_STATUS;
+            csr_SA_STATUS  <= in_SA_STATUS;
         end
     end
 
@@ -324,14 +294,20 @@ module Csr (
     endfunction
 
     // ---------------- main ----------------
-    //reg [31:0] oldv, newv;
     logic [31:0] oldv, newv;
+    logic        csr_write_pending;
+    logic [11:0] csr_write_addr;
+    logic [31:0] csr_write_newv;
+    logic        csr_write_no_side_effect_rs;
 
-    // The old CSR value is part of the commit-stage writeback data.  Keep the
-    // read port combinational; the actual CSR update still occurs only when
-    // csr_enb is asserted at commit.
-    always_comb begin
-        csr_rdata = csr_read_mux(csr_addr);
+    // CSR retirement is followed by an architectural-PRF write stage.  Sample
+    // the old value locally so the wide CSR read mux and PRF destination
+    // decoder do not form one timing path.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n)
+            csr_rdata <= 32'd0;
+        else
+            csr_rdata <= csr_read_mux(csr_addr);
     end
 
     assign  oldv = csr_read_mux(csr_addr);
@@ -339,8 +315,10 @@ module Csr (
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            //oldv          <= 32'h0;
-            //newv          <= 32'h0;
+            csr_write_pending <= 1'b0;
+            csr_write_addr    <= 12'd0;
+            csr_write_newv    <= 32'd0;
+            csr_write_no_side_effect_rs <= 1'b1;
             csr_priv_mode   <= PRIV_M;
             // M
             csr_mstatus   <= 32'h00001800; // MPP=M-mode, IE=OFF
@@ -378,56 +356,66 @@ module Csr (
             csr_CPU_MON_CTRL <= 32'b0; 
 
         end else begin
-            // ---- CSR writes ----
+            // CSR instructions serialize younger dispatch.  Capture the
+            // shared read/modify result here and perform the addressed bank
+            // update on the following cycle.  This breaks the original
+            // ROB-head -> CSR RMW -> CSR destination path without duplicating
+            // the RMW logic for every CSR.
+            csr_write_pending <= csr_wr & csr_enb;
             if (csr_wr & csr_enb) begin
-                //oldv = csr_read_mux(csr_addr);
-                //newv = csr_apply(csr_cmd, side_effect_none_rs, oldv, csr_wr_val);
+                csr_write_addr <= csr_addr;
+                csr_write_newv <= newv;
+                csr_write_no_side_effect_rs <= side_effect_none_rs;
+            end
 
-                case (csr_addr)
+            // ---- CSR writes ----
+            if (csr_write_pending) begin
+                case (csr_write_addr)
                     // ===== Supervisor =====
-                    12'h100: csr_sstatus  <= (newv & SSTATUS_MASK);   // sstatus
-                    12'h104: csr_sie      <= (newv & SIRQ_MASK);      // sie
-                    12'h105: csr_stvec    <= pack_tvec_direct(newv);  // stvec
-                    12'h140: csr_sscratch <= newv;
-                    12'h141: csr_sepc     <= pack_epc(newv);
-                    12'h142: csr_scause   <= newv;
-                    12'h143: csr_stval    <= newv;
+                    12'h100: csr_sstatus  <= (csr_write_newv & SSTATUS_MASK);
+                    12'h104: csr_sie      <= (csr_write_newv & SIRQ_MASK);
+                    12'h105: csr_stvec    <= pack_tvec_direct(csr_write_newv);
+                    12'h140: csr_sscratch <= csr_write_newv;
+                    12'h141: csr_sepc     <= pack_epc(csr_write_newv);
+                    12'h142: csr_scause   <= csr_write_newv;
+                    12'h143: csr_stval    <= csr_write_newv;
                     // sip write: SSIPのみ可 → mip[MSIP]へ反映
                     12'h144: begin
-                        if (!side_effect_none_rs) csr_mip[3] <= newv[1];
+                        if (!csr_write_no_side_effect_rs)
+                            csr_mip[3] <= csr_write_newv[1];
                     end
-                    12'h180: csr_satp     <= pack_satp_sv32(newv);
+                    12'h180: csr_satp <= pack_satp_sv32(csr_write_newv);
 
                     // ===== Machine =====
-                    12'h300: csr_mstatus  <= newv;                    // mstatus
-                    12'h302: csr_medeleg <= newv;                     // medeleg
+                    12'h300: csr_mstatus <= csr_write_newv;
+                    12'h302: csr_medeleg <= csr_write_newv;
                     12'h301: /* misa: RO */;
-                    12'h304: csr_mie      <= (newv & MIRQ_MASK);
-                    12'h305: csr_mtvec    <= pack_tvec_direct(newv);
-                    12'h340: csr_mscratch <= newv;
-                    12'h341: csr_mepc     <= pack_epc(newv);
-                    12'h342: csr_mcause   <= newv;
-                    12'h344: csr_mip      <= (newv & MIRQ_MASK);
+                    12'h304: csr_mie <= (csr_write_newv & MIRQ_MASK);
+                    12'h305: csr_mtvec <= pack_tvec_direct(csr_write_newv);
+                    12'h340: csr_mscratch <= csr_write_newv;
+                    12'h341: csr_mepc <= pack_epc(csr_write_newv);
+                    12'h342: csr_mcause <= csr_write_newv;
+                    12'h344: csr_mip <= (csr_write_newv & MIRQ_MASK);
 
                     // ===== DATA CACHE =====
-                    12'h7F0: csr_DCACHE_CTRL <= newv;
+                    12'h7F0: csr_DCACHE_CTRL <= csr_write_newv;
 
                     // ===== DMA =====
-                    12'h7E0: csr_DMA_CTRL   <= newv;
-                    12'h7E4: csr_DMA_WORDS  <= newv;
-                    12'h7E8: csr_DMA_SRC    <= newv;
-                    12'h7EC: csr_DMA_DST    <= newv;
+                    12'h7E0: csr_DMA_CTRL   <= csr_write_newv;
+                    12'h7E4: csr_DMA_WORDS  <= csr_write_newv;
+                    12'h7E8: csr_DMA_SRC    <= csr_write_newv;
+                    12'h7EC: csr_DMA_DST    <= csr_write_newv;
 
                     // ===== SynapEngine =====
-                    12'h7C0: csr_SA_CTRL    <= newv;
-                    12'h7C4: csr_SA_MODE    <= newv;
+                    12'h7C0: csr_SA_CTRL    <= csr_write_newv;
+                    12'h7C4: csr_SA_MODE    <= csr_write_newv;
                     // 7C8: csr_SA_STATUS
-                    12'h7D0: csr_SA_ADDR_A  <= newv;
-                    12'h7D4: csr_SA_ADDR_B  <= newv;
-                    12'h7D8: csr_SA_ADDR_C  <= newv;
+                    12'h7D0: csr_SA_ADDR_A  <= csr_write_newv;
+                    12'h7D4: csr_SA_ADDR_B  <= csr_write_newv;
+                    12'h7D8: csr_SA_ADDR_C  <= csr_write_newv;
 
                     // ===== CPU MONITOR =====
-                    12'hBC0: csr_CPU_MON_CTRL <= newv;
+                    12'hBC0: csr_CPU_MON_CTRL <= csr_write_newv;
 
                     default: ;
                 endcase

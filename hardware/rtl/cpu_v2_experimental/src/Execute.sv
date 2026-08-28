@@ -102,23 +102,19 @@ module Execute #(
         endcase
     endfunction
 
-    // Single-cycle ALU operations are combinational and can complete on
-    // consecutive clocks.  MUL/DIV hold the same issue-stage record until
-    // their result is accepted by the next stage.
+    // All results cross this registered boundary before write-back.  For a
+    // normal integer operation this adds one execution cycle, but separates
+    // the 32-bit ALU carry/shift network from the ROB/PRF/forwarding muxes.
     always_comb begin
         r_data1 = reg_data_addr1;
         r_data2 = reg_data_addr2;
         out_pc  = decoder_ctrl.out_pc;
         busy    = (state != IDLE);
         done    = 1'b0;
-        alu_data = alu_exec(decoder_ctrl.alucon, operand_1, operand_2);
+        alu_data = multi_result;
 
         if (state == RESULT_HOLD) begin
-            alu_data = multi_result;
             done     = execute_enb;
-        end else if ((state == IDLE) && execute_enb &&
-                     !is_mul_op && !is_div_op) begin
-            done = 1'b1;
         end
     end
 
@@ -133,6 +129,11 @@ module Execute #(
                         state <= DIV_WAIT;
                     else if (mul_start)
                         state <= MUL_WAIT;
+                    else if (execute_enb) begin
+                        multi_result <= alu_exec(decoder_ctrl.alucon,
+                                                 operand_1, operand_2);
+                        state <= RESULT_HOLD;
+                    end
                 end
 
                 DIV_WAIT: begin

@@ -63,50 +63,50 @@ module PSC_RV32ISP_InstructionEngine #(
     output logic [8:0]  uart_out
 );
 
-    logic       decode_enb;
-    logic       decode_done;
-    dec_ctrl_t  decoded_ctrl;
+    logic        decode_enb;
+    logic        decode_done;
+    dec_ctrl_t   decoded_ctrl;
 
-    logic       execute_valid;
-    dec_ctrl_t  execute_ctrl;
+    logic        execute_valid;
+    dec_ctrl_t   execute_ctrl;
     logic [31:0] execute_reg_data_1;
     logic [31:0] execute_reg_data_2;
     logic [31:0] execute_alu_data;
-    logic       execute_done;
+    logic        execute_done;
 
-    dec_ctrl_t  memory_ctrl;
+    dec_ctrl_t   memory_ctrl;
     logic [31:0] memory_alu_data;
     logic [31:0] memory_reg_data_1;
     logic [31:0] memory_reg_data_2;
     logic [31:0] memory_pc;
-    logic       load_valid;
-    logic       store_valid;
-    logic       load_done;
-    logic       store_done;
+    logic        load_valid;
+    logic        store_valid;
+    logic        load_done;
+    logic        store_done;
     logic [31:0] load_read_data;
 
-    dec_ctrl_t  commit_ctrl;
+    dec_ctrl_t   commit_ctrl;
     logic [31:0] commit_alu_data;
-    logic       commit_branch_taken;
+    logic        commit_branch_taken;
 
-    logic       load_data_mem_read_valid;
-    logic       load_mmu_valid;
+    logic        load_data_mem_read_valid;
+    logic        load_mmu_valid;
     logic [31:0] load_data_mem_read_address;
     logic [31:0] load_vaddr;
-    logic       load_branch_unused;
+    logic        load_branch_unused;
 
-    logic       store_mmu_valid;
+    logic        store_mmu_valid;
     logic [31:0] store_vaddr;
     logic [31:0] store_mem_write_address;
     logic [31:0] store_wdata_unused;
 
-    logic       d_mmu_mem_valid;
-    logic       d_mmu_done;
-    logic       d_mode_sv32;
+    logic        d_mmu_mem_valid;
+    logic        d_mmu_done;
+    logic        d_mode_sv32;
     logic [31:0] d_mmu_mem_addr;
     logic [31:0] d_paddr;
-    logic       d_mmu_enb;
-    logic       cpu_state_done;
+    logic        d_mmu_enb;
+    logic        cpu_state_done;
 
     logic [31:0] raw_load_data;
     logic        is_counter_load;

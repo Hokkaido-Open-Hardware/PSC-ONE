@@ -3,6 +3,9 @@ myenv/
 __pycache__/
 *.pyc
 
+# Log
+log_gowin/
+
 # Build
 build/
 sim_build/

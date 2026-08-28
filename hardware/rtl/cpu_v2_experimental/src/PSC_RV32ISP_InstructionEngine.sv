@@ -67,53 +67,53 @@ module PSC_RV32ISP_InstructionEngine #(
     logic       decode_done;
     dec_ctrl_t  decoded_ctrl;
 
-    logic       alu_execute_valid;
-    dec_ctrl_t  alu_execute_ctrl;
+    logic        alu_execute_valid;
+    dec_ctrl_t   alu_execute_ctrl;
     logic [31:0] alu_execute_reg_data_1;
     logic [31:0] alu_execute_reg_data_2;
     logic [31:0] alu_execute_data;
-    logic       alu_execute_done;
+    logic        alu_execute_done;
 
-    logic       md_execute_valid;
-    dec_ctrl_t  md_execute_ctrl;
+    logic        md_execute_valid;
+    dec_ctrl_t   md_execute_ctrl;
     logic [31:0] md_execute_reg_data_1;
     logic [31:0] md_execute_reg_data_2;
     logic [31:0] md_execute_data;
-    logic       md_execute_done;
+    logic        md_execute_done;
 
-    dec_ctrl_t  memory_ctrl;
+    dec_ctrl_t   memory_ctrl;
     logic [31:0] memory_alu_data;
     logic [31:0] memory_reg_data_1;
     logic [31:0] memory_reg_data_2;
     logic [31:0] memory_pc;
-    logic       load_valid;
-    logic       store_valid;
-    logic       load_done;
-    logic       store_done;
+    logic        load_valid;
+    logic        store_valid;
+    logic        load_done;
+    logic        store_done;
     logic [31:0] load_read_data;
 
-    dec_ctrl_t  commit_ctrl;
+    dec_ctrl_t   commit_ctrl;
     logic [31:0] commit_alu_data;
-    logic       commit_branch_taken;
+    logic        commit_branch_taken;
 
-    logic       load_data_mem_read_valid;
-    logic       load_mmu_valid;
+    logic        load_data_mem_read_valid;
+    logic        load_mmu_valid;
     logic [31:0] load_data_mem_read_address;
-    logic [31:0] load_vaddr;
-    logic       load_branch_unused;
+    logic        load_branch_unused;
 
-    logic       store_mmu_valid;
-    logic [31:0] store_vaddr;
+    logic        store_mmu_valid;
     logic [31:0] store_mem_write_address;
     logic [31:0] store_wdata_unused;
 
-    logic       d_mmu_mem_valid;
-    logic       d_mmu_done;
-    logic       d_mode_sv32;
+    logic [31:0] memory_vaddr;
+
+    logic        d_mmu_mem_valid;
+    logic        d_mmu_done;
+    logic        d_mode_sv32;
     logic [31:0] d_mmu_mem_addr;
     logic [31:0] d_paddr;
-    logic       d_mmu_enb;
-    logic       cpu_state_done;
+    logic        d_mmu_enb;
+    logic        cpu_state_done;
 
     logic [31:0] raw_load_data;
     logic        is_counter_load;
@@ -133,8 +133,17 @@ module PSC_RV32ISP_InstructionEngine #(
                            is_uart_flag_load ? 32'd1 : data_mem_read_data;
     assign load_read_data = raw_load_data;
 
-    assign vaddr = load_valid  ? load_vaddr  :
-                   store_valid ? store_vaddr : 32'd0;
+    // The load/store FSMs assert their MMU request one cycle after accepting
+    // the ROB-head operation.  Capture the address at that boundary so the
+    // MMU input does not include the ROB read and load/store selection paths.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n)
+            memory_vaddr <= 32'd0;
+        else if (load_valid || store_valid)
+            memory_vaddr <= memory_alu_data;
+    end
+
+    assign vaddr = memory_vaddr;
     assign data_fault_pc       = memory_pc;
     assign data_fault_vaddr    = memory_alu_data;
     assign data_fault_is_store = memory_ctrl.is_store;
@@ -265,7 +274,7 @@ module PSC_RV32ISP_InstructionEngine #(
         .r_data1               (memory_reg_data_1),
         .r_data2               (memory_reg_data_2),
         .mmu_valid             (load_mmu_valid),
-        .vaddr                 (load_vaddr),
+        .vaddr                 (),
         .mmu_ready             (d_mmu_done),
         .access_fault          (d_pf),
         .d_paddr               (d_paddr),
@@ -297,7 +306,7 @@ module PSC_RV32ISP_InstructionEngine #(
         .ld_low2                (memory_alu_data[1:0]),
         .csr_rdata              (csr_rdata),
         .mmu_valid              (store_mmu_valid),
-        .vaddr                  (store_vaddr),
+        .vaddr                  (),
         .mmu_ready              (d_mmu_done),
         .access_fault           (d_pf),
         .d_paddr                (d_paddr),

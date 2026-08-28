@@ -47,7 +47,9 @@ module PSC_ONE_Chip #(
     parameter integer ID_WIDTH     = 1,
     parameter integer DATA_WIDTH   = 32,   // AXI Data bus. fixed 32bit Bus
 
-    // PIO アドレス（0なら無効）
+    // MMIO MASK BITS
+    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS     = 32'h1000_F00F,
+    // MMIO アドレス（0なら無効）
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_TX     = 32'h1000_0000,
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_RX     = 32'h1000_0004,
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_ST     = 32'h1000_0008,
@@ -201,6 +203,8 @@ module PSC_ONE_Chip #(
     wire [31:0] mmio_rdata_i2s;
     wire [31:0] mmio_rdata_pfe;
 
+    wire [31:0] addr_mmio_masked = mmio_addr & MMMIO_BASK_BITS;
+    
     always @(*) begin
         case(mmio_addr)    // byte address.
             PIO_ADDRESS:         mmio_rdata = mmio_rdata_pio;
@@ -441,6 +445,8 @@ module PSC_ONE_Chip #(
         .ADDR_WIDTH         (ADDR_W),
         .ID_WIDTH           (ID_W),
         .DATA_WIDTH         (DW),
+        // MMIO MASK BITS
+        .MMMIO_BASK_BITS     (MMMIO_BASK_BITS),
         // MMIO ADDRESS
         .UART_ADDRESS_TX     (UART_ADDRESS_TX),
         .UART_ADDRESS_RX     (UART_ADDRESS_RX),

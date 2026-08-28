@@ -22,6 +22,8 @@ module cache_dma_controller_io #(
     parameter TAG_WIDTH         = TAGMSB - TAGLSB + 1,         // 例:18
     parameter TAG_ENTRY_WIDTH   = TAG_WIDTH + 2,               // {tag,valid,dirty}
 
+    // MMIO MASK BITS
+    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS     = 32'h1000_F00F,
     // MMIO アドレス（0なら無効）
     parameter [ADDR_WIDTH-1:0]  PIO_ADDRESS         = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_TX     = {ADDR_WIDTH{1'b0}},
@@ -300,28 +302,30 @@ module cache_dma_controller_io #(
 
     // MMIO（一致かつ0以外で有効）
     function mmio_hit(input [ADDR_WIDTH-1:0] addr_mmio);
+        reg [31:0]  addr_mmio_masked;
         begin
+            addr_mmio_masked = addr_mmio & MMMIO_BASK_BITS;
             mmio_hit =
-                (((PIO_ADDRESS          != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PIO_ADDRESS      )) |
-                 ((UART_ADDRESS_TX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == UART_ADDRESS_TX  )) |
-                 ((UART_ADDRESS_RX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == UART_ADDRESS_RX  )) |
-                 ((UART_ADDRESS_ST      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == UART_ADDRESS_ST  )) |
-                 ((UART_ADDRESS_CT      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == UART_ADDRESS_CT  )) |
-                 ((TIMER_WRITE_ADDR     != {ADDR_WIDTH{1'b0}}) && (addr_mmio == TIMER_WRITE_ADDR )) |
-                 ((TIMER_READ_ADDR      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == TIMER_READ_ADDR  )) |
-                 ((TIMER_ST_ADDR        != {ADDR_WIDTH{1'b0}}) && (addr_mmio == TIMER_ST_ADDR    )) |
-                 ((LCD_PIXS_DATA        != {ADDR_WIDTH{1'b0}}) && (addr_mmio == LCD_PIXS_DATA    )) |
-                 ((LCD_PIXS_ST          != {ADDR_WIDTH{1'b0}}) && (addr_mmio == LCD_PIXS_ST      )) |
-                 ((LED_ADDRESS          != {ADDR_WIDTH{1'b0}}) && (addr_mmio == LED_ADDRESS      )) |
-                 ((PSC_SA_CTRL          != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PSC_SA_CTRL      )) |
-                 ((PSC_SA_STATUS        != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PSC_SA_STATUS    )) |
-                 ((PSC_SD_IF_READ_DATA  != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PSC_SD_IF_READ_DATA )) |
-                 ((PSC_SD_IF_SECTOR     != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PSC_SD_IF_SECTOR    )) |
-                 ((PSC_SD_IF_CTRL       != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PSC_SD_IF_CTRL      )) |
-                 ((PSC_I2S_ADDR_RX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PSC_I2S_ADDR_RX     )) |
-                 ((PSC_I2S_ADDR_ST      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PSC_I2S_ADDR_ST     )) |
-                 ((PSC_PFE_IF_DATA      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PSC_PFE_IF_DATA     )) |
-                 ((PSC_PFE_IF_CTRL      != {ADDR_WIDTH{1'b0}}) && (addr_mmio == PSC_PFE_IF_CTRL     )));
+                (((PIO_ADDRESS          != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PIO_ADDRESS          )) |
+                 ((UART_ADDRESS_TX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == UART_ADDRESS_TX      )) |
+                 ((UART_ADDRESS_RX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == UART_ADDRESS_RX      )) |
+                 ((UART_ADDRESS_ST      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == UART_ADDRESS_ST      )) |
+                 ((UART_ADDRESS_CT      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == UART_ADDRESS_CT      )) |
+                 ((TIMER_WRITE_ADDR     != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == TIMER_WRITE_ADDR     )) |
+                 ((TIMER_READ_ADDR      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == TIMER_READ_ADDR      )) |
+                 ((TIMER_ST_ADDR        != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == TIMER_ST_ADDR        )) |
+                 ((LCD_PIXS_DATA        != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == LCD_PIXS_DATA        )) |
+                 ((LCD_PIXS_ST          != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == LCD_PIXS_ST          )) |
+                 ((LED_ADDRESS          != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == LED_ADDRESS          )) |
+                 ((PSC_SA_CTRL          != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_SA_CTRL          )) |
+                 ((PSC_SA_STATUS        != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_SA_STATUS        )) |
+                 ((PSC_SD_IF_READ_DATA  != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_SD_IF_READ_DATA  )) |
+                 ((PSC_SD_IF_SECTOR     != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_SD_IF_SECTOR     )) |
+                 ((PSC_SD_IF_CTRL       != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_SD_IF_CTRL       )) |
+                 ((PSC_I2S_ADDR_RX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_I2S_ADDR_RX      )) |
+                 ((PSC_I2S_ADDR_ST      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_I2S_ADDR_ST      )) |
+                 ((PSC_PFE_IF_DATA      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_PFE_IF_DATA      )) |
+                 ((PSC_PFE_IF_CTRL      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_PFE_IF_CTRL      )));
         end
     endfunction
 

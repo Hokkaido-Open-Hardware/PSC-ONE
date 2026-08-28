@@ -27,7 +27,9 @@ module PSC_ONE_RV32ISP_core #(
     parameter integer DATA_WIDTH   = 32,    // AXI bus. fixed 32
     parameter integer CPU_DATA_WIDTH  = 32,  
 
-    // PIO アドレス（0なら無効）
+    // MMIO MASK BITS
+    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS         = 32'h1000_F00F,
+    // MMIO アドレス（0なら無効）
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_TX         = 32'h1000_0000,
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_RX         = 32'h1000_0004,
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_ST         = 32'h1000_0008,
@@ -524,6 +526,8 @@ module PSC_ONE_RV32ISP_core #(
         `else
         .TAGLSB              (14),
         `endif
+        // MMIO MASK BITS
+        .MMMIO_BASK_BITS     (MMMIO_BASK_BITS),
         // MMIO ADDR
         .UART_ADDRESS_TX     (UART_ADDRESS_TX),
         .UART_ADDRESS_RX     (UART_ADDRESS_RX),

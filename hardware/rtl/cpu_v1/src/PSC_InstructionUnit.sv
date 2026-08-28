@@ -126,11 +126,7 @@ module PSC_InstructionUnit (
     logic [31:0] issue_reg_data_2;
     logic [2:0] forward_sel_rs1;
     logic [2:0] forward_sel_rs2;
-    logic issue_ex_forwardable;
-    logic ex_mem_forwardable;
     logic mem_wb_forwardable;
-    logic [31:0] issue_ex_forward_data;
-    logic [31:0] ex_mem_forward_data;
     logic backend_serial;
     logic backend_empty;
     logic pipeline_empty;
@@ -243,26 +239,6 @@ module PSC_InstructionUnit (
     // youngest matching producer wins; an unavailable young value must stall
     // instead of falling through to an older value for the same register.
     always_comb begin
-        issue_ex_forwardable = execute_done &&
-                               ((issue_ex.ctrl.wb_sel == 2'b00) ||
-                                (issue_ex.ctrl.wb_sel == 2'b10));
-        issue_ex_forward_data = (issue_ex.ctrl.wb_sel == 2'b10)
-                              ? issue_ex.pc + 32'd4
-                              : execute_alu_data;
-
-        ex_mem_forwardable = (ex_mem.ctrl.wb_sel == 2'b00) ||
-                             (ex_mem.ctrl.wb_sel == 2'b10) ||
-                             ((ex_mem.ctrl.wb_sel == 2'b01) &&
-                              ex_mem.ctrl.is_load && load_done);
-        case (ex_mem.ctrl.wb_sel)
-            2'b01: ex_mem_forward_data = load_result(
-                                               load_read_data,
-                                               ex_mem.alu_data[1:0],
-                                               ex_mem.ctrl.funct3);
-            2'b10: ex_mem_forward_data = ex_mem.pc + 32'd4;
-            default: ex_mem_forward_data = ex_mem.alu_data;
-        endcase
-
         mem_wb_forwardable = (mem_wb.ctrl.wb_sel != 2'b11);
 
         issue_reg_data_1 = regfile_rdata_1;
@@ -272,14 +248,18 @@ module PSC_InstructionUnit (
             if (issue_ex.valid && issue_ex.ctrl.rf_wen &&
                 (issue_ex.ctrl.w_addr != 5'd0) &&
                 (id_issue.ctrl.r_addr1 == issue_ex.ctrl.w_addr)) begin
-                issue_reg_data_1 = issue_ex_forward_data;
-                raw_hazard_rs1   = !issue_ex_forwardable;
+                // Do not cascade the current EX ALU and the next operand
+                // selector in one cycle.  Wait until the producer reaches
+                // MEM/WB, where its registered result can be forwarded.
+                raw_hazard_rs1   = 1'b1;
                 forward_sel_rs1  = 3'd1;
             end else if (ex_mem.valid && ex_mem.ctrl.rf_wen &&
                          (ex_mem.ctrl.w_addr != 5'd0) &&
                          (id_issue.ctrl.r_addr1 == ex_mem.ctrl.w_addr)) begin
-                issue_reg_data_1 = ex_mem_forward_data;
-                raw_hazard_rs1   = !ex_mem_forwardable;
+                // Keep the load-result formatter and EX/MEM write-back mux
+                // out of the issue operand timing path.  The value is
+                // forwarded from MEM/WB on the following cycle.
+                raw_hazard_rs1   = 1'b1;
                 forward_sel_rs1  = 3'd2;
             end else if (mem_wb.valid && mem_wb.ctrl.rf_wen &&
                          (mem_wb.ctrl.w_addr != 5'd0) &&
@@ -305,14 +285,12 @@ module PSC_InstructionUnit (
             if (issue_ex.valid && issue_ex.ctrl.rf_wen &&
                 (issue_ex.ctrl.w_addr != 5'd0) &&
                 (id_issue.ctrl.r_addr2 == issue_ex.ctrl.w_addr)) begin
-                issue_reg_data_2 = issue_ex_forward_data;
-                raw_hazard_rs2   = !issue_ex_forwardable;
+                raw_hazard_rs2   = 1'b1;
                 forward_sel_rs2  = 3'd1;
             end else if (ex_mem.valid && ex_mem.ctrl.rf_wen &&
                          (ex_mem.ctrl.w_addr != 5'd0) &&
                          (id_issue.ctrl.r_addr2 == ex_mem.ctrl.w_addr)) begin
-                issue_reg_data_2 = ex_mem_forward_data;
-                raw_hazard_rs2   = !ex_mem_forwardable;
+                raw_hazard_rs2   = 1'b1;
                 forward_sel_rs2  = 3'd2;
             end else if (mem_wb.valid && mem_wb.ctrl.rf_wen &&
                          (mem_wb.ctrl.w_addr != 5'd0) &&
