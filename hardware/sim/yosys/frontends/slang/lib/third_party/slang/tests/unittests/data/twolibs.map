@@ -1,2 +1,0 @@
-library libA "test6.sv";
-library libB "test6.sv";

@@ -1,5 +1,0 @@
-read_slang regress.sv
-check -assert
-design -reset
-read_slang -D KEEP_HIERARCHY --keep-hierarchy regress.sv
-check -assert

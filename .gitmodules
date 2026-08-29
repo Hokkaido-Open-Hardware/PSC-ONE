@@ -5,3 +5,6 @@
 [submodule "software/micropython/micropython"]
 	path = software/micropython/micropython
 	url = https://github.com/micropython/micropython.git
+[submodule "hardware/sim/yosys"]
+	path = hardware/sim/yosys
+	url = https://github.com/YosysHQ/yosys.git

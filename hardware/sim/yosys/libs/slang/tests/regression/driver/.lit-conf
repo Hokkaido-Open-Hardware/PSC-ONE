@@ -1,2 +1,0 @@
-define testdir=${confdir}
-define data=${confdir}/../../unittests/data

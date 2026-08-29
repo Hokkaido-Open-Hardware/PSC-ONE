@@ -1,6 +1,0 @@
-read_verilog <<EOT
-module top(input x, output y);
-top top_i(.x(x), .y(y));
-endmodule
-EOT
-hierarchy
