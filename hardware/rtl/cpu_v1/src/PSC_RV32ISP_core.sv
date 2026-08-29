@@ -226,6 +226,8 @@ module PSC_RV32ISP_core #(
     logic        csr_enb;
     logic        csr_valid;
     logic [31:0] csr_rdata;
+    logic [11:0] csr_read_addr;
+    logic [31:0] csr_old_value;
 
     // CSR logic
     logic [1:0]  priv_mode;
@@ -243,6 +245,8 @@ module PSC_RV32ISP_core #(
         .csr_cmd            (decoder_ctrl.csr_cmd),
         .csr_use_imm        (decoder_ctrl.csr_use_imm),
         .csr_addr           (decoder_ctrl.csr_addr),
+        .csr_read_addr      (csr_read_addr),
+        .csr_old_value      (csr_old_value),
         .csr_zimm           (decoder_ctrl.csr_zimm),
         .csr_rs1_val        (csr_reg_data_1),
         .csr_rdata          (csr_rdata),
@@ -428,6 +432,8 @@ module PSC_RV32ISP_core #(
         .csr_valid                  (csr_valid),
         // CSR
         .csr_rdata                  (csr_rdata),
+        .csr_read_addr              (csr_read_addr),
+        .csr_old_value              (csr_old_value),
         .csr_reg_data_1             (csr_reg_data_1),
         // MMU fault sig.
         .i_pf                       (i_pf),

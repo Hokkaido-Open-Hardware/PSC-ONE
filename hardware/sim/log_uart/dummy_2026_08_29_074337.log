@@ -1,0 +1,45 @@
+[dbg] cycle=0, uart_tx=0x0000, pc=0x00000000, data_addr=0x00000000
+memset = OFF
+PSC_OS Boot Start.........
+--- memset done ---
+Test Ver: test_1.5.0
+
++--------------------------------------------------+
+|                    PSC_OS                        |
+|            Minimal RISC-V Kernel Boot            |
++--------------------------------------------------+
+| Build : Aug 29 2026 07:43:36
+| CPU   : RV32 (Supervisor mode)
+| MMU   : SV32
+| UART  : SBI console or
+| UART  : MMIO console
+| CMD   : hello, primes, dump
+| CMD   : sa_start
+| CMD   : sd_read, sd_write
+| CMD   : mic_read, mic_write
+| CMD   : fat32_info, fat32_ls, fat32_cat
+| CMD   : fat32_touch
+| CMD   : speech
+| CMD   : microPython
+| microPython exit: Ctl+D.
+| SBI quit : Ctl+A C. q.
++--------------------------------------------------+
+---- kernel map start. ----
+---- MMIO map start. ----
+---- MMIO region map start. ----
+---- SA core address map start. ----
+---- SA core data address map start. ----
+---- SA core data wb address map start. ----
+create_process_End
+DUMMY_TEST_START
+DUMMY_A_0
+DUMMY_B_0
+DUMMY_A_1
+DUMMY_B_1
+DUMMY_A_2
+DUMMY_B_2
+DUMMY_A_3
+DUMMY_B_3
+DUMMY__DONE
+DUMMY__DONE
+PANIC: ./src/multitask_test.c:88: dummy scheduler returned

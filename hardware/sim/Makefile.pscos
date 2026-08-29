@@ -1,4 +1,12 @@
 # ============================================================
+# Usage
+# ============================================================
+
+#make -f Makefile.pscos simulate_PSCOS SIM_USER=minimal SIM_FAST=1 RUN_CYCLES=30000000 
+
+#make -f Makefile.pscos simulate_PSCOS
+
+# ============================================================
 #  MODE で一括切り替え（verilator / icarus）
 # ============================================================
 # PSC_OS実行のデフォルトはverilator
@@ -258,7 +266,7 @@ VDEF = -DFST_UART_MODE -DOS_SIM -DDUMP_FST_FILE
 
 simulate_PSCOS: 
 	$(MAKE) clean
-	$(MAKE) -C ../../software/os sim_mem
+	$(MAKE) -C ../../software/os $(if $(SIM_USER),SIM_USER=$(SIM_USER),) sim_mem
 	cp ../../software/os/build/bootrom.mem ./mem/
 	cp ../../software/os/build/kernel.mem ./mem/
 	cp ../../software/os/build/user.mem ./mem/
@@ -269,6 +277,7 @@ simulate_PSCOS:
 	test -f ./mem/user.mem
 
 	grep -n -v '^00000000$$' ./mem/bootrom.mem | tail -n 1
+	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
 	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
 	grep -n -v '^00000000$$' ./mem/user.mem | tail -n 1
 
@@ -297,6 +306,37 @@ simulate_PSCOS:
 	printf '\a'
 
 # ============================================================
+# PSC-OS cooperative two-process scheduler smoke test
+# ============================================================
+# This target uses a test-only kernel build.  The normal simulate_PSCOS
+# target above remains the PSC-OS baseline regression test.
+
+simulate_PSCOS_MULTITASK:
+	$(MAKE) clean
+	$(MAKE) -C ../../software/os MODE=sim ./build/bootrom.mem
+	$(MAKE) -C ../../software/os MODE=sim KCPPFLAGS="-DBSS_CLEAR_OFF=1 -DPSC_OS_DUMMY_TEST=1" kernel_mem
+	$(MAKE) -C ../../software/os MODE=sim ./build/user.mem
+	cp ../../software/os/build/bootrom.mem ./mem/
+	cp ../../software/os/build/kernel.mem ./mem/
+	cp ../../software/os/build/user.mem ./mem/
+	$(MAKE) -C ../../software/os clean
+	test -f ./mem/bootrom.mem
+	test -f ./mem/kernel.mem
+	test -f ./mem/user.mem
+	@mkdir -p ./wave ./log_uart
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "[SIM] PSC-OS dummy process yield test, SIM=$(SIM)"
+	MODULE=cocotb_tb.psc_os.PSCONE_multitask_test \
+	PSC_UART_LOGFILE=./log_uart/dummy_$$(date +%Y_%m_%d_%H%M%S).log \
+	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+	make --silent -f $(COCOTB_MAKEFILE)
+
+# ============================================================
 # PSC-OS テスト from SD-Card
 
 MODE = verilator
@@ -320,7 +360,6 @@ simulate_SD_PSCOS:
 	test -f ./mem/user.mem
 	test -f ./mem/bootloader.mem
 
-	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
 	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
 	grep -n -v '^00000000$$' ./mem/user.mem | tail -n 1
 	grep -n -v '^00000000$$' ./mem/bootloader.mem | tail -n 1

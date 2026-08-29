@@ -10,6 +10,8 @@ module Csr (
     input  logic [1:0]       csr_cmd,             // 0:RW, 1:RS(OR), 2:RC(ANDN)
     input  logic             csr_use_imm,         // *I (zimm)
     input  logic [11:0]      csr_addr,            // CSR address
+    input  logic [11:0]      csr_read_addr,       // pipelined read address
+    input  logic [31:0]      csr_old_value,       // old value captured before commit
     input  logic [31:0]      csr_rs1_val,         // rs1 value
     input  logic [4:0]       csr_zimm,            // zimm (0..31)
     output logic  [31:0]     csr_rdata,           // old value to rd
@@ -297,14 +299,14 @@ module Csr (
     //reg [31:0] oldv, newv;
     logic [31:0] oldv, newv;
 
-    // The old CSR value is part of the commit-stage writeback data.  Keep the
-    // read port combinational; the actual CSR update still occurs only when
-    // csr_enb is asserted at commit.
+    // Read the CSR before commit and register it in the pipeline.  This keeps
+    // the address decoder and the read mux out of the commit-stage CSR update
+    // and register-file write-back paths.
     always_comb begin
-        csr_rdata = csr_read_mux(csr_addr);
+        csr_rdata = csr_read_mux(csr_read_addr);
     end
 
-    assign  oldv = csr_read_mux(csr_addr);
+    assign  oldv = csr_old_value;
     assign  newv = csr_apply(csr_cmd, side_effect_none_rs, oldv, csr_wr_val);
 
     always_ff @(posedge clock or negedge reset_n) begin

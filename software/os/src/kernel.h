@@ -1,5 +1,5 @@
 #pragma once
-#include <stddef.h>  // offsetof 用（必要なら）
+#include "common.h"
 
 #define PROCS_MAX 8
 #define PROC_UNUSED   0
@@ -23,9 +23,6 @@
 #define USER_STACK_TOP   (USER_BASE + 0x00100000u)
 #define USER_STACK_SIZE  (128 * 1024)
 #define USER_STACK_GUARD (4 * 1024)
-
-// user stack: 128KB
-#define USER_STACK_SIZE (128 * 1024)
 
 #define PAGE_V (1 << 0)
 #define PAGE_R (1 << 1)
@@ -54,6 +51,10 @@ struct process {
   uint8_t stack[8192];
 };
 
+extern struct process *current_proc;
+extern struct process *idle_proc;
+extern struct process procs[PROCS_MAX];
+
 struct trap_frame {
   uint32_t ra, gp, tp;
   uint32_t t0, t1, t2, t3, t4, t5, t6;
@@ -76,6 +77,7 @@ struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3,
 void putchar(char ch);
 void uart_putchar(char ch);
 long uart_getchar(void);
+long uart_getchar_timeout(uint32_t timeout);
 
 // --- メモリ管理/ページング ---
 paddr_t alloc_pages(uint32_t n);
@@ -95,8 +97,10 @@ void switch_context(uint32_t *prev_sp, uint32_t *next_sp);
 
 struct process *create_process(const void *image, size_t image_size);
 void yield(void);
+__attribute__((noreturn)) void reboot(void);
 
 // --- デモ用（必要なら残す） ---
 void delay(void);
 void proc_a_entry(void);
 void proc_b_entry(void);
+void run_multitask_dummy_test(void);

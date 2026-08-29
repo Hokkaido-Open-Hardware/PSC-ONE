@@ -47,6 +47,8 @@ module PSC_InstructionUnit (
     // Commit / CSR interface
     input  csr_state_t  csr_state,
     input  logic [31:0] csr_rdata,
+    output logic [11:0] csr_read_addr,
+    output logic [31:0] csr_old_value,
     output logic [31:0] csr_reg_data_1,
     output logic        csr_enb,
     output logic        csr_valid,
@@ -219,8 +221,7 @@ module PSC_InstructionUnit (
     // ============================================================
     assign regfile_wen = commit.valid && commit.ctrl.rf_wen &&
                          (commit.ctrl.w_addr != 5'd0);
-    assign regfile_wdata = (commit.ctrl.wb_sel == 2'b11)
-                         ? csr_rdata : commit.w_data;
+    assign regfile_wdata = commit.w_data;
 
     PSC_Register u_regfile (
         .clock         (clock),
@@ -369,6 +370,8 @@ module PSC_InstructionUnit (
     assign commit_ctrl         = commit.valid ? commit.ctrl : '0;
     assign commit_alu_data     = commit.alu_data;
     assign commit_branch_taken = commit.valid && commit.branch_taken;
+    assign csr_read_addr       = ex_mem.ctrl.csr_addr;
+    assign csr_old_value       = commit.w_data;
     assign csr_reg_data_1      = commit.reg_data_1;
     assign csr_enb             = commit.valid;
 
@@ -493,7 +496,7 @@ module PSC_InstructionUnit (
                                                 ex_mem.alu_data[1:0],
                                                 ex_mem.ctrl.funct3);
                     2'b10: mem_wb.w_data <= ex_mem.pc + 32'd4;
-                    default: mem_wb.w_data <= 32'd0;
+                    default: mem_wb.w_data <= csr_rdata;
                 endcase
             end else begin
                 mem_wb.valid <= 1'b0;

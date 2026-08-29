@@ -1,0 +1,5 @@
+[dbg] cycle=150000000, uart_tx=0x006d, pc=0x00200c98, data_addr=0x0039a2ec
+[dbg] cycle=160000000, uart_tx=0x006d, pc=0x00200064, data_addr=0x10000008
+[dbg] cycle=170000000, uart_tx=0x006d, pc=0x00200060, data_addr=0x10000008
+[dbg] cycle=180000000, uart_tx=0x006d, pc=0x00200060, data_addr=0x10000008
+[dbg] cycle=190000000, uart_tx=0x006d, pc=0x00200060, data_addr=0x10000008

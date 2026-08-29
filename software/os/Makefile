@@ -98,6 +98,9 @@ LDFLAGS_KERNEL := \
 	-Wl,-Map=$(Build)/kernel.map \
 	-Wl,--no-relax
 
+# kernel.c分割後もalloc_pages/map_pageを跨いだ最適化を維持する。
+KERNEL_CFLAGS := $(CFLAGS) -flto
+
 # ========================
 # Builtins
 # ========================
@@ -134,8 +137,26 @@ SRCS_USER := \
 	$(Src)/user.c \
 	$(Src)/fat32.c
 
+SIM_USER ?= full
+ifeq ($(SIM_USER),minimal)
+  USER_SRCS = $(Src)/sim_shell.c
+  USER_DEPS = $(Src)/sim_shell.c
+  USER_LIBS =
+  USER_OBJCOPY_FLAGS =
+else ifeq ($(SIM_USER),full)
+  USER_SRCS = $(SRCS_USER)
+  USER_DEPS = $(SRCS_USER) $(MICROPY_LIB)
+  USER_LIBS = $(MICROPY_LIB) $(LIBM) $(LIBC)
+  USER_OBJCOPY_FLAGS = --set-section-flags .bss=alloc,contents
+else
+  $(error SIM_USER=$(SIM_USER) is invalid (use: full | minimal))
+endif
+
 SRCS_KERNEL := \
 	$(Src)/kernel.c \
+	$(Src)/kernel_process.c \
+	$(Src)/kernel_trap.c \
+	$(Src)/kernel_syscall.c \
 	$(Src)/common.c \
 	$(Src)/dma.c \
 	$(Src)/synap_api.c \
@@ -146,7 +167,8 @@ SRCS_KERNEL := \
 	$(Src)/led_api.c \
 	$(Src)/fft_api.c \
 	$(Src)/mem_test.c \
-	$(Src)/speech_recognition_api.c
+	$(Src)/speech_recognition_api.c \
+	$(Src)/multitask_test.c
 
 SRCS_MBIOS := $(Src)/psc_mbios.S
 
@@ -311,33 +333,30 @@ $(MICROPY_LIB): $(MICROPY_DEPS)
 # ------------------------------------------------------------
 $(USER_ELF): \
 	$(Build) \
-	$(SRCS_USER) \
-	$(Build)/divmodsi3.o \
-	$(MICROPY_LIB)
+	$(USER_DEPS) \
+	$(Build)/divmodsi3.o
 
 	$(CC) $(CFLAGS) $(DUSERBASE) $(DEFUSERBASE) \
 		$(LDFLAGS_USER) \
 		-o $@ \
-		$(SRCS_USER) \
+		$(USER_SRCS) \
 		$(Build)/divmodsi3.o \
-		$(MICROPY_LIB) \
-		$(LIBM) \
-		$(LIBC) \
+		$(USER_LIBS) \
 		$(BUILTINS_LIB)
 
 $(USER_BIN): $(USER_ELF)
 	$(OBJCOPY) \
-		--set-section-flags .bss=alloc,contents \
+		$(USER_OBJCOPY_FLAGS) \
 		-O binary \
 		$< $@
-	@echo "[USER] PSC-OS shell + MicroPython -> $(USER_BIN)"
+	@echo "[USER] SIM_USER=$(SIM_USER) -> $(USER_BIN)"
 
 # ------------------------------------------------------------
 # Common USER output
 # ------------------------------------------------------------
 $(USER_MEM): $(USER_BIN) | $(Build)
 	hexdump -v -e '1/4 "%08x\n"' $(USER_BIN) > $(USER_MEM)
-	@echo "[USER] shell + MicroPython -> $(USER_MEM)"
+	@echo "[USER] SIM_USER=$(SIM_USER) -> $(USER_MEM)"
 
 # ========================
 # Kernel linker selection
@@ -375,7 +394,7 @@ $(KERNEL_ELF): \
 
 	@USER_SIZE=$$(stat -c%s $(USER_BIN)); \
 	echo "[USER] external image PA=$(USER_BASE_VAL) size=$$USER_SIZE"; \
-	$(CC) $(CFLAGS) $(KCPPFLAGS) $(DUSERBASE) \
+	$(CC) $(KERNEL_CFLAGS) $(KCPPFLAGS) $(DUSERBASE) \
 		-Wl,-T$(KERNEL_LD) \
 		$(LDFLAGS_KERNEL) \
 		-Wl,--defsym,_binary_shell_bin_start=$(USER_BASE_VAL) \

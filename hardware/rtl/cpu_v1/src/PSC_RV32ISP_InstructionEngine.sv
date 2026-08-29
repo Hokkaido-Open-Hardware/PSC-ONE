@@ -45,6 +45,8 @@ module PSC_RV32ISP_InstructionEngine #(
     output logic        csr_enb,
     output logic        csr_valid,
     input  logic [31:0] csr_rdata,
+    output logic [11:0] csr_read_addr,
+    output logic [31:0] csr_old_value,
     output logic [31:0] csr_reg_data_1,
 
     output logic        data_mem_read_valid,
@@ -178,6 +180,8 @@ module PSC_RV32ISP_InstructionEngine #(
         .load_read_data         (load_read_data),
         .csr_state              (csr_state),
         .csr_rdata              (csr_rdata),
+        .csr_read_addr          (csr_read_addr),
+        .csr_old_value          (csr_old_value),
         .csr_reg_data_1         (csr_reg_data_1),
         .csr_enb                (csr_enb),
         .csr_valid              (csr_valid),
