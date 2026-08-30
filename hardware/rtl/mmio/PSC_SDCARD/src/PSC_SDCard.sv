@@ -19,13 +19,13 @@ module PSC_SDCard #(
     // ---------------- CPU BUS ----------------
     input  wire        cpu_rvalid,
     input  wire [31:0] cpu_raddr,
-    output reg  [31:0] cpu_rdata,
-    output reg         cpu_rready,
+    output logic  [31:0] cpu_rdata,
+    output logic         cpu_rready,
 
     input  wire        cpu_wvalid,
     input  wire [31:0] cpu_waddr,
     input  wire [31:0] cpu_wdata,
-    output reg         cpu_wready,
+    output logic         cpu_wready,
 
     // ---------------- SD SPI ----------------
     output wire        sd_cs_n,
@@ -57,17 +57,17 @@ module PSC_SDCard #(
     wire [7:0] spi_rx_data;
     wire       spi_busy;
 
-    reg        spi_tx_data_valid;
-    reg        spi_cs_high;
-    reg  [7:0] spi_tx_data;
-    reg        spi_tx_start;
-    reg        spi_tx_start_d;
+    logic        spi_tx_data_valid;
+    logic        spi_cs_high;
+    logic  [7:0] spi_tx_data;
+    logic        spi_tx_start;
+    logic        spi_tx_start_d;
 
-    reg        sck_fast_mode;
-    reg        sd_card_ready;
+    logic        sck_fast_mode;
+    logic        sd_card_ready;
 
     // input latch
-    reg        sd_miso_latch;
+    logic        sd_miso_latch;
     always @(posedge clock) begin
         sd_miso_latch <= sd_miso;
     end
@@ -98,16 +98,16 @@ module PSC_SDCard #(
     // ============================================================
     // MMIO registers / flags
     // ============================================================
-    reg [31:0] sector_reg;      // LBA
-    reg        init_pulse;     // CPUが書いた「開始」ワンショット（内部）
-    reg        read_start;
-    reg        fifo_flush;
-    reg        fifo_pop;
-    reg        fifo_wdata_push;
-    reg        fifo_wdata_pop;
-    reg        soft_reset;
-    reg        write_start;
-    reg        error;
+    logic [31:0] sector_reg;      // LBA
+    logic        init_pulse;     // CPUが書いた「開始」ワンショット（内部）
+    logic        read_start;
+    logic        fifo_flush;
+    logic        fifo_pop;
+    logic        fifo_wdata_push;
+    logic        fifo_wdata_pop;
+    logic        soft_reset;
+    logic        write_start;
+    logic        error;
 
     // ============================================================
     // FIFO (byte)
@@ -116,36 +116,36 @@ module PSC_SDCard #(
     localparam integer FIFO_CW = FIFO_AW + 1;
 
     // read fifo
-    reg [7:0] fifo_R_mem [0:FIFO_DEPTH-1];
-    reg [FIFO_AW-1:0] fifo_wr_ptr, fifo_rd_ptr;
-    reg [FIFO_CW-1:0] fifo_count; // 0..FIFO_DEPTH
+    logic [7:0] fifo_R_mem [0:FIFO_DEPTH-1];
+    logic [FIFO_AW-1:0] fifo_wr_ptr, fifo_rd_ptr;
+    logic [FIFO_CW-1:0] fifo_count; // 0..FIFO_DEPTH
 
     wire fifo_empty = (fifo_count == 0);
     wire fifo_full  = (fifo_count == FIFO_DEPTH + 1);
 
     // fifo push/pop strobes
-    reg         fifo_push;
-    reg [7:0]   fifo_push_data;
+    logic         fifo_push;
+    logic [7:0]   fifo_push_data;
 
     // write fifo
-    reg [7:0] fifo_W_mem [0:FIFO_DEPTH-1];
-    reg [FIFO_AW-1:0] fifo_W_wr_ptr, fifo_W_rd_ptr;
+    logic [7:0] fifo_W_mem [0:FIFO_DEPTH-1];
+    logic [FIFO_AW-1:0] fifo_W_wr_ptr, fifo_W_rd_ptr;
 
-    reg [7:0]   fifo_W_push_data;
-    reg [7:0]   fifo_write_data;
+    logic [7:0]   fifo_W_push_data;
+    logic [7:0]   fifo_write_data;
 
     // crc data
-    reg         crc_write1;
-    reg         crc_write2;
-    reg [7:0]   crc_rdata;
-    reg [7:0]   crc_data1;
-    reg [7:0]   crc_data2;
+    logic         crc_write1;
+    logic         crc_write2;
+    logic [7:0]   crc_rdata;
+    logic [7:0]   crc_data1;
+    logic [7:0]   crc_data2;
 
     // ============================================================
     // CPU BUS (MMIO)
     // ============================================================
-    reg     cpu_rvalid_latch;
-    reg     cpu_wvalid_latch;
+    logic     cpu_rvalid_latch;
+    logic     cpu_wvalid_latch;
     
     // ---------------- cpu_valid latch ----------------
     always @(posedge clock or negedge reset_n) begin
@@ -379,13 +379,13 @@ module PSC_SDCard #(
         ST_FULL        = 5'd30,
         ST_ERROR       = 5'd31;
 
-    reg [4:0] state;
-    reg [4:0] next_state;
+    logic [4:0] state;
+    logic [4:0] next_state;
 
-    reg [6:0]   cmd_i;
-    reg [9:0]   byte_cnt;
-    reg [7:0]   cmd_rx;
-    reg [7:0]   rx_cmd_sd_card;
+    logic [6:0]   cmd_i;
+    logic [9:0]   byte_cnt;
+    logic [7:0]   cmd_rx;
+    logic [7:0]   rx_cmd_sd_card;
 
     // BUSY definition:
     //   - not READY (init/read ongoing) OR fifo has remaining data
@@ -393,7 +393,7 @@ module PSC_SDCard #(
     wire sd_rw_ready = (state == ST_READY);
 
     // state error
-    reg       state_error;
+    logic       state_error;
 
     // ============================================================
     // Task

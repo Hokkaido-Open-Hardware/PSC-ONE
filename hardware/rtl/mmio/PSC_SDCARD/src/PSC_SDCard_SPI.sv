@@ -14,18 +14,18 @@ module PSC_SDCard_SPI #(
     input  wire        spi_tx_data_valid,
     input  wire [7:0]  spi_tx_data,
     input  wire        spi_tx_start,
-    output reg  [7:0]  spi_rx_data,
+    output logic  [7:0]  spi_rx_data,
     output wire        spi_busy,
 
     // SD SPI
-    output reg         CS_N,
-    output reg         SCK,
-    output reg         MOSI,
+    output logic         CS_N,
+    output logic         SCK,
+    output logic         MOSI,
     input  wire        MISO
 );
 
     // clock divider
-    reg [15:0] sck_div;
+    logic [15:0] sck_div;
 
     always @(*) begin
         if (sck_fast_mode)
@@ -35,14 +35,14 @@ module PSC_SDCard_SPI #(
     end
 
     // SPI engine
-    reg [15:0] divcnt;
-    reg [2:0]  bitcnt;
-    reg        spi_active;
+    logic [15:0] divcnt;
+    logic [2:0]  bitcnt;
+    logic        spi_active;
 
-    reg [7:0] sh_tx;
-    reg [7:0] sh_rx;
+    logic [7:0] sh_tx;
+    logic [7:0] sh_rx;
 
-    reg sck_d1;
+    logic sck_d1;
 
     wire pos_sck = ~sck_d1 & SCK;
     wire neg_sck =  sck_d1 & ~SCK;

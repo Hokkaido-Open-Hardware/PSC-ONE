@@ -205,8 +205,8 @@ PSCONELCD_FILE = \
 
 # SD Card Reader
 SD_READER_FILE = \
-	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard.v \
-	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard_SPI.v 
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard.sv \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard_SPI.sv 
 
 # PSC Phase Flow Engine
 FPE_DIR  = ../rtl/pfe/src
