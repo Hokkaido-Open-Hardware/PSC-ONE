@@ -470,12 +470,18 @@ module Csr (
                     csr_mstatus[7]  <= 1'b1;            // MPIE <- 1
                     csr_mstatus[12:11] <= 2'b00;        // ★ MPP <- U (必須)
                 end
-                if (set_mtrap) begin
-                    csr_mepc       <= pack_epc(trap_mepc);
-                    csr_mcause     <= trap_mcause;
-                    csr_mstatus[7] <= csr_mstatus[3];   // MPIE <- MIE
-                    csr_mstatus[3] <= 1'b0;             // MIE  <- 0
-                end
+            end
+
+            // Machine interrupts arrive at a precise boundary where there is
+            // no committing CSR instruction, so trap entry is independent of
+            // the CSR commit enable.
+            if (set_mtrap) begin
+                csr_priv_mode       <= PRIV_M;
+                csr_mepc            <= pack_epc(trap_mepc);
+                csr_mcause          <= trap_mcause;
+                csr_mstatus[7]      <= csr_mstatus[3]; // MPIE <- MIE
+                csr_mstatus[3]      <= 1'b0;           // MIE  <- 0
+                csr_mstatus[12:11]  <= priv_mode;      // MPP  <- prior mode
             end
 
             // ---- mip pending ----

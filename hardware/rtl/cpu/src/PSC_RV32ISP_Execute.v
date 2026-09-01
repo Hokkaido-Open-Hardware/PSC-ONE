@@ -10,9 +10,11 @@ module PSC_RV32ISP_Execute #(
     input wire              reset_n,
     input wire              cpu_stop,
     input wire              cpu_trap,
+    input wire              timer_irq_request,
     // in,out
     input wire              execute_valid,      // = !fifo_empty
     output reg              execute_ready,      // execute state 終了パルス
+    output wire             execute_idle,
     // fifo sig.
     output wire             fifo_read_state_sig,
     output wire             execute_state_sig,
@@ -85,7 +87,7 @@ module PSC_RV32ISP_Execute #(
     //wire pipeline_type =  1'b0;   // Pipeline = off    
     //wire pipeline_type =  is_R_type;   // R type.
     //wire pipeline_type =  is_op_imm;   // IMM type.
-    wire pipeline_type = (is_R_type | is_op_imm);   // R type & I type.
+    wire pipeline_type = 1'b0;   // Pipeline off: no forwarding or hazard stall.
 
     // mode reg.
     reg  pipeline_mode;          // pipeline_mode=1 のときは「パイプライン指定命令のみ」受け入れ
@@ -130,6 +132,8 @@ module PSC_RV32ISP_Execute #(
     reg [3:0] execute_state, next_state;
     reg [3:0] execute_state_d;
 
+    assign execute_idle = (execute_state == IDLE);
+
     always @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             execute_state <= IDLE;
@@ -163,7 +167,7 @@ module PSC_RV32ISP_Execute #(
 
             // =====================
             IDLE:
-                if (execute_valid)
+                if (execute_valid && !timer_irq_request)
                     next_state = FIFO_READ;
 
             // =====================
@@ -218,10 +222,12 @@ module PSC_RV32ISP_Execute #(
 
             // =====================
             STORE:
-                if (mem_rw & store_done)
+                if (mem_rw) begin
+                    if (store_done)
+                        next_state = IDLE;
+                end else begin
                     next_state = IDLE;
-                else
-                    next_state = IDLE;
+                end
 
             // =====================
             default:

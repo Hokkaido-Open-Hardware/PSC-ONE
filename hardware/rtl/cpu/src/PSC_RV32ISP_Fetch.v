@@ -66,6 +66,7 @@ module PSC_RV32ISP_Fetch #(
 
     reg [31:0] fetch_pc, next_pc;
     reg        fetch_fifo_flush, next_flush;
+    reg        flush_execute_done;
     reg        next_ready;
 
     wire       i_mmu_done;
@@ -80,13 +81,22 @@ module PSC_RV32ISP_Fetch #(
             fetch_pc          <= 0;
             fetch_ready       <= 0;
             fetch_fifo_flush  <= 0;
+            flush_execute_done <= 0;
         end else if(cpu_stop) begin
             fetch_state       <= IDLE;
+            flush_execute_done <= 0;
         end else begin
             fetch_state       <= next_state;
             fetch_pc          <= next_pc;
             fetch_ready       <= next_ready;
             fetch_fifo_flush  <= next_flush;
+            if (fetch_state == IDLE)
+                flush_execute_done <= 1'b0;
+            else if (execute_ready &&
+                     ((fetch_state == FIFO_FLUSH) ||
+                      (fetch_state == FIFO_FLUSH_MMU_W) ||
+                      (fetch_state == FIFO_FLUSH_W)))
+                flush_execute_done <= 1'b1;
         end
     end
 
@@ -209,24 +219,35 @@ module PSC_RV32ISP_Fetch #(
                 // state = 7
                 FIFO_FLUSH: begin
                     next_pc    = pc;
-                    next_state = IDLE;
+                    if (execute_ready || flush_execute_done)
+                        next_state = IDLE;
                 end
 
                 // =====================
                 // state = 8
                 FIFO_FLUSH_MMU_W: begin
                     next_pc = pc;
-                    if (i_mmu_done)
-                        next_state = IDLE;
+                    // An interrupt accepted while an instruction fetch is
+                    // in flight must be allowed to abandon that MMU request.
+                    // The core presents the accept pulse as execute_ready.
+                    if (i_mmu_done || execute_ready) begin
+                        if (execute_ready || flush_execute_done)
+                            next_state = IDLE;
+                        else
+                            next_state = FIFO_FLUSH;
+                    end
                 end
 
                 // =====================
                 // state = 9
                 FIFO_FLUSH_W: begin
                     next_pc = pc;
-                    if (program_mem_read_ready | execute_ready) begin       // TBD
-                        next_state = IDLE;
-                        next_flush = 1'b1;
+                    if (program_mem_read_ready || execute_ready) begin
+                        if (execute_ready || flush_execute_done)
+                            next_state = IDLE;
+                        else
+                            next_state = FIFO_FLUSH;
+                        next_flush = program_mem_read_ready;
                     end
                 end
 
@@ -292,7 +313,8 @@ module PSC_RV32ISP_Fetch #(
     wire f_program_mem_read_ready;
     wire f_program_mem_req_ready;
 
-    assign  program_mem_read_valid = ((fetch_state==FETCH) ? f_program_mem_read_valid : 1'b0);
+    assign  program_mem_read_valid = ((fetch_state==FETCH) && !fifo_flush) ?
+                                     f_program_mem_read_valid : 1'b0;
     assign  f_program_mem_read_ready = program_mem_read_ready;
     assign  f_program_mem_read_data  = program_mem_read_data;
     assign  f_program_mem_req_ready  = program_mem_req_ready;
@@ -303,7 +325,7 @@ module PSC_RV32ISP_Fetch #(
     Fetch u_fetch (
         .clock                  (clock),                        // クロック
         .reset_n                (reset_n),                      // リセット（負論理）
-        .fetch_enb              (fetch_state==FETCH),           // フェッチ有効信号
+        .fetch_enb              ((fetch_state==FETCH) && !fifo_flush), // フェッチ有効信号
         .mem_read_data          (f_program_mem_read_data),
         .program_mem_read_valid (f_program_mem_read_valid),     // プログラムメモリ読出し有効
         .program_mem_read_ready (f_program_mem_read_ready), 

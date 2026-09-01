@@ -13,6 +13,12 @@
 #define SCAUSE_ECALL 8
 #define SCAUSE_INST_MISALIGNED  0
 
+#define MCAUSE_ECALL_S          9u
+#define MCAUSE_TIMER_IRQ        0x80000007u
+#define MSTATUS_MIE             (1u << 3)
+#define MSTATUS_MPIE            (1u << 7)
+#define MSTATUS_MPP_S           (1u << 11)
+
 // USER_BASE は run.sh から -DUSER_BASE=... で渡す。
 // 未指定ならデフォルト値（0x0040_0000）を使用。
 #ifndef USER_BASE
@@ -32,6 +38,15 @@
 
 struct sbiret { long error; long value; };
 
+/* Layout shared with machine_trap_entry in kernel_trap.c. */
+struct machine_context {
+  uint32_t x[32];
+  uint32_t mepc;
+  uint32_t mstatus;
+  uint32_t mcause;
+  uint32_t padding;
+} __attribute__((packed, aligned(16)));
+
 #define PANIC(fmt, ...) do { \
   s_printf("PANIC: %s:%d: " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__); \
   while (1) {} \
@@ -43,6 +58,8 @@ struct process {
 
   // context
   vaddr_t sp;
+  struct machine_context machine_context;
+  uint32_t machine_context_valid;
 
   // memory
   uint32_t *page_table;
@@ -86,8 +103,10 @@ void map_page(uint32_t *table1, uint32_t vaddr, paddr_t paddr, uint32_t flags);
 // --- 例外/トラップ/ブート ---
 __attribute__((naked)) void user_entry(void);
 __attribute__((naked, aligned(4))) void kernel_entry(void);
+__attribute__((naked, aligned(4))) void machine_trap_entry(void);
 void handle_syscall(struct trap_frame *f);
 void handle_trap(struct trap_frame *f);
+void handle_machine_trap(struct machine_context *context);
 __attribute__((section(".text.boot"), naked)) void boot(void);
 void kernel_main(void);
 
@@ -97,7 +116,15 @@ void switch_context(uint32_t *prev_sp, uint32_t *next_sp);
 
 struct process *create_process(const void *image, size_t image_size);
 void yield(void);
+void schedule_from_machine_trap(struct machine_context *context);
+void init_process_machine_context(struct process *proc, void (*entry)(void));
+void preemption_start(void);
+extern volatile uint32_t preemption_ticks;
+extern uint8_t machine_interrupt_stack[4096];
 __attribute__((noreturn)) void reboot(void);
+
+struct process *create_kernel_task(void (*entry)(void));
+void shell_idle_task(void);
 
 // --- デモ用（必要なら残す） ---
 void delay(void);

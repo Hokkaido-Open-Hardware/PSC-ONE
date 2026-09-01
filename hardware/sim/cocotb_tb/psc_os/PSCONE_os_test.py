@@ -242,6 +242,13 @@ async def RV32IS_chip_test1(dut):
     timeout_cycles = RUN_CYCLES
     waited = 0
 
+    # ---- PSC-OS prompt detection ----
+    # "PSC_OS> " がUARTに出力されたら、そのXX万クロック後に停止する。
+    prompt_target = "PSC_OS> "
+    prompt_index = 0
+    prompt_detected_cycle = None
+    stop_after_prompt_cycles = 1000000
+
     #dump_sdram_mem(dut, "GW2AR", 0x0000_0000, 24)
     #dump_sdram_mem(dut, "GW2AR", 0x0010_0000, 24)
     #dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
@@ -317,6 +324,31 @@ async def RV32IS_chip_test1(dut):
                 f.write(ch_out)
             # ----------------------------------------------------------
 
+            # ---- "PSC_OS> " prompt sequence detection ----
+            if ch == ord(prompt_target[prompt_index]):
+                prompt_index += 1
+
+                if prompt_index == len(prompt_target):
+                    prompt_detected_cycle = waited
+                    prompt_index = 0
+                    dut._log.info(
+                        f'[PSC-OS] Prompt "PSC_OS> " detected at cycle {waited}. '
+                        f"Simulation will stop after {stop_after_prompt_cycles} clocks."
+                    )
+            else:
+                # 現在文字が先頭 'P' なら、次の候補として1文字目を保持
+                prompt_index = 1 if ch == ord(prompt_target[0]) else 0
+
+        # prompt検出からXX万クロック経過したら停止
+        if (
+            prompt_detected_cycle is not None
+            and (waited - prompt_detected_cycle) >= stop_after_prompt_cycles
+        ):
+            dut._log.info(
+                f'[PSC-OS] {stop_after_prompt_cycles} clocks elapsed after "PSC_OS> ". Stop.'
+            )
+            break
+
         # ↓デバッグログ
         if ((waited % 10000000) == 0):
             pc_val  = safe_peek(dut.u_chip.u_core_axi.u_core.pc, 0)
@@ -335,11 +367,14 @@ async def RV32IS_chip_test1(dut):
         # waited インクリメント
         waited += 1
 
-    await ncycles(dut.clock, 100000)  # 100000 clockウェイト
+    # PSC_OS> 検出による停止時は、すでに1万クロック待っているので即終了。
+    # その他の終了条件では従来どおり settle wait を入れる。
+    if prompt_detected_cycle is None:
+        await ncycles(dut.clock, 100000)  # 100000 clockウェイト
 
-    # ---- Stop & settle ----
-    dut._log.info("Uart tx-rx wait.")
-    await ncycles(dut.clock, 50000)
+        # ---- Stop & settle ----
+        dut._log.info("Uart tx-rx wait.")
+        await ncycles(dut.clock, 50000)
 
     # Simulation End
     dut._log.info("Simulation End.")

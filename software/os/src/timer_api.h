@@ -27,6 +27,11 @@ void timer_start(uint32_t reload);
  * ------------------------------------------------------------ */
 void timer_start_auto(uint32_t reload);
 
+/* Start the 1ms autoreload timer used by the preemptive scheduler. */
+void timer_start_scheduler_tick(void);
+
+/* Clear the scheduler timer's level-sensitive interrupt pending state. */
+void timer_clear_scheduler_irq(void);
 
 /* ------------------------------------------------------------
  * タイマー停止

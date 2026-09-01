@@ -5,6 +5,8 @@
 #make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=basic
 #or
 #make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=legacy TEST_PROGRAM_LIST=basic
+#or
+#make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=basic RUN_CYCLES=30000
 
 # ============================================================
 #  MODE で一括切り替え（verilator / icarus）
@@ -248,7 +250,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	divmod_test1:RV32ISP_chip_test:./mem/divmod_test1.mem:0x00000e02 \
+	timer_irq_test2:RV32ISP_chip_test:./mem/timer_irq_test2.mem:0x00000322 \
 
 # ============================================================
 # 複数テスト定義
@@ -260,6 +262,8 @@ PSCONE_SINGLE_TEST = \
 PSCONE_BASIC_TESTS = \
 	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
 	add_test2:RV32ISP_chip_test:./mem/add_test2.mem:0x00000000 \
+	timer_irq_test1:RV32ISP_chip_test:./mem/timer_irq_test1.mem:0x00000321 \
+	timer_irq_test2:RV32ISP_chip_test:./mem/timer_irq_test2.mem:0x00000322 \
 	forwarding_test1:RV32ISP_chip_test:./mem/forwarding_test1.mem:0x00000011 \
 	forwarding_timing_test1:RV32ISP_chip_test:./mem/forwarding_timing_test1.mem:0x00008000 \
 	pfe_test1:RV32ISP_chip_test:./mem/pfe_test1.mem:0x00000000 \

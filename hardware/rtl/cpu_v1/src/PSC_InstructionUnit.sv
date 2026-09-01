@@ -7,6 +7,7 @@ module PSC_InstructionUnit (
     input  logic        reset_n,
     input  logic        cpu_stop,
     input  logic        cpu_trap,
+    input  logic        timer_irq_ext,
     input  logic [1:0]  priv_mode,
 
     // PC / current FIFO head
@@ -55,6 +56,7 @@ module PSC_InstructionUnit (
     output dec_ctrl_t   commit_ctrl,
     output logic [31:0] commit_alu_data,
     output logic        commit_branch_taken,
+    output logic        timer_irq_take,
 
     // Fault information
     input  logic        d_pf,
@@ -140,6 +142,7 @@ module PSC_InstructionUnit (
     dec_ctrl_t pc_update_ctrl;
     logic [31:0] pc_update_alu_data;
     logic pc_update_branch_taken;
+    logic timer_irq_request;
 
     function automatic logic serializing_instruction(input dec_ctrl_t ctrl);
         serializing_instruction =
@@ -339,9 +342,17 @@ module PSC_InstructionUnit (
                                        (id_issue.ctrl.pc_sel != 2'b00);
 
     assign id_issue_ready = !id_issue.valid || issue_fire;
+    // Stop admitting younger instructions once a machine timer interrupt is
+    // pending.  The already-issued instructions retire normally, so the PC at
+    // timer_irq_take is the precise architectural resume address.
+    assign timer_irq_request = timer_irq_ext && csr_state.mstatus[3] &&
+                               csr_state.mie[7];
+    assign timer_irq_take = timer_irq_request && pipeline_empty;
+
     assign decode_enb = fifo_req_ready && id_issue_ready &&
-                        !cpu_stop && !cpu_trap;
-    assign decode_fire = decode_done && fifo_req_ready && id_issue_ready;
+                        !cpu_stop && !cpu_trap && !timer_irq_request;
+    assign decode_fire = decode_done && fifo_req_ready && id_issue_ready &&
+                         !timer_irq_request;
     assign issue_fire = id_issue.valid && issue_ex_ready &&
                         !raw_hazard && !backend_serial &&
                         (!issue_serial || backend_empty ||
@@ -400,7 +411,7 @@ module PSC_InstructionUnit (
                                     (commit.valid && commit.branch_taken &&
                                      !commit_branch_redirected);
 
-    assign fifo_flush = d_pf || i_pf ||
+    assign fifo_flush = d_pf || i_pf || timer_irq_take ||
                         early_branch_valid ||
                         (commit.valid &&
                         (commit.ctrl.is_fence_i              ||
@@ -540,6 +551,7 @@ module PSC_InstructionUnit (
         .d_pf              (d_pf_event),
         .i_pf              (i_pf_event),
         .trap_scause       (trap_scause),
+        .timer_irq_take    (timer_irq_take),
         .csr_state         (csr_state),
         .pc                (pc),
         .counter           (counter)

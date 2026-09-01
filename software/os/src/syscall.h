@@ -52,8 +52,12 @@
 #define SYS_LED_ALL_OFF           85
 #define SYS_LED_GET_STATE         86
 
+// --- LCD ---
+#define SYS_LCD_INIT              90
+#define SYS_LCD_FILL_RGB          91
+
 // --- SYSTEM ---
-#define SYS_EXIT            90
-#define SYS_PRINT_INT       91
+#define SYS_EXIT                  100
+#define SYS_PRINT_INT             101
 
 #endif

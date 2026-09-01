@@ -151,7 +151,7 @@ __attribute__((used)) void kernel_main(void) {
 #endif
     s_printf("PSC_OS Boot Start.........\n");
     s_printf("--- memset done ---\n");
-    s_printf("Test Ver: test_1.5.0\n");
+    s_printf("Test Ver: test_1.6.0\n");
     s_printf(
         "\n"
         "+--------------------------------------------------+\n"
@@ -188,15 +188,39 @@ __attribute__((used)) void kernel_main(void) {
     idle_proc->pid = 0;
     current_proc = idle_proc;
 
+    /* 
+    task1: 本物shell 
+    */
+    s_printf("--- create_process_2 ---\n");
     s_printf("DBG: _binary_shell_bin_start=%x _binary_shell_bin_end=%x\n",
              (uint32_t)_binary_shell_bin_start,
              (uint32_t)_binary_shell_bin_end);
     size_t shell_size = _binary_shell_bin_end - _binary_shell_bin_start;
-    s_printf("--- create_process_2 ---\n");
     create_process(_binary_shell_bin_start, shell_size);
     __asm__ __volatile__("fence.i" ::: "memory");
+
+#if 0
+    /* 
+    task2: kernel内テストtask 
+    */
+    s_printf("--- create_process_3 ---\n");
+    create_kernel_task(shell_idle_task);
+
+    //ここのコメントアウトを外すとブートしない
+    preemption_start();
+    
+    /*
+     * yield()しない。
+     * Timer IRQだけで idle -> shell -> shell_idle_task
+     * と切り替わることを確認する。
+     */
+    for (;;) {
+        __asm__ __volatile__("nop");
+    }
+#else
     s_printf("--- yield ---\n");
     yield();
     s_printf("--- yield end ---\n");
     PANIC("switched to idle process");
+#endif
 }

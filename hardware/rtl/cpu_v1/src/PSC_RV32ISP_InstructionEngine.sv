@@ -13,6 +13,8 @@ module PSC_RV32ISP_InstructionEngine #(
     input  logic [3:0]  cpu_state,
     input  logic        cpu_trap,
 
+    input  logic        timer_irq_ext,
+
     input  logic        fifo_req_ready,
     output logic        execute_task_busy,
     output logic        execute_task_done,
@@ -44,6 +46,7 @@ module PSC_RV32ISP_InstructionEngine #(
     input  csr_state_t  csr_state,
     output logic        csr_enb,
     output logic        csr_valid,
+    output logic        timer_irq_take,
     input  logic [31:0] csr_rdata,
     output logic [11:0] csr_read_addr,
     output logic [31:0] csr_old_value,
@@ -150,6 +153,7 @@ module PSC_RV32ISP_InstructionEngine #(
         .reset_n                (reset_n),
         .cpu_stop               (cpu_stop),
         .cpu_trap               (cpu_trap),
+        .timer_irq_ext          (timer_irq_ext),
         .priv_mode              (priv_mode),
         .pc                     (pc),
         .counter                (counter),
@@ -185,6 +189,7 @@ module PSC_RV32ISP_InstructionEngine #(
         .csr_reg_data_1         (csr_reg_data_1),
         .csr_enb                (csr_enb),
         .csr_valid              (csr_valid),
+        .timer_irq_take         (timer_irq_take),
         .commit_ctrl            (commit_ctrl),
         .commit_alu_data        (commit_alu_data),
         .commit_branch_taken    (commit_branch_taken),

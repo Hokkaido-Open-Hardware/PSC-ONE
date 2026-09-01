@@ -441,6 +441,9 @@ module PSC_ONE_Chip #(
     wire        dma_done;
     wire [31:0] csr_DMA_STATUS = {30'd0, dma_busy, dma_done};
 
+    // irq
+    wire        irq_tx;
+
     PSC_ONE_RV32ISP_core #(
         .ADDR_WIDTH         (ADDR_W),
         .ID_WIDTH           (ID_W),
@@ -472,6 +475,7 @@ module PSC_ONE_Chip #(
         .clock              (clock_100MHz),
         .reset_n            (reset_n),
         .cpu_stop           (cpu_stop),
+        .timer_irq_ext      (irq_tx),
         .uart_out           (),
 
         // ---- 外部 IO ----
@@ -963,7 +967,7 @@ module PSC_ONE_Chip #(
         .cpu_rready       (mmio_rready_timer),
 
         // 割り込み出力
-        .irq_tx           ()
+        .irq_tx           (irq_tx)
     );
 
     //==========================================================

@@ -1,0 +1,52 @@
+[dbg] cycle=0, uart_tx=0x0000, pc=0x00000000, data_addr=0x00000000
+memset = OFF
+PSC_OS Boot Start.........
+--- memset done ---
+Test Ver: test_1.6.0
+
++--------------------------------------------------+
+|                    PSC_OS                        |
+|            Minimal RISC-V Kernel Boot            |
++--------------------------------------------------+
+| Build : Sep  1 2026 19:04:17
+| CPU   : RV32 (Supervisor mode)
+| MMU   : SV32
+| UART  : SBI console or
+| UART  : MMIO console
+| CMD   : hello, primes, dump
+| CMD   : sa_start
+| CMD   : sd_read, sd_write
+| CMD   : mic_read, mic_write
+| CMD   : fat32_info, fat32_ls, fat32_cat
+| CMD   : fat32_touch
+| CMD   : speech
+| CMD   : microPython
+| microPython exit: Ctl+D.
+| SBI quit : Ctl+A C. q.
++--------------------------------------------------+
+--- create_process_1 ---
+---- kernel map start. ----
+---- MMIO map start. ----
+---- MMIO region map start. ----
+---- SA core address map start. ----
+---- SA core data address map start. ----
+---- SA core data wb address map start. ----
+create_process_End
+DBG: _binary_shell_bin_start=00400000 _binary_shell_bin_end=004237b0
+--- create_process_2 ---
+---- kernel map start. ----
+---- MMIO map start. ----
+---- MMIO region map start. ----
+---- SA core address map start. ----
+---- SA core data address map start. ----
+---- SA core data wb address map start. ----
+---- user image map start. ----
+[dbg] cycle=10000000, uart_tx=0x000a, pc=0x002012ec, data_addr=0x002c8ad4
+[dbg] cycle=20000000, uart_tx=0x000a, pc=0x00201308, data_addr=0x004112e3
+[dbg] cycle=30000000, uart_tx=0x000a, pc=0x00201308, data_addr=0x0041c86f
+---- user stack map start. ----
+[dbg] cycle=40000000, uart_tx=0x000a, pc=0x002013a4, data_addr=0x002c8ad4
+create_process_End
+--- yield ---
+shell start.
+[34mPSC_OS> [0

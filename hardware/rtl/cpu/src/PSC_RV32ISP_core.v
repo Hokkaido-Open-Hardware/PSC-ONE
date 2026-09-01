@@ -12,7 +12,7 @@ module PSC_RV32ISP_core #(
     input wire              clock,
     input wire              reset_n,
     input wire              cpu_stop,
-    input wire              irq_ext,     // TBD
+    input wire              timer_irq_ext,
     // Program
     output wire             program_mem_burst_mode,
     output wire             program_mem_read_valid,
@@ -174,13 +174,17 @@ module PSC_RV32ISP_core #(
                             d_pf                ? (is_store ? 32'd15 : 32'd13) :
                                                 32'd0;
 
-    wire        set_mtrap   = ecall_m;      // 最小構成
+    wire        timer_irq_request = timer_irq_ext && csr_mstatus[3] && csr_mie[7];
+    wire        timer_irq_take;
+    reg         timer_irq_active;
+    wire        set_mtrap   = (ecall_m && csr_enb) || timer_irq_take;
     wire [31:0] trap_mepc   = pc;
-    wire [31:0] trap_mcause = ecall_m  ? 32'd11 : 32'd0;
+    wire [31:0] trap_mcause = timer_irq_take ? 32'h8000_0007 :
+                                ecall_m      ? 32'd11 : 32'd0;
 
     // ペンディング入力（mip制御）
     wire        set_msip   = 1'b0, clr_msip = 1'b0;
-    wire        set_mtip   = 1'b0, clr_mtip = 1'b0;
+    wire        set_mtip   = timer_irq_ext, clr_mtip = !timer_irq_ext;
     wire        set_meip   = 1'b0, clr_meip = 1'b0;
 
     // Execute wire
@@ -295,6 +299,8 @@ module PSC_RV32ISP_core #(
     wire        fifo_flush_sig;
     wire        fifo_read_ready;
     wire        execute_ready;
+    wire        execute_idle;
+    wire        execute_fifo_flush_sig;
     wire        fifo_read_state_sig;
     wire        is_load, is_store;
     wire        is_sfence_vma;
@@ -313,7 +319,9 @@ module PSC_RV32ISP_core #(
         // in,out
         .fetch_valid                (fetch_valid),
         .fetch_ready                (fetch_ready),
-        .execute_ready              (execute_ready),
+        // An interrupt can be accepted while Execute is already IDLE, so
+        // use the accept pulse to complete the fetch FIFO flush as well.
+        .execute_ready              (execute_ready | timer_irq_take | timer_irq_active),
         // fifo sig.
         .fifo_empty                 (fifo_empty),
         .fifo_full                  (fifo_full),
@@ -370,14 +378,16 @@ module PSC_RV32ISP_core #(
         .reset_n                    (reset_n),
         .cpu_stop                   (cpu_stop),
         .cpu_trap                   (cpu_state==CPU_TRAP),
+        .timer_irq_request          (timer_irq_request && !timer_irq_active),
         // in,out
         .execute_valid              (!fifo_empty),
         .execute_ready              (execute_ready),
+        .execute_idle               (execute_idle),
         // fifo sig.
         .fifo_read_state_sig        (fifo_read_state_sig),
         .execute_state_sig          (execute_state_sig),
         .fifo_read_ready            (fifo_read_ready),
-        .fifo_flush_sig             (fifo_flush_sig),
+        .fifo_flush_sig             (execute_fifo_flush_sig),
         // other sig.
         .pc                         (pc),
         .opcode                     (fifo_opcode_data),
@@ -426,13 +436,25 @@ module PSC_RV32ISP_core #(
     // =====================================
     // NEXT PC
     // =====================================
+    assign timer_irq_take = timer_irq_request && !timer_irq_active && execute_idle;
+    assign fifo_flush_sig = execute_fifo_flush_sig || timer_irq_take;
+
+    always @(posedge clock or negedge reset_n) begin
+        if (!reset_n || cpu_stop)
+            timer_irq_active <= 1'b0;
+        else if (!timer_irq_ext)
+            timer_irq_active <= 1'b0;
+        else if (timer_irq_take)
+            timer_irq_active <= 1'b1;
+    end
+
     wire exception = is_ecall | illegal_instruction | d_pf | i_pf;
-    wire interrupt = 1'b0; // 将来用
+    wire interrupt = timer_irq_take;
 
     wire trap = exception | interrupt;
     wire trap_deleg_to_s = (priv_mode != PRIV_M) && csr_medeleg[trap_scause];
 
-    wire [31:0] trap_pc = trap_deleg_to_s ? csr_stvec : csr_mtvec;
+    wire [31:0] trap_pc = (!interrupt && trap_deleg_to_s) ? csr_stvec : csr_mtvec;
     wire [31:0] branch_target_pc = {alu_data[31:1], 1'b0};  // JALR/JAL/branch用
     wire [31:0] seq_pc           = pc + 32'd4;              // 順次実行用
     wire [31:0] sret_pc          = csr_sepc;                // Csr からの戻り先
@@ -455,6 +477,7 @@ module PSC_RV32ISP_core #(
     wire [31:0] next_pc;
     assign next_pc = (do_mret)              ? csr_mepc :      // ★ M-mode return
                      (do_sret)              ? sret_pc :
+                     (interrupt)            ? csr_mtvec :
                      (trap)                 ? trap_pc_latch :
                      (cpu_state==CPU_TRAP)  ? trap_pc_latch : 
                      (pc_sel2 == 1'b1)      ? branch_target_pc :
@@ -469,7 +492,10 @@ module PSC_RV32ISP_core #(
             pc      <= 32'b0;
             counter <= 32'b0;
         end else begin
-            if(execute_ready) begin
+            if(timer_irq_take) begin
+                pc      <= csr_mtvec;
+                counter <= counter + 1;
+            end else if(execute_ready) begin
                 pc      <= next_pc;
                 counter <= counter + 1;
             end

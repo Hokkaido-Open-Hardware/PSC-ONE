@@ -363,9 +363,9 @@ async def watch_tohost_result(
 # DUT入力初期化
 # ------------------------------------------------
 def initialize_dut_inputs(dut):
-    dut.reset_n.value = 0
-    dut.cpu_stop.value = 0
-    dut.irq_ext.value = 0
+    dut.reset_n.value   = 0
+    dut.cpu_stop.value  = 0
+    dut.timer_irq_ext.value = 0
 
     # Program memory
     dut.program_mem_read_ready.value = 0

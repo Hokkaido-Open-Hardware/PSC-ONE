@@ -2,13 +2,13 @@
 memset = OFF
 PSC_OS Boot Start.........
 --- memset done ---
-Test Ver: test_1.5.0
+Test Ver: test_1.6.0
 
 +--------------------------------------------------+
 |                    PSC_OS                        |
 |            Minimal RISC-V Kernel Boot            |
 +--------------------------------------------------+
-| Build : Aug 29 2026 23:08:06
+| Build : Sep  1 2026 12:46:08
 | CPU   : RV32 (Supervisor mode)
 | MMU   : SV32
 | UART  : SBI console or
@@ -32,7 +32,7 @@ Test Ver: test_1.5.0
 ---- SA core data address map start. ----
 ---- SA core data wb address map start. ----
 create_process_End
-DBG: _binary_shell_bin_start=00400000 _binary_shell_bin_end=004001e5
+DBG: _binary_shell_bin_start=00400000 _binary_shell_bin_end=004237a0
 --- create_process_2 ---
 ---- kernel map start. ----
 ---- MMIO map start. ----
@@ -41,4 +41,3 @@ DBG: _binary_shell_bin_start=00400000 _binary_shell_bin_end=004001e5
 ---- SA core data address map start. ----
 ---- SA core data wb address map start. ----
 ---- user image map start. ----
----- user stack map start. ----

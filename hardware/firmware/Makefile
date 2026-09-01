@@ -16,4 +16,4 @@ firmware_fat32:
 	cp ../../software/os/build/kernel.S 			./S_file/
 
 clean:
-	$(RM) -rf ./mem/*.mem
+	$(RM) -rf ./mem/

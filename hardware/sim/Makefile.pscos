@@ -2,8 +2,16 @@
 # Usage
 # ============================================================
 
-#make -f Makefile.pscos simulate_PSCOS SIM_USER=minimal SIM_FAST=1 RUN_CYCLES=30000000 
+# task切り替えテスト
+#make -f Makefile.pscos simulate_PSCOS_MULTITASK SIM_USER=minimal SIM_FAST=1 RUN_CYCLES=30000000 
 
+# ブートのみ高速確認テスト
+#make -f Makefile.pscos simulate_PSCOS SIM_USER=minimal SIM_FAST=1
+
+# micropythonリンクしないモード
+#make -f Makefile.pscos simulate_PSCOS SIM_FAST=1
+
+# 通常テスト
 #make -f Makefile.pscos simulate_PSCOS
 
 # ============================================================
@@ -306,7 +314,7 @@ simulate_PSCOS:
 	printf '\a'
 
 # ============================================================
-# PSC-OS cooperative two-process scheduler smoke test
+# PSC-OS preemptive two-process scheduler timer-IRQ test
 # ============================================================
 # This target uses a test-only kernel build.  The normal simulate_PSCOS
 # target above remains the PSC-OS baseline regression test.
@@ -326,7 +334,7 @@ simulate_PSCOS_MULTITASK:
 	@mkdir -p ./wave ./log_uart
 	@echo "MODE=$(MODE)"
 	@echo "CPU_VERSION=$(CPU_VERSION)"
-	@echo "[SIM] PSC-OS dummy process yield test, SIM=$(SIM)"
+	@echo "[SIM] PSC-OS 1ms timer preemption test, SIM=$(SIM)"
 	MODULE=cocotb_tb.psc_os.PSCONE_multitask_test \
 	PSC_UART_LOGFILE=./log_uart/dummy_$$(date +%Y_%m_%d_%H%M%S).log \
 	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
@@ -334,10 +342,12 @@ simulate_PSCOS_MULTITASK:
 	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
 	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
-	make --silent -f $(COCOTB_MAKEFILE)
+	make --silent -f $(COCOTB_MAKEFILE); \
+	printf '\a'
 
 # ============================================================
 # PSC-OS テスト from SD-Card
+# ============================================================
 
 MODE = verilator
 

@@ -11,7 +11,7 @@ module PSC_RV32ISP_core #(
     input logic              clock,
     input logic              reset_n,
     input logic              cpu_stop,
-    input logic              irq_ext,     // TBD
+    input logic              timer_irq_ext,
     // Program
     output logic             program_mem_burst_mode,
     output logic             program_mem_read_valid,
@@ -185,6 +185,7 @@ module PSC_RV32ISP_core #(
     logic        set_mtrap;
     logic [31:0] trap_mepc;
     logic [31:0] trap_mcause;
+    logic        timer_irq_take;
 
     assign trap_stval = i_pf_event ? pc :
                         d_pf_event ? data_fault_vaddr :
@@ -199,9 +200,10 @@ module PSC_RV32ISP_core #(
             (data_fault_is_store ? 32'd15 : 32'd13) :
                                                  32'd0;
 
-    assign set_mtrap   = ecall_m;
+    assign set_mtrap   = ecall_m || timer_irq_take;
     assign trap_mepc   = pc;
-    assign trap_mcause = ecall_m ? 32'd11 : 32'd0;
+    assign trap_mcause = timer_irq_take ? 32'h8000_0007 :
+                         ecall_m         ? 32'd11 : 32'd0;
 
     // ペンディング入力（mip制御）
     logic set_msip, clr_msip;
@@ -210,8 +212,8 @@ module PSC_RV32ISP_core #(
 
     assign set_msip = 1'b0;
     assign clr_msip = 1'b0;
-    assign set_mtip = 1'b0;
-    assign clr_mtip = 1'b0;
+    assign set_mtip = timer_irq_ext;
+    assign clr_mtip = !timer_irq_ext;
     assign set_meip = 1'b0;
     assign clr_meip = 1'b0;
 
@@ -403,6 +405,8 @@ module PSC_RV32ISP_core #(
         .cpu_stop                   (cpu_stop),
         .cpu_state                  (cpu_state),
         .cpu_trap                   (cpu_state==CPU_TRAP),
+        // irq
+        .timer_irq_ext              (timer_irq_ext),
         // in,out
         .fifo_req_ready             (fifo_req_ready),
         .execute_task_busy          (execute_task_busy),
@@ -430,6 +434,7 @@ module PSC_RV32ISP_core #(
         // CSR sig.
         .csr_enb                    (csr_enb),
         .csr_valid                  (csr_valid),
+        .timer_irq_take             (timer_irq_take),
         // CSR
         .csr_rdata                  (csr_rdata),
         .csr_read_addr              (csr_read_addr),

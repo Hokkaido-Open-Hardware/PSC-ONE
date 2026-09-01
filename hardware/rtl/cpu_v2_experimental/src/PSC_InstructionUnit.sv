@@ -20,6 +20,7 @@ module PSC_InstructionUnit #(
     input  logic        reset_n,
     input  logic        cpu_stop,
     input  logic        cpu_trap,
+    input  logic        timer_irq_ext,
     input  logic [1:0]  priv_mode,
 
     output logic [31:0] pc,
@@ -68,6 +69,7 @@ module PSC_InstructionUnit #(
     output dec_ctrl_t   commit_ctrl,
     output logic [31:0] commit_alu_data,
     output logic        commit_branch_taken,
+    output logic        timer_irq_take,
 
     input  logic        d_pf,
     input  logic        i_pf,
@@ -201,6 +203,8 @@ module PSC_InstructionUnit #(
     logic [31:0]          commit_prf_data;
     logic                 commit_prf_csr;
     logic                 branch_redirect;
+    logic                 pipeline_empty;
+    logic                 timer_irq_request;
     logic [63:0]          ooo_cycle;
     integer i;
     integer scan_free;
@@ -415,6 +419,13 @@ module PSC_InstructionUnit #(
         (rob[1].valid && serializing_instruction(rob[1].ctrl));
 
     assign rob_full = (rob_count == ROB_DEPTH);
+    assign pipeline_empty = (rob_count == 0) && !decode_stage_valid &&
+                            !alu_active && !md_active;
+    // Stop accepting younger instructions while the interrupt is pending.
+    // Existing decoded/ROB work retires before the precise trap boundary.
+    assign timer_irq_request = timer_irq_ext && csr_state.mstatus[3] &&
+                               csr_state.mie[7];
+    assign timer_irq_take = timer_irq_request && pipeline_empty;
     assign dispatch_fire = decode_stage_valid && !rob_full && iq_has_free &&
                            (!dispatch_needs_dest || has_free_phys) &&
                            !dispatch_blocked && !cpu_stop && !cpu_trap &&
@@ -423,10 +434,11 @@ module PSC_InstructionUnit #(
     assign decode_stage_ready = !decode_stage_valid || dispatch_fire;
     assign decode_enb = fifo_req_ready && decode_stage_ready && !decode_done &&
                         !cpu_stop && !cpu_trap && !d_pf && !i_pf &&
-                        !fifo_flush;
+                        !fifo_flush && !timer_irq_request;
     assign decode_capture_fire = decode_done && fifo_req_ready &&
                                  decode_stage_ready && !cpu_stop &&
-                                 !cpu_trap && !d_pf && !i_pf && !fifo_flush;
+                                 !cpu_trap && !d_pf && !i_pf && !fifo_flush &&
+                                 !timer_irq_request;
     assign fifo_read_valid = decode_capture_fire;
 
     // Two-entry oldest-ready selection, independently for the integer and M
@@ -526,7 +538,7 @@ module PSC_InstructionUnit #(
     assign csr_reg_data_1 = rob[rob_head].side_effect_value;
     assign csr_enb = commit_fire && !rob[rob_head].exception_valid;
 
-    assign fifo_flush = d_pf || i_pf || branch_redirect ||
+    assign fifo_flush = d_pf || i_pf || timer_irq_take || branch_redirect ||
                         (commit_fire &&
                          (rob[rob_head].ctrl.is_fence_i ||
                           rob[rob_head].ctrl.is_sfence_vma ||
@@ -864,6 +876,7 @@ module PSC_InstructionUnit #(
         .d_pf              (d_pf_event),
         .i_pf              (i_pf_event),
         .trap_scause       (trap_scause),
+        .timer_irq_take    (timer_irq_take),
         .csr_state         (csr_state),
         .pc                (pc),
         .counter           (counter)

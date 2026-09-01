@@ -55,6 +55,7 @@ module PSC_ONE_RV32ISP_core #(
     input  wire                         clock,
     input  wire                         reset_n,
     input  wire                         cpu_stop,
+    input  wire                         timer_irq_ext,
     output wire [8:0]                   uart_out,
 
     // MMIO
@@ -222,7 +223,7 @@ module PSC_ONE_RV32ISP_core #(
         .clock                      (clock),
         .reset_n                    (reset_n),
         .cpu_stop                   (cpu_stop),
-        .irq_ext                    (1'b0),
+        .timer_irq_ext              (timer_irq_ext),
 
         .program_mem_burst_mode     (),
         .program_mem_read_valid     (program_mem_read_valid),

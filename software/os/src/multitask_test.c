@@ -1,5 +1,6 @@
 #include "common.h"
 #include "kernel.h"
+#include "timer_api.h"
 
 /*
  * Small supervisor-mode scheduler smoke test.
@@ -10,9 +11,8 @@ static void dummy_finish(char name)
 {
     s_printf("DUMMY_%c_DONE\n", name);
     current_proc->state = PROC_EXITED;
-    yield();
 
-    /* The scheduler must never resume an exited dummy process. */
+    /* A timer IRQ must preempt this busy loop; there is no cooperative yield. */
     for (;;) {
         __asm__ __volatile__("nop");
     }
@@ -45,14 +45,23 @@ static struct process *dummy_process(int slot, int pid,
     proc->sp = (uint32_t)sp;
     /* All three supervisor-only test processes use the idle page table. */
     proc->page_table = idle_proc->page_table;
+    init_process_machine_context(proc, entry);
     return proc;
+}
+
+static void wait_for_next_quantum(void)
+{
+    uint32_t resume_tick = preemption_ticks + 2u;
+    while (preemption_ticks < resume_tick) {
+        __asm__ __volatile__("nop");
+    }
 }
 
 void proc_a_entry(void)
 {
     for (int i = 0; i < 4; ++i) {
         s_printf("DUMMY_A_%d\n", i);
-        yield();
+        wait_for_next_quantum();
     }
     dummy_finish('A');
 }
@@ -61,7 +70,7 @@ void proc_b_entry(void)
 {
     for (int i = 0; i < 4; ++i) {
         s_printf("DUMMY_B_%d\n", i);
-        yield();
+        wait_for_next_quantum();
     }
     dummy_finish('B');
 }
@@ -82,8 +91,17 @@ void run_multitask_dummy_test(void)
     (void)b;
 
     s_printf("DUMMY_TEST_START\n");
-    yield();
+    preemption_start();
 
-    /* A and B should both exit and leave the CPU in idle_entry(). */
-    PANIC("dummy scheduler returned");
+    /* The first timer IRQ starts A; this idle loop is itself preempted. */
+    while (a->state != PROC_EXITED || b->state != PROC_EXITED) {
+        __asm__ __volatile__("nop");
+    }
+
+    timer_stop();
+    s_printf("DUMMY_TIMER_DONE ticks=%d\n", (int)preemption_ticks);
+
+    for (;;) {
+        __asm__ __volatile__("nop");
+    }
 }

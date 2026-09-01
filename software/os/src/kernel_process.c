@@ -1,10 +1,32 @@
 #include "common.h"
 #include "kernel.h"
 #include "synap_api.h"
+#include "timer_api.h"
 
 struct process procs[PROCS_MAX];
 struct process *current_proc;
 struct process *idle_proc;
+volatile uint32_t preemption_ticks;
+static volatile uint32_t preemption_active;
+
+static uint32_t current_gp(void)
+{
+    uint32_t gp;
+    __asm__ __volatile__("mv %0, gp" : "=r"(gp));
+    return gp;
+}
+
+void init_process_machine_context(struct process *proc, void (*entry)(void))
+{
+    memset(&proc->machine_context, 0, sizeof(proc->machine_context));
+    proc->machine_context.x[2] =
+        (uint32_t)&proc->stack[sizeof(proc->stack)];
+    proc->machine_context.x[3] = current_gp();
+    proc->machine_context.mepc = (uint32_t)entry;
+    /* mret restores S privilege and enables M interrupts from MPIE. */
+    proc->machine_context.mstatus = MSTATUS_MPP_S | MSTATUS_MPIE;
+    proc->machine_context_valid = 1u;
+}
 
 // idle entry
 static void __attribute__((unused)) idle_entry(void) {
@@ -100,11 +122,18 @@ struct process *create_process(const void *image, size_t image_size) {
     proc->state      = PROC_RUNNABLE;
     proc->sp         = (uint32_t)sp;
     proc->page_table = page_table;
+    init_process_machine_context(proc, user_entry);
     s_printf("create_process_End\n");
     return proc;
 }
 
 void yield(void) {
+    if (preemption_active != 0u) {
+        register uint32_t extension __asm__("a7") = 6u;
+        __asm__ __volatile__("ecall" : "+r"(extension) :: "memory");
+        return;
+    }
+
     struct process *next = idle_proc;
     for (int i = 0; i < PROCS_MAX; i++) {
         struct process *proc = &procs[(current_proc->pid + i) % PROCS_MAX];
@@ -128,6 +157,74 @@ void yield(void) {
           [sscratch] "r" ((uint32_t) &next->stack[sizeof(next->stack)])
     );
     switch_context(&prev->sp, &next->sp);
+}
+
+void schedule_from_machine_trap(struct machine_context *context)
+{
+    struct process *next = idle_proc;
+    int current_slot = 0;
+    int prev_pid = -1;
+
+    preemption_ticks++;
+    if (current_proc != NULL) {
+
+        prev_pid = current_proc->pid;
+
+        current_proc->machine_context = *context;
+        current_proc->machine_context_valid = 1u;
+        current_slot = (int)(current_proc - procs);
+    }
+
+    for (int i = 1; i <= PROCS_MAX; ++i) {
+        struct process *candidate = &procs[(current_slot + i) % PROCS_MAX];
+        if (candidate->state == PROC_RUNNABLE && candidate->pid > 0) {
+            next = candidate;
+            break;
+        }
+    }
+
+    if (next == NULL || next == current_proc)
+        return;
+    if (next->machine_context_valid == 0u) {
+        for (;;) {
+            __asm__ __volatile__("nop");
+        }
+    }
+
+    current_proc = next;
+    //s_printf("[SW] %d -> %d\n", prev_pid, next->pid);
+
+    *context = next->machine_context;
+    
+    __asm__ __volatile__(
+        "sfence.vma\n"
+        "csrw satp, %[satp]\n"
+        "sfence.vma\n"
+        "csrw sscratch, %[sscratch]\n"
+        :
+        : [satp] "r" (SATP_SV32 |
+                       ((uint32_t)next->page_table / PAGE_SIZE)),
+          [sscratch] "r" ((uint32_t)&next->stack[sizeof(next->stack)])
+        : "memory"
+    );
+}
+
+void preemption_start(void)
+{
+    register uint32_t handler __asm__("a0") =
+        (uint32_t)machine_trap_entry;
+    register uint32_t machine_sp __asm__("a1") =
+        (uint32_t)&machine_interrupt_stack[sizeof(machine_interrupt_stack)];
+    register uint32_t extension __asm__("a7") = 3u;
+
+    /* MBIOS installs mtvec and enables mie.MTIE plus mstatus.MIE. */
+    __asm__ __volatile__("ecall"
+                         : "+r"(handler), "+r"(machine_sp), "+r"(extension)
+                         :
+                         : "memory");
+    preemption_ticks = 0u;
+    preemption_active = 1u;
+    timer_start_scheduler_tick();
 }
 
 __attribute__((naked)) void switch_context(uint32_t *prev_sp,
@@ -165,6 +262,70 @@ __attribute__((naked)) void switch_context(uint32_t *prev_sp,
         "addi sp, sp, 13 * 4\n"
         "ret\n"
     );
+}
+
+struct process *create_kernel_task(void (*entry)(void))
+{
+    struct process *proc = NULL;
+    int i;
+
+    for (i = 0; i < PROCS_MAX; i++) {
+        if (procs[i].state == PROC_UNUSED) {
+            proc = &procs[i];
+            break;
+        }
+    }
+
+    if (!proc)
+        PANIC("no free process slots");
+
+    memset(proc, 0, sizeof(*proc));
+
+    uint32_t *sp =
+        (uint32_t *)&proc->stack[sizeof(proc->stack)];
+
+    *--sp = 0; // s11
+    *--sp = 0; // s10
+    *--sp = 0; // s9
+    *--sp = 0; // s8
+    *--sp = 0; // s7
+    *--sp = 0; // s6
+    *--sp = 0; // s5
+    *--sp = 0; // s4
+    *--sp = 0; // s3
+    *--sp = 0; // s2
+    *--sp = 0; // s1
+    *--sp = 0; // s0
+    *--sp = (uint32_t)entry;
+
+    proc->pid   = i + 1;
+    proc->state = PROC_RUNNABLE;
+    proc->sp    = (uint32_t)sp;
+
+    /*
+     * kernel taskなのでidleと同じpage tableを使う
+     */
+    proc->page_table = idle_proc->page_table;
+
+    init_process_machine_context(
+        proc,
+        entry
+    );
+
+    return proc;
+}
+
+// 2つ目のtask
+void shell_idle_task(void)
+{
+    for (;;) {
+        //ここに2つ目のtaskを記述する
+        s_printf("T");
+
+        for (volatile uint32_t i = 0; i < 1000000; i++) {
+            __asm__ __volatile__("nop");
+        }
+    }
 }
 
 __attribute__((noreturn)) void reboot(void)

@@ -2,10 +2,14 @@
 #include "user.h"
 #include "fat32.h"
 
+// micropythonを含めるとSIM時間が長すぎる場合のオプション
+#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
+
 extern int psc_micropython_run(void);
 
 void main(void) {
 
+#if 0
     //SA API call
     //printf("call sa start.\n");
     call_sa_api(0x04);
@@ -13,7 +17,7 @@ void main(void) {
 
     // DUMP API call
     //call_dump_api();
-
+#endif
 
     printf("shell start.\n");
     //cmd_primes(100);
@@ -319,12 +323,14 @@ prompt:
             cmd_speech();
                     
         // ---- MicroPython REPL ----
+#ifndef PSC_OS_DEBUG_WITHOUT_MICROPYTHON
         } else if (strcmp(argv[0], "microPython") == 0 ||
                    strcmp(argv[0], "micropython") == 0) {
 
             printf("\n--- MicroPython start ---\n");
             int mp_ret = psc_micropython_run();
             printf("\n--- return to PSC-OS shell (ret=%d) ---\n", mp_ret);
+#endif
 
         // ---- Helps出力 ----
         } else if (strcmp(argv[0], "help") == 0) {

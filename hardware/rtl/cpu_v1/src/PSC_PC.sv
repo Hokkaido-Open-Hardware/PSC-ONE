@@ -21,6 +21,8 @@ module PSC_PC #(
     input  logic        i_pf,
     // Trap cause
     input  logic [4:0]  trap_scause,
+    // Precise machine timer interrupt acceptance pulse
+    input  logic        timer_irq_take,
     // CSR
     input  csr_state_t  csr_state,
     
@@ -56,7 +58,7 @@ module PSC_PC #(
         d_pf |
         i_pf;
 
-    assign interrupt = 1'b0;
+    assign interrupt = timer_irq_take;
 
     assign trap = exception | interrupt;
 
@@ -65,7 +67,7 @@ module PSC_PC #(
         (((csr_state.medeleg >> trap_scause) & 32'd1) != 32'd0);
 
     assign trap_pc =
-        trap_deleg_to_s
+        !interrupt && trap_deleg_to_s
             ? csr_state.stvec
             : csr_state.mtvec;
 

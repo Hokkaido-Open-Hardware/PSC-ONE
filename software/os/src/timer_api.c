@@ -23,6 +23,12 @@
 
 #define TIMER_RELOAD_MASK     0xFFFFu
 
+/*
+ * PSC-ONE runs this timer from 100MHz and the RTL prescaler divides by 100,
+ * so one timer tick is 1us.  Expiry occurs on the tick after counter reaches
+ * zero; reload=999 therefore gives exactly 1000 ticks = 1ms.
+ */
+#define TIMER_SCHEDULER_RELOAD 999u
 
 /* ------------------------------------------------------------
  * TIMER STATUS bit
@@ -53,6 +59,25 @@ void timer_start_auto(uint32_t reload)
         (reload & TIMER_RELOAD_MASK) |
         TIMER_START_BIT |
         TIMER_AUTORELOAD_BIT;
+}
+
+void timer_start_scheduler_tick(void)
+{
+    TIMER_CTRL =
+        TIMER_SCHEDULER_RELOAD |
+        TIMER_START_BIT |
+        TIMER_AUTORELOAD_BIT |
+        TIMER_IRQ_ENABLE_BIT;
+}
+
+void timer_clear_scheduler_irq(void)
+{
+    /* Preserve reload/autoreload/IRQ-enable while applying pending W1C. */
+    TIMER_CTRL =
+        TIMER_SCHEDULER_RELOAD |
+        TIMER_AUTORELOAD_BIT |
+        TIMER_IRQ_ENABLE_BIT |
+        TIMER_CLEAR_IRQ_BIT;
 }
 
 
