@@ -321,7 +321,7 @@ under constrained memory bandwidth for edge AI systems.
 
 ## PSC-ONE AI Architecture
 
-<img src="docs/images/PSC_TPU.jpg" width="800">
+<img src="docs/images/PSC_NPU.jpg" width="800">
 
 The system integrates the PSC-NPU systolic array
 with the PSC-ONE SoC platform.
