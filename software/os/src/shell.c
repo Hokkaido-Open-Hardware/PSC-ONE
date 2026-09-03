@@ -336,14 +336,12 @@ prompt:
         } else if (strcmp(argv[0], "help") == 0) {
             printf("commands:\n");
             printf("  microPython | micropython\n");
-            /*
             printf("  hello\n");
             printf("  dump [addr] [len]\n");
             printf("  primes [max]\n");
             printf("  sa_start\n");
             printf("  sd_read\n");
             printf("  exit | quit | q\n");
-            */
 
         } else if (strcmp(argv[0], "exit") == 0 ||
                    strcmp(argv[0], "quit") == 0 ||

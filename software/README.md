@@ -20,21 +20,24 @@ PSC-ONE Software is a full-stack software environment designed specifically for 
 
 It includes:
 
-- Boot software
-- PSC-OS kernel
-- User-mode applications
-- System-call interface
-- Device-control libraries
-- FAT32 filesystem support
-- Hardware-accelerator APIs
-- Test and diagnostic programs
+* Boot software
+* PSC-OS kernel
+* User-mode applications
+* System-call interface
+* Device-control libraries
+* FAT32 filesystem support
+* Hardware-accelerator APIs
+* Limited multitasking support
+* Test and diagnostic programs
 
 The figure below illustrates the conceptual PSC-ONE software architecture, including user programs, kernel services, device drivers, and the PSC-ONE hardware platform.
 
 <img src="docs/PSC_OS.jpg" width="800">
 
-> This diagram presents the conceptual architecture of PSC-OS and PSC-ONE.  
+> This diagram presents the conceptual architecture of PSC-OS and PSC-ONE.
 > Some modules shown in the diagram may represent planned or experimental extensions.
+
+PSC-OS currently provides limited multitasking support, allowing a user program and a kernel task to run concurrently through timer-interrupt-based task switching.
 
 All major software components are developed specifically for PSC-ONE and are closely integrated with its custom hardware architecture.
 

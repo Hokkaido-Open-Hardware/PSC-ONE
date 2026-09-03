@@ -26,7 +26,9 @@ CLK_PERIOD_NS = int(os.getenv("CLK_PERIOD_NS", "10"))     # 100 MHz
 # UART RTL is driven by 100 MHz and uses an integer clock divider.
 # 100 MHz / 23.04 MHz -> 4 clocks/bit -> 40 ns/bit.
 UART_BIT_NS = int(os.getenv("UART_BIT_NS", "40"))
-PROMPT_TEXT = "primes\r"
+#PROMPT_TEXT = "primes\r"
+#PROMPT_TEXT = "help\r"
+PROMPT_TEXT = "exit\r"
 #RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "1000_0000"))   # lcd test
 RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "5000_0000"))
 SDRAM_INIT_TIMEOUT = int(os.getenv("SDRAM_INIT_TIMEOUT", "500000"))  # cycles
@@ -460,7 +462,7 @@ async def RV32IS_chip_test1(dut):
                         dut,
                         dut.uart_rx,
                         PROMPT_TEXT,
-                        key_interval_ms=0.5
+                        key_interval_ms=2.0
                     )
             else:
                 # 現在文字が先頭 'P' なら、次の候補として1文字目を保持

@@ -77,7 +77,7 @@ This reduces the number of individual control signals and makes the CPU easier t
 The CPU currently operates as a multi-cycle state-machine processor.  
 However, the separation of execution modules provides a foundation for future pipelined execution, multiple instruction slots, and multithreaded operation.
 
-<img src="docs/images/PSC_RV32ISP_V1.jpg" width="800">
+<img src="../docs/images/PSC_RV32ISP_V1.jpg" width="800">
 
 The task-driven design provides:
 
@@ -97,7 +97,7 @@ PSC_RV32ISP_V1 currently uses a state-controlled execution model. Future version
 
 ## Experimental Dual-Issue / Out-of-Order Architecture
 
-<img src="docs/images/PSC_RV32ISP_V2.jpg" width="800">
+<img src="../docs/images/PSC_RV32ISP_V2.jpg" width="800">
 
 `PSC_RV32ISP_V2` is an experimental CPU architecture derived from `PSC_RV32ISP_V1`.
 
@@ -182,7 +182,7 @@ RISC-V GNU Toolchain
 
 ---
 
-### Memory Management Unit
+## Memory Management Unit
 
 PSC-ONE includes an Sv32-compatible virtual-memory system.
 
@@ -199,7 +199,7 @@ The MMU allows PSC-OS to execute user programs in a protected virtual address sp
 
 ---
 
-### Cache System
+## Cache System
 
 PSC-ONE includes separate instruction and data cache paths.
 
@@ -216,7 +216,7 @@ SynapEngine and other accelerators share the system memory with the CPU. Softwar
 
 ---
 
-### SDRAM System
+## SDRAM System
 
 The current Tang Nano 20K implementation uses the FPGA's integrated SDRAM as the main system memory.
 
@@ -233,7 +233,7 @@ The CPU, caches, DMA-related logic, and hardware accelerators access the shared 
 
 ---
 
-### Boot System
+## Boot System
 
 PSC-ONE contains boot ROM logic used to initialize the system and load software from an SD card.
 
@@ -247,7 +247,7 @@ The loaded software is copied into system memory before execution begins.
 
 ---
 
-### SD Card Interface
+## SD Card Interface
 
 PSC-ONE includes an SPI-mode SD-card controller.
 
@@ -265,7 +265,20 @@ SPI mode is used to keep the hardware implementation compact and reliable.
 
 ---
 
-### PSC-NPU (SynapEngine)
+## UART Interface
+
+The UART interface provides:
+
+* Boot and debug output
+* PSC-OS command-line access
+* Test-result output
+* Hardware and software diagnostics
+
+UART is the primary development and debugging interface.
+
+---
+
+# PSC-NPU (SynapEngine)
 
 **PSC-NPU** is the matrix-processing accelerator integrated into PSC-ONE.
 
@@ -325,7 +338,7 @@ These topology-reconfiguration features are architectural concepts and are not i
 
 ---
 
-### PFE QUBO Engine
+# PFE QUBO Engine
 
 PSC-ONE includes an experimental **PFE** accelerator for QUBO-related computation.
 
@@ -341,7 +354,7 @@ This engine is used to explore non-von-Neumann and optimization-oriented hardwar
 
 ---
 
-### I2S Audio Interface
+# I2S Audio Interface
 
 PSC-ONE contains an I2S receive interface for digital microphone input.
 
@@ -358,7 +371,7 @@ The audio interface is intended for future speech-recognition and signal-process
 
 ---
 
-### Display Interface
+# Display Interface
 
 PSC-ONE supports an ILI9488-based LCD module.
 
@@ -371,20 +384,7 @@ The display interface is used for:
 
 ---
 
-### UART Interface
-
-The UART interface provides:
-
-* Boot and debug output
-* PSC-OS command-line access
-* Test-result output
-* Hardware and software diagnostics
-
-UART is the primary development and debugging interface.
-
----
-
-## Interconnect Architecture
+# Interconnect Architecture
 
 PSC-ONE uses a unified memory-mapped address architecture.
 
@@ -407,7 +407,7 @@ Normal memory is accessed through the cache and SDRAM paths, while peripheral re
 
 ---
 
-## Hardware/Software Co-Design
+# Hardware/Software Co-Design
 
 PSC-ONE hardware is developed together with PSC-OS.
 
@@ -426,7 +426,7 @@ This allows new hardware features to be tested through complete software workloa
 
 ---
 
-## Verification
+# Verification
 
 PSC-ONE uses multiple levels of verification:
 
@@ -443,7 +443,7 @@ Hardware accelerator results are compared against software reference implementat
 
 ---
 
-## Current Status
+# Current Status
 
 The current PSC-ONE hardware supports:
 
@@ -464,7 +464,7 @@ The current PSC-ONE hardware supports:
 
 ---
 
-## Notes
+# Notes
 
 * The current primary FPGA target is the Tang Nano 20K
 * Main memory uses the FPGA's integrated SDRAM
@@ -477,7 +477,7 @@ The current PSC-ONE hardware supports:
 
 ---
 
-## Status
+# Status
 
 🚧 **Active Development**
 
