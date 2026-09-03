@@ -6,8 +6,9 @@
 # =========================================================
 import os
 import cocotb
-from cocotb.triggers import Timer, RisingEdge
+from collections import deque
 from cocotb.handle import SimHandleBase
+from cocotb.triggers import Timer, RisingEdge, FallingEdge
 
 # ========= 設定 =========
 Assert = 1
@@ -21,10 +22,15 @@ PROGRAM_FILE   = (MEM_FILE_ENV if MEM_FILE_ENV else
 
 EXPECTED_STR = os.getenv("EXPECTED_RESULT", "").strip()
 CLK_PERIOD_NS = int(os.getenv("CLK_PERIOD_NS", "10"))     # 100 MHz
+# FST_UART_MODE: BAUDRATE = 11520000 * 2
+# UART RTL is driven by 100 MHz and uses an integer clock divider.
+# 100 MHz / 23.04 MHz -> 4 clocks/bit -> 40 ns/bit.
+UART_BIT_NS = int(os.getenv("UART_BIT_NS", "40"))
+PROMPT_TEXT = "primes\r"
 #RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "1000_0000"))   # lcd test
-RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "2_0000_0000"))
+RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "5000_0000"))
 SDRAM_INIT_TIMEOUT = int(os.getenv("SDRAM_INIT_TIMEOUT", "500000"))  # cycles
-BOOT_ROM_TIMEOUT   = int(os.getenv("BOOT_ROM_TIMEOUT", "5000000"))  # cycles
+BOOT_ROM_TIMEOUT   = int(os.getenv("BOOT_ROM_TIMEOUT", "50000000"))  # cycles
 # ======================
 val_str = os.getenv("EXPECTED_RESULT")
 if not val_str or val_str.strip() == "":
@@ -192,6 +198,104 @@ def dump_sdram_mem(dut, mode, start_addr, datanum=16):
 
     print("===== MEM DUMP END =====\n")
 
+async def uart_serial_decoder(tx, rx_queue):
+    """
+    UART TX serial line をデコードして 8bit データに戻す。
+
+    Format:
+        1 start bit
+        8 data bits (LSB first)
+        1 stop bit
+    """
+
+    bit_ns = UART_BIT_NS
+
+    while True:
+
+        # Idle=1 → Start bit=0
+        await FallingEdge(tx)
+
+        # Start bit中央まで待つ
+        await Timer(bit_ns // 2, unit="ns")
+
+        # 本当に Start bit か確認
+        if int_resolved(tx) != 0:
+            continue
+
+        value = 0
+
+        # data bit 0～7
+        for bit in range(8):
+
+            # 次のbit中央へ
+            await Timer(bit_ns, unit="ns")
+
+            bit_value = int_resolved(tx)
+
+            if bit_value:
+                value |= (1 << bit)
+
+        # stop bit中央
+        await Timer(bit_ns, unit="ns")
+
+        stop_bit = int_resolved(tx)
+
+        if stop_bit != 1:
+            # framing error
+            continue
+
+        rx_queue.append(value)
+
+async def uart_serial_send(dut, rx, text: str, key_interval_ms: int = 10):
+    """
+    PC側から UART RX へ文字列を送信する。
+
+    Format:
+        1 start bit
+        8 data bits (LSB first)
+        1 stop bit
+
+    key_interval_ms:
+        文字と文字の間隔 [ms]
+    """
+
+    bit_ns = UART_BIT_NS
+
+    # UART idle
+    rx.value = 1
+
+    # 最初のstart bitを確実に検出させる
+    await Timer(bit_ns * 80, unit="ns")
+
+    dut._log.info(
+        f'[UART RX] Send start: "{text}" '
+        f"(key interval={key_interval_ms} ms)"
+    )
+
+    for ch in text:
+        value = ord(ch) & 0xFF
+
+        dut._log.info(
+            f'[UART RX] Send value=0x{value:02X} ({repr(ch)})'
+        )
+
+        # start bit
+        rx.value = 0
+        await Timer(bit_ns, unit="ns")
+
+        # data bits 0-7, LSB first
+        for bit in range(8):
+            rx.value = (value >> bit) & 1
+            await Timer(bit_ns, unit="ns")
+
+        # stop bit
+        rx.value = 1
+        await Timer(bit_ns, unit="ns")
+
+        # キー入力間隔
+        if key_interval_ms > 0:
+            await Timer(key_interval_ms, unit="ms")
+
 # ---------- メインテスト ---------------
 @cocotb.test()
 async def RV32IS_chip_test1(dut):
@@ -208,11 +312,20 @@ async def RV32IS_chip_test1(dut):
     rom_write_num = dut.u_chip.u_bt_rom.ROM_WORD.value
     dut._log.info(f"PSC_ONE_Boot_axi ROM_WORD : {rom_write_num}")
 
+    # uart
+    uart_rx_queue = deque()
+
     cocotb.start_soon(generate_clock(dut, CLK_PERIOD_NS))
+    cocotb.start_soon(
+        uart_serial_decoder(
+            dut.uart_tx,
+            uart_rx_queue
+        )
+    )
 
     # ---- reset & hold CPU ----
     #dut.PIO_external_in.value  = 3          # PIO_IN = 3 for PIO_test1.cpp　　
-    dut.uart_rx.value          = 0
+    dut.uart_rx.value          = 1
     dut.rst.value              = 0
 
     #dump_sdram_mem(dut, 0x0000_0000, 24)
@@ -227,11 +340,13 @@ async def RV32IS_chip_test1(dut):
     # ---- SDRAM init level wait (timeout 付き) ----
     ok_init = await wait_level(dut.u_chip.sdram_init_fin, 1, dut.clock, timeout_cycles=SDRAM_INIT_TIMEOUT)
     if not ok_init:
-        raise cocotb.result.TestFailure("[FAIL] Timeout waiting for sdram_init_fin == 1")
+        raise RuntimeError("[FAIL] Timeout waiting for sdram_init_fin == 1")
     await ncycles(dut.clock, 100)
 
     # ---- Boot_rom_done wait (timeout 付き) ----
-    ok_init = await wait_level(dut.u_chip.Boot_rom_done, 1, dut.clock, timeout_cycles=BOOT_ROM_TIMEOUT)
+    ok_boot = await wait_level(dut.u_chip.Boot_rom_done, 1, dut.clock, timeout_cycles=BOOT_ROM_TIMEOUT)
+    if not ok_boot:
+        raise RuntimeError("[FAIL] Timeout waiting for Boot_rom_done == 1")
     await ncycles(dut.clock, 100)
 
     # ---- Run CPU ----
@@ -241,11 +356,13 @@ async def RV32IS_chip_test1(dut):
     dut._log.info("Waiting for Uart tx data...")
     timeout_cycles = RUN_CYCLES
     waited = 0
+    last_uart_byte = None
 
     # ---- PSC-OS prompt detection ----
     # "PSC_OS> " がUARTに出力されたら、そのXX万クロック後に停止する。
-    prompt_target = "PSC_OS> "
+    prompt_target = "PSC_OS>"
     prompt_index = 0
+    primes_run_count = 0
     prompt_detected_cycle = None
     stop_after_prompt_cycles = 1000000
 
@@ -255,7 +372,7 @@ async def RV32IS_chip_test1(dut):
     #dump_sdram_mem(dut, "GW2AR", 0x0010_4440, 24)
     
     #dump_sdram_mem(dut, "GW2AR", 0x0020_0000, 24)
-    #dump_sdram_mem(dut, 0x0020_1400, 84)
+    #dump_sdram_mem(dut, "GW2AR", 0x0020_1400, 84)
     #dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
     #dump_page_table(dut, 0x024)
     #satp_val = int(dut.u_chip.u_core_axi.u_core.u_csr.csr_satp.value)
@@ -302,11 +419,11 @@ async def RV32IS_chip_test1(dut):
             dut._log.info(f"Burst Fault detected: rmismatch={col_rmismatch}, wmismatch={col_wmismatch}")
             break
 
-        uart_val = safe_peek(dut.u_chip.u_uart.cpu_wdata, 0)
-        uart_valid = dut.u_chip.u_uart.w_tx_wr.value
+        # UART TX のシリアル信号から復元された byte を処理
+        while uart_rx_queue:
+            ch = uart_rx_queue.popleft()
+            last_uart_byte = ch
 
-        if uart_valid == 1:
-            ch = uart_val & 0xFF
             # 表示用文字
             if ch in (0x0A, 0x0D):
                 ch_str = "\\n" if ch == 0x0A else "\\r"
@@ -317,64 +434,68 @@ async def RV32IS_chip_test1(dut):
             else:
                 ch_str = f"\\x{ch:02x}"
                 ch_out = ""  # ファイルに入れない（必要なら変更可）
-            # UART表示
-            dut._log.info(f"uart_tx=0x{uart_val:04x} ({ch_str})")
+
+            dut._log.info(f"uart_tx serial=0x{ch:02x} ({ch_str})")
+
             # ----------- ファイルを1文字ごとに追記して閉じる -----------
             with open(logfile, "a") as f:
                 f.write(ch_out)
             # ----------------------------------------------------------
 
-            # ---- "PSC_OS> " prompt sequence detection ----
+            # ---- "PSC_OS>" prompt sequence detection ----
             if ch == ord(prompt_target[prompt_index]):
                 prompt_index += 1
 
                 if prompt_index == len(prompt_target):
                     prompt_detected_cycle = waited
                     prompt_index = 0
+
+                    primes_run_count += 1
                     dut._log.info(
-                        f'[PSC-OS] Prompt "PSC_OS> " detected at cycle {waited}. '
-                        f"Simulation will stop after {stop_after_prompt_cycles} clocks."
+                        f'[PSC-OS] Prompt "PSC_OS>" detected. '
+                        f'Start primes run #{primes_run_count}.'
+                    )
+
+                    await uart_serial_send(
+                        dut,
+                        dut.uart_rx,
+                        PROMPT_TEXT,
+                        key_interval_ms=0.5
                     )
             else:
                 # 現在文字が先頭 'P' なら、次の候補として1文字目を保持
                 prompt_index = 1 if ch == ord(prompt_target[0]) else 0
 
-        # prompt検出からXX万クロック経過したら停止
-        if (
-            prompt_detected_cycle is not None
-            and (waited - prompt_detected_cycle) >= stop_after_prompt_cycles
-        ):
-            dut._log.info(
-                f'[PSC-OS] {stop_after_prompt_cycles} clocks elapsed after "PSC_OS> ". Stop.'
-            )
-            break
-
         # ↓デバッグログ
         if ((waited % 10000000) == 0):
             pc_val  = safe_peek(dut.u_chip.u_core_axi.u_core.pc, 0)
             adr_val = safe_peek(dut.u_chip.u_core_axi.cpu_data_addr, 0)
+            uart_dbg = (
+                f"0x{last_uart_byte:02x}"
+                if last_uart_byte is not None
+                else "--"
+            )
             dut._log.info(
-                f"[dbg] cycle={waited}, uart_tx=0x{uart_val:04x}, "
-                f"pc=0x{pc_val:04x}, data_addr=0x{adr_val:08x}"
+                f"[dbg] cycle={waited}, last_uart={uart_dbg}, "
+                f"pc=0x{pc_val:08x}, data_addr=0x{adr_val:08x}"
             )
             log = None
             if logfile is not None:
                 log = open(logfile, "a")
-                log.write(f"[dbg] cycle={waited}, uart_tx=0x{uart_val:04x}, ")
+                log.write(f"[dbg] cycle={waited}, last_uart={uart_dbg}, ")
                 log.write(f"pc=0x{pc_val:08x}, data_addr=0x{adr_val:08x}\n")
                 log.close()
         
         # waited インクリメント
         waited += 1
 
-    # PSC_OS> 検出による停止時は、すでに1万クロック待っているので即終了。
-    # その他の終了条件では従来どおり settle wait を入れる。
-    if prompt_detected_cycle is None:
-        await ncycles(dut.clock, 100000)  # 100000 clockウェイト
-
-        # ---- Stop & settle ----
-        dut._log.info("Uart tx-rx wait.")
-        await ncycles(dut.clock, 50000)
+    # ---- Stop & settle ----
+    dut._log.info(
+        f"Stress test stopped after {primes_run_count} primes runs."
+    )
+    await ncycles(dut.clock, 100000)
+    dut._log.info("Uart tx-rx wait.")
+    await ncycles(dut.clock, 50000)
 
     # Simulation End
     dut._log.info("Simulation End.")

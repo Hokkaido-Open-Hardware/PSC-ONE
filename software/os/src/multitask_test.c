@@ -59,20 +59,48 @@ static void wait_for_next_quantum(void)
 
 void proc_a_entry(void)
 {
+#if 0
     for (int i = 0; i < 4; ++i) {
         s_printf("DUMMY_A_%d\n", i);
         wait_for_next_quantum();
     }
     dummy_finish('A');
+#else
+    int count = 0;
+    for (;;) {
+        //ここに2つ目のtaskを記述する
+        s_printf("DDDDDDDD\n");
+        s_printf("%d\n", count);
+
+        for (volatile uint32_t i = 0; i < 1000; i++) {
+            __asm__ __volatile__("nop");
+        }
+        count = count + 1;
+    }
+#endif
 }
 
 void proc_b_entry(void)
 {
+#if 0
     for (int i = 0; i < 4; ++i) {
         s_printf("DUMMY_B_%d\n", i);
         wait_for_next_quantum();
     }
     dummy_finish('B');
+#else
+    int count = 0;
+    for (;;) {
+        //ここに2つ目のtaskを記述する
+        s_printf("EEEEEEEE\n");
+        s_printf("%d\n", count);
+
+        for (volatile uint32_t i = 0; i < 1000; i++) {
+            __asm__ __volatile__("nop");
+        }
+        count = count + 1;
+    }
+#endif
 }
 
 void run_multitask_dummy_test(void)

@@ -29,6 +29,7 @@
  * zero; reload=999 therefore gives exactly 1000 ticks = 1ms.
  */
 #define TIMER_SCHEDULER_RELOAD 999u
+//#define TIMER_SCHEDULER_RELOAD 9999u
 
 /* ------------------------------------------------------------
  * TIMER STATUS bit

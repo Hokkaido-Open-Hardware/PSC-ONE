@@ -156,7 +156,6 @@ __attribute__((naked))
 __attribute__((aligned(4)))
 void kernel_entry(void) {
     __asm__ __volatile__(
-        "csrw sscratch, sp\n"
         "addi sp, sp, -4 * 31\n"
         "nop\n"
         "sw ra,  4 * 0(sp)\n"
@@ -189,7 +188,12 @@ void kernel_entry(void) {
         "sw s9,  4 * 27(sp)\n"
         "sw s10, 4 * 28(sp)\n"
         "sw s11, 4 * 29(sp)\n"
-        "csrr a0, sscratch\n"
+        /*
+         * A machine timer interrupt may preempt this prologue, and the
+         * scheduler updates sscratch when it switches tasks.  Recover the
+         * interrupted sp from this frame instead of keeping it in a CSR.
+         */
+        "addi a0, sp, 4 * 31\n"
         "sw a0, 4 * 30(sp)\n"
         "mv a0, sp\n"
         "call handle_trap\n"

@@ -320,11 +320,12 @@ void shell_idle_task(void)
 {
     for (;;) {
         //ここに2つ目のtaskを記述する
-        s_printf("T");
+        //TBD
 
         for (volatile uint32_t i = 0; i < 1000000; i++) {
             __asm__ __volatile__("nop");
         }
+        s_printf("T\n");
     }
 }
 

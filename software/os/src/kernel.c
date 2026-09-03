@@ -151,7 +151,7 @@ __attribute__((used)) void kernel_main(void) {
 #endif
     s_printf("PSC_OS Boot Start.........\n");
     s_printf("--- memset done ---\n");
-    s_printf("Test Ver: test_1.6.0\n");
+    s_printf("Test Ver: test_1.7.0\n");
     s_printf(
         "\n"
         "+--------------------------------------------------+\n"
@@ -199,7 +199,7 @@ __attribute__((used)) void kernel_main(void) {
     create_process(_binary_shell_bin_start, shell_size);
     __asm__ __volatile__("fence.i" ::: "memory");
 
-#if 0
+#if 1
     /* 
     task2: kernel内テストtask 
     */

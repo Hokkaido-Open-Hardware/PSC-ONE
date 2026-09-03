@@ -336,7 +336,34 @@ simulate_PSCOS_MULTITASK:
 	@echo "CPU_VERSION=$(CPU_VERSION)"
 	@echo "[SIM] PSC-OS 1ms timer preemption test, SIM=$(SIM)"
 	MODULE=cocotb_tb.psc_os.PSCONE_multitask_test \
-	PSC_UART_LOGFILE=./log_uart/dummy_$$(date +%Y_%m_%d_%H%M%S).log \
+	PSC_UART_LOGFILE=./log_uart/log_$$(date +%Y_%m_%d_%H%M%S).log \
+	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+	make --silent -f $(COCOTB_MAKEFILE); \
+	printf '\a'
+
+# UART LOG MODE
+simulate_PSCOS_MULTITASK_LOG:
+	$(MAKE) clean
+	$(MAKE) -C ../../software/os MODE=sim ./build/bootrom.mem
+	$(MAKE) -C ../../software/os MODE=sim KCPPFLAGS="-DBSS_CLEAR_OFF=1 -DPSC_OS_DUMMY_TEST=1" kernel_mem
+	$(MAKE) -C ../../software/os MODE=sim ./build/user.mem
+	cp ../../software/os/build/bootrom.mem ./mem/
+	cp ../../software/os/build/kernel.mem ./mem/
+	cp ../../software/os/build/user.mem ./mem/
+	$(MAKE) -C ../../software/os clean
+	test -f ./mem/bootrom.mem
+	test -f ./mem/kernel.mem
+	test -f ./mem/user.mem
+	@mkdir -p ./wave ./log_uart
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "[SIM] PSC-OS 1ms timer preemption test, SIM=$(SIM)"
+	MODULE=cocotb_tb.psc_os.PSCONE_os_test \
+	PSC_UART_LOGFILE=./log_uart/log_$$(date +%Y_%m_%d_%H%M%S).log \
 	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
 	SIM=$(SIM) \
 	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
