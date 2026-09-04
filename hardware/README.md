@@ -29,15 +29,15 @@ The main target platform is currently the **Tang Nano 20K**, using the FPGA's in
 
 ## Main Components
 
-### PSC_RV32ISP CPU
+### PSC_RV32 CPU
 
-**PSC_RV32ISP** is a custom 32-bit RISC-V processor designed from scratch for PSC-ONE.
+**PSC_RV32** is a custom 32-bit RISC-V processor designed from scratch for PSC-ONE.
 
-The following diagram shows the internal architecture of the PSC_RV32ISP CPU and its connection to the PSC-ONE memory subsystem.
+The following diagram shows the internal architecture of the PSC_RV32 CPU and its connection to the PSC-ONE memory subsystem.
 
 The CPU integrates instruction fetch and execution logic, general-purpose registers, CSR control, privilege-mode handling, Sv32 address translation, instruction and data caches, and interfaces to system memory and memory-mapped peripherals.
 
-<img src="../docs/images/PSC_RV32ISP.jpg" width="800">
+<img src="../docs/images/PSC_RV32.jpg" width="800">
 
 Current CPU features include:
 
@@ -59,13 +59,13 @@ The CPU is designed to execute PSC-OS and user applications directly on the FPGA
 
 ---
 
-# CPU (PSC_RV32ISP_V1)
+# CPU (PSC_RV32_V1)
 
 ## CPU Architecture
 
-The following diagram shows the internal architecture of the PSC_RV32ISP_V1 CPU and its connection to the PSC-ONE memory subsystem.
+The following diagram shows the internal architecture of the PSC_RV32_V1 CPU and its connection to the PSC-ONE memory subsystem.
 
-PSC_RV32ISP_V1 is a redesigned version of the original PSC_RV32ISP processor.  
+PSC_RV32_V1 is a redesigned version of the original PSC_RV32 processor.  
 Its execution logic is divided into independent functional modules, including instruction fetch, decode, arithmetic execution, branch processing, memory access, CSR control, and register write-back.
 
 A central control unit dispatches operations to these modules and waits for their completion.  
@@ -77,7 +77,7 @@ This reduces the number of individual control signals and makes the CPU easier t
 The CPU currently operates as a multi-cycle state-machine processor.  
 However, the separation of execution modules provides a foundation for future pipelined execution, multiple instruction slots, and multithreaded operation.
 
-<img src="../docs/images/PSC_RV32ISP_V1.jpg" width="800">
+<img src="../docs/images/PSC_RV32_V1.jpg" width="800">
 
 The task-driven design provides:
 
@@ -89,17 +89,17 @@ The task-driven design provides:
 * A foundation for multiple execution slots and limited parallel execution
 * Easier extension with custom PSC-ONE hardware accelerators
 
-PSC_RV32ISP_V1 currently uses a state-controlled execution model. Future versions may hold multiple instruction tasks simultaneously and permit independent tasks to overlap when there are no register, memory, or control dependencies.
+PSC_RV32_V1 currently uses a state-controlled execution model. Future versions may hold multiple instruction tasks simultaneously and permit independent tasks to overlap when there are no register, memory, or control dependencies.
 
 ---
 
-# CPU (PSC_RV32ISP_V2)
+# CPU (PSC_RV32_V2)
 
 ## Experimental Dual-Issue / Out-of-Order Architecture
 
-<img src="../docs/images/PSC_RV32ISP_V2.jpg" width="800">
+<img src="../docs/images/PSC_RV32_V2.jpg" width="800">
 
-`PSC_RV32ISP_V2` is an experimental CPU architecture derived from `PSC_RV32ISP_V1`.
+`PSC_RV32_V2` is an experimental CPU architecture derived from `PSC_RV32_V1`.
 
 While V1 uses a state-controlled execution model in which instruction processing is largely serialized, V2 explores overlapping instruction execution, dual instruction slots, register renaming, and limited out-of-order execution.
 
@@ -131,7 +131,7 @@ For example, when a DIV or REM instruction is waiting for completion, an indepen
 
 ## Verification
 
-PSC_RV32ISP_V2 is verified using the same simulation infrastructure as V1, including Verilator, cocotb, and the official RISC-V ISA tests.
+PSC_RV32_V2 is verified using the same simulation infrastructure as V1, including Verilator, cocotb, and the official RISC-V ISA tests.
 
 The development requirement is that architectural optimizations must not break the existing instruction tests.
 
@@ -151,7 +151,7 @@ The long-term objective is to determine how far a relatively small FPGA RISC-V p
 
 ## RISC-V ISA Test Results
 
-The `PSC_RV32ISP_V1` processor has been verified using the official `riscv-tests` instruction test suite.
+The `PSC_RV32_V1` processor has been verified using the official `riscv-tests` instruction test suite.
 
 The following test groups currently pass in Verilator and cocotb simulation:
 
@@ -162,9 +162,9 @@ The following test groups currently pass in Verilator and cocotb simulation:
 * Shift and comparison instruction tests
 * `FENCE.I` instruction test
 
-A total of **49 official RISC-V ISA tests pass** on `PSC_RV32ISP_V1`.
+A total of **49 official RISC-V ISA tests pass** on `PSC_RV32_V1`.
 
-The `rv32ui-ma_data` test is currently excluded because it requires misaligned data access support. PSC_RV32ISP_V1 currently expects naturally aligned load and store accesses.
+The `rv32ui-ma_data` test is currently excluded because it requires misaligned data access support. PSC_RV32_V1 currently expects naturally aligned load and store accesses.
 
 Test sources are based on:
 

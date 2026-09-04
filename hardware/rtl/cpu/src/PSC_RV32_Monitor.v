@@ -1,4 +1,4 @@
-module PSC_RV32ISP_Monitor #(
+module PSC_RV32_Monitor #(
     parameter CLK_FREQ_MHz = 80
 )(
     input  wire         clock,

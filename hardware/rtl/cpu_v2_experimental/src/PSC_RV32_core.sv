@@ -3,7 +3,7 @@
 
 import PSC_Types::*;
 
-module PSC_RV32ISP_core #(
+module PSC_RV32_core #(
     parameter logic [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,     // 未使用.
     parameter logic [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
     parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0
@@ -67,11 +67,11 @@ module PSC_RV32ISP_core #(
     initial begin
         `ifdef DUMP_VCD
         $display("COCOTB_SIM CPU CORE DUMP_VCD ENABLE");
-        $dumpfile("./wave/PSC_RV32ISP_V2_core.vcd");
+        $dumpfile("./wave/PSC_RV32_V2_core.vcd");
         $dumpvars(0);
         `else
         $display("COCOTB_SIM CPU CORE verilator FST ENABLE");
-        $dumpfile("./wave/PSC_RV32ISP_V2_core.fst");
+        $dumpfile("./wave/PSC_RV32_V2_core.fst");
         $dumpvars(0);
         `endif
     end
@@ -228,8 +228,6 @@ module PSC_RV32ISP_core #(
     logic        csr_enb;
     logic        csr_valid;
     logic [31:0] csr_rdata;
-    logic [11:0] csr_read_addr;
-    logic [31:0] csr_old_value;
 
     // CSR logic
     logic [1:0]  priv_mode;
@@ -247,8 +245,6 @@ module PSC_RV32ISP_core #(
         .csr_cmd            (decoder_ctrl.csr_cmd),
         .csr_use_imm        (decoder_ctrl.csr_use_imm),
         .csr_addr           (decoder_ctrl.csr_addr),
-        .csr_read_addr      (csr_read_addr),
-        .csr_old_value      (csr_old_value),
         .csr_zimm           (decoder_ctrl.csr_zimm),
         .csr_rs1_val        (csr_reg_data_1),
         .csr_rdata          (csr_rdata),
@@ -341,7 +337,7 @@ module PSC_RV32ISP_core #(
 
     assign fetch_pc = pc;
 
-    PSC_RV32ISP_FetchUnit u_fetch_unit(
+    PSC_RV32_FetchUnit u_fetch_unit(
         // clock, reset
         .clock                      (clock),
         .reset_n                    (reset_n),
@@ -398,7 +394,7 @@ module PSC_RV32ISP_core #(
 
     assign illegal_instruction = decoder_ctrl.raise_illegal_instruction;
 
-    PSC_RV32ISP_InstructionEngine u_inst_engine(
+    PSC_RV32_InstructionEngine u_inst_engine(
         // clock, reset
         .clock                      (clock),
         .reset_n                    (reset_n),
@@ -437,8 +433,6 @@ module PSC_RV32ISP_core #(
         .timer_irq_take             (timer_irq_take),
         // CSR
         .csr_rdata                  (csr_rdata),
-        .csr_read_addr              (csr_read_addr),
-        .csr_old_value              (csr_old_value),
         .csr_reg_data_1             (csr_reg_data_1),
         // MMU fault sig.
         .i_pf                       (i_pf),

@@ -1,5 +1,5 @@
 // NISHIHARU
-module PSC_RV32ISP_Fetch #(
+module PSC_RV32_Fetch #(
     // Parameter
     parameter integer   FIFO_DEPTH   = 4
 )(
@@ -242,7 +242,12 @@ module PSC_RV32ISP_Fetch #(
                 // state = 9
                 FIFO_FLUSH_W: begin
                     next_pc = pc;
-                    if (program_mem_read_ready || execute_ready) begin
+                    // A program-memory request has already been accepted in
+                    // FETCH_W and cannot be cancelled.  Even if execution of
+                    // the branch/trap is complete, drain that response before
+                    // starting a fetch at the redirected PC; otherwise the
+                    // stale response is mistaken for the target instruction.
+                    if (program_mem_read_ready) begin
                         if (execute_ready || flush_execute_done)
                             next_state = IDLE;
                         else

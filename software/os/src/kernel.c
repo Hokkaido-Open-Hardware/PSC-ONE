@@ -149,6 +149,10 @@ __attribute__((used)) void kernel_main(void) {
     s_printf("memset = ON\n");
     memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
 #endif
+#if 1
+    s_printf("Draw PSC Logo\n");
+    lcd_draw_boot_logo();
+#endif
     s_printf("PSC_OS Boot Start.........\n");
     s_printf("--- memset done ---\n");
     s_printf("Test Ver: test_1.7.0\n");

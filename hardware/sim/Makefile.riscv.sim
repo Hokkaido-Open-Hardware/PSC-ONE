@@ -47,17 +47,18 @@ endif
 #  以下、元の Makefile の変数定義など（SDRAM_MODEL を置き換え）
 # ============================================================
 
-CPU_TOP 	 = PSC_RV32ISP_core
+CPU_TOP 	 = PSC_RV32_core
 
 CPU_SRC_DIR  	= ../rtl/cpu/src
 CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
 CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
 
-# RV32ISP_core
+# RV32_core
 CPU_CORE_FILES = \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_core.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_Fetch.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_Execute.v \
+	$(CPU_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Execute.v \
 	$(CPU_SRC_DIR)/Fetch_Fifo.v \
 	$(CPU_SRC_DIR)/Fetch.v \
 	$(CPU_SRC_DIR)/Decorder.v \
@@ -69,15 +70,18 @@ CPU_CORE_FILES = \
 	$(CPU_SRC_DIR)/Register.v \
 	$(CPU_SRC_DIR)/MMU.v \
 	$(CPU_SRC_DIR)/Csr.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_Monitor.v
+	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
 
-# RV32ISP_core
+CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
+
+# RV32_core
 CPU_V1_CORE_FILES = \
+	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32_core.v \
 	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_core.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_FetchUnit.sv \
 	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
 	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
 	$(CPU_V1_SRC_DIR)/Fetch.sv \
 	$(CPU_V1_SRC_DIR)/Decorder.sv \
@@ -90,15 +94,18 @@ CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
 	$(CPU_V1_SRC_DIR)/MMU.sv \
 	$(CPU_V1_SRC_DIR)/Csr.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_Monitor.v
+	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
 
-# RV32ISP_core(V2)
+CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+
+# RV32_core(V2)
 CPU_V2_CORE_FILES = \
+	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32_core.v \
 	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_core.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_FetchUnit.sv \
 	$(CPU_V2_SRC_DIR)/Fetch_Fifo.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
 	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
 	$(CPU_V2_SRC_DIR)/Fetch.sv \
 	$(CPU_V2_SRC_DIR)/Decorder.sv \
@@ -111,7 +118,7 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/PSC_PC.sv \
 	$(CPU_V2_SRC_DIR)/MMU.sv \
 	$(CPU_V2_SRC_DIR)/Csr.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_Monitor.v
+	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
 
 # ============================================================
 # CPUコアの切り替え（v1 / legacy）

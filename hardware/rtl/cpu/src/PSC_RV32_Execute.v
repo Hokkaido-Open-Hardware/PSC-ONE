@@ -1,6 +1,6 @@
 // NISHIHARU
 
-module PSC_RV32ISP_Execute #(
+module PSC_RV32_Execute #(
     parameter [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,     // 未使用.
     parameter [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
     parameter [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0

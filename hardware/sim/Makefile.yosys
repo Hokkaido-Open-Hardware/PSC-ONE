@@ -16,7 +16,7 @@ YOSYS_INPUT := $(filter-out \
     $(SDRAM_MODEL), \
     $(CPU_FILES))
 
-YOSYS_TOP := PSC_RV32ISP_core
+YOSYS_TOP := PSC_RV32_core
 YOSYS_LOG := ./log/yosys_$(YOSYS_TOP).log
 
 yosys_check:
@@ -39,9 +39,9 @@ yosys_check:
 # ============================================================
 
 # PSC_RV32ISP_coreファイル
-CPU_YOSYS_INPUT := $(CPU_CORE_FILES)
+CPU_YOSYS_INPUT := $(SELECTED_CPU_CORE_FILES)
 
-CPU_YOSYS_TOP := PSC_RV32ISP_core
+CPU_YOSYS_TOP := PSC_RV32_core
 CPU_YOSYS_LOG := ./log_yosys/yosys_$(CPU_YOSYS_TOP).log
 
 yosys_cpu:

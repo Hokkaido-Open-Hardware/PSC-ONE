@@ -12,7 +12,7 @@
 // SystolicArray_OFF mode
 //`define SystolicArray_OFF
 
-module PSC_ONE_RV32ISP_core #(
+module PSC_ONE_RV32_core #(
     // Mode 
 `ifdef OS_SIM
     parameter PROTECT_MODE         = 1,
@@ -217,7 +217,7 @@ module PSC_ONE_RV32ISP_core #(
     // --------------------------------
     // CORE
     // --------------------------------
-    PSC_RV32ISP_core #(
+    PSC_RV32_core #(
         .COUNTER_MMIO_ADDR          (32'hF004_FFF0)
     ) u_core (
         .clock                      (clock),
@@ -677,7 +677,7 @@ module PSC_ONE_RV32ISP_core #(
     //==========================================================
 
     // CPU Monitor
-    PSC_RV32ISP_Monitor #(
+    PSC_RV32_Monitor #(
         .CLK_FREQ_MHz       (80)
     ) u_cpu_monitor (
         .clock              (clock),

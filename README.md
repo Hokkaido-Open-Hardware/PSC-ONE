@@ -50,7 +50,7 @@ PSC-ONE is not just a CPU core, but a complete experimental SoC platform for res
 <img src="docs/images/PSC_ONE_SoC_Block.jpg" width="800">
 
 This section presents the overall PSC-ONE SoC architecture, including the
-PSC_RV32ISP CPU, memory subsystem, peripherals, PSC-OS, and PSC-ONE AI.
+PSC_RV32 CPU, memory subsystem, peripherals, PSC-OS, and PSC-ONE AI.
 
 ---
 
@@ -66,7 +66,7 @@ PSC_RV32ISP CPU, memory subsystem, peripherals, PSC-OS, and PSC-ONE AI.
 
 The hardware side of PSC-ONE currently includes:
 
-- `PSC_RV32ISP` custom RISC-V CPU core
+- `PSC_RV32` custom RISC-V CPU core
 - SDRAM controller
 - SD card interface (SPI mode)
 - Memory-mapped peripheral system
@@ -84,18 +84,18 @@ The software side of PSC-ONE currently includes:
 
 ---
 
-# CPU (PSC_RV32ISP)
+# CPU (PSC_RV32)
 
 ## CPU Architecture
 
 This diagram presents the top-level architecture of the PSC system.  
-It shows how the PSC_RV32ISP CPU core is integrated with memory and peripheral components, including UART, SDRAM, and the SD card interface.  
+It shows how the PSC_RV32 CPU core is integrated with memory and peripheral components, including UART, SDRAM, and the SD card interface.  
 Most peripherals are connected through memory-mapped interfaces.
 The PSC-NPU accelerator is controlled directly through custom RISC-V
 CSR registers and accesses matrix data through the shared cache/memory subsystem.
   
 A key feature of the PSC architecture is the tightly coupled integration of the PSC-NPU accelerator with the CPU.  
-Both the PSC_RV32ISP core and the PSC-NPU access memory through
+Both the PSC_RV32 core and the PSC-NPU access memory through
 the shared cache and memory subsystem.
 Unlike loosely coupled accelerator designs that require explicit DMA transfers
 for every operation, PSC-NPU can directly access data through the shared
@@ -103,7 +103,7 @@ cache/memory subsystem, reducing redundant memory copies.
   
 This tightly coupled architecture improves overall efficiency by reducing memory access overhead and is particularly suitable for data-intensive workloads such as matrix operations and future neural-network inference.
 
-<img src="docs/images/PSC_RV32ISP.jpg" width="800">
+<img src="docs/images/PSC_RV32.jpg" width="800">
 
 Current CPU features include:
 
@@ -123,13 +123,13 @@ Current CPU features include:
 
 ---
 
-# CPU (PSC_RV32ISP_V1)
+# CPU (PSC_RV32_V1)
 
 ## CPU Architecture
 
-The following diagram shows the internal architecture of the PSC_RV32ISP_V1 CPU and its connection to the PSC-ONE memory subsystem.
+The following diagram shows the internal architecture of the PSC_RV32_V1 CPU and its connection to the PSC-ONE memory subsystem.
 
-PSC_RV32ISP_V1 is a redesigned version of the original PSC_RV32ISP processor.  
+PSC_RV32_V1 is a redesigned version of the original PSC_RV32 processor.  
 Its execution logic is divided into independent functional modules, including instruction fetch, decode, arithmetic execution, branch processing, memory access, CSR control, and register write-back.
 
 A central control unit dispatches operations to these modules and waits for their completion.  
@@ -141,7 +141,7 @@ This reduces the number of individual control signals and makes the CPU easier t
 The CPU currently operates as a multi-cycle state-machine processor.  
 However, the separation of execution modules provides a foundation for future pipelined execution, multiple instruction slots, and multithreaded operation.
 
-<img src="docs/images/PSC_RV32ISP_V1.jpg" width="800">
+<img src="docs/images/PSC_RV32_V1.jpg" width="800">
 
 The task-driven design provides:
 
@@ -153,17 +153,17 @@ The task-driven design provides:
 * A foundation for multiple execution slots and limited parallel execution
 * Easier extension with custom PSC-ONE hardware accelerators
 
-PSC_RV32ISP_V1 currently uses a state-controlled execution model. Future versions may hold multiple instruction tasks simultaneously and permit independent tasks to overlap when there are no register, memory, or control dependencies.
+PSC_RV32_V1 currently uses a state-controlled execution model. Future versions may hold multiple instruction tasks simultaneously and permit independent tasks to overlap when there are no register, memory, or control dependencies.
 
 ---
 
-# CPU (PSC_RV32ISP_V2)
+# CPU (PSC_RV32_V2)
 
 ## Experimental Dual-Issue / Out-of-Order Architecture
 
-<img src="docs/images/PSC_RV32ISP_V2.jpg" width="800">
+<img src="docs/images/PSC_RV32_V2.jpg" width="800">
 
-`PSC_RV32ISP_V2` is an experimental CPU architecture derived from `PSC_RV32ISP_V1`.
+`PSC_RV32_V2` is an experimental CPU architecture derived from `PSC_RV32_V1`.
 
 While V1 uses a state-controlled execution model in which instruction processing is largely serialized, V2 explores overlapping instruction execution, dual instruction slots, register renaming, and limited out-of-order execution.
 
@@ -193,7 +193,7 @@ For example, when a DIV or REM instruction is waiting for completion, an indepen
 
 ### FPGA-Oriented Design
 
-Unlike large commercial out-of-order processors, PSC_RV32ISP_V2 intentionally keeps the scheduling window and execution resources small.
+Unlike large commercial out-of-order processors, PSC_RV32_V2 intentionally keeps the scheduling window and execution resources small.
 
 The design is intended for FPGA implementation and therefore prioritizes:
 
@@ -211,7 +211,7 @@ The architecture is being developed incrementally: first overlapping simple R/I-
 
 ## Verification
 
-PSC_RV32ISP_V2 is verified using the same simulation infrastructure as V1, including Verilator, cocotb, and the official RISC-V ISA tests.
+PSC_RV32_V2 is verified using the same simulation infrastructure as V1, including Verilator, cocotb, and the official RISC-V ISA tests.
 
 The development requirement is that architectural optimizations must not break the existing instruction tests.
 
@@ -230,7 +230,7 @@ The long-term objective is to determine how far a relatively small FPGA RISC-V p
 
 ## RISC-V ISA Test Results
 
-The `PSC_RV32ISP_V1` processor has been verified using the official `riscv-tests` instruction test suite.
+The `PSC_RV32_V1` processor has been verified using the official `riscv-tests` instruction test suite.
 
 The following test groups currently pass in Verilator and cocotb simulation:
 
@@ -241,9 +241,9 @@ The following test groups currently pass in Verilator and cocotb simulation:
 * Shift and comparison instruction tests
 * `FENCE.I` instruction test
 
-A total of **49 official RISC-V ISA tests pass** on `PSC_RV32ISP_V1`.
+A total of **49 official RISC-V ISA tests pass** on `PSC_RV32_V1`.
 
-The `rv32ui-ma_data` test is currently excluded because it requires misaligned data access support. PSC_RV32ISP_V1 currently expects naturally aligned load and store accesses.
+The `rv32ui-ma_data` test is currently excluded because it requires misaligned data access support. PSC_RV32_V1 currently expects naturally aligned load and store accesses.
 
 Test sources are based on:
 
@@ -262,11 +262,11 @@ RISC-V GNU Toolchain
 
 ---
 
-## PSC_RV32ISP vs PicoRV32 (Yosys Analysis)
+## PSC_RV32 vs PicoRV32 (Yosys Analysis)
 
 ### Resource Comparison
 
-| Metric           | PSC_RV32ISP          | PicoRV32 |
+| Metric           | PSC_RV32             | PicoRV32 |
 |------------------|----------------------|----------|
 | Cells            | 1385                 | 515      |
 | Adders           | 15                   | 8        |
@@ -280,7 +280,7 @@ RISC-V GNU Toolchain
 
 ## Architectural Features
 
-| Feature                       | PSC_RV32ISP | PicoRV32 |
+| Feature                       | PSC_RV32    | PicoRV32 |
 | ----------------------------- | :---------: | :------: |
 | RV32I                         |      ✓      |     ✓    |
 | Zicsr / CSR Support           |      ✓      | Optional |
@@ -334,30 +334,30 @@ with the PSC-ONE SoC platform.
 - Output-Stationary (OS) dataflow
 - Direct control through custom RISC-V CSR registers
 - Direct matrix data access through the CPU cache/memory subsystem
-- Integrated with the custom PSC-RV32ISP processor
+- Integrated with the custom PSC-RV32 processor
 - Experimental hardware/software co-design platform
 
 ---
 
 ## 8×8 Matrix Multiplication Performance
 
-The following results compare the execution time of an 8×8 matrix multiplication across different PSC-RV32ISP configurations and the systolic array accelerator.
+The following results compare the execution time of an 8×8 matrix multiplication across different PSC-RV32 configurations and the systolic array accelerator.
 
 ### Execution Time Comparison
 
 | Configuration                                  | Execution Time | Performance vs. V1 |
 | ---------------------------------------------- | -------------: | -----------------: |
-| PSC_RV32ISP                                    |         591 µs |       ~1.80× faster |
-| PSC_RV32ISP_V1                                 |        1066 µs |           Baseline |
+| PSC_RV32                                       |         591 µs |       ~1.80× faster |
+| PSC_RV32_V1                                    |        1066 µs |           Baseline |
 | Systolic Array                                 |          44 µs |       ~24.2× faster |
-| PSC_RV32ISP_V1 (Fetch FIFO enabled)            |         742 µs |       ~1.44× faster |
-| PSC_RV32ISP_V1 (R/I-Type pipeline enabled)     |         651 µs |       ~1.64× faster |
+| PSC_RV32_V1 (Fetch FIFO enabled)               |         742 µs |       ~1.44× faster |
+| PSC_RV32_V1 (R/I-Type pipeline enabled)        |         651 µs |       ~1.64× faster |
 
 ### Results
 
-The systolic array completed the 8×8 matrix multiplication in **44 µs**, approximately **24.2× faster** than the baseline PSC_RV32ISP_V1 processor.
+The systolic array completed the 8×8 matrix multiplication in **44 µs**, approximately **24.2× faster** than the baseline PSC_RV32_V1 processor.
 
-Enabling the Fetch FIFO reduced the PSC_RV32ISP_V1 execution time from **1066 µs to 742 µs**. Enabling the R/I-Type pipeline further reduced it to **651 µs**, approaching the performance of the original PSC_RV32ISP processor at **591 µs**.
+Enabling the Fetch FIFO reduced the PSC_RV32_V1 execution time from **1066 µs to 742 µs**. Enabling the R/I-Type pipeline further reduced it to **651 µs**, approaching the performance of the original PSC_RV32 processor at **591 µs**.
 
 These results demonstrate that both instruction-fetch optimization and R/I-Type pipelining significantly improve CPU performance. However, the dedicated systolic array still provides a much larger performance advantage for matrix multiplication workloads.
 
@@ -411,7 +411,7 @@ Instead, the goal is to explore:
 
 PSC-OS is a custom operating system developed specifically for the PSC-ONE platform.
 
-Unlike Linux, BSD, or existing RTOSes, PSC-OS is designed together with the PSC_RV32ISP CPU, memory subsystem, peripherals, and hardware accelerators, providing a tightly integrated hardware/software co-design environment.
+Unlike Linux, BSD, or existing RTOSes, PSC-OS is designed together with the PSC_RV32 CPU, memory subsystem, peripherals, and hardware accelerators, providing a tightly integrated hardware/software co-design environment.
 
 The following diagram illustrates the software architecture of PSC-OS, including user applications, the kernel, device drivers, and the underlying PSC-ONE hardware platform.
 
@@ -436,7 +436,7 @@ PSC-OS serves both as the runtime environment for the PSC-ONE SoC and as an expe
 
 ## MicroPython on PSC-OS
 
-MicroPython has been ported to PSC-OS and can run as a user-space application on the custom PSC_RV32ISP CPU.
+MicroPython has been ported to PSC-OS and can run as a user-space application on the custom PSC_RV32 CPU.
 The following console output is an excerpt from an actual execution on PSC-ONE.
 
 ```text
@@ -565,7 +565,7 @@ The system successfully boots and executes software on a fully integrated hardwa
 ## PSC-OS Boot
 
 This video demonstrates the PSC system running `PSC-OS` on FPGA hardware after boot.  
-It shows prime number computation executed on the custom `PSC_RV32ISP` CPU, with results transmitted over UART.  
+It shows prime number computation executed on the custom `PSC_RV32` CPU, with results transmitted over UART.  
 The demo highlights a fully functional hardware-software stack, from boot to program execution.
 
 [![Watch the demo](https://img.youtube.com/vi/lV74ni7FAt4/maxresdefault.jpg)](https://youtu.be/lV74ni7FAt4?si=_Xm8yCdqHN_oQzrs)

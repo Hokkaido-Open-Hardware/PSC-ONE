@@ -2,7 +2,7 @@
 
 import PSC_Types::*;
 
-module PSC_RV32ISP_InstructionEngine #(
+module PSC_RV32_InstructionEngine #(
     parameter logic [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,
     parameter logic [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
     parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0
@@ -48,8 +48,6 @@ module PSC_RV32ISP_InstructionEngine #(
     output logic        csr_valid,
     output logic        timer_irq_take,
     input  logic [31:0] csr_rdata,
-    output logic [11:0] csr_read_addr,
-    output logic [31:0] csr_old_value,
     output logic [31:0] csr_reg_data_1,
 
     output logic        data_mem_read_valid,
@@ -68,16 +66,23 @@ module PSC_RV32ISP_InstructionEngine #(
     output logic [8:0]  uart_out
 );
 
-    logic        decode_enb;
-    logic        decode_done;
-    dec_ctrl_t   decoded_ctrl;
+    logic       decode_enb;
+    logic       decode_done;
+    dec_ctrl_t  decoded_ctrl;
 
-    logic        execute_valid;
-    dec_ctrl_t   execute_ctrl;
-    logic [31:0] execute_reg_data_1;
-    logic [31:0] execute_reg_data_2;
-    logic [31:0] execute_alu_data;
-    logic        execute_done;
+    logic        alu_execute_valid;
+    dec_ctrl_t   alu_execute_ctrl;
+    logic [31:0] alu_execute_reg_data_1;
+    logic [31:0] alu_execute_reg_data_2;
+    logic [31:0] alu_execute_data;
+    logic        alu_execute_done;
+
+    logic        md_execute_valid;
+    dec_ctrl_t   md_execute_ctrl;
+    logic [31:0] md_execute_reg_data_1;
+    logic [31:0] md_execute_reg_data_2;
+    logic [31:0] md_execute_data;
+    logic        md_execute_done;
 
     dec_ctrl_t   memory_ctrl;
     logic [31:0] memory_alu_data;
@@ -97,13 +102,13 @@ module PSC_RV32ISP_InstructionEngine #(
     logic        load_data_mem_read_valid;
     logic        load_mmu_valid;
     logic [31:0] load_data_mem_read_address;
-    logic [31:0] load_vaddr;
     logic        load_branch_unused;
 
     logic        store_mmu_valid;
-    logic [31:0] store_vaddr;
     logic [31:0] store_mem_write_address;
     logic [31:0] store_wdata_unused;
+
+    logic [31:0] memory_vaddr;
 
     logic        d_mmu_mem_valid;
     logic        d_mmu_done;
@@ -117,7 +122,7 @@ module PSC_RV32ISP_InstructionEngine #(
     logic        is_counter_load;
     logic        is_uart_flag_load;
 
-    assign execute_state_sig = execute_valid;
+    assign execute_state_sig = alu_execute_valid || md_execute_valid;
     assign decoder_ctrl      = commit_ctrl;
     assign alu_data          = commit_alu_data;
     assign pc_sel2           = commit_branch_taken;
@@ -131,8 +136,17 @@ module PSC_RV32ISP_InstructionEngine #(
                            is_uart_flag_load ? 32'd1 : data_mem_read_data;
     assign load_read_data = raw_load_data;
 
-    assign vaddr = load_valid  ? load_vaddr  :
-                   store_valid ? store_vaddr : 32'd0;
+    // The load/store FSMs assert their MMU request one cycle after accepting
+    // the ROB-head operation.  Capture the address at that boundary so the
+    // MMU input does not include the ROB read and load/store selection paths.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n)
+            memory_vaddr <= 32'd0;
+        else if (load_valid || store_valid)
+            memory_vaddr <= memory_alu_data;
+    end
+
+    assign vaddr = memory_vaddr;
     assign data_fault_pc       = memory_pc;
     assign data_fault_vaddr    = memory_alu_data;
     assign data_fault_is_store = memory_ctrl.is_store;
@@ -166,12 +180,18 @@ module PSC_RV32ISP_InstructionEngine #(
         .decoded_ctrl           (decoded_ctrl),
         .decode_enb             (decode_enb),
         .decode_done            (decode_done),
-        .execute_valid          (execute_valid),
-        .execute_ctrl           (execute_ctrl),
-        .execute_reg_data_1     (execute_reg_data_1),
-        .execute_reg_data_2     (execute_reg_data_2),
-        .execute_alu_data       (execute_alu_data),
-        .execute_done           (execute_done),
+        .alu_execute_valid      (alu_execute_valid),
+        .alu_execute_ctrl       (alu_execute_ctrl),
+        .alu_execute_reg_data_1 (alu_execute_reg_data_1),
+        .alu_execute_reg_data_2 (alu_execute_reg_data_2),
+        .alu_execute_data       (alu_execute_data),
+        .alu_execute_done       (alu_execute_done),
+        .md_execute_valid       (md_execute_valid),
+        .md_execute_ctrl        (md_execute_ctrl),
+        .md_execute_reg_data_1  (md_execute_reg_data_1),
+        .md_execute_reg_data_2  (md_execute_reg_data_2),
+        .md_execute_data        (md_execute_data),
+        .md_execute_done        (md_execute_done),
         .memory_ctrl            (memory_ctrl),
         .memory_alu_data        (memory_alu_data),
         .memory_reg_data_1      (memory_reg_data_1),
@@ -184,8 +204,6 @@ module PSC_RV32ISP_InstructionEngine #(
         .load_read_data         (load_read_data),
         .csr_state              (csr_state),
         .csr_rdata              (csr_rdata),
-        .csr_read_addr          (csr_read_addr),
-        .csr_old_value          (csr_old_value),
         .csr_reg_data_1         (csr_reg_data_1),
         .csr_enb                (csr_enb),
         .csr_valid              (csr_valid),
@@ -214,21 +232,39 @@ module PSC_RV32ISP_InstructionEngine #(
     );
 
     Execute #(
-        .ENABLE_MUL (1'b1),
-        .ENABLE_DIV (1'b1)
-    ) u_execute (
+        .ENABLE_MUL (1'b0),
+        .ENABLE_DIV (1'b0)
+    ) u_execute_alu (
         .clock          (clock),
         .reset_n        (reset_n),
-        .execute_enb    (execute_valid),
-        .decoder_ctrl   (execute_ctrl),
-        .reg_data_addr1 (execute_reg_data_1),
-        .reg_data_addr2 (execute_reg_data_2),
-        .alu_data       (execute_alu_data),
+        .execute_enb    (alu_execute_valid),
+        .decoder_ctrl   (alu_execute_ctrl),
+        .reg_data_addr1 (alu_execute_reg_data_1),
+        .reg_data_addr2 (alu_execute_reg_data_2),
+        .alu_data       (alu_execute_data),
         .r_data1        (),
         .r_data2        (),
         .out_pc         (),
         .busy           (),
-        .done           (execute_done)
+        .done           (alu_execute_done)
+    );
+
+    Execute #(
+        .ENABLE_MUL (1'b1),
+        .ENABLE_DIV (1'b1)
+    ) u_execute_mul_div (
+        .clock          (clock),
+        .reset_n        (reset_n),
+        .execute_enb    (md_execute_valid),
+        .decoder_ctrl   (md_execute_ctrl),
+        .reg_data_addr1 (md_execute_reg_data_1),
+        .reg_data_addr2 (md_execute_reg_data_2),
+        .alu_data       (md_execute_data),
+        .r_data1        (),
+        .r_data2        (),
+        .out_pc         (),
+        .busy           (),
+        .done           (md_execute_done)
     );
 
     // The load engine owns only the variable-latency read transaction.
@@ -243,7 +279,7 @@ module PSC_RV32ISP_InstructionEngine #(
         .r_data1               (memory_reg_data_1),
         .r_data2               (memory_reg_data_2),
         .mmu_valid             (load_mmu_valid),
-        .vaddr                 (load_vaddr),
+        .vaddr                 (),
         .mmu_ready             (d_mmu_done),
         .access_fault          (d_pf),
         .d_paddr               (d_paddr),
@@ -275,7 +311,7 @@ module PSC_RV32ISP_InstructionEngine #(
         .ld_low2                (memory_alu_data[1:0]),
         .csr_rdata              (csr_rdata),
         .mmu_valid              (store_mmu_valid),
-        .vaddr                  (store_vaddr),
+        .vaddr                  (),
         .mmu_ready              (d_mmu_done),
         .access_fault           (d_pf),
         .d_paddr                (d_paddr),

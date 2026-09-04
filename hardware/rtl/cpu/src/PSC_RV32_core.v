@@ -4,7 +4,7 @@
 
 `timescale 1ns / 1ps
 
-module PSC_RV32ISP_core #(
+module PSC_RV32_core #(
     parameter [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,     // 未使用.
     parameter [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
     parameter [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0
@@ -68,11 +68,11 @@ module PSC_RV32ISP_core #(
     initial begin
         `ifdef DUMP_VCD
         $display("COCOTB_SIM CPU CORE DUMP_VCD ENABLE");
-        $dumpfile("./wave/PSC_RV32ISP_core.vcd");
+        $dumpfile("./wave/PSC_RV32_core.vcd");
         $dumpvars(0);
         `else
         $display("COCOTB_SIM CPU CORE verilator FST ENABLE");
-        $dumpfile("./wave/PSC_RV32ISP_core.fst");
+        $dumpfile("./wave/PSC_RV32_core.fst");
         $dumpvars(0);
         `endif
     end
@@ -311,7 +311,7 @@ module PSC_RV32ISP_core #(
     // Program Counter
     wire [31:0] fetch_pc = pc;
 
-    PSC_RV32ISP_Fetch u_fetch_state(
+    PSC_RV32_Fetch u_fetch_state(
         // clock, reset
         .clock                      (clock),
         .reset_n                    (reset_n),
@@ -372,7 +372,7 @@ module PSC_RV32ISP_core #(
     wire        d_pf;
     wire        illegal_instruction;
 
-    PSC_RV32ISP_Execute u_execute_state(
+    PSC_RV32_Execute u_execute_state(
         // clock, reset
         .clock                      (clock),
         .reset_n                    (reset_n),
@@ -440,7 +440,9 @@ module PSC_RV32ISP_core #(
     assign fifo_flush_sig = execute_fifo_flush_sig || timer_irq_take;
 
     always @(posedge clock or negedge reset_n) begin
-        if (!reset_n || cpu_stop)
+        if (!reset_n)
+            timer_irq_active <= 1'b0;
+        else if (cpu_stop)
             timer_irq_active <= 1'b0;
         else if (!timer_irq_ext)
             timer_irq_active <= 1'b0;

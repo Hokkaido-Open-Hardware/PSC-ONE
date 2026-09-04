@@ -2,7 +2,7 @@
 
 //`define fifo_pipeline_off
 
-module PSC_RV32ISP_FetchUnit #(
+module PSC_RV32_FetchUnit #(
     parameter logic BURST_MODE = 1'b1,
     parameter int   FIFO_DEPTH = 16
 )(

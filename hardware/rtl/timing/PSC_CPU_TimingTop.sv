@@ -18,7 +18,7 @@
 //   - Only clock/reset_n/timing_keep are top-level I/O, so the CST can be tiny.
 //
 // The PSC_RV32ISP_core interface used here matches the project source:
-// clock/reset/cpu_stop/irq_ext, program/data/MMU memory ports,
+// clock/reset/cpu_stop/timer_irq_ext, program/data/MMU memory ports,
 // cache/DMA/SynapEngine/monitor CSR ports, and uart_out.
 
 `timescale 1ns / 1ps
@@ -135,11 +135,11 @@ module PSC_CPU_TimingTop (
     // ------------------------------------------------------------------------
     // CPU under timing analysis
     // ------------------------------------------------------------------------
-    PSC_RV32ISP_core u_cpu (
+    PSC_RV32_core u_cpu (
         .clock                      (clock),
         .reset_n                    (reset_n),
         .cpu_stop                   (cpu_stop),
-        .irq_ext                    (irq_ext),
+        .timer_irq_ext              (timer_irq_ext),
 
         // Program memory
         .program_mem_burst_mode     (program_mem_burst_mode),

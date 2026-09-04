@@ -6,7 +6,7 @@
 //
 //  Brief
 //      PSC-ONE プロジェクト向け SoC トップレベルモジュール。
-//      RV32ISP CPU コア、SDRAM コントローラ、キャッシュ、Boot ROM、
+//      RV32 CPU コア、SDRAM コントローラ、キャッシュ、Boot ROM、
 //      UART、Timer、LCD、SD Card、I2S、および SynapEngine AI
 //      アクセラレータを統合する。
 //
@@ -16,7 +16,7 @@
 //      提供し、メモリ初期化やデバッグを容易にする。
 //
 //  Main Components
-//      - PSC RV32ISP CPU Core
+//      - PSC RV32 CPU Core
 //      - SDR SDRAM Controller
 //      - DMA Cache Controller
 //      - Boot AXI Interface
@@ -444,7 +444,7 @@ module PSC_ONE_Chip #(
     // irq
     wire        irq_tx;
 
-    PSC_ONE_RV32ISP_core #(
+    PSC_ONE_RV32_core #(
         .ADDR_WIDTH         (ADDR_W),
         .ID_WIDTH           (ID_W),
         .DATA_WIDTH         (DW),
