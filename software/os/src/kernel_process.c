@@ -325,7 +325,7 @@ void shell_idle_task(void)
         for (volatile uint32_t i = 0; i < 1000000; i++) {
             __asm__ __volatile__("nop");
         }
-        s_printf("T\n");
+        //s_printf("T\n");
     }
 }
 

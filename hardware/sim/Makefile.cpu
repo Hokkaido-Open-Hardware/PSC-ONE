@@ -250,7 +250,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	speech_recog_test1:RV32ISP_chip_test:./mem/speech_recog_test1.mem:0x00000002 \
+	speech_recog_down_test1:RV32ISP_chip_test:./mem/speech_recog_down_test1.mem:0x00000001 \
 
 # ============================================================
 # 複数テスト定義
@@ -318,7 +318,6 @@ PSCONE_BASIC_TESTS = \
 # ============================================================
 
 PSCONE_LONG_TESTS = \
-	speech_recog_test1:RV32ISP_chip_test:./mem/speech_recog_test1.mem:0x00001212 \
 	pio_uart_test1:RV32ISP_chip_test:./mem/pio_uart_test1.mem:0x00001212 \
 	fencei_test1:RV32ISP_chip_test:./mem/fencei_test1.mem:0xabcd5678 \
 	sret_test1:RV32ISP_chip_test:./mem/sret_test1.mem:0x0000DC12 \
@@ -343,6 +342,9 @@ PSCONE_LONG_TESTS = \
 # ============================================================
 
 PSCONE_VOICE_TESTS = \
+	speech_recog_test1:RV32ISP_chip_test:./mem/speech_recog_test1.mem:0x00000002 \
+	speech_recog_down_test1:RV32ISP_chip_test:./mem/speech_recog_down_test1.mem:0x00000001 \
+	speech_recog_down_sa_test1:RV32ISP_chip_test:./mem/speech_recog_down_sa_test1.mem:0x00000001 \
 	audio_feature_test1:RV32ISP_chip_test:./mem/audio_feature_test1.mem:0x00001212 \
 	audio_nn_test1:RV32ISP_chip_test:./mem/audio_nn_test1.mem:0x00001213 \
 	voice_test1:RV32ISP_chip_test:./mem/voice_test1.mem:0x00001214 \
