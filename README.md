@@ -802,13 +802,16 @@ hardware/pfe/
 
 # Getting Started
 
-A more detailed setup guide will be added as the project evolves.  
+A more detailed setup guide will be added as the project evolves.
+
 At a high level, the workflow is as follows:
 
 1. Build the hardware design
 2. Program the FPGA
 3. Prepare the boot image or software binaries
 4. Run the system and observe output through the available interfaces
+
+For detailed instructions, see the [Getting Started Guide](docs/getting-started.md).
 
 ------------------------------------------------------------------------
 

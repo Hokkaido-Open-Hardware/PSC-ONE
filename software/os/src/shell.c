@@ -3,7 +3,7 @@
 #include "fat32.h"
 
 // micropythonを含めるとSIM時間が長すぎる場合のオプション
-#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
+//#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
 
 extern int psc_micropython_run(void);
 
