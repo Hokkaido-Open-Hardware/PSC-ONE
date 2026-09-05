@@ -2,6 +2,9 @@
 
 import PSC_Types::*;
 
+// Main instruction pipeline controller.
+// Coordinates decode, register hazards, execute, memory access, commit,
+// control-flow redirection, CSR operations, and timer interrupt entry.
 module PSC_InstructionUnit (
     input  logic        clock,
     input  logic        reset_n,
@@ -69,12 +72,16 @@ module PSC_InstructionUnit (
     output logic        execute_task_done
 );
 
+    // Pipeline register between decode and issue.
+    // Holds the decoded control information and the instruction PC.
     typedef struct packed {
         logic        valid;
         dec_ctrl_t   ctrl;
         logic [31:0] pc;
     } id_issue_t;
 
+    // Pipeline register between issue and execute.
+    // Source register values are captured here after hazard checking.
     typedef struct packed {
         logic        valid;
         dec_ctrl_t   ctrl;
@@ -83,6 +90,8 @@ module PSC_InstructionUnit (
         logic [31:0] reg_data_2;
     } issue_ex_t;
 
+    // Pipeline register between execute and memory.
+    // Keeps the ALU result together with operands needed by memory/control logic.
     typedef struct packed {
         logic        valid;
         dec_ctrl_t   ctrl;
@@ -92,6 +101,8 @@ module PSC_InstructionUnit (
         logic [31:0] alu_data;
     } ex_mem_t;
 
+    // Common write-back/commit pipeline payload.
+    // w_data is the final value selected for register-file write-back.
     typedef struct packed {
         logic        valid;
         dec_ctrl_t   ctrl;
@@ -144,6 +155,8 @@ module PSC_InstructionUnit (
     logic pc_update_branch_taken;
     logic timer_irq_request;
 
+    // Return 1 for instructions that must not overlap with younger instructions.
+    // These operations may change memory ordering, privilege state, CSRs, or PC.
     function automatic logic serializing_instruction(input dec_ctrl_t ctrl);
         serializing_instruction =
             ctrl.is_load                    ||
@@ -159,6 +172,8 @@ module PSC_InstructionUnit (
             ctrl.raise_illegal_instruction;
     endfunction
 
+    // Return 1 for ordinary control-flow instructions that can redirect the PC
+    // before the architectural commit stage.
     function automatic logic early_redirect_instruction(input dec_ctrl_t ctrl);
         early_redirect_instruction =
             (ctrl.pc_sel != 2'b00)             &&
@@ -168,6 +183,7 @@ module PSC_InstructionUnit (
             !ctrl.raise_illegal_instruction;
     endfunction
 
+    // Evaluate branch/jump direction using the decoded PC-select mode and funct3.
     function automatic logic branch_exec(
         input logic [1:0]  pc_sel,
         input logic [2:0]  funct3,
@@ -193,6 +209,8 @@ module PSC_InstructionUnit (
         end
     endfunction
 
+    // Format a raw 32-bit memory read according to the RISC-V load type.
+    // Byte/halfword loads are selected by address bits and sign/zero extended.
     function automatic logic [31:0] load_result(
         input logic [31:0] raw_data,
         input logic [1:0]  low2,
@@ -226,6 +244,7 @@ module PSC_InstructionUnit (
                          (commit.ctrl.w_addr != 5'd0);
     assign regfile_wdata = commit.w_data;
 
+    // Architectural integer register file. Writes occur only from commit.
     PSC_Register u_regfile (
         .clock         (clock),
         .reset_n       (reset_n),
@@ -316,6 +335,8 @@ module PSC_InstructionUnit (
     // ============================================================
     // Per-stage valid/ready flow control
     // ============================================================
+    // A memory-stage instruction may advance only after the requested access
+    // has completed. Non-memory instructions complete immediately.
     assign memory_complete = ex_mem.ctrl.is_load  ? load_done  :
                              ex_mem.ctrl.is_store ? store_done : 1'b1;
 
@@ -371,6 +392,7 @@ module PSC_InstructionUnit (
     assign load_valid        = ex_mem.valid && ex_mem.ctrl.is_load;
     assign store_valid       = ex_mem.valid && ex_mem.ctrl.is_store;
 
+    // Resolve the branch condition using operands carried into the memory stage.
     assign branch_taken_now = branch_exec(
         ex_mem.ctrl.pc_sel,
         ex_mem.ctrl.funct3,
@@ -411,6 +433,8 @@ module PSC_InstructionUnit (
                                     (commit.valid && commit.branch_taken &&
                                      !commit_branch_redirected);
 
+    // Flush prefetched/decoded instructions whenever execution changes the
+    // architectural control flow or an exception/interrupt invalidates them.
     assign fifo_flush = d_pf || i_pf || timer_irq_take ||
                         early_branch_valid ||
                         (commit.valid &&
@@ -434,6 +458,8 @@ module PSC_InstructionUnit (
     // ============================================================
     // Unified stage registers
     // ============================================================
+    // Decode -> Issue pipeline register.
+    // A flush discards any younger decoded instruction.
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             id_issue <= '0;
@@ -450,6 +476,8 @@ module PSC_InstructionUnit (
         end
     end
 
+    // Issue -> Execute pipeline register.
+    // Source operands are latched only when the instruction successfully issues.
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             issue_ex <= '0;
@@ -468,6 +496,8 @@ module PSC_InstructionUnit (
         end
     end
 
+    // Execute -> Memory pipeline register.
+    // Captures the completed ALU result when the execute stage fires.
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             ex_mem <= '0;
@@ -487,6 +517,8 @@ module PSC_InstructionUnit (
         end
     end
 
+    // Memory -> Write-back pipeline register.
+    // Select the final write-back value from ALU, load, PC+4, or CSR data.
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             mem_wb <= '0;
@@ -515,6 +547,8 @@ module PSC_InstructionUnit (
         end
     end
 
+    // Write-back -> Commit pipeline register.
+    // Commit is the architectural retirement point for the instruction.
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             commit <= '0;
@@ -538,6 +572,8 @@ module PSC_InstructionUnit (
     // ============================================================
     // Architectural PC advances only at in-order commit
     // ============================================================
+    // Architectural PC controller.
+    // Receives redirects, traps, returns, page faults, and timer interrupts.
     PSC_PC u_PSC_PC (
         .clock             (clock),
         .reset_n           (reset_n),
@@ -557,6 +593,7 @@ module PSC_InstructionUnit (
         .counter           (counter)
     );
 
+// Optional simulation-only pipeline trace for forwarding and RAW stalls.
 `ifdef PIPELINE_TRACE
     always_ff @(posedge clock) begin
         if (reset_n && issue_fire &&
