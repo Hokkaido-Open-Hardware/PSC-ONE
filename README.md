@@ -43,7 +43,7 @@ It aims to build a fully custom edge computing platform from the ground up, incl
 
 PSC-ONE is not just a CPU core, but a complete experimental SoC platform for research, edge AI development, and architectural exploration.
 
----
+------------------------------------------------------------------------
 
 ## PSC-ONE SoC Architecture
 
@@ -52,7 +52,7 @@ PSC-ONE is not just a CPU core, but a complete experimental SoC platform for res
 This section presents the overall PSC-ONE SoC architecture, including the
 PSC_RV32 CPU, memory subsystem, peripherals, PSC-OS, and PSC-ONE AI.
 
----
+------------------------------------------------------------------------
 
 ## Repository Structure
 
@@ -60,7 +60,7 @@ PSC_RV32 CPU, memory subsystem, peripherals, PSC-OS, and PSC-ONE AI.
 - `software/` - PSC-OS, boot code, and user-side software
 - `docs/` - Architecture diagrams and supporting documentation
 
----
+------------------------------------------------------------------------
 
 ## Hardware Components
 
@@ -82,7 +82,7 @@ The software side of PSC-ONE currently includes:
 - Boot and initialization flow for FPGA-based execution
 - User programs and runtime experiments, including UART-based output demos
 
----
+------------------------------------------------------------------------
 
 # CPU (PSC_RV32)
 
@@ -121,7 +121,7 @@ Current CPU features include:
 * Optional pipelined execution
 * Custom hardware-accelerator integration
 
----
+------------------------------------------------------------------------
 
 # CPU (PSC_RV32_V1)
 
@@ -155,7 +155,7 @@ The task-driven design provides:
 
 PSC_RV32_V1 currently uses a state-controlled execution model. Future versions may hold multiple instruction tasks simultaneously and permit independent tasks to overlap when there are no register, memory, or control dependencies.
 
----
+------------------------------------------------------------------------
 
 # CPU (PSC_RV32_V2)
 
@@ -260,7 +260,7 @@ RISC-V GNU Toolchain
 ```
 
 
----
+------------------------------------------------------------------------
 
 ## PSC_RV32 vs PicoRV32 (Yosys Analysis)
 
@@ -276,7 +276,7 @@ RISC-V GNU Toolchain
 | Comparators      | 354                  | 69       |
 | Registers (FF)   | 217                  | 105      |
 
----
+------------------------------------------------------------------------
 
 ## Architectural Features
 
@@ -299,7 +299,7 @@ RISC-V GNU Toolchain
 > technology mapping. PicoRV32 results depend on the selected configuration.
 > Multiplexer counts include Yosys `$mux` cells only and exclude `$pmux` cells.
 
----
+------------------------------------------------------------------------
 
 # PSC-ONE AI
 
@@ -317,7 +317,7 @@ which integrates:
 The project focuses on exploring efficient dataflow architectures
 under constrained memory bandwidth for edge AI systems.
 
----
+------------------------------------------------------------------------
 
 ## PSC-ONE AI Architecture
 
@@ -326,7 +326,7 @@ under constrained memory bandwidth for edge AI systems.
 The system integrates the PSC-NPU systolic array
 with the PSC-ONE SoC platform.
 
----
+------------------------------------------------------------------------
 
 ## PSC-ONE AI Features
 
@@ -337,7 +337,7 @@ with the PSC-ONE SoC platform.
 - Integrated with the custom PSC-RV32 processor
 - Experimental hardware/software co-design platform
 
----
+------------------------------------------------------------------------
 
 ## 8×8 Matrix Multiplication Performance
 
@@ -361,7 +361,7 @@ Enabling the Fetch FIFO reduced the PSC_RV32_V1 execution time from **1066 µs t
 
 These results demonstrate that both instruction-fetch optimization and R/I-Type pipelining significantly improve CPU performance. However, the dedicated systolic array still provides a much larger performance advantage for matrix multiplication workloads.
 
----
+------------------------------------------------------------------------
 
 ## PSC-NPU and PicoRV32 Resource Scale Comparison
 
@@ -381,7 +381,7 @@ These results demonstrate that both instruction-fetch optimization and R/I-Type 
 - A **dataflow-oriented compute engine (Systolic Array)**
 - A **control-oriented general-purpose CPU (PicoRV32)**
 
----
+------------------------------------------------------------------------
 
 ## PSC-ONE AI Goals
 
@@ -405,7 +405,82 @@ Instead, the goal is to explore:
 - Expansion of the systolic array architecture
 - DMA and memory subsystem improvements
 
----
+------------------------------------------------------------------------
+
+# PSC-ONE Speech Recognition Project
+
+## Background
+
+This speech-recognition project started from PSC-ONE.
+
+In June 2026, I wrote **"PSC-ONEによる音声認識①（キックオフ編）"**.
+
+<img src="docs/images/PSC_ONE_voice_anime_en.png" width="700">
+
+About two months have passed since then.
+
+The project has finally reached an important milestone, so the current
+results are summarized here.
+
+## Image
+
+The PC is connected to the PSC-ONE board via UART.
+Speech recognition is performed by speaking into the microphone connected to PSC-ONE, 
+while the recognition results are displayed on the PC through the UART console.  
+
+<img src="docs/images/PSC_speech_demo.jpg" width="800">
+
+## Equipment
+
+-   PSC-ONE FPGA platform
+-   Custom PSC_RV32 RISC-V CPU
+-   PSC-OS
+-   I2S microphone
+-   PSC-NPU (SynapEngine) AI accelerator
+
+## Results
+
+The following output is from an actual speech-recognition test running
+on PSC-ONE.
+
+### UP
+
+``` text
+PSC_OS> speech
+Speech recognition start
+
+（私の声でアップ）
+
+SPEECH RECORD START samples=48000
+SPEECH RECORD END samples=48000
+VOICE RANGE start=0 end=32000
+SCORE UP=22776 DOWN=-71191 UNKNOWN=-14509
+SPEECH RESULT=UP
+RESULT: UP
+```
+
+### DOWN
+
+``` text
+PSC_OS> speech
+Speech recognition start
+
+（私の声でダウン）
+
+SPEECH RECORD START samples=48000
+SPEECH RECORD END samples=48000
+VOICE RANGE start=0 end=32000
+SCORE UP=-85630 DOWN=5339 UNKNOWN=-9757
+SPEECH RESULT=DOWN
+```
+
+In the current implementation, speech recognition succeeds approximately
+**70% of the time**.
+
+This marks the completion of the first working PSC-ONE
+speech-recognition implementation.
+
+------------------------------------------------------------------------
 
 # PSC-OS
 
@@ -548,7 +623,7 @@ Hello from SD card
 
 This demonstrates that the PSC-ONE software stack can execute an interactive Python environment directly on the custom RISC-V processor, including integer arithmetic, list comprehensions, generators, and floating-point math functions provided by MicroPython.
 
----
+------------------------------------------------------------------------
 
 # Demo
 
@@ -560,7 +635,7 @@ The system successfully boots and executes software on a fully integrated hardwa
 
 [![Watch the demo](https://img.youtube.com/vi/aRCHluWXozY/maxresdefault.jpg)](https://youtube.com/shorts/aRCHluWXozY?si=T0kp_dv_nBH07tnj)
 
----
+------------------------------------------------------------------------
 
 ## PSC-OS Boot
 
@@ -570,7 +645,7 @@ The demo highlights a fully functional hardware-software stack, from boot to pro
 
 [![Watch the demo](https://img.youtube.com/vi/lV74ni7FAt4/maxresdefault.jpg)](https://youtu.be/lV74ni7FAt4?si=_Xm8yCdqHN_oQzrs)
 
----
+------------------------------------------------------------------------
 
 ## PSC-OS Boot from SD Card
 
@@ -584,7 +659,7 @@ If an error is detected, the system automatically retries the read operation, en
 
 [![Watch the demo](https://img.youtube.com/vi/FILxQiaqKrk/maxresdefault.jpg)](https://youtu.be/FILxQiaqKrk?si=9KQKO3LVkketo0ZM)
 
----
+------------------------------------------------------------------------
 
 # Development Status
 
@@ -700,23 +775,9 @@ If an error is detected, the system automatically retries the read operation, en
 - [ ] Self-Balancing Robot Demo
 - [ ] Custom ASIC Prototype
 
----
+------------------------------------------------------------------------
 
 # Future Work
-
-## Demonstration FPGA board
-
-A demonstration FPGA board is currently under development.
-Future work includes speech recognition and robotic control using the AI accelerator.
-
-<img src="docs/images/PSC-ONE_RedBoard.png" width="700">
-
-## Speech Recognition Demo
-
-This demo showcases real-time speech recognition running on the PSC-ONE platform.  
-An external microphone captures voice input, which is processed by the onboard PSC-NPU AI accelerator. The recognized text is then displayed directly on the LCD screen in real time.  
-
-<img src="docs/images/PSC_ONE_voice_anime_en.png" width="700">
 
 ## Demonstration Robot
 
@@ -737,7 +798,7 @@ Location:
 hardware/pfe/
 ```
 
----
+------------------------------------------------------------------------
 
 # Getting Started
 
@@ -749,7 +810,7 @@ At a high level, the workflow is as follows:
 3. Prepare the boot image or software binaries
 4. Run the system and observe output through the available interfaces
 
----
+------------------------------------------------------------------------
 
 # Repository Status
 
@@ -758,13 +819,13 @@ and is under active development.
 
 RTL, software, and architecture may change frequently.
 
----
+------------------------------------------------------------------------
 
 # License
 
 MIT License
 
----
+------------------------------------------------------------------------
 
 ## 🚧 Work in Progress
 
