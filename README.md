@@ -676,7 +676,7 @@ If an error is detected, the system automatically retries the read operation, en
 - [x] CSR Support
 - [x] ECALL / SRET Support
 - [x] MMU (Sv32)
-- [ ] Interrupt Controller
+- [x] Interrupt Controller
 
 ### Memory System
 - [x] SDRAM Controller
@@ -733,9 +733,9 @@ If an error is detected, the system automatically retries the read operation, en
 - [x] SD Card Test
 - [x] FAT32 File Browser (`ls`, `cat`)
 - [x] FAT32 File Write
-- [ ] AI Inference Demo
-- [ ] Audio Processing Demo
-- [ ] Speech Recognition Demo
+- [x] AI Inference Demo
+- [x] Audio Processing Demo
+- [x] Speech Recognition Demo
 
 ## Verification
 
