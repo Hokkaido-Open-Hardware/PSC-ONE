@@ -208,7 +208,7 @@ PSC_ONE_BOOT_FILE = $(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v
 PSC_ONE_DMA_FILE =  $(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
 
 # Systolic Array (not use)
-SA_DIR   = ../rtl/ai/src
+SA_DIR   = ../rtl/npu/src
 SA_FILE  = \
 	$(SA_DIR)/PSC_NPU_Controller.v \
 	$(SA_DIR)/PSC_NPU_ReadController.v \

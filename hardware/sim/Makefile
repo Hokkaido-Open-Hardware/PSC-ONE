@@ -1,7 +1,7 @@
 # Clean intermediate files
 clean:
 	$(RM) -rf sim_build 
-	$(RM) -rf ./cocotb_tb/ai/__pycache__
+	$(RM) -rf ./cocotb_tb/npu/__pycache__
 	$(RM) -rf ./cocotb_tb/cache/__pycache__
 	$(RM) -rf ./cocotb_tb/mmio/__pycache__
 	$(RM) -rf ./cocotb_tb/cpu/__pycache__
