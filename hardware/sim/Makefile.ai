@@ -73,8 +73,8 @@ COCOTB_MAKEFILE := $(shell cocotb-config --makefiles)/Makefile.sim
 
 SRC_DIR = ../rtl/npu/src
 
-PE_FILE = $(SRC_DIR)/PSC_NPU_PE_INT.v \
-          $(SRC_DIR)/PSC_NPU_PE_Mult.v \
+PE_FILE = $(SRC_DIR)/PSC_NPU_PE_INT.sv \
+          $(SRC_DIR)/PSC_NPU_PE_Mult.sv \
           $(SRC_DIR)/PSC_NPU_PE_SimTop.v
 
 VERILOG_FILE_SA = $(SRC_DIR)/PSC_NPU_SystolicArray2x2.v \
@@ -103,7 +103,7 @@ SIM_BUILD        ?= sim_build
 .PHONY: simulate_all 
 
 # まとめて実行
-simulate_all: simulate_PE simulate_SA simulate_SA_Ctrl simulate_SA_multicycle_Ctrl
+simulate_all: simulate_PE simulate_SA simulate_SA_4x4 simulate_SA_Ctrl simulate_SA_multicycle_Ctrl
 		
 # Output Stationary.
 simulate_SA_Ctrl: 

@@ -112,6 +112,8 @@ async def test_pe_seri_nbit_multiple(dut):
     # --------------------------------------------------------
 
     reset_n = get_sig(dut, "reset_n")
+    
+    signed_mode = get_sig(dut, "signed_mode")
 
     data_clear = get_sig(dut, "data_clear")
     en_b_shift_bottom = get_sig(dut, "en_b_shift_bottom")
@@ -132,6 +134,8 @@ async def test_pe_seri_nbit_multiple(dut):
 
     reset_n.value = 0
     data_clear.value = 0
+
+    signed_mode.value = 0
 
     en_b_shift_bottom.value = 0
     en_shift_right.value = 0
@@ -363,4 +367,188 @@ async def test_pe_seri_nbit_multiple(dut):
 
     dut._log.info(
         f"All patterns passed: THREADS={THREADS}, unsigned."
+    )
+
+    # ========================================================
+    # Signed multiplication test
+    # ========================================================
+
+    dut._log.info(
+        "============================================================"
+    )
+    dut._log.info("Starting signed multiplication test")
+
+    signed_mode.value = 1
+
+    signed_min = -(1 << (DW - 1))
+    signed_max =  (1 << (DW - 1)) - 1
+
+    signed_base_tests = [
+        (0, 0),
+        (1, 1),
+        (-1, 1),
+        (1, -1),
+        (-1, -1),
+        (2, -3),
+        (-3, 3),
+        (13, -22),
+        (-13, 22),
+        (signed_max, 1),
+        (signed_min, 1),
+        (signed_max, -1),
+        (signed_min, -1),
+        (signed_max, signed_max),
+        (signed_min, signed_min),
+        (signed_min, signed_max),
+        (-5, 7),
+        (5, -7),
+    ]
+
+    for _ in range(8):
+        signed_base_tests.append((
+            random.randint(signed_min, signed_max),
+            random.randint(signed_min, signed_max),
+        ))
+
+    signed_tests = []
+
+    for case_index in range(len(signed_base_tests)):
+        thread_case = []
+
+        for thread in range(THREADS):
+            pattern_index = (
+                case_index + thread * 3
+            ) % len(signed_base_tests)
+
+            thread_case.append(
+                signed_base_tests[pattern_index]
+            )
+
+        signed_tests.append(thread_case)
+
+    # ========================================================
+    # Signed independent multiplication test
+    # ========================================================
+
+    for case_index, thread_values in enumerate(signed_tests):
+
+        data_clear.value = 1
+        await RisingEdge(clk_sig)
+
+        data_clear.value = 0
+        await RisingEdge(clk_sig)
+
+        await run_operation(thread_values)
+
+        packed_acc = int_resolved(ps_acc)
+        got_values = unpack_lanes(
+            packed_acc,
+            THREADS,
+            SW,
+        )
+
+        for thread in range(THREADS):
+            aval, bval = thread_values[thread]
+
+            # signed multiplication result
+            expected_signed = aval * bval
+
+            # accumulator上では2の補数SW bitとして比較
+            expected = expected_signed & maskSW
+
+            got = got_values[thread]
+
+            assert got == expected, (
+                f"signed case={case_index} "
+                f"thread={thread}: "
+                f"a={aval} b={bval} "
+                f"got=0x{got:X} "
+                f"expected=0x{expected:X} "
+                f"({expected_signed}); "
+                f"packed_acc=0x{packed_acc:X}"
+            )
+
+        expressions = ", ".join(
+            f"T{thread}: {a}*{b}={a*b}"
+            for thread, (a, b)
+            in enumerate(thread_values)
+        )
+
+        dut._log.info(
+            f"✅ Signed independent pattern "
+            f"{case_index} passed: "
+            f"{expressions}"
+        )
+
+    # ========================================================
+    # Signed accumulation test
+    # ========================================================
+
+    dut._log.info(
+        "============================================================"
+    )
+    dut._log.info(
+        "Starting signed multi-thread accumulation test"
+    )
+
+    data_clear.value = 1
+    await RisingEdge(clk_sig)
+
+    data_clear.value = 0
+    await RisingEdge(clk_sig)
+
+    expected_acc_signed = [
+        0 for _ in range(THREADS)
+    ]
+
+    for case_index, thread_values in enumerate(signed_tests):
+
+        await run_operation(thread_values)
+
+        for thread in range(THREADS):
+            aval, bval = thread_values[thread]
+
+            expected_acc_signed[thread] += (
+                aval * bval
+            )
+
+        packed_acc = int_resolved(ps_acc)
+        got_acc = unpack_lanes(
+            packed_acc,
+            THREADS,
+            SW,
+        )
+
+        for thread in range(THREADS):
+
+            expected = (
+                expected_acc_signed[thread]
+                & maskSW
+            )
+
+            assert got_acc[thread] == expected, (
+                f"signed acc case={case_index} "
+                f"thread={thread}: "
+                f"got=0x{got_acc[thread]:X} "
+                f"expected=0x{expected:X} "
+                f"({expected_acc_signed[thread]}); "
+                f"packed_acc=0x{packed_acc:X}"
+            )
+
+        expressions = ", ".join(
+            f"T{thread}: "
+            f"acc={expected_acc_signed[thread]}"
+            for thread in range(THREADS)
+        )
+
+        dut._log.info(
+            f"✅ Signed accumulation pattern "
+            f"{case_index} passed: "
+            f"{expressions}"
+        )
+
+    dut._log.info(
+        f"All signed patterns passed: "
+        f"THREADS={THREADS}, "
+        f"DW={DW}, SW={SW}."
     )

@@ -97,6 +97,7 @@ async def test_systolic_array_2x2(dut):
 
     # Reset
     dut.reset_n.value = 0
+    dut.signed_mode.value = 0
     dut.data_clear.value = 1
     dut.en_b_shift_bottom.value = 0
     dut.en_shift_right.value = 0

@@ -158,6 +158,7 @@ async def test_systolic_array_driver_4x4(dut):
 
     # reset
     dut.reset_n.value       = 0
+    dut.signed_mode.value = 0
     dut.sa_clear.value      = 0
     dut.rd_read_ready.value = 0
     dut.sa_state_reset.value = 0
@@ -1075,3 +1076,193 @@ async def test_systolic_array_driver_4x8(dut):
     assert np.array_equal(C_hw, C_exp)
 
     dut._log.info("✅ 4x8 PASS")
+
+
+# =============================================
+# 6th test
+# signed INT8 4x4
+# =============================================
+@cocotb.test()
+async def test_systolic_array_driver_4x4_signed(dut):
+
+    dut._log.info("\n")
+    dut._log.info("=============================================")
+
+    # ==================
+    MATRIX_N = 4
+    dut.matrix_size_x.value = MATRIX_N
+    dut.matrix_size_y.value = MATRIX_N
+    # ==================
+
+    clock = Clock(dut.clock, 10, unit="ns")
+    cocotb.start_soon(clock.start())
+
+    # reset
+    dut.reset_n.value = 0
+    dut.signed_mode.value = 1
+    dut.sa_clear.value = 0
+    dut.rd_read_ready.value = 0
+    dut.c_write_ready.value = 0
+    dut.sa_state_reset.value = 0
+    dut.sa_req_ready.value = 1
+
+    # Output-Stationary mode
+    dut.sa_os_instruction.value = 0b0000
+
+    dut.BASE_ADDR_A.value = BASE_ADDR_A
+    dut.BASE_ADDR_B.value = BASE_ADDR_B
+    dut.BASE_ADDR_C.value = BASE_ADDR_C
+
+    dut.start.value = 0
+
+    for _ in range(5):
+        await RisingEdge(dut.clock)
+
+    dut.reset_n.value = 1
+
+    for _ in range(5):
+        await RisingEdge(dut.clock)
+
+    # ------------------------------
+    # generate deterministic signed matrices
+    # ------------------------------
+    rng = np.random.default_rng(0x5349474E)
+
+    A_np = rng.integers(
+        -128,
+        128,
+        size=(MATRIX_N, MATRIX_N),
+        dtype=np.int16
+    ).astype(np.int64)
+
+    B_np = rng.integers(
+        -128,
+        128,
+        size=(MATRIX_N, MATRIX_N),
+        dtype=np.int16
+    ).astype(np.int64)
+
+    C_exp = A_np @ B_np
+
+    dut._log.info(section("Signed INT8 4x4 Matrix Test"))
+    dut._log.info(fmt_mat("A_signed", A_np))
+    dut._log.info(fmt_mat("B_signed", B_np))
+    dut._log.info(fmt_mat("Expected_signed", C_exp))
+
+    # ------------------------------
+    # memory model
+    # ------------------------------
+    mem = {}
+
+    # A: signed int8 x4 packed into one 32-bit word per row.
+    # pack_u8x4() masks each value with 0xFF, so negative values
+    # are stored as two's-complement int8 bit patterns.
+    for row in range(MATRIX_N):
+        mem[BASE_ADDR_A + row * 4] = pack_u8x4([
+            A_np[row][0],
+            A_np[row][1],
+            A_np[row][2],
+            A_np[row][3],
+        ])
+
+    # B: signed int8 x4 packed into one 32-bit word per row.
+    for row in range(MATRIX_N):
+        mem[BASE_ADDR_B + row * 4] = pack_u8x4([
+            B_np[row][0],
+            B_np[row][1],
+            B_np[row][2],
+            B_np[row][3],
+        ])
+
+    # C: 4x4 signed int32 result area
+    for index in range(MATRIX_N * MATRIX_N):
+        mem[BASE_ADDR_C + (index * 4)] = 0
+
+    cocotb.start_soon(memory_driver(dut, mem))
+
+    # ------------------------------
+    # start DUT
+    # ------------------------------
+    dut.start.value = 1
+    await RisingEdge(dut.clock)
+    dut.start.value = 0
+
+    timeout = 2000
+
+    for cycle in range(timeout):
+        if int(dut.done.value) == 1:
+            dut._log.info(
+                f"signed 4x4 operation completed after {cycle} cycles"
+            )
+            break
+
+        await RisingEdge(dut.clock)
+    else:
+        raise AssertionError(
+            f"signed 4x4 operation timeout after {timeout} cycles"
+        )
+
+    # Ensure the final C write is visible in the memory model.
+    for _ in range(10):
+        await RisingEdge(dut.clock)
+
+    # ------------------------------
+    # assemble signed C matrix
+    # ------------------------------
+    C_hw = np.zeros(
+        (MATRIX_N, MATRIX_N),
+        dtype=np.int64
+    )
+
+    for row in range(MATRIX_N):
+        for col in range(MATRIX_N):
+            index = row * MATRIX_N + col
+            addr = BASE_ADDR_C + (index * 4)
+
+            word = mem.get(addr, 0) & 0xFFFFFFFF
+
+            # Convert 32-bit two's-complement bit pattern to Python int.
+            if word & 0x80000000:
+                word -= 0x100000000
+
+            C_hw[row, col] = word
+
+    # ------------------------------
+    # result
+    # ------------------------------
+    dut._log.info(section("Signed 4x4 Assert"))
+    dut._log.info(fmt_mat("Expected", C_exp))
+    dut._log.info(fmt_mat("HW", C_hw))
+
+    if not np.array_equal(C_hw, C_exp):
+        mismatch = np.argwhere(C_hw != C_exp)
+
+        first_row = int(mismatch[0][0])
+        first_col = int(mismatch[0][1])
+
+        dut._log.error(
+            "First signed mismatch: "
+            f"C[{first_row}][{first_col}] "
+            f"expected={int(C_exp[first_row, first_col])} "
+            f"got={int(C_hw[first_row, first_col])}"
+        )
+
+        dut._log.error(
+            "Expected row: "
+            + fmt_list([int(value) for value in C_exp[first_row]])
+        )
+
+        dut._log.error(
+            "HW row      : "
+            + fmt_list([int(value) for value in C_hw[first_row]])
+        )
+
+    assert np.array_equal(C_hw, C_exp)
+
+    dut._log.info("✅ SIGNED INT8 4x4 PASS")
+
+    # Return to legacy/unsigned mode for safety.
+    dut.signed_mode.value = 0
+
+    for _ in range(20):
+        await RisingEdge(dut.clock)

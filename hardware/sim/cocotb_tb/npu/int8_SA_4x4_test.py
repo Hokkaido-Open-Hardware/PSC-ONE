@@ -172,6 +172,8 @@ async def test_systolic_array_4x4(dut):
     # ==============================
     dut.reset_n.value = 0
 
+    dut.signed_mode.value = 0
+
     dut.data_clear.value = 1
     dut.en_b_shift_bottom.value = 0
     dut.en_shift_right.value = 0
@@ -322,6 +324,188 @@ async def test_systolic_array_4x4(dut):
         )
 
     dut._log.info("✅ PASS")
+
+    for _ in range(5):
+        await RisingEdge(dut.clock)
+
+    # ========================================================
+    # Signed INT8 matrix multiplication test
+    # ========================================================
+
+    log_section(dut, "Signed INT8 Test")
+
+    dut.signed_mode.value = 1
+
+    # accumulator clear
+    dut.data_clear.value = 1
+    await RisingEdge(dut.clock)
+
+    dut.data_clear.value = 0
+    await RisingEdge(dut.clock)
+
+    # ==============================
+    # Signed test vectors
+    # ==============================
+    A_signed = np.random.randint(
+        low=-128,
+        high=128,
+        size=(N, N),
+        dtype=np.int64,
+    )
+
+    B_signed = np.random.randint(
+        low=-128,
+        high=128,
+        size=(N, N),
+        dtype=np.int64,
+    )
+
+    C_signed_expected = python_model(
+        A_signed,
+        B_signed,
+    )
+
+    log_matrix(dut, "A_signed", A_signed)
+    log_matrix(dut, "B_signed", B_signed)
+    log_matrix(
+        dut,
+        "Expected_signed",
+        C_signed_expected,
+    )
+
+    # ==============================
+    # Signed stream
+    # ==============================
+
+    total_steps = 2 * N - 1
+
+    for t in range(total_steps):
+
+        a_values = []
+
+        for row in range(N):
+            k = t - row
+
+            if 0 <= k < N:
+                a_values.append(
+                    int(A_signed[row, k])
+                )
+            else:
+                a_values.append(0)
+
+        b_values = []
+
+        for col in range(N):
+            k = t - col
+
+            if 0 <= k < N:
+                b_values.append(
+                    int(B_signed[k, col])
+                )
+            else:
+                b_values.append(0)
+
+        dut._log.debug(
+            f"signed stream t={t}: "
+            f"A_LEFT={a_values}, "
+            f"B_TOP={b_values}"
+        )
+
+        await execute_mac_step(
+            dut,
+            a_values,
+            b_values,
+        )
+
+    # ==============================
+    # Flush
+    # ==============================
+
+    zero_values = [0] * N
+
+    for flush_index in range(N):
+
+        dut._log.debug(
+            f"signed flush={flush_index}"
+        )
+
+        await execute_mac_step(
+            dut,
+            zero_values,
+            zero_values,
+        )
+
+    # ==============================
+    # Read signed results
+    # ==============================
+
+    C_signed_raw = await read_ps_acc_matrix(dut)
+
+    # ps_acc_out は cocotb から見ると unsigned 32bit
+    # なので2の補数→signed整数へ変換する
+    C_signed_hw = np.zeros(
+        (N, N),
+        dtype=np.int64,
+    )
+
+    SW = len(dut.ps_acc_out)
+    sign_bit = 1 << (SW - 1)
+    full_range = 1 << SW
+
+    for row in range(N):
+        for col in range(N):
+
+            value = int(
+                C_signed_raw[row, col]
+            )
+
+            if value & sign_bit:
+                value -= full_range
+
+            C_signed_hw[row, col] = value
+
+    log_matrix(
+        dut,
+        "HW_signed",
+        C_signed_hw,
+    )
+
+    # ==============================
+    # Compare
+    # ==============================
+
+    signed_ok = np.array_equal(
+        C_signed_hw,
+        C_signed_expected,
+    )
+
+    if not signed_ok:
+        log_matrix(
+            dut,
+            "SIGNED_DIFF",
+            C_signed_hw - C_signed_expected,
+        )
+
+    if ASSERT_MODE == 1:
+        assert signed_ok, (
+            "\n"
+            "Signed matrix mismatch\n"
+            f"A=\n{A_signed}\n"
+            f"B=\n{B_signed}\n"
+            f"Expected=\n"
+            f"{C_signed_expected}\n"
+            f"HW=\n"
+            f"{C_signed_hw}\n"
+            f"DIFF=\n"
+            f"{C_signed_hw - C_signed_expected}\n"
+        )
+
+    dut._log.info(
+        "✅ SIGNED INT8 4x4 PASS"
+    )
+
+    # unsigned mode に戻す
+    dut.signed_mode.value = 0
 
     for _ in range(5):
         await RisingEdge(dut.clock)

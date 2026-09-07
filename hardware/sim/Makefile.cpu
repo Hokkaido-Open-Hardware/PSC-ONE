@@ -193,8 +193,8 @@ SA_FILE  = \
 	$(SA_DIR)/PSC_NPU_Controller.v \
 	$(SA_DIR)/PSC_NPU_ReadController.v \
 	$(SA_DIR)/PSC_NPU_SystolicArray4x4.v \
-	$(SA_DIR)/PSC_NPU_PE_INT.v \
-	$(SA_DIR)/PSC_NPU_PE_Mult.v
+	$(SA_DIR)/PSC_NPU_PE_INT.sv \
+	$(SA_DIR)/PSC_NPU_PE_Mult.sv
 
 MMIO_BASE_DIR	= ../rtl/mmio
 
@@ -250,7 +250,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	speech_recog_down_test1:RV32ISP_chip_test:./mem/speech_recog_down_test1.mem:0x00000001 \
+	sa_test4:RV32ISP_chip_test:./mem/sa_test4.mem:0x0000BEEF \
 
 # ============================================================
 # 複数テスト定義
@@ -291,6 +291,7 @@ PSCONE_BASIC_TESTS = \
 	nn_test1:RV32ISP_chip_test:./mem/nn_test1.mem:0x00000170 \
 	nn_test2:RV32ISP_chip_test:./mem/nn_test2.mem:0x00000170 \
 	nn_test3:RV32ISP_chip_test:./mem/nn_test3.mem:0x00000170 \
+	sa_test4:RV32ISP_chip_test:./mem/sa_test4.mem:0x0000BEEF \
 	sa_test3:RV32ISP_chip_test:./mem/sa_test3.mem:0x0000BEEF \
 	sa_test2:RV32ISP_chip_test:./mem/sa_test2.mem:0x0000BEEF \
 	sa_test1:RV32ISP_chip_test:./mem/sa_test1.mem:0x0000BEEF \
