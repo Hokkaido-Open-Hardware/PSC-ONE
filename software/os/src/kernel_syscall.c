@@ -56,7 +56,7 @@ void handle_syscall(struct trap_frame *f) {
             kernel_B[i] = user_B[i];
             kernel_C[i] = 0;
         }
-        sa_run(kernel_A, kernel_B, (uint8_t)n, kernel_C);
+        sa_run(kernel_A, kernel_B, (uint8_t)n, kernel_C, false);
         for (uint32_t i = 0; i < elements; ++i)
             user_C[i] = kernel_C[i];
         f->a0 = 0;

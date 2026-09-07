@@ -150,6 +150,10 @@ __attribute__((used)) void kernel_main(void) {
     memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
 #endif
 #if 1
+    s_printf("NPU TEST\n");
+    s_call_sa_api(4, true, true);
+#endif
+#if 1
     s_printf("Draw PSC Logo\n");
     lcd_draw_boot_logo();
 #endif

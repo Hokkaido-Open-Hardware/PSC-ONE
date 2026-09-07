@@ -1,52 +1,54 @@
 `timescale 1ns/1ps
 
 module PSC_NPU_PE_INT #(
-    parameter integer DW       = 8,
-    parameter integer PW       = 32,
-    parameter integer SW       = 32,
-    parameter integer THREADS  = 4
+    parameter int DW       = 8,
+    parameter int PW       = 32,
+    parameter int SW       = 32,
+    parameter int THREADS  = 4
 )(
-    input  wire                         clock,
-    input  wire                         reset_n,
+    input  logic                         clock,
+    input  logic                         reset_n,
+    input  logic                         signed_mode,
 
-    input  wire                         data_clear,
-    input  wire                         start,
-    input  wire                         en_b_shift_bottom,
-    input  wire                         en_shift_right,
+    input  logic                         data_clear,
+    input  logic                         start,
+    input  logic                         en_b_shift_bottom,
+    input  logic                         en_shift_right,
 
-    input  wire [THREADS*DW-1:0]        b_in,
-    input  wire [THREADS*DW-1:0]        a_in,
+    input  logic [THREADS*DW-1:0]        b_in,
+    input  logic [THREADS*DW-1:0]        a_in,
 
-    output reg  [THREADS-1:0]           data_out_valid,
-    input  wire [THREADS-1:0]           data_in_ready,
+    output logic [THREADS-1:0]           data_out_valid,
+    input  logic [THREADS-1:0]           data_in_ready,
 
-    output reg  [THREADS*DW-1:0]        data_A,
-    output reg  [THREADS*DW-1:0]        data_B,
-    input  wire [THREADS*PW-1:0]        result_C,
+    output logic [THREADS*DW-1:0]        data_A,
+    output logic [THREADS*DW-1:0]        data_B,
+    input  logic [THREADS*PW-1:0]        result_C,
 
-    output reg                          busy,
-    output reg                          done,
+    output logic                         busy,
+    output logic                         done,
 
-    output wire [THREADS*DW-1:0]        a_shift_to_right,
-    output wire [THREADS*DW-1:0]        b_shift_to_bottom,
-    output reg  [THREADS*SW-1:0]        ps_acc
+    output logic [THREADS*DW-1:0]        a_shift_to_right,
+    output logic [THREADS*DW-1:0]        b_shift_to_bottom,
+    output logic [THREADS*SW-1:0]        ps_acc
 );
 
-    localparam [THREADS-1:0] ALL_THREADS = {THREADS{1'b1}};
+    localparam logic [THREADS-1:0] ALL_THREADS = {THREADS{1'b1}};
 
-    localparam [2:0]
+    localparam logic [2:0]
         S_INIT        = 3'd0,
         S_MUL         = 3'd1,
         S_MUL_WAIT    = 3'd2,
         S_PARTIAL_SUM = 3'd3;
 
-    reg [2:0] state;
+    logic [2:0] state;
 
-    reg [THREADS-1:0]    mul_done;
-    reg [THREADS*PW-1:0] product;
+    logic [THREADS-1:0]    mul_done;
+    logic [THREADS*PW-1:0] product;
 
-    wire [THREADS-1:0] mul_complete_next;
-    wire               all_mul_done;
+    logic [THREADS-1:0] mul_complete_next;
+    logic               all_mul_done;
+    logic               signed_mode_latch;
 
     integer i;
 
@@ -59,7 +61,7 @@ module PSC_NPU_PE_INT #(
     /*
      * A shift registers
      */
-    always @(posedge clock or negedge reset_n) begin
+    always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             data_A <= {(THREADS*DW){1'b0}};
         end else if (data_clear) begin
@@ -72,7 +74,7 @@ module PSC_NPU_PE_INT #(
     /*
      * B shift registers
      */
-    always @(posedge clock or negedge reset_n) begin
+    always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             data_B <= {(THREADS*DW){1'b0}};
         end else if (data_clear) begin
@@ -85,7 +87,7 @@ module PSC_NPU_PE_INT #(
     /*
      * Shared state machine
      */
-    always @(posedge clock or negedge reset_n) begin
+    always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             state          <= S_INIT;
             mul_done       <= {THREADS{1'b0}};
@@ -94,8 +96,9 @@ module PSC_NPU_PE_INT #(
             product        <= {(THREADS*PW){1'b0}};
             ps_acc         <= {(THREADS*SW){1'b0}};
 
-            busy           <= 1'b0;
-            done           <= 1'b0;
+            busy                <= 1'b0;
+            done                <= 1'b0;
+            signed_mode_latch   <= 1'b0;
 
         end else begin
             done <= 1'b0;
@@ -112,8 +115,9 @@ module PSC_NPU_PE_INT #(
                         ps_acc        <= {(THREADS*SW){1'b0}};
 
                     end else if (start) begin
-                        busy  <= 1'b1;
-                        state <= S_MUL;
+                        busy                <= 1'b1;
+                        signed_mode_latch   <= signed_mode;
+                        state               <= S_MUL;
                     end
                 end
 
@@ -143,10 +147,17 @@ module PSC_NPU_PE_INT #(
 
                 S_PARTIAL_SUM: begin
                     for (i = 0; i < THREADS; i = i + 1) begin
-                        ps_acc[i*SW +: SW]
-                            <= ps_acc[i*SW +: SW]
-                             + {{(SW-PW){1'b0}},
-                                product[i*PW +: PW]};
+                        if (signed_mode_latch) begin
+                            ps_acc[i*SW +: SW]
+                                <= ps_acc[i*SW +: SW]
+                                 + {{(SW-PW){product[i*PW + PW - 1]}},
+                                    product[i*PW +: PW]};
+                        end else begin
+                            ps_acc[i*SW +: SW]
+                                <= ps_acc[i*SW +: SW]
+                                 + {{(SW-PW){1'b0}},
+                                    product[i*PW +: PW]};
+                        end
                     end
 
                     busy  <= 1'b0;

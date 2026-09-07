@@ -41,7 +41,12 @@ void sa_run(
     const uint8_t *in_A,
     const uint8_t *in_B,
     uint8_t matrix_N,
-    uint32_t *out_C
+    uint32_t *out_C,
+    bool signed_mode
 );
 
-void s_call_sa_api(uint8_t matrix_N, bool verify);
+void s_call_sa_api(
+    uint8_t matrix_N,
+    bool verify,
+    bool signed_mode)
+;

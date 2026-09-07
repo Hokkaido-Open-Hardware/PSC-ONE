@@ -9,6 +9,7 @@ module PSC_NPU_SystolicArray2x2 #(
 )(
     input  wire         clock,
     input  wire         reset_n,
+    input  wire         signed_mode,
 
     // Shared controls
     input  wire         data_clear,
@@ -183,6 +184,7 @@ module PSC_NPU_SystolicArray2x2 #(
     ) u_pe_threads (
         .clock              (clock),
         .reset_n            (reset_n),
+        .signed_mode        (signed_mode),
 
         .data_clear         (data_clear),
         .start              (start_pulse),
@@ -228,15 +230,16 @@ module PSC_NPU_SystolicArray2x2 #(
         .N       (THREADS),
         .MUL_NUM (MUL_NUM)
     ) u_mult (
-        .clock          (clock),
-        .reset_n        (reset_n),
+        .clock              (clock),
+        .reset_n            (reset_n),
+        .signed_mode        (signed_mode),
 
-        .data_in_valid  (data_out_valid),
-        .data_out_ready (data_in_ready),
+        .data_in_valid      (data_out_valid),
+        .data_out_ready     (data_in_ready),
 
-        .data_A         (data_A_threads),
-        .data_B         (data_B_threads),
-        .result_C       (result_C_threads)
+        .data_A             (data_A_threads),
+        .data_B             (data_B_threads),
+        .result_C           (result_C_threads)
     );
 
     // ========================================================

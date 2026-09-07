@@ -293,6 +293,7 @@ module PSC_ONE_RV32_core #(
     wire sa_start         = csr_SA_CTRL[0];
     wire sa_state_reset   = csr_SA_CTRL[1];
     wire sa_clear         = csr_SA_CTRL[2];
+    wire signed_mode      = csr_SA_CTRL[3];
     wire [3:0] sa_os_instruction 
                           = csr_SA_CTRL[11:8];
     wire [7:0] sa_matrix_size_x 
@@ -330,6 +331,7 @@ module PSC_ONE_RV32_core #(
         `endif
 
         // SA Control
+        .signed_mode        (signed_mode),
         .start              (sa_start),
         .sa_state_reset     (sa_state_reset),
         .sa_os_instruction  (sa_os_instruction),

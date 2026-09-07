@@ -10,6 +10,7 @@ module PSC_NPU_PE_SimTop #(
     // Clock & Reset
     input  wire                         clock,
     input  wire                         reset_n,
+    input  wire                         signed_mode,
 
     // Common control
     input  wire                         data_clear,
@@ -70,6 +71,7 @@ module PSC_NPU_PE_SimTop #(
     ) u_pe (
         .clock              (clock),
         .reset_n            (reset_n),
+        .signed_mode        (signed_mode),
 
         .data_clear         (data_clear),
         .start              (start),
@@ -108,6 +110,7 @@ module PSC_NPU_PE_SimTop #(
     ) u_mult (
         .clock              (clock),
         .reset_n            (reset_n),
+        .signed_mode        (signed_mode),
 
         .data_in_valid      (data_out_valid),
         .data_out_ready     (data_in_ready),

@@ -9,6 +9,7 @@ module PSC_NPU_SystolicArray4x4 #(
 )(
     input  wire              clock,
     input  wire              reset_n,
+    input  wire              signed_mode,
 
     // Shared controls
     input  wire              data_clear,
@@ -56,11 +57,11 @@ module PSC_NPU_SystolicArray4x4 #(
         `ifdef DUMP_VCD
             $display("COCOTB_SIM SA4x4 DUMP_VCD ENABLE");
             $dumpfile("./wave/SystolicArray4x4_test.vcd");
-            $dumpvars(0, SystolicArray4x4);
+            $dumpvars(0, PSC_NPU_SystolicArray4x4);
         `else
             $display("COCOTB_SIM SA4x4 verilator FST ENABLE");
             $dumpfile("./wave/SystolicArray4x4_test.fst");
-            $dumpvars(0, SystolicArray4x4);
+            $dumpvars(0, PSC_NPU_SystolicArray4x4);
         `endif
     end
     `endif
@@ -195,6 +196,7 @@ module PSC_NPU_SystolicArray4x4 #(
     ) u_pe_threads (
         .clock              (clock),
         .reset_n            (reset_n),
+        .signed_mode        (signed_mode),
 
         .data_clear         (data_clear),
         .start              (start_pulse),
@@ -243,15 +245,16 @@ module PSC_NPU_SystolicArray4x4 #(
         .N       (THREADS),
         .MUL_NUM (MUL_NUM)
     ) u_mult (
-        .clock          (clock),
-        .reset_n        (reset_n),
+        .clock              (clock),
+        .reset_n            (reset_n),
+        .signed_mode        (signed_mode),
 
-        .data_in_valid  (data_out_valid),
-        .data_out_ready (data_in_ready),
+        .data_in_valid      (data_out_valid),
+        .data_out_ready     (data_in_ready),
 
-        .data_A         (data_A_threads),
-        .data_B         (data_B_threads),
-        .result_C       (result_C_threads)
+        .data_A             (data_A_threads),
+        .data_B             (data_B_threads),
+        .result_C           (result_C_threads)
     );
 
     // ========================================================

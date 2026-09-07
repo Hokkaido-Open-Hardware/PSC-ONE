@@ -7,6 +7,7 @@ module PSC_NPU_Controller #(
 )(
     input  wire             clock,
     input  wire             reset_n,
+    input  wire             signed_mode,
 
     // SA control
     input  wire             start,
@@ -167,6 +168,7 @@ module PSC_NPU_Controller #(
     ) u_sa (
         .clock                  (clock),
         .reset_n                (reset_n),
+        .signed_mode            (signed_mode),
 
         .data_clear             (data_clear | sa_clear),
         .en_b_shift_bottom      (en_b_shift_bottom),

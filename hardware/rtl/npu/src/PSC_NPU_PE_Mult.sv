@@ -1,34 +1,34 @@
 module PSC_NPU_PE_Mult #(
-    parameter integer DW      = 8,
-    parameter integer PW      = 32,
-    parameter integer SW      = PW,
-    parameter integer N       = 16,
+    parameter int DW      = 8,
+    parameter int PW      = 32,
+    parameter int SW      = PW,
+    parameter int N       = 16,
 
     // 物理乗算器数
-    parameter integer MUL_NUM = 2
+    parameter int MUL_NUM = 2
 )(
-    input  wire                     clock,
-    input  wire                     reset_n,
+    input  logic                     clock,
+    input  logic                     reset_n,
+    input  logic                     signed_mode,
 
     // 1バッチ分の入力
-    input  wire [N-1:0]             data_in_valid,
+    input  logic [N-1:0]             data_in_valid,
 
     // 計算完了したレーンを1クロック通知
-    output reg  [N-1:0]             data_out_ready,
+    output logic [N-1:0]             data_out_ready,
 
-    input  wire [N*DW-1:0]          data_A,
-    input  wire [N*DW-1:0]          data_B,
+    input  logic [N*DW-1:0]          data_A,
+    input  logic [N*DW-1:0]          data_B,
 
     // レーンごとの乗算結果
-    output reg  [N*SW-1:0]          result_C
+    output logic [N*SW-1:0]          result_C
 );
 
     // ========================================================
     // Utility
     // ========================================================
 
-    function integer CLOG2;
-        input integer value;
+    function automatic integer CLOG2(input integer value);
         integer tmp;
         begin
             tmp   = value - 1;
@@ -48,31 +48,31 @@ module PSC_NPU_PE_Mult #(
     // Parameters
     // ========================================================
 
-    localparam integer PARALLEL_NUM =
+    localparam int PARALLEL_NUM =
         (MUL_NUM < 1) ? 1 :
         (MUL_NUM > N) ? N :
                         MUL_NUM;
 
-    localparam integer MW =
+    localparam int MW =
         2 * DW;
 
-    localparam integer GROUPS =
+    localparam int GROUPS =
         (N + PARALLEL_NUM - 1) / PARALLEL_NUM;
 
-    localparam integer GROUP_W =
+    localparam int GROUP_W =
         CLOG2(GROUPS);
 
     // ========================================================
     // State machine
     // ========================================================
 
-    localparam [1:0] STATE_IDLE       = 2'd0;
-    localparam [1:0] STATE_ACTIVE     = 2'd1;
-    localparam [1:0] STATE_WAIT_CLEAR = 2'd2;
+    localparam logic [1:0] STATE_IDLE       = 2'd0;
+    localparam logic [1:0] STATE_ACTIVE     = 2'd1;
+    localparam logic [1:0] STATE_WAIT_CLEAR = 2'd2;
 
-    reg [1:0] state;
+    logic [1:0] state;
 
-    wire active;
+    logic active;
 
     assign active = (state == STATE_ACTIVE);
 
@@ -92,25 +92,26 @@ module PSC_NPU_PE_Mult #(
      * group_index=6 : lane 12,13
      * group_index=7 : lane 14,15
      */
-    reg [GROUP_W-1:0] group_index;
+    logic [GROUP_W-1:0] group_index;
 
     // バッチ受付時のvalidを保持
-    reg [N-1:0] valid_latch;
+    logic [N-1:0] valid_latch;
+    logic         signed_mode_latch;
 
     // バッチ受付時のA/Bを保持
-    reg [DW-1:0] data_A_latch [0:N-1];
-    reg [DW-1:0] data_B_latch [0:N-1];
+    logic [DW-1:0] data_A_latch [0:N-1];
+    logic [DW-1:0] data_B_latch [0:N-1];
 
     // ========================================================
     // Physical multiplier input/output buses
     // ========================================================
 
-    reg  [PARALLEL_NUM*DW-1:0] mul_A_bus;
-    reg  [PARALLEL_NUM*DW-1:0] mul_B_bus;
+    logic [PARALLEL_NUM*DW-1:0] mul_A_bus;
+    logic [PARALLEL_NUM*DW-1:0] mul_B_bus;
 
-    wire [PARALLEL_NUM*MW-1:0] mul_result_bus;
+    logic [PARALLEL_NUM*MW-1:0] mul_result_bus;
 
-    reg [PARALLEL_NUM-1:0] mul_lane_valid;
+    logic [PARALLEL_NUM-1:0] mul_lane_valid;
 
     // ========================================================
     // Fixed lane selection
@@ -119,7 +120,7 @@ module PSC_NPU_PE_Mult #(
     integer comb_m;
     integer comb_lane;
 
-    always @(*) begin
+    always_comb begin
         mul_A_bus      = {(PARALLEL_NUM*DW){1'b0}};
         mul_B_bus      = {(PARALLEL_NUM*DW){1'b0}};
         mul_lane_valid = {PARALLEL_NUM{1'b0}};
@@ -163,10 +164,22 @@ module PSC_NPU_PE_Mult #(
             g = g + 1
         ) begin : GEN_MULT
 
+            logic signed [DW-1:0] signed_mul_a;
+            logic signed [DW-1:0] signed_mul_b;
+            logic signed [MW-1:0] signed_mul_result;
+            logic        [MW-1:0] unsigned_mul_result;
+
+            assign signed_mul_a = $signed(mul_A_bus[g*DW +: DW]);
+            assign signed_mul_b = $signed(mul_B_bus[g*DW +: DW]);
+
+            assign signed_mul_result = signed_mul_a * signed_mul_b;
+            assign unsigned_mul_result =
+                mul_A_bus[g*DW +: DW] * mul_B_bus[g*DW +: DW];
+
             assign mul_result_bus[g*MW +: MW] =
-                mul_A_bus[g*DW +: DW]
-                *
-                mul_B_bus[g*DW +: DW];
+                signed_mode_latch
+                ? signed_mul_result
+                : unsigned_mul_result;
 
         end
     endgenerate
@@ -179,12 +192,13 @@ module PSC_NPU_PE_Mult #(
     integer seq_m;
     integer seq_lane;
 
-    always @(posedge clock or negedge reset_n) begin
+    always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             state          <= STATE_IDLE;
             group_index    <= {GROUP_W{1'b0}};
-            valid_latch    <= {N{1'b0}};
-            data_out_ready <= {N{1'b0}};
+            valid_latch         <= {N{1'b0}};
+            signed_mode_latch   <= 1'b0;
+            data_out_ready      <= {N{1'b0}};
             result_C       <= {(N*SW){1'b0}};
 
             for (
@@ -210,7 +224,8 @@ module PSC_NPU_PE_Mult #(
 
                 STATE_IDLE: begin
                     if (|data_in_valid) begin
-                        valid_latch <= data_in_valid;
+                        valid_latch         <= data_in_valid;
+                        signed_mode_latch   <= signed_mode;
 
                         for (
                             seq_i = 0;
@@ -253,13 +268,26 @@ module PSC_NPU_PE_Mult #(
                         ) begin
                             /*
                              * DW=8の場合、乗算結果は16bit。
-                             * SW=32へゼロ拡張して格納する。
+                             * unsignedモードではSW bitへゼロ拡張、
+                             * signedモードではSW bitへ符号拡張して格納する。
                              */
-                            result_C[seq_lane*SW +: SW]
-                                <= {{(SW-MW){1'b0}},
-                                    mul_result_bus[
-                                        seq_m*MW +: MW
-                                    ]};
+                            if (signed_mode_latch) begin
+                                result_C[seq_lane*SW +: SW]
+                                    <= {{(SW-MW){
+                                            mul_result_bus[
+                                                seq_m*MW + MW - 1
+                                            ]
+                                        }},
+                                        mul_result_bus[
+                                            seq_m*MW +: MW
+                                        ]};
+                            end else begin
+                                result_C[seq_lane*SW +: SW]
+                                    <= {{(SW-MW){1'b0}},
+                                        mul_result_bus[
+                                            seq_m*MW +: MW
+                                        ]};
+                            end
 
                             data_out_ready[seq_lane]
                                 <= 1'b1;
