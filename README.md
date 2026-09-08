@@ -15,6 +15,58 @@ The PSC-NPU (SynapEngine) accelerator is controlled directly through custom
 RISC-V CSR registers and accesses matrix data through the shared
 cache/memory subsystem. This reduces explicit data transfers and
 redundant memory copies during matrix operations and future neural-network workloads.
+
+## Table of Contents
+
+- [What is PSC-ONE?](#what-is-psc-one)
+- [PSC-ONE SoC Architecture](#psc-one-soc-architecture)
+- [Repository Structure](#repository-structure)
+- [Hardware Components](#hardware-components)
+- [Software Stack](#software-stack)
+- [CPU (PSC_RV32)](#cpu-psc_rv32)
+  - [CPU Architecture](#cpu-architecture)
+- [CPU (PSC_RV32_V1)](#cpu-psc_rv32_v1)
+  - [CPU Architecture](#cpu-architecture-1)
+- [CPU (PSC_RV32_V2)](#cpu-psc_rv32_v2)
+  - [Experimental Dual-Issue / Out-of-Order Architecture](#experimental-dual-issue--out-of-order-architecture)
+  - [Verification](#verification)
+  - [RISC-V ISA Test Results](#risc-v-isa-test-results)
+  - [PSC_RV32 vs PicoRV32 (Yosys Analysis)](#psc_rv32-vs-picorv32-yosys-analysis)
+  - [Architectural Features](#architectural-features)
+- [PSC-ONE AI](#psc-one-ai)
+  - [PSC-ONE AI Architecture](#psc-one-ai-architecture)
+  - [PSC-ONE AI Features](#psc-one-ai-features)
+  - [8×8 Matrix Multiplication Performance](#88-matrix-multiplication-performance)
+  - [PSC-NPU and PicoRV32 Resource Scale Comparison](#psc-npu-and-picorv32-resource-scale-comparison)
+  - [PSC-ONE AI Goals](#psc-one-ai-goals)
+  - [PSC-ONE AI Future Work](#psc-one-ai-future-work)
+- [PSC-OS](#psc-os)
+  - [MicroPython on PSC-OS](#micropython-on-psc-os)
+- [Demo](#demo)
+  - [PSC-OS LCD Demo](#psc-os-lcd-demo)
+  - [PSC-OS Boot](#psc-os-boot)
+  - [PSC-OS Boot from SD Card](#psc-os-boot-from-sd-card)
+- [PSC-ONE Speech Recognition Project](#psc-one-speech-recognition-project)
+  - [Background](#background)
+  - [Image](#image)
+  - [Equipment](#equipment)
+  - [Results](#results)
+- [FST Viewer](#fst-viewer)
+- [Development Status](#development-status)
+  - [Hardware](#hardware)
+  - [Software](#software)
+  - [Verification](#verification-1)
+  - [Documentation](#documentation)
+  - [Future Goals](#future-goals)
+- [Future Work](#future-work)
+  - [Demonstration Robot](#demonstration-robot)
+  - [PFE](#pfe)
+- [Getting Started](#getting-started)
+- [Repository Status](#repository-status)
+- [License](#license)
+
+------------------------------------------------------------------------
+
   
 The current PSC-ONE prototype hardware.  
   
@@ -407,81 +459,6 @@ Instead, the goal is to explore:
 
 ------------------------------------------------------------------------
 
-# PSC-ONE Speech Recognition Project
-
-## Background
-
-This speech-recognition project started from PSC-ONE.
-
-In June 2026, I wrote **"PSC-ONEによる音声認識①（キックオフ編）"**.
-
-<img src="docs/images/PSC_ONE_voice_anime_en.png" width="700">
-
-About two months have passed since then.
-
-The project has finally reached an important milestone, so the current
-results are summarized here.
-
-## Image
-
-The PC is connected to the PSC-ONE board via UART.
-Speech recognition is performed by speaking into the microphone connected to PSC-ONE, 
-while the recognition results are displayed on the PC through the UART console.  
-
-<img src="docs/images/PSC_speech_demo.jpg" width="800">
-
-## Equipment
-
--   PSC-ONE FPGA platform
--   Custom PSC_RV32 RISC-V CPU
--   PSC-OS
--   I2S microphone
--   PSC-NPU (SynapEngine) AI accelerator
-
-## Results
-
-The following output is from an actual speech-recognition test running
-on PSC-ONE.
-
-### UP
-
-``` text
-PSC_OS> speech
-Speech recognition start
-
-（私の声でアップ）
-
-SPEECH RECORD START samples=48000
-SPEECH RECORD END samples=48000
-VOICE RANGE start=0 end=32000
-SCORE UP=22776 DOWN=-71191 UNKNOWN=-14509
-SPEECH RESULT=UP
-RESULT: UP
-```
-
-### DOWN
-
-``` text
-PSC_OS> speech
-Speech recognition start
-
-（私の声でダウン）
-
-SPEECH RECORD START samples=48000
-SPEECH RECORD END samples=48000
-VOICE RANGE start=0 end=32000
-SCORE UP=-85630 DOWN=5339 UNKNOWN=-9757
-SPEECH RESULT=DOWN
-```
-
-In the current implementation, speech recognition succeeds approximately
-**70% of the time**.
-
-This marks the completion of the first working PSC-ONE
-speech-recognition implementation.
-
-------------------------------------------------------------------------
-
 # PSC-OS
 
 PSC-OS is a custom operating system developed specifically for the PSC-ONE platform.
@@ -659,6 +636,140 @@ If an error is detected, the system automatically retries the read operation, en
 
 [![Watch the demo](https://img.youtube.com/vi/FILxQiaqKrk/maxresdefault.jpg)](https://youtu.be/FILxQiaqKrk?si=9KQKO3LVkketo0ZM)
 
+
+
+------------------------------------------------------------------------
+
+# PSC-ONE Speech Recognition Project
+
+## Background
+
+This speech-recognition project started from PSC-ONE.
+
+In June 2026, I wrote **"PSC-ONEによる音声認識①（キックオフ編）"**.
+
+<img src="docs/images/PSC_ONE_voice_anime_en.png" width="700">
+
+About two months have passed since then.
+
+The project has finally reached an important milestone, so the current
+results are summarized here.
+
+## Image
+
+The PC is connected to the PSC-ONE board via UART.
+Speech recognition is performed by speaking into the microphone connected to PSC-ONE, 
+while the recognition results are displayed on the PC through the UART console.  
+
+<img src="docs/images/PSC_speech_demo.jpg" width="800">
+
+## Equipment
+
+-   PSC-ONE FPGA platform
+-   Custom PSC_RV32 RISC-V CPU
+-   PSC-OS
+-   I2S microphone
+-   PSC-NPU (SynapEngine) AI accelerator
+
+## Results
+
+The following output is from an actual speech-recognition test running
+on PSC-ONE.
+
+### UP
+
+``` text
+PSC_OS> speech
+Speech recognition start
+
+（私の声でアップ）
+
+SPEECH RECORD START samples=48000
+SPEECH RECORD END samples=48000
+VOICE RANGE start=0 end=32000
+SCORE UP=22776 DOWN=-71191 UNKNOWN=-14509
+SPEECH RESULT=UP
+RESULT: UP
+```
+
+### DOWN
+
+``` text
+PSC_OS> speech
+Speech recognition start
+
+（私の声でダウン）
+
+SPEECH RECORD START samples=48000
+SPEECH RECORD END samples=48000
+VOICE RANGE start=0 end=32000
+SCORE UP=-85630 DOWN=5339 UNKNOWN=-9757
+SPEECH RESULT=DOWN
+```
+
+In the current implementation, speech recognition succeeds approximately
+**70% of the time**.
+
+This marks the completion of the first working PSC-ONE
+speech-recognition implementation.
+
+------------------------------------------------------------------------
+
+# FST Viewer
+
+<img src="docs/images/FST_viewer_image1.jpg" width="800">
+
+PSC-ONE includes **FST Viewer (PSC_RV32 Trace Studio)**, a Python-based browser GUI for visualizing CPU execution traces generated by simulation.
+
+The viewer reads FST/VCD waveform files and presents CPU activity at the instruction and architectural level rather than displaying only raw RTL signals. It is designed specifically for the PSC_RV32 processor family and does not require any modification to the RTL.
+
+Currently supported CPU architectures are:
+
+- `PSC_RV32` (legacy FSM architecture)
+- `PSC_RV32_V1` (valid/ready pipeline architecture)
+- `PSC_RV32_V2` (experimental out-of-order architecture)
+
+The CPU architecture is automatically detected from the trace structure.
+
+FST Viewer provides:
+
+- Instruction-level execution timeline
+- CPU pipeline and execution-stage visualization
+- Instruction tracking across multiple cycles
+- PC and instruction search
+- Instruction filtering
+- Instruction Ledger with PC, instruction word, disassembly, execution cycles, and retire status
+- Cycle Inspector for register operands, execution results, memory accesses, hazards, and CPU state
+- Architectural register display (`x0`–`x31`) with ABI names and value-change highlighting
+- MUL/DIV execution and wait-state visualization
+- Support for legacy, V1, and experimental V2 CPU architectures
+
+The horizontal axis represents CPU clock cycles, allowing execution behavior to be inspected cycle by cycle.
+
+For example, the viewer can show how an instruction moves through the CPU, how long it remains in each execution stage, when register values change, and where pipeline stalls or long-latency MUL/DIV operations occur.
+
+The viewer runs locally using Python and a standard JavaScript/Canvas-capable web browser.
+
+```bash
+cd tool/FST_viewer
+python3 fst_viewer.py
+```
+
+When no trace file is specified, the viewer automatically selects the latest FST/VCD file generated in:
+
+```text
+hardware/sim/wave/
+```
+
+A specific trace can also be opened directly:
+
+```bash
+python3 fst_viewer.py trace.fst
+```
+
+The default web interface runs on `127.0.0.1:8000`. If the port is already in use, the viewer automatically searches for the next available port.
+
+FST Viewer is intended to make PSC_RV32 CPU development and verification easier by providing a higher-level view of processor execution than conventional waveform inspection alone.
 ------------------------------------------------------------------------
 
 # Development Status
