@@ -87,43 +87,9 @@ module PSC_NPU_ReadController #(
         input [7:0] row_size;
 
         begin
-            case (row_size)
-                8'd4:
-                    tile_row_offset =
-                        {24'd0, tile_idx} << 4;
-                    // tile_idx * 4 * 4 = tile_idx * 16
-
-                8'd8:
-                    tile_row_offset =
-                        {24'd0, tile_idx} << 5;
-                    // tile_idx * 4 * 8 = tile_idx * 32
-
-                8'd12:
-                    tile_row_offset =
-                        ({24'd0, tile_idx} << 5)
-                      + ({24'd0, tile_idx} << 4);
-                    // tile_idx * 4 * 12 = tile_idx * 48
-
-                8'd16:
-                    tile_row_offset =
-                        {24'd0, tile_idx} << 6;
-                    // tile_idx * 4 * 16 = tile_idx * 64
-
-                8'd32:
-                    tile_row_offset =
-                        {24'd0, tile_idx} << 7;
-                    // tile_idx * 4 * 32 = tile_idx * 128
-
-                8'd64:
-                    tile_row_offset =
-                        {24'd0, tile_idx} << 8;
-                    // tile_idx * 4 * 64 = tile_idx * 256
-
-                default:
-                    tile_row_offset =
-                        ({24'd0, tile_idx} << 2)
-                        * {24'd0, row_size};
-            endcase
+            // All former size-specific cases compute this same product.
+            // Use one multiplier without a size decoder and result mux.
+            tile_row_offset = ({24'd0, tile_idx} * {24'd0, row_size}) << 2;
         end
     endfunction
 

@@ -33,6 +33,7 @@ parallel_run/
 hardware/sim/build_nextpnr_v1/
 hardware/sim/build_nextpnr_v2/
 hardware/sim/build_nextpnr_legacy/
+hardware/sim/build_nextpnr_npu/
 
 # Vosk models
 vosk-model*/

@@ -5,7 +5,7 @@ import random
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, Timer
+from cocotb.triggers import RisingEdge, FallingEdge, Timer
 
 
 # ============================================================
@@ -552,3 +552,95 @@ async def test_pe_seri_nbit_multiple(dut):
         f"THREADS={THREADS}, "
         f"DW={DW}, SW={SW}."
     )
+
+
+@cocotb.test()
+async def test_pe_cycle_contract(dut):
+    """Check atomic accumulation and input capture, including busy-time changes.
+
+    Model the public contract: start, two cycles to operand capture, fixed
+    groups of multiplications, then an atomic accumulator commit. In
+    particular, input shifts/clear and mode changes during a batch must
+    not alter already captured operands or expose partially updated sums.
+    """
+    dw = int(os.getenv("PE_DW", "8"))
+    pw = int(os.getenv("PE_PW", "32"))
+    threads = len(dut.a_in) // dw
+    sw = len(dut.ps_acc) // threads
+    parallel = max(1, min(threads, int(os.getenv("PE_MUL_NUM", "1"))))
+    groups = (threads + parallel - 1) // parallel
+    mask = (1 << sw) - 1
+    dw_mask = (1 << dw) - 1
+    rng = random.Random(0x4D4143)
+
+    def pack(values, width):
+        return sum((v & ((1 << width) - 1)) << (i * width)
+                   for i, v in enumerate(values))
+
+    def signed(value, width):
+        return value - (1 << width) if value & (1 << (width - 1)) else value
+
+    cocotb.start_soon(Clock(dut.clock, 10, unit="ns").start())
+    a = [0] * threads
+    b = [0] * threads
+    acc = [0] * threads
+    pending = [0] * threads
+    phase = 0
+    pe_signed = 0
+    completed = 0
+    for cycle in range(2500):
+        await FallingEdge(dut.clock)
+        reset_n = int(cycle > 2 and cycle not in (731, 1703))
+        clear = int(rng.randrange(19) == 0)
+        start = int(rng.randrange(3) != 0)
+        mode = rng.randrange(2)
+        shift_a, shift_b = rng.randrange(2), rng.randrange(2)
+        a_in = [rng.randrange(dw_mask + 1) for _ in a]
+        b_in = [rng.randrange(dw_mask + 1) for _ in b]
+        dut.reset_n.value = reset_n
+        dut.data_clear.value = clear
+        dut.start.value = start
+        dut.signed_mode.value = mode
+        dut.en_shift_right.value = shift_a
+        dut.en_b_shift_bottom.value = shift_b
+        dut.a_in.value = pack(a_in, dw)
+        dut.b_in.value = pack(b_in, dw)
+
+        done = 0
+        if not reset_n:
+            a, b, acc = [0] * threads, [0] * threads, [0] * threads
+            phase = 0
+        else:
+            # Capture uses the operands from before this clock's shifts.
+            if phase == 2:
+                pending = []
+                for x, y in zip(a, b):
+                    product = signed(x, dw) * signed(y, dw) if mode else x * y
+                    product &= (1 << pw) - 1
+                    pending.append(signed(product, pw) if pe_signed else product)
+            if phase == groups + 4:
+                acc = [(x + y) & mask for x, y in zip(acc, pending)]
+                phase, done = 0, 1
+                completed += 1
+            elif phase:
+                phase += 1
+            elif clear:
+                acc = [0] * threads
+            elif start:
+                phase, pe_signed = 1, mode
+            if clear:
+                a, b = [0] * threads, [0] * threads
+            else:
+                if shift_a:
+                    a = a_in
+                if shift_b:
+                    b = b_in
+
+        await RisingEdge(dut.clock)
+        await Timer(1, unit="ns")
+        assert int(dut.busy.value) == int(phase != 0), f"busy cycle={cycle}"
+        assert int(dut.done.value) == done, f"done cycle={cycle}"
+        assert int(dut.ps_acc.value) == pack(acc, sw), f"acc cycle={cycle}"
+        assert int(dut.a_shift_to_right.value) == pack(a, dw), f"A cycle={cycle}"
+        assert int(dut.b_shift_to_bottom.value) == pack(b, dw), f"B cycle={cycle}"
+    assert completed > 20, "insufficient completed transactions"

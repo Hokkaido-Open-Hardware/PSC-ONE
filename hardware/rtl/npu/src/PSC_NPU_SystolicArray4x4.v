@@ -192,7 +192,8 @@ module PSC_NPU_SystolicArray4x4 #(
         .DW      (DW),
         .PW      (PW),
         .SW      (SW),
-        .THREADS (THREADS)
+        .THREADS (THREADS),
+        .RESULT_HELD (1)
     ) u_pe_threads (
         .clock              (clock),
         .reset_n            (reset_n),

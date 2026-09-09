@@ -92,25 +92,9 @@ module PSC_NPU_Controller #(
         input [7:0] size;
 
         begin
-            case (size)
-                8'd4:
-                    matrix_row_elements = {24'd0, row_idx} << 2;
-                8'd8:
-                    matrix_row_elements = {24'd0, row_idx} << 3;
-                8'd12:
-                    matrix_row_elements =
-                        ({24'd0, row_idx} << 3)
-                      + ({24'd0, row_idx} << 2);
-                8'd16:
-                    matrix_row_elements = {24'd0, row_idx} << 4;
-                8'd32:
-                    matrix_row_elements = {24'd0, row_idx} << 5;
-                8'd64:
-                    matrix_row_elements = {24'd0, row_idx} << 6;
-                default:
-                    matrix_row_elements =
-                        {24'd0, row_idx} * {24'd0, size};
-            endcase
+            // All former size-specific cases compute this same product.
+            // Use one multiplier without a size decoder and result mux.
+            matrix_row_elements = {24'd0, row_idx} * {24'd0, size};
         end
     endfunction
 

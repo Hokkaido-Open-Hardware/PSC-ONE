@@ -4,7 +4,11 @@ module PSC_NPU_PE_INT #(
     parameter int DW       = 8,
     parameter int PW       = 32,
     parameter int SW       = 32,
-    parameter int THREADS  = 4
+    parameter int THREADS  = 4,
+    // Set only when result_C retains every completed lane until the
+    // next batch, as PSC_NPU_PE_Mult does. Standalone handshake users
+    // keep the default capture registers.
+    parameter int RESULT_HELD = 0
 )(
     input  logic                         clock,
     input  logic                         reset_n,
@@ -45,6 +49,8 @@ module PSC_NPU_PE_INT #(
 
     logic [THREADS-1:0]    mul_done;
     logic [THREADS*PW-1:0] product;
+    wire [THREADS*PW-1:0] accumulate_product =
+        RESULT_HELD ? result_C : product;
 
     logic [THREADS-1:0] mul_complete_next;
     logic               all_mul_done;
@@ -131,7 +137,7 @@ module PSC_NPU_PE_INT #(
                     data_out_valid <= ALL_THREADS & ~mul_complete_next;
 
                     for (i = 0; i < THREADS; i = i + 1) begin
-                        if (data_in_ready[i] && !mul_done[i]) begin
+                        if (!RESULT_HELD && data_in_ready[i] && !mul_done[i]) begin
                             product[i*PW +: PW]
                                 <= result_C[i*PW +: PW];
                         end
@@ -150,13 +156,13 @@ module PSC_NPU_PE_INT #(
                         if (signed_mode_latch) begin
                             ps_acc[i*SW +: SW]
                                 <= ps_acc[i*SW +: SW]
-                                 + {{(SW-PW){product[i*PW + PW - 1]}},
-                                    product[i*PW +: PW]};
+                                 + {{(SW-PW){accumulate_product[i*PW + PW - 1]}},
+                                    accumulate_product[i*PW +: PW]};
                         end else begin
                             ps_acc[i*SW +: SW]
                                 <= ps_acc[i*SW +: SW]
                                  + {{(SW-PW){1'b0}},
-                                    product[i*PW +: PW]};
+                                    accumulate_product[i*PW +: PW]};
                         end
                     end
 

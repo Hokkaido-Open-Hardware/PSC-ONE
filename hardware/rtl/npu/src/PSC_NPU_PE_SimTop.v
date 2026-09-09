@@ -67,7 +67,8 @@ module PSC_NPU_PE_SimTop #(
         .DW       (DW),
         .PW       (PW),
         .SW       (SW),
-        .THREADS  (THREADS)
+        .THREADS  (THREADS),
+        .RESULT_HELD (1)
     ) u_pe (
         .clock              (clock),
         .reset_n            (reset_n),

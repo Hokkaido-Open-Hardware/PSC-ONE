@@ -1266,3 +1266,116 @@ async def test_systolic_array_driver_4x4_signed(dut):
 
     for _ in range(20):
         await RisingEdge(dut.clock)
+
+@cocotb.test()
+async def test_controller_pipeline_backpressure(dut):
+    """Independent memory scoreboard, stalls, signed extremes and restart.
+
+    Existing six matrix tests remain unchanged. This test adds dimensions
+    outside their set and checks every memory transaction, not just done.
+    """
+    import random
+    from cocotb.triggers import FallingEdge, Timer
+
+    rng = random.Random(0x4E505550)
+    cocotb.start_soon(Clock(dut.clock, 10, unit="ns").start())
+    dut.reset_n.value = 0
+    dut.start.value = 0
+    dut.sa_state_reset.value = 0
+    dut.sa_clear.value = 0
+    dut.sa_os_instruction.value = 0
+    dut.signed_mode.value = 0
+    dut.matrix_size_x.value = 4
+    dut.matrix_size_y.value = 4
+    dut.BASE_ADDR_A.value = 0x12000
+    dut.BASE_ADDR_B.value = 0x24000
+    dut.BASE_ADDR_C.value = 0x48000
+    dut.rd_read_ready.value = 0
+    dut.rd_read_data.value = 0
+    dut.c_write_ready.value = 0
+    dut.sa_req_ready.value = 0
+    for _ in range(4):
+        await RisingEdge(dut.clock)
+    await FallingEdge(dut.clock)
+    dut.reset_n.value = 1
+
+    cycle = 0
+    read_pending = None
+    write_pending = None
+    memory, expected, writes = {}, {}, {}
+    reads = 0
+
+    async def tick():
+        nonlocal cycle, read_pending, write_pending, reads
+        await FallingEdge(dut.clock)
+        cycle += 1
+        read_ack = read_pending is not None and read_pending[0] == cycle
+        write_ack = write_pending == cycle
+        dut.rd_read_ready.value = int(read_ack)
+        dut.rd_read_data.value = read_pending[1] if read_ack else rng.getrandbits(32)
+        dut.c_write_ready.value = int(write_ack)
+        req_ready = int(rng.randrange(4) != 0)
+        dut.sa_req_ready.value = req_ready
+        if read_ack:
+            read_pending = None
+        if write_ack:
+            write_pending = None
+        await RisingEdge(dut.clock)
+        await Timer(1, unit="ns")
+        if int(dut.rd_read_valid.value):
+            address = int(dut.rd_read_addr.value)
+            assert read_pending is None, "overlapping read requests"
+            assert all(address + b in memory for b in range(4)), hex(address)
+            word = sum(memory[address + b] << (8 * b) for b in range(4))
+            read_pending = (cycle + rng.randrange(1, 10), word)
+            reads += 1
+        if int(dut.c_write_valid.value):
+            address = int(dut.c_write_addr.value)
+            data = int(dut.c_write_wdata.value)
+            assert req_ready, "write issued despite request backpressure"
+            assert write_pending is None, "overlapping write requests"
+            assert address in expected, f"unexpected output address {address:x}"
+            assert address not in writes, f"duplicate output {address:x}"
+            assert data == expected[address], (
+                f"C[{address:x}]={data:08x}, expected {expected[address]:08x}"
+            )
+            writes[address] = data
+            write_pending = cycle + rng.randrange(1, 10)
+
+    for x, y, mode in [(12, 20, 0), (20, 12, 1), (252, 4, 1),
+                       (4, 8, 1), (8, 8, 0), (12, 12, 1)]:
+        values = [-128, -1, 0, 1, 127] if mode else [0, 1, 127, 128, 255]
+        a = np.array([[rng.choice(values) for _ in range(x)] for _ in range(y)],
+                     dtype=np.int64)
+        b = np.array([[rng.choice(values) for _ in range(y)] for _ in range(x)],
+                     dtype=np.int64)
+        c = a @ b
+        memory = {0x12000 + i: int(v) & 255 for i, v in enumerate(a.flat)}
+        memory.update({0x24000 + i: int(v) & 255 for i, v in enumerate(b.flat)})
+        expected = {0x48000 + 4*i: int(v) & 0xFFFFFFFF for i, v in enumerate(c.flat)}
+        writes, reads = {}, 0
+        dut.matrix_size_x.value = x
+        dut.matrix_size_y.value = y
+        dut.signed_mode.value = mode
+        dut.start.value = 1
+        await tick()
+        dut.start.value = 0
+        for elapsed in range(200_000):
+            await tick()
+            if int(dut.done.value):
+                break
+        else:
+            assert False, f"timeout x={x} y={y} signed={mode}"
+        assert writes == expected, "missing output writes"
+        assert reads == (x // 4) * (y // 4)**2 * 8, "missing/extra tile reads"
+        assert read_pending is None and write_pending is None, "done before final ack"
+        dut._log.info("PASS stalled/restart x=%d y=%d signed=%d: %d cycles",
+                      x, y, mode, elapsed + 1)
+        for _ in range(3):
+            await tick()
+            assert int(dut.done.value), "done must stay asserted until state reset"
+        dut.sa_state_reset.value = 1
+        for _ in range(3):
+            await tick()
+        dut.sa_state_reset.value = 0
+        assert not int(dut.busy.value) and not int(dut.done.value)

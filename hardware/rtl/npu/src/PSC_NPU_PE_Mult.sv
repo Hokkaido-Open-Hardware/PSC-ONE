@@ -189,8 +189,6 @@ module PSC_NPU_PE_Mult #(
     // ========================================================
 
     integer seq_i;
-    integer seq_m;
-    integer seq_lane;
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
@@ -253,44 +251,24 @@ module PSC_NPU_PE_Mult #(
                 // =============================================
 
                 STATE_ACTIVE: begin
-                    for (
-                        seq_m = 0;
-                        seq_m < PARALLEL_NUM;
-                        seq_m = seq_m + 1
-                    ) begin
-                        seq_lane =
-                            group_index * PARALLEL_NUM
-                            + seq_m;
-
-                        if (
-                            (seq_lane < N) &&
-                            mul_lane_valid[seq_m]
-                        ) begin
-                            /*
-                             * DW=8の場合、乗算結果は16bit。
-                             * unsignedモードではSW bitへゼロ拡張、
-                             * signedモードではSW bitへ符号拡張して格納する。
-                             */
+                    // Decode the destination group once per fixed lane.
+                    // Constant slices avoid a variable write into the entire
+                    // result bus (and its wide feedback mux).
+                    for (seq_i = 0; seq_i < N; seq_i = seq_i + 1) begin
+                        if ((group_index == seq_i / PARALLEL_NUM) &&
+                            mul_lane_valid[seq_i % PARALLEL_NUM]) begin
                             if (signed_mode_latch) begin
-                                result_C[seq_lane*SW +: SW]
-                                    <= {{(SW-MW){
-                                            mul_result_bus[
-                                                seq_m*MW + MW - 1
-                                            ]
-                                        }},
+                                result_C[seq_i*SW +: SW]
+                                    <= {{(SW-MW){mul_result_bus[
+                                        (seq_i % PARALLEL_NUM)*MW + MW-1]}},
                                         mul_result_bus[
-                                            seq_m*MW +: MW
-                                        ]};
+                                        (seq_i % PARALLEL_NUM)*MW +: MW]};
                             end else begin
-                                result_C[seq_lane*SW +: SW]
-                                    <= {{(SW-MW){1'b0}},
-                                        mul_result_bus[
-                                            seq_m*MW +: MW
-                                        ]};
+                                result_C[seq_i*SW +: SW]
+                                    <= {{(SW-MW){1'b0}}, mul_result_bus[
+                                        (seq_i % PARALLEL_NUM)*MW +: MW]};
                             end
-
-                            data_out_ready[seq_lane]
-                                <= 1'b1;
+                            data_out_ready[seq_i] <= 1'b1;
                         end
                     end
 

@@ -1,0 +1,173 @@
+# ============================================================
+# PSC-ONE NPU timing flow with nextpnr / Himbaechel
+#
+# Usage:
+#   make -f Makefile.nextpnr.npu timing
+#
+# Optional:
+#   make -f Makefile.nextpnr.npu timing FREQ=81
+#
+# Target FPGA:
+#   Tang Nano 20K
+#   GW2AR-LV18QN88C8/I7
+#   family = GW2A-18C
+#
+# Notes:
+#   - Gowin IDE is not used.
+#   - PSC_NPU_Timing.sv is used as the synthesis top-level wrapper.
+#   - The wrapper drives PSC_NPU_Controller with pseudo stimulus so the
+#     controller / read path / systolic array datapaths are preserved.
+#   - NPU SystemVerilog/Verilog sources are read directly by Yosys.
+#   - No board-level CST is required for this standalone timing flow.
+# ============================================================
+
+SHELL := /bin/bash
+
+YOSYS   ?= ./yosys/build/yosys
+NEXTPNR ?= nextpnr-himbaechel
+
+DEVICE ?= GW2AR-LV18QN88C8/I7
+FAMILY ?= GW2A-18C
+FREQ   ?= 81
+
+# ------------------------------------------------------------
+# NPU timing wrapper and source files
+# ------------------------------------------------------------
+
+TIMING_DIR  := ../rtl/timing
+NPU_SRC_DIR := ../rtl/npu/src
+
+# PSC_NPU_Timing.sv is expected in the same directory as this Makefile.
+TIMING_WRAPPER := $(TIMING_DIR)/PSC_NPU_TimingTop.sv
+TIMING_CST     := $(TIMING_DIR)/PSC_NPU_TimingTop.cst
+
+PE_FILES := \
+	$(NPU_SRC_DIR)/PSC_NPU_PE_INT.sv \
+	$(NPU_SRC_DIR)/PSC_NPU_PE_Mult.sv \
+	$(NPU_SRC_DIR)/PSC_NPU_PE_SimTop.v
+
+NPU_FILES := \
+	$(TIMING_WRAPPER) \
+	$(NPU_SRC_DIR)/PSC_NPU_Controller.v \
+	$(NPU_SRC_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_SRC_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(PE_FILES)
+
+TOP := PSC_NPU_Timing
+
+# ------------------------------------------------------------
+# Build files
+# ------------------------------------------------------------
+
+BUILD_DIR   ?= build_nextpnr_npu
+JSON        := $(BUILD_DIR)/npu.json
+PNR_JSON    := $(BUILD_DIR)/npu_pnr.json
+YOSYS_LOG   := $(BUILD_DIR)/yosys_npu.log
+NEXTPNR_LOG := $(BUILD_DIR)/nextpnr_npu.log
+REPORT      := $(BUILD_DIR)/timing_npu.json
+
+.PHONY: all check-tools check-files synth pnr timing report clean
+
+all: timing
+
+# ------------------------------------------------------------
+# Tool checks
+# ------------------------------------------------------------
+
+check-tools:
+	@command -v $(YOSYS) >/dev/null 2>&1 || { \
+		echo "[ERROR] yosys not found"; exit 1; }
+	@command -v $(NEXTPNR) >/dev/null 2>&1 || { \
+		echo "[ERROR] nextpnr-himbaechel not found"; exit 1; }
+	@echo "[OK] yosys   : $$(command -v $(YOSYS))"
+	@echo "[OK] nextpnr : $$(command -v $(NEXTPNR))"
+	@$(NEXTPNR) --version
+
+# ------------------------------------------------------------
+# Source checks
+# ------------------------------------------------------------
+
+check-files:
+	@for f in $(NPU_FILES); do \
+		test -f "$$f" || { \
+			echo "[ERROR] source file not found: $$f"; \
+			exit 1; \
+		}; \
+	done
+	@echo "[OK] TOP     : $(TOP)"
+	@echo "[OK] source files:"
+	@for f in $(NPU_FILES); do \
+		echo "     $$f"; \
+	done
+
+# ------------------------------------------------------------
+# Yosys synthesis
+# ------------------------------------------------------------
+
+synth: check-tools check-files
+	@mkdir -p $(BUILD_DIR)
+	@echo "============================================================"
+	@echo " TOP         : $(TOP)"
+	@echo " DEVICE      : $(DEVICE)"
+	@echo " FAMILY      : $(FAMILY)"
+	@echo " TARGET FREQ : $(FREQ) MHz"
+	@echo "============================================================"
+	$(YOSYS) -l $(YOSYS_LOG) -p " \
+		read_verilog -sv $(NPU_FILES); \
+		hierarchy -check -top $(TOP); \
+		flatten; \
+		synth_gowin -top $(TOP) -family gw2a -json $(JSON); \
+		stat \
+	"
+	@echo "[OK] JSON : $(JSON)"
+	@echo "[OK] LOG  : $(YOSYS_LOG)"
+
+# ------------------------------------------------------------
+# nextpnr place and route
+# ------------------------------------------------------------
+
+pnr: synth
+	@mkdir -p $(BUILD_DIR)
+	@set -o pipefail; \
+	$(NEXTPNR) \
+		--json $(JSON) \
+		--write $(PNR_JSON) \
+		--device $(DEVICE) \
+		--vopt family=$(FAMILY) \
+		--vopt cst=$(TIMING_CST) \
+		--freq $(FREQ) \
+		--report $(REPORT) \
+		2>&1 | tee $(NEXTPNR_LOG)
+	@echo "[OK] P&R JSON : $(PNR_JSON)"
+	@echo "[OK] REPORT   : $(REPORT)"
+	@echo "[OK] LOG      : $(NEXTPNR_LOG)"
+
+# ------------------------------------------------------------
+# Timing summary
+# ------------------------------------------------------------
+
+timing: pnr
+	@echo "============================================================"
+	@echo " PSC_NPU_Timing nextpnr timing summary"
+	@echo "============================================================"
+	@grep -Ei \
+		'Max frequency|MHz|critical path|slack|timing|logic utilisation|utilization|Device utilisation' \
+		$(NEXTPNR_LOG) | tail -n 200 || true
+	@echo "Full log:    $(NEXTPNR_LOG)"
+	@echo "JSON report: $(REPORT)"
+
+report:
+	@if [ ! -f "$(NEXTPNR_LOG)" ]; then \
+		echo "[ERROR] $(NEXTPNR_LOG) not found. Run timing first."; \
+		exit 1; \
+	fi
+	@grep -Ei \
+		'Max frequency|MHz|critical path|slack|timing|logic utilisation|utilization|Device utilisation' \
+		$(NEXTPNR_LOG) | tail -n 240 || true
+
+# ------------------------------------------------------------
+# Clean
+# ------------------------------------------------------------
+
+clean:
+	rm -rf build_nextpnr_npu

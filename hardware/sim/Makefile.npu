@@ -100,7 +100,7 @@ SIM_BUILD        ?= sim_build
 #--------------------------------------------------
 # Targets
 #--------------------------------------------------
-.PHONY: simulate_all 
+.PHONY: simulate_all simulate_PE simulate_SA simulate_SA_4x4 simulate_SA_Ctrl simulate_SA_multicycle_Ctrl
 
 # まとめて実行
 simulate_all: simulate_PE simulate_SA simulate_SA_4x4 simulate_SA_Ctrl simulate_SA_multicycle_Ctrl
@@ -108,10 +108,11 @@ simulate_all: simulate_PE simulate_SA simulate_SA_4x4 simulate_SA_Ctrl simulate_
 # Output Stationary.
 simulate_SA_Ctrl: 
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
-	make clean
 	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_CTRL=1" \
-	make -f $(COCOTB_MAKEFILE) \
+	$(MAKE) -f $(COCOTB_MAKEFILE) \
 	    SIM=$(SIM) \
+	    SIM_BUILD=$(SIM_BUILD)/$@ \
+	    COCOTB_RESULTS_FILE=$(abspath $(SIM_BUILD))/$@/results.xml \
 	    COCOTB_TEST_MODULES=cocotb_tb.npu.$(COCOTB_FILE_SA_Ctrl) \
 	    TOPLEVEL=PSC_NPU_Controller \
 	    TOPLEVEL_LANG=verilog \
@@ -120,10 +121,11 @@ simulate_SA_Ctrl:
 # Output Stationary.
 simulate_SA:
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
-	make clean
 	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_SA=1" \
-	make -f $(COCOTB_MAKEFILE) \
+	$(MAKE) -f $(COCOTB_MAKEFILE) \
 	    SIM=$(SIM) \
+	    SIM_BUILD=$(SIM_BUILD)/$@ \
+	    COCOTB_RESULTS_FILE=$(abspath $(SIM_BUILD))/$@/results.xml \
 	    COCOTB_TEST_MODULES=cocotb_tb.npu.$(COCOTB_FILE_SA) \
 	    TOPLEVEL=PSC_NPU_SystolicArray2x2 \
 	    TOPLEVEL_LANG=verilog \
@@ -132,25 +134,37 @@ simulate_SA:
 # Output Stationary.
 simulate_SA_4x4:
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
-	make clean
 	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_SA=1" \
-	make -f $(COCOTB_MAKEFILE) \
+	$(MAKE) -f $(COCOTB_MAKEFILE) \
 	    SIM=$(SIM) \
+	    SIM_BUILD=$(SIM_BUILD)/$@ \
+	    COCOTB_RESULTS_FILE=$(abspath $(SIM_BUILD))/$@/results.xml \
 	    COCOTB_TEST_MODULES=cocotb_tb.npu.$(COCOTB_FILE_SA_4x4) \
 	    TOPLEVEL=PSC_NPU_SystolicArray4x4 \
 	    TOPLEVEL_LANG=verilog \
 	    VERILOG_SOURCES="$(VERILOG_FILE_SA_4x4)"
 
 simulate_PE:
-	make clean
 	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_PE=1" \
-	make -f $(COCOTB_MAKEFILE) \
+	$(MAKE) -f $(COCOTB_MAKEFILE) \
 	    SIM=$(SIM) \
+	    SIM_BUILD=$(SIM_BUILD)/$@ \
+	    COCOTB_RESULTS_FILE=$(abspath $(SIM_BUILD))/$@/results.xml \
 	    COCOTB_TEST_MODULES=cocotb_tb.npu.$(COCOTB_FILE_PE) \
 	    TOPLEVEL=PSC_NPU_PE_SimTop \
 	    TOPLEVEL_LANG=verilog \
 	    VERILOG_SOURCES="$(PE_FILE)"
 
+# Exercise the shared multiplier with one physical multiplier.
+# All Controller tests run, including delayed-memory/restart scoreboards.
+simulate_SA_multicycle_Ctrl:
+	$(MAKE) -f Makefile.npu \
+	    simulate_SA_Ctrl \
+	    SIM_BUILD=$(SIM_BUILD)/$@ \
+	    $(if $(filter icarus,$(SIM)), \
+	        COMPILE_ARGS="$(SIM_ARGS) -g2012 -PPSC_NPU_Controller.MUL_NUM=1", \
+	        EXTRA_ARGS="$(SIM_ARGS) -GMUL_NUM=1")
+			
 #--------------------------------------------------
 # Yosys
 #--------------------------------------------------

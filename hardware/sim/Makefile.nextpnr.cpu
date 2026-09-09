@@ -2,12 +2,12 @@
 # PSC-ONE CPU timing flow with nextpnr / Himbaechel
 #
 # Usage:
-#   make -f Makefile.nextpnr timing CPU_VERSION=v1
-#   make -f Makefile.nextpnr timing CPU_VERSION=v2
-#   make -f Makefile.nextpnr timing CPU_VERSION=legacy
+#   make -f Makefile.nextpnr.cpu timing CPU_VERSION=v1
+#   make -f Makefile.nextpnr.cpu timing CPU_VERSION=v2
+#   make -f Makefile.nextpnr.cpu timing CPU_VERSION=legacy
 #
 # Optional:
-#   make -f Makefile.nextpnr timing CPU_VERSION=v1 FREQ=81
+#   make -f Makefile.nextpnr.cpu timing CPU_VERSION=v1 FREQ=81
 #
 # Target FPGA:
 #   Tang Nano 20K
