@@ -3,7 +3,7 @@
 #include "fat32.h"
 
 // micropythonを含めるとSIM時間が長すぎる場合のオプション
-#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
+//#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
 
 extern int psc_micropython_run(void);
 
@@ -208,7 +208,7 @@ prompt:
                 }
             }
             // SA API call 
-            call_sa_api(matrix_max);
+            call_sa_api(matrix_max, true);
 
         // ---- I2S MIC READ ----
         } else if (strcmp(argv[0], "mic_read") == 0) {

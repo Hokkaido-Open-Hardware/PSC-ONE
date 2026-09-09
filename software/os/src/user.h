@@ -38,7 +38,7 @@ uint32_t cluster_to_lba(uint32_t cluster);
 int fat32_mount(void);
 
 // Systlic Array
-void call_sa_api(uint32_t matrix_size);
+void call_sa_api(uint32_t matrix_size, bool option);
 // Mic
 void call_mic_api(unsigned count);
 void call_mic_write_api(unsigned count);
@@ -63,7 +63,13 @@ int getchar(void);
 int getchar_timeout(void);
 void print_int(int v);
 
-static inline uint32_t sa_api(uint32_t sysno, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg4);
+static inline uint32_t sa_api(
+    uint32_t sysno,
+    uint32_t arg0,
+    uint32_t arg1,
+    uint32_t arg2,
+    uint32_t arg4,
+    uint32_t arg5);
 static inline uint32_t mic_api(uint32_t sysno, uint32_t arg0);
 
 inline static uint32_t sd_api(uint32_t sysno, uint32_t arg0);

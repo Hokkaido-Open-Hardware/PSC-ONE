@@ -5,6 +5,8 @@ static uint8_t fat32_buf[512];
 
 fat32_info_t g_fat32;
 
+static int fat32_next_cluster(uint32_t cluster, uint32_t *next);
+
 int fat32_cat(const char *name)
 {
     uint8_t buf[512];
@@ -20,18 +22,31 @@ int fat32_cat(const char *name)
         return -1;
     }
 
-    uint32_t lba =
-        cluster_to_lba(cluster);
+    uint32_t remaining = size;
+    while (remaining != 0) {
+        if (cluster < 2 || cluster >= 0x0FFFFFF0u ||
+            g_fat32.sectors_per_cluster == 0)
+            return -1;
 
-    if (call_sd_read_buf_api(lba, buf))
-        return -1;
+        uint32_t lba = cluster_to_lba(cluster);
+        for (uint32_t sector = 0;
+             sector < g_fat32.sectors_per_cluster && remaining != 0;
+             ++sector) {
+            if (call_sd_read_buf_api(lba + sector, buf))
+                return -1;
 
-    for (uint32_t i = 0; i < size; i++) {
+            uint32_t count = remaining < sizeof(buf) ? remaining : sizeof(buf);
+            for (uint32_t i = 0; i < count; ++i)
+                putchar(buf[i]);
+            remaining -= count;
+        }
 
-        if (i >= 512)
-            break;
-
-        putchar(buf[i]);
+        if (remaining != 0) {
+            uint32_t next;
+            if (fat32_next_cluster(cluster, &next))
+                return -1;
+            cluster = next;
+        }
     }
 
     putchar('\n');
@@ -49,71 +64,84 @@ int fat32_find(
     if (fat32_mount())
         return -1;
 
-    uint32_t root_lba =
-        cluster_to_lba(g_fat32.root_cluster);
+    uint32_t dir_cluster = g_fat32.root_cluster;
 
-    if (call_sd_read_buf_api(root_lba, buf))
+    if (g_fat32.sectors_per_cluster == 0)
         return -1;
 
-    for (int i = 0; i < 16; i++) {
+    while (dir_cluster >= 2 && dir_cluster < 0x0FFFFFF0u) {
+        uint32_t root_lba = cluster_to_lba(dir_cluster);
+        for (uint32_t sector = 0;
+             sector < g_fat32.sectors_per_cluster; ++sector) {
+            if (call_sd_read_buf_api(root_lba + sector, buf))
+                return -1;
 
-        uint8_t *e = &buf[i * 32];
+            for (int i = 0; i < 16; i++) {
 
-        // End of directory
-        if (e[0] == 0x00)
-            break;
+                uint8_t *e = &buf[i * 32];
 
-        // Deleted
-        if (e[0] == 0xE5)
-            continue;
+                // End of directory
+                if (e[0] == 0x00)
+                    return -1;
 
-        // LFN
-        if (e[11] == 0x0F)
-            continue;
+                // Deleted
+                if (e[0] == 0xE5)
+                    continue;
 
-        char shortname[13];
-        int k = 0;
+                // LFN
+                if (e[11] == 0x0F)
+                    continue;
 
-        // name
-        for (int j = 0; j < 8; j++) {
-            if (e[j] != ' ')
-                shortname[k++] = e[j];
-        }
+                char shortname[13];
+                int k = 0;
 
-        // extension
-        if (e[8] != ' ') {
+                // name
+                for (int j = 0; j < 8; j++) {
+                    if (e[j] != ' ')
+                        shortname[k++] = e[j];
+                }
 
-            shortname[k++] = '.';
+                // extension
+                if (e[8] != ' ') {
 
-            for (int j = 8; j < 11; j++) {
-                if (e[j] != ' ')
-                    shortname[k++] = e[j];
+                    shortname[k++] = '.';
+
+                    for (int j = 8; j < 11; j++) {
+                        if (e[j] != ' ')
+                            shortname[k++] = e[j];
+                    }
+                }
+
+                shortname[k] = '\0';
+
+                if (strcmp(shortname, name) == 0) {
+
+                    uint32_t cl_hi =
+                        ((uint32_t)e[20]) |
+                        ((uint32_t)e[21] << 8);
+
+                    uint32_t cl_lo =
+                        ((uint32_t)e[26]) |
+                        ((uint32_t)e[27] << 8);
+
+                    *cluster =
+                        (cl_hi << 16) | cl_lo;
+
+                    *size =
+                        ((uint32_t)e[28]) |
+                        ((uint32_t)e[29] << 8) |
+                        ((uint32_t)e[30] << 16) |
+                        ((uint32_t)e[31] << 24);
+
+                    return 0;
+                }
             }
         }
 
-        shortname[k] = '\0';
-
-        if (strcmp(shortname, name) == 0) {
-
-            uint32_t cl_hi =
-                ((uint32_t)e[20]) |
-                ((uint32_t)e[21] << 8);
-
-            uint32_t cl_lo =
-                ((uint32_t)e[26]) |
-                ((uint32_t)e[27] << 8);
-
-            *cluster =
-                (cl_hi << 16) | cl_lo;
-
-            *size =
-                ((uint32_t)e[28]) |
-                ((uint32_t)e[29] << 8) |
-                ((uint32_t)e[30] << 16) |
-                ((uint32_t)e[31] << 24);
-
-            return 0;
-        }
+        uint32_t next;
+        if (fat32_next_cluster(dir_cluster, &next) || next == dir_cluster)
+            return -1;
+        dir_cluster = next;
     }
 
     return -1;

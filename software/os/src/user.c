@@ -117,7 +117,7 @@ void exit(void) {
 
 // -------------------------------------------------------
 // SA実行関数
-void call_sa_api(uint32_t matrix_size)
+void call_sa_api(uint32_t matrix_size, bool option)
 {
     /*
     static uint8_t matrix_A[SA_MAT_MAX * SA_MAT_MAX];
@@ -151,7 +151,8 @@ void call_sa_api(uint32_t matrix_size)
         (uint32_t)(uintptr_t)matrix_A,
         (uint32_t)(uintptr_t)matrix_B,
         (uint32_t)(uintptr_t)matrix_C,
-        matrix_size
+        matrix_size,
+        option ? 1u : 0u
     );
 
     putchar('A');
@@ -595,13 +596,15 @@ static inline uint32_t sa_api(
     uint32_t arg0,
     uint32_t arg1,
     uint32_t arg2,
-    uint32_t arg4)
+    uint32_t arg4,
+    uint32_t arg5)
 {
     register uint32_t reg_a0 __asm__("a0") = arg0;
     register uint32_t reg_a1 __asm__("a1") = arg1;
     register uint32_t reg_a2 __asm__("a2") = arg2;
     register uint32_t reg_a3 __asm__("a3") = sysno;
     register uint32_t reg_a4 __asm__("a4") = arg4;
+    register uint32_t reg_a5 __asm__("a5") = arg5;
 
     __asm__ volatile(
         "ecall"
@@ -609,7 +612,8 @@ static inline uint32_t sa_api(
         : "r"(reg_a1),
           "r"(reg_a2),
           "r"(reg_a3),
-          "r"(reg_a4)
+          "r"(reg_a4),
+          "r"(reg_a5)
         : "memory"
     );
 

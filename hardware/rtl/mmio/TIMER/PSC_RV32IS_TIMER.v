@@ -141,7 +141,10 @@ module PSC_RV32IS_TIMER #(
             end
 
             // カウントダウン
-            if (running && tick_en) begin
+            // A start/load must win over a tick using the old counter.
+            if (running && tick_en &&
+                !(cpu_wvalid_latch && (cpu_byte_waddr == TIMER_WRITE_ADDR) &&
+                  cpu_wdata[16])) begin
                 if (counter > {{(TIMER_BITS-1){1'b0}},1'b0}) begin
                     counter <= counter - {{(TIMER_BITS-1){1'b0}},1'b1};
                 end else begin

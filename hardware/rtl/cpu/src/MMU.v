@@ -222,6 +222,8 @@ module MMU (
                         cache_vpn1      <= vpn1;        // vpn1 cache data
                         cache_root_ppn  <= root_ppn;    // cache vpn1 に対応する root_ppn
                         pte_cached      <= 1'b1;
+                        // L0 belongs to the previous L1 entry.
+                        l0_cached       <= 1'b0;
                         state  <= S_L1_CHECK;
                     end
                 end

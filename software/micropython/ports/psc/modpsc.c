@@ -61,13 +61,14 @@ static mp_obj_t psc_run(mp_obj_t filename_obj)
      * user stackを消費しないようstatic領域を使用する。
      * 最大4KBのPythonスクリプトを読み込む。
      */
+    // Read one extra byte so an oversized file cannot look complete.
     static uint8_t buf[PSC_PY_MAX_SIZE + 1u];
     uint32_t size = 0;
 
     if (fat32_read(
             filename,
             buf,
-            PSC_PY_MAX_SIZE,
+            sizeof(buf),
             &size) != 0) {
 
         mp_raise_OSError(MP_ENOENT);
@@ -325,8 +326,6 @@ static MP_DEFINE_CONST_FUN_OBJ_0(
 );
 
 
-
-
 /* ------------------------------------------------------------
  * SynapEngine
  * ------------------------------------------------------------ */
@@ -339,11 +338,15 @@ extern int psc_sa_run_api(
     const uint8_t *A,
     const uint8_t *B,
     uint32_t *C,
-    uint32_t n
+    uint32_t n,
+    bool signed_mode
 );
 
-/* Python: psc.sa_run(A, B) */
-static mp_obj_t psc_sa_run(mp_obj_t A_obj, mp_obj_t B_obj)
+/* Python: psc.sa_run(A, B, signed_mode) */
+static mp_obj_t psc_sa_run(
+    mp_obj_t A_obj,
+    mp_obj_t B_obj,
+    mp_obj_t signed_mode_obj)
 {
     size_t n = 0;
     size_t bn = 0;
@@ -353,9 +356,12 @@ static mp_obj_t psc_sa_run(mp_obj_t A_obj, mp_obj_t B_obj)
     mp_obj_get_array(A_obj, &n, &A_rows);
     mp_obj_get_array(B_obj, &bn, &B_rows);
 
+    bool signed_mode = mp_obj_is_true(signed_mode_obj);
+
     if ((n == 0u) ||
         (n > PSC_SA_MAT_MAX) ||
         ((n & 3u) != 0u)) {
+
         mp_raise_ValueError(
             MP_ERROR_TEXT("invalid matrix size")
         );
@@ -371,6 +377,9 @@ static mp_obj_t psc_sa_run(mp_obj_t A_obj, mp_obj_t B_obj)
     static uint8_t B_buf[PSC_SA_MAT_MAX * PSC_SA_MAT_MAX];
     static uint32_t C_buf[PSC_SA_MAT_MAX * PSC_SA_MAT_MAX];
 
+    /*
+     * Matrix A
+     */
     for (size_t i = 0; i < n; ++i) {
         size_t cols = 0;
         mp_obj_t *row = NULL;
@@ -386,16 +395,51 @@ static mp_obj_t psc_sa_run(mp_obj_t A_obj, mp_obj_t B_obj)
         for (size_t j = 0; j < n; ++j) {
             mp_int_t value = mp_obj_get_int(row[j]);
 
-            if ((value < 0) || (value > 255)) {
-                mp_raise_ValueError(
-                    MP_ERROR_TEXT("A value out of range")
-                );
+            if (signed_mode) {
+
+                /*
+                 * Signed INT8:
+                 * -128 ... +127
+                 */
+                if ((value < -128) || (value > 127)) {
+                    mp_raise_ValueError(
+                        MP_ERROR_TEXT(
+                            "A signed value out of range"
+                        )
+                    );
+                }
+
+            } else {
+
+                /*
+                 * Unsigned UINT8:
+                 * 0 ... 255
+                 */
+                if ((value < 0) || (value > 255)) {
+                    mp_raise_ValueError(
+                        MP_ERROR_TEXT(
+                            "A unsigned value out of range"
+                        )
+                    );
+                }
             }
 
+            /*
+             * Signed values are stored as two's-complement
+             * 8-bit values in the uint8_t buffer.
+             *
+             * Example:
+             *   -1   -> 0xFF
+             *   -128 -> 0x80
+             *   127  -> 0x7F
+             */
             A_buf[i * n + j] = (uint8_t)value;
         }
     }
 
+    /*
+     * Matrix B
+     */
     for (size_t i = 0; i < n; ++i) {
         size_t cols = 0;
         mp_obj_t *row = NULL;
@@ -411,27 +455,57 @@ static mp_obj_t psc_sa_run(mp_obj_t A_obj, mp_obj_t B_obj)
         for (size_t j = 0; j < n; ++j) {
             mp_int_t value = mp_obj_get_int(row[j]);
 
-            if ((value < 0) || (value > 255)) {
-                mp_raise_ValueError(
-                    MP_ERROR_TEXT("B value out of range")
-                );
+            if (signed_mode) {
+
+                /*
+                 * Signed INT8:
+                 * -128 ... +127
+                 */
+                if ((value < -128) || (value > 127)) {
+                    mp_raise_ValueError(
+                        MP_ERROR_TEXT(
+                            "B signed value out of range"
+                        )
+                    );
+                }
+
+            } else {
+
+                /*
+                 * Unsigned UINT8:
+                 * 0 ... 255
+                 */
+                if ((value < 0) || (value > 255)) {
+                    mp_raise_ValueError(
+                        MP_ERROR_TEXT(
+                            "B unsigned value out of range"
+                        )
+                    );
+                }
             }
 
             B_buf[i * n + j] = (uint8_t)value;
         }
     }
 
+    /*
+     * Run SynapEngine
+     */
     int ret = psc_sa_run_api(
         A_buf,
         B_buf,
         C_buf,
-        (uint32_t)n
+        (uint32_t)n,
+        signed_mode
     );
 
     if (ret != 0) {
         mp_raise_OSError(ret);
     }
 
+    /*
+     * Convert result matrix to MicroPython list
+     */
     mp_obj_t result = mp_obj_new_list(n, NULL);
     mp_obj_list_t *result_list = MP_OBJ_TO_PTR(result);
 
@@ -440,9 +514,16 @@ static mp_obj_t psc_sa_run(mp_obj_t A_obj, mp_obj_t B_obj)
         mp_obj_list_t *row_list = MP_OBJ_TO_PTR(row_obj);
 
         for (size_t j = 0; j < n; ++j) {
-            row_list->items[j] = mp_obj_new_int_from_uint(
-                C_buf[i * n + j]
-            );
+
+            if (signed_mode) {
+                row_list->items[j] = mp_obj_new_int(
+                    (int32_t)C_buf[i * n + j]
+                );
+            } else {
+                row_list->items[j] = mp_obj_new_int_from_uint(
+                    C_buf[i * n + j]
+                );
+            }
         }
 
         result_list->items[i] = row_obj;
@@ -451,7 +532,7 @@ static mp_obj_t psc_sa_run(mp_obj_t A_obj, mp_obj_t B_obj)
     return result;
 }
 
-static MP_DEFINE_CONST_FUN_OBJ_2(
+static MP_DEFINE_CONST_FUN_OBJ_3(
     psc_sa_run_obj,
     psc_sa_run
 );

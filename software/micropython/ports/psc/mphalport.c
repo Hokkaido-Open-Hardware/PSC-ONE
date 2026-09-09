@@ -35,7 +35,8 @@ static inline long psc_syscall_sa_run(
     const uint8_t *A,
     const uint8_t *B,
     uint32_t *C,
-    uint32_t n
+    uint32_t n,
+    bool signed_mode
 )
 {
     register long a0 __asm__("a0") = (long)(uintptr_t)A;
@@ -43,6 +44,7 @@ static inline long psc_syscall_sa_run(
     register long a2 __asm__("a2") = (long)(uintptr_t)C;
     register long a3 __asm__("a3") = SYS_SA_RUN;
     register long a4 __asm__("a4") = (long)n;
+    register long a5 __asm__("a5") = signed_mode;
 
     __asm__ volatile (
         "ecall"
@@ -50,7 +52,8 @@ static inline long psc_syscall_sa_run(
         : "r"(a1),
           "r"(a2),
           "r"(a3),
-          "r"(a4)
+          "r"(a4),
+          "r"(a5)
         : "memory"
     );
 
@@ -231,8 +234,9 @@ int psc_sa_run_api(
     const uint8_t *A,
     const uint8_t *B,
     uint32_t *C,
-    uint32_t n
+    uint32_t n,
+    bool signed_mode
 )
 {
-    return (int)psc_syscall_sa_run(A, B, C, n);
+    return (int)psc_syscall_sa_run(A, B, C, n, signed_mode);
 }

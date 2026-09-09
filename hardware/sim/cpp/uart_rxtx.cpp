@@ -52,7 +52,7 @@ extern "C" void run() {
     UART_CT = 0u;                          // irq_en=0
     UART_CT = (CT_IRQ_CLR | CT_OVR_CLR);   // W1C クリア
 
-    uint8_t ch;
+    uint8_t ch = 0;
     // エコーループ：受信したらそのまま返す
     //while (1) {
     for(int i=0; i<3; ++i) {

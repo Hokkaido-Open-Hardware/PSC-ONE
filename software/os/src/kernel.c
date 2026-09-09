@@ -207,7 +207,8 @@ __attribute__((used)) void kernel_main(void) {
     create_process(_binary_shell_bin_start, shell_size);
     __asm__ __volatile__("fence.i" ::: "memory");
 
-#if 1
+// if 1 : multitask mode
+#if 0
     /* 
     task2: kernel内テストtask 
     */

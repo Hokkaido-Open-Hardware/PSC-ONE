@@ -42,6 +42,8 @@ void handle_syscall(struct trap_frame *f) {
         const uint8_t *user_B = (const uint8_t *)(uintptr_t)f->a1;
         uint32_t *user_C = (uint32_t *)(uintptr_t)f->a2;
         uint32_t n = f->a4;
+        bool option = (bool)f->a5;
+
         if (n == 0 || n > SA_MAT_MAX || (n & 3u) != 0u) {
             f->a0 = (uint32_t)-1;
             break;
@@ -50,15 +52,20 @@ void handle_syscall(struct trap_frame *f) {
         static uint8_t kernel_A[SA_MAT_MAX * SA_MAT_MAX];
         static uint8_t kernel_B[SA_MAT_MAX * SA_MAT_MAX];
         static uint32_t kernel_C[SA_MAT_MAX * SA_MAT_MAX];
+
         uint32_t elements = n * n;
+
         for (uint32_t i = 0; i < elements; ++i) {
             kernel_A[i] = user_A[i];
             kernel_B[i] = user_B[i];
             kernel_C[i] = 0;
         }
-        sa_run(kernel_A, kernel_B, (uint8_t)n, kernel_C, false);
+
+        sa_run(kernel_A, kernel_B, (uint8_t)n, kernel_C, option);
+
         for (uint32_t i = 0; i < elements; ++i)
             user_C[i] = kernel_C[i];
+
         f->a0 = 0;
         break;
     }

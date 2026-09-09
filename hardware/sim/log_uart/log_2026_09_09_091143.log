@@ -1,0 +1,36 @@
+[dbg] cycle=0, last_uart=--, pc=0x00000000, data_addr=0x00000000
+memset = OFF
+NPU TEST
+SynapEngine start: 4x4 mode=signed
+SynapEngine done.
+
+SA result / CPU reference
+
+row 0
+  [0][0]  SA=-18054  CPU=-18054
+  [0][1]  SA=7264  CPU=7264
+  [0][2]  SA=-680  CPU=-680
+  [0][3]  SA=9152  CPU=9152
+
+row 1
+  [1][0]  SA=-11242  CPU=-11242
+  [1][1]  SA=10050  CPU=10050
+  [1][2]  SA=-6668  CPU=-6668
+  [1][3]  SA=-3659  CPU=-3659
+
+row 2
+  [2][0]  SA=-8980  CPU=-8980
+  [2][1]  SA=7138  CPU=7138
+  [2][2]  SA=-6132  CPU=-6132
+  [2][3]  SA=6301  CPU=6301
+
+row 3
+  [3][0]  SA=-259  CPU=-259
+  [3][1]  SA=260  CPU=260
+  [3][2]  SA=-4046  CPU=-4046
+  [3][3]  SA=3429  CPU=3429
+
+SA SIGNED VERIFY OK
+
+Draw PSC Logo
+IMG BOOT LOGO start.

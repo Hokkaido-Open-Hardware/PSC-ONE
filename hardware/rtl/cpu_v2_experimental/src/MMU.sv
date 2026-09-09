@@ -235,6 +235,8 @@ module MMU (
                         l1_cache_vpn      <= vpn1;
                         l1_cache_root_ppn <= root_ppn;
                         l1_cache_valid    <= 1'b1;
+                        // L0 belongs to the previous L1 entry.
+                        l0_cache_valid    <= 1'b0;
                         state <= S_L1_CHECK;
                     end
                 end

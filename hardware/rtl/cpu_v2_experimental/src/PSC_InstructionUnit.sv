@@ -3,11 +3,20 @@
 import PSC_Types::*;
 
 // Small FPGA-oriented out-of-order backend.
-//
 // Rename uses p0-p31 as the committed architectural bank and p32-p33 as
 // speculative slots.  The RAT stores only a valid bit and a ROB-sized slot index;
 // precise recovery therefore resets the mapping checkpoint without copying a
 // second register file.  Architectural effects occur only at the ROB head.
+// This organization keeps the rename, scheduling, and recovery logic intentionally
+// small so that limited out-of-order execution can fit in a resource-constrained FPGA.
+// The ROB preserves program-order retirement, while the IQ allows independent ready
+// instructions to execute before older stalled instructions when architectural safety permits.
+// 小規模FPGAへの実装を前提とした、軽量なアウト・オブ・オーダ実行バックエンドです。
+// リネームではp0～p31をコミット済みのアーキテクチャレジスタとして使用し、p32以降を
+// 投機的な物理レジスタとして使用します。RATは完全なレジスタコピーを保持せず、
+// 有効ビットとROBスロット相当の小さな対応情報だけを保持することで回路規模を抑えています。
+// ROBによって命令のコミット順序は必ずプログラム順に保たれ、IQでは依存関係が解消済みの
+// 命令だけを選択することで、FPGA資源を抑えながら限定的なOoO実行を実現します。
 module PSC_InstructionUnit #(
     parameter int ROB_DEPTH = 2,
     parameter int IQ_DEPTH  = 2,
@@ -89,6 +98,12 @@ module PSC_InstructionUnit #(
         dec_ctrl_t            ctrl;
         // Store data or CSR rs1 value.  These instruction classes are
         // mutually exclusive, so commit never needs two source operands.
+        // Keeping only one deferred side-effect operand reduces ROB entry width
+        // while still preserving the value required at precise in-order commit.
+        // STORE命令の書き込みデータ、またはCSR命令のrs1値をコミットまで保持します。
+        // STOREとCSR書き込みは同一命令で同時に必要になることがないため、ROBエントリには
+        // 副作用用オペランドを1本だけ保持すれば十分です。これによりROBのビット幅を抑えつつ、
+        // 正確なインオーダ・コミット時に必要な値を失わない構成にしています。
         logic [31:0]          side_effect_value;
         logic                 dest_valid;
         logic [PHY_TAG_W-1:0] dest_phys;
@@ -117,6 +132,12 @@ module PSC_InstructionUnit #(
     // FIFO/Decode -> Rename/Dispatch timing boundary.  The FIFO is popped
     // when this one-entry elastic stage accepts an instruction, not when the
     // backend eventually dispatches it.
+    // The stage decouples front-end timing from ROB/IQ resource availability,
+    // allowing decode to stop cleanly while an already captured instruction waits.
+    // FIFO/Decode段とRename/Dispatch段の間に置かれた1エントリのエラスティックバッファです。
+    // FIFOはバックエンドへのdispatch完了時ではなく、この段が命令を受理した時点でpopされます。
+    // これによりフロントエンドのタイミングとROB/IQの空き状況を分離し、バックエンドが詰まった場合でも
+    // すでにデコード済みの命令を保持したまま、安全にデコード要求を停止できます。
     logic                 decode_stage_valid;
     dec_ctrl_t            decode_stage_ctrl;
     logic [31:0]          decode_stage_opcode;
@@ -134,6 +155,12 @@ module PSC_InstructionUnit #(
     // p0-p31 hold committed architectural state.  RAT entries point either
     // to that identity mapping or to an in-flight destination above p31.
     // The number of speculative mappings cannot exceed the ROB depth.
+    // Therefore each live destination can be represented by a compact ROB-slot-sized
+    // mapping rather than by a full physical-register index table.
+    // p0～p31は常にコミット済みのアーキテクチャ状態を保持します。RATは通常この同一番号マッピングを
+    // 使用し、未コミットの書き込み先が存在するときだけp32以降の投機レジスタを指します。
+    // 同時に存在できる投機的な書き込み先はROB深度を超えないため、完全な物理レジスタ番号を
+    // 32エントリ分保持せず、ROBスロット幅の小さな情報でマッピングを表現できます。
     logic [31:0]          rat_spec_valid;
     logic [ROB_TAG_W-1:0] rat_spec_slot       [0:31];
     logic [PRF_DEPTH-1:0] free_list;
@@ -172,6 +199,12 @@ module PSC_InstructionUnit #(
     // Registered integer issue boundary.  IQ/ROB selection and operand muxing
     // finish here; the ALU and ROB write-back run in the following cycle.
     // This intentionally trades issue throughput for FPGA Fmax.
+    // Inserting this register boundary prevents ready-selection, operand multiplexing,
+    // execution, and write-back from becoming one long combinational path.
+    // 整数ALUへのissue直前にレジスタ境界を設けています。IQ/ROBからの命令選択とオペランド選択は
+    // この段までで完了し、実際のALU演算とROBへのwrite-backは次サイクルで行います。
+    // ready判定→命令選択→オペランドMUX→ALU→write-backを1本の長い組み合わせ経路にしないことで、
+    // 1サイクル当たりのissue性能よりもFPGA上のFmax確保を優先しています。
     logic                 alu_active;
     logic [ROB_TAG_W-1:0] alu_active_rob_tag;
     logic [PHY_TAG_W-1:0] alu_active_dest_phys;
@@ -312,6 +345,12 @@ module PSC_InstructionUnit #(
 
     // Only ROB_DEPTH speculative rename slots are required: every live
     // destination belongs to exactly one live ROB entry.
+    // The allocator scans only the speculative PRF region and returns the first
+    // currently free physical destination slot.
+    // 投機リネーム用レジスタはROB_DEPTH個だけあれば十分です。未コミットの書き込み先は必ず
+    // どれか1つの有効ROBエントリに対応するため、それ以上の投機物理レジスタは必要ありません。
+    // この回路ではp32以降の投機領域だけを走査し、free_listで空いている最初の物理レジスタを
+    // 次のdestinationとして割り当てます。
     always_comb begin
         has_free_phys = 1'b0;
         alloc_phys    = '0;
@@ -329,6 +368,12 @@ module PSC_InstructionUnit #(
     // keeps the 32-way RAT mux out of the PRF-read/bypass/IQ-write path.
     // Same-cycle dispatch and commit are folded into the lookup so adjacent
     // producer/consumer instructions retain correct rename semantics.
+    // The capture tags therefore already reflect a destination allocated or released
+    // on the same edge, avoiding a one-cycle stale mapping hazard.
+    // RAT参照はPRF読み出しサイクルより前に解決します。32エントリRATの選択MUXを
+    // PRF read・write-back bypass・IQ書き込みと同じクリティカルパスに入れないための境界です。
+    // 同一サイクルのdispatchによる新規リネームとcommitによるマッピング解除も参照結果に反映し、
+    // producer直後のconsumerが古い物理レジスタを参照する1サイクル遅れのハザードを防ぎます。
     always_comb begin
         capture_src1_tag = decoded_ctrl.r_addr1;
         if (!decoded_ctrl.use_rs1)
@@ -370,6 +415,12 @@ module PSC_InstructionUnit #(
 
     // Current-cycle WB bypasses exist only into rename.  IQ wake-up remains
     // registered, avoiding WB->wake-up->select->execute in one cycle.
+    // A just-produced value may therefore be captured immediately by a newly dispatched
+    // instruction, while instructions already resident in the IQ wake one cycle later.
+    // 当該サイクルのwrite-back値はrename/dispatch時の新規命令にだけ直接バイパスします。
+    // すでにIQ内で待機している命令のwake-upはレジスタ更新として次サイクルに反映します。
+    // これにより、新規consumerは直前の結果を即座に取得できる一方で、WB→wake-up→select→executeを
+    // 1サイクル内に連結する長い組み合わせパスを作らない構成になっています。
     always_comb begin
         dispatch_src1_ready = !decode_stage_ctrl.use_rs1 ||
                               (decode_stage_ctrl.r_addr1 == 5'd0) ||
@@ -423,6 +474,12 @@ module PSC_InstructionUnit #(
                             !alu_active && !md_active;
     // Stop accepting younger instructions while the interrupt is pending.
     // Existing decoded/ROB work retires before the precise trap boundary.
+    // The interrupt is taken only after the decode stage, ROB, and execution lanes are
+    // empty, guaranteeing that no younger speculative state crosses the trap boundary.
+    // タイマ割り込み要求が保留中になった時点で、それより若い命令の新規受け入れを停止します。
+    // すでにdecode段やROBに存在する命令は通常どおり完了・コミットさせ、パイプライン全体が空に
+    // なった時点で割り込みを受理します。これにより投機状態を割り込み境界の先へ持ち越さず、
+    // precise interruptとして扱えるようにしています。
     assign timer_irq_request = timer_irq_ext && csr_state.mstatus[3] &&
                                csr_state.mie[7];
     assign timer_irq_take = timer_irq_request && pipeline_empty;
@@ -443,6 +500,12 @@ module PSC_InstructionUnit #(
 
     // Two-entry oldest-ready selection, independently for the integer and M
     // lanes.  A tag equal to rob_head is older than the other possible tag.
+    // Ready instructions are filtered by execution class, and serializing operations
+    // are allowed onto the integer lane only when they have reached the ROB head.
+    // 2エントリIQから、整数ALUレーンとMUL/DIVレーンそれぞれについて独立にoldest-ready命令を選択します。
+    // ROB_DEPTH=2のため、rob_headと同じtagを持つ命令が2候補のうち古い命令です。
+    // 実行ユニット種別に応じて候補を分離し、メモリ・分岐・CSRなどのserializing命令はROB先頭に
+    // 到達した場合だけ整数レーンへ発行することで、順序を伴う副作用を保護します。
     always_comb begin
         iq0_ready = iq[0].valid && iq[0].src1_ready && iq[0].src2_ready;
         iq1_ready = iq[1].valid && iq[1].src1_ready && iq[1].src2_ready;
@@ -508,6 +571,12 @@ module PSC_InstructionUnit #(
 
     // Loads and stores issue only at the ROB head.  A store cannot modify
     // memory until all older instructions have committed.
+    // This conservative head-only policy avoids the need for a load/store queue,
+    // memory-dependence prediction, or speculative store recovery logic.
+    // LOAD/STOREはROB先頭に到達した命令だけをメモリ系へ発行します。特にSTOREは、
+    // それより古い命令がすべてコミットするまで実メモリを書き換えません。
+    // この保守的な方針により、LSQ、メモリ依存予測、投機STOREのロールバック回路を持たずに
+    // 正確なメモリ順序と例外回復を実現し、小規模FPGA向けに回路規模を抑えています。
     assign memory_ctrl       = (rob_count != 0) ? rob[rob_head].ctrl : '0;
     assign memory_alu_data   = rob[rob_head].result;
     assign memory_reg_data_1 = 32'd0;
@@ -527,6 +596,12 @@ module PSC_InstructionUnit #(
     // Only expose side-effecting control when an instruction really commits.
     // The CSR read address is safe to present early and lets Csr register the
     // old value without putting commit_fire in its read-mux data path.
+    // Write enables and architectural side effects are therefore gated by commit, while
+    // non-destructive CSR address selection may be prepared in advance for timing.
+    // CSR書き込みなどアーキテクチャ状態を変更する制御信号は、命令が実際にcommitするサイクルだけ
+    // 外部へ有効化します。一方、CSRの読み出しアドレス指定自体には副作用がないため先行して提示し、
+    // 旧CSR値を事前にレジスタ化できるようにしています。これによりcommit_fireをCSR read MUXの
+    // データパスへ入れず、正確な副作用制御とタイミング短縮を両立します。
     always_comb begin
         commit_ctrl = '0;
         commit_ctrl.csr_addr = rob[rob_head].ctrl.csr_addr;
@@ -557,6 +632,13 @@ module PSC_InstructionUnit #(
     // are not part of one clock-to-clock path.  Dispatch pauses while this
     // packet is written, ensuring a held consumer cannot observe the old
     // architectural value after its speculative mapping is released.
+    // This commit packet separates retirement bookkeeping from the physical write fanout
+    // and creates a clean architectural-state update point.
+    // アーキテクチャ側PRFはx1～x31に対応する多数の書き込み先デコードを持つため、commit結果を
+    // いったん専用レジスタに受けてから高fanoutの書き込みネットワークへ渡します。
+    // これによりROB完了判定・count更新・CSR選択・PRF宛先デコードを同一クロック間パスから分離します。
+    // このcommit packetを書き込む間はdispatchを停止し、投機マッピング解除直後のconsumerが
+    // 更新前のアーキテクチャ値を誤って読むことも防止します。
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             commit_prf_valid <= 1'b0;
@@ -581,6 +663,12 @@ module PSC_InstructionUnit #(
     // dispatch while the comparison is pending.  Register the redirect pulse
     // and apply the FIFO flush in the following commit cycle; this removes the
     // comparator -> global flush/enable fanout from one timing path.
+    // Because younger work is blocked, delaying the redirect control by one register
+    // stage does not permit architecturally unsafe instructions to escape.
+    // 分岐命令はROB上でserializingとして扱うため、分岐条件の確定待ち中に若い命令をdispatchしません。
+    // 分岐リダイレクト信号はいったんレジスタ化し、次のcommitサイクルでFIFO flushへ反映します。
+    // これにより比較器出力からグローバルなflush/enable fanoutまでを1本のタイミングパスにせずに済みます。
+    // 若い命令の発行自体が停止しているため、この1段遅延によって誤った命令が副作用を起こすことはありません。
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n)
             branch_redirect <= 1'b0;
@@ -613,6 +701,11 @@ module PSC_InstructionUnit #(
 
     // Elastic decode/dispatch stage.  dispatch_fire may consume the current
     // entry on the same edge that decode_capture_fire refills it.
+    // This permits one instruction per cycle to flow through the boundary when the
+    // backend is ready, while still providing back-pressure when resources are full.
+    // DecodeとDispatch間のエラスティック段です。dispatch_fireで現在の命令を消費する同じクロックエッジで、
+    // decode_capture_fireによって次の命令を補充できます。バックエンドに空きがある通常時は1命令/サイクルで
+    // 境界を通過でき、ROB/IQや物理レジスタが不足した場合にはvalidを保持して自然にback-pressureをかけます。
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             decode_stage_valid  <= 1'b0;
@@ -635,6 +728,12 @@ module PSC_InstructionUnit #(
             // A decoded instruction may wait here while its producer commits.
             // The speculative slot is released on that edge, so retarget any
             // held operand to the newly updated architectural register bank.
+            // Without this repair, a stalled consumer could keep a tag that has just
+            // become free and later be reallocated to an unrelated instruction.
+            // デコード済み命令はproducerのcommit待ちでこの段に滞留する場合があります。そのcommitと同じエッジで
+            // producerの投機物理レジスタが解放されるため、保持中のconsumerがそのtagを持ち続けないよう、
+            // コミット済みアーキテクチャレジスタ側へ参照先を付け替えます。これを行わないと、解放されたtagが
+            // 別命令へ再割り当てされた後に、古いconsumerが無関係な値を読む危険があります。
             if (decode_stage_ctrl.use_rs1 &&
                 (decode_stage_src1_tag == rob[rob_head].dest_phys))
                 decode_stage_src1_tag <= rob[rob_head].ctrl.w_addr;
@@ -688,6 +787,11 @@ module PSC_InstructionUnit #(
         end else if (cpu_trap || d_pf || i_pf) begin
             // Precise recovery discards speculative mappings while retaining
             // the committed p0-p31 architectural bank.
+            // ROB, IQ, active execution lanes, and speculative free-list state are reset
+            // together so execution restarts from a purely committed machine state.
+            // precise trap/page fault時には、投機RATマッピングをすべて破棄する一方、p0～p31に保持された
+            // コミット済みアーキテクチャ状態はそのまま残します。ROB、IQ、実行中レーン、投機free-list状態も
+            // 同時に初期化し、例外復帰後は完全にコミット済みの機械状態から実行を再開できるようにします。
             rob_head  <= '0;
             rob_tail  <= '0;
             rob_count <= '0;
@@ -706,6 +810,12 @@ module PSC_InstructionUnit #(
 
             // In-order retirement updates the architectural bank and releases
             // the speculative destination slot.
+            // The RAT mapping is cleared only if it still refers to this retiring
+            // destination, preserving a newer rename of the same architectural register.
+            // ROB先頭からインオーダでretireし、コミット値をアーキテクチャレジスタへ反映した後、対応する
+            // 投機物理レジスタをfree_listへ返却します。RATは、このretire命令が現在もそのレジスタの最新
+            // マッピングである場合だけ解除します。同じアーキテクチャレジスタに対するより新しいrenameが
+            // 存在する場合、その新しいマッピングを誤って消さないようにしています。
             if (commit_fire) begin
                 rob[rob_head].valid <= 1'b0;
                 if (rob[rob_head].dest_valid &&
@@ -720,6 +830,11 @@ module PSC_InstructionUnit #(
             end
 
             // Rename and dispatch one instruction per cycle.
+            // A new ROB entry and IQ entry are created atomically, source readiness is
+            // captured, and a speculative destination is allocated only when required.
+            // 1サイクルにつき最大1命令をrenameしてdispatchします。ROBエントリとIQエントリを同時に生成し、
+            // source operandのready/value/tagをその時点で取り込みます。destination書き込みが必要な命令だけ
+            // 投機物理レジスタを割り当て、RATとfree_listも同じdispatchイベントで整合して更新します。
             if (dispatch_fire) begin
                 rob[rob_tail].valid           <= 1'b1;
                 rob[rob_tail].completed       <= 1'b0;
@@ -764,6 +879,11 @@ module PSC_InstructionUnit #(
 
             // Register IQ selection before the integer ALU.  Selection cannot
             // launch again until the current result has written back.
+            // The active register owns the selected ROB tag, destination tag, control,
+            // and operands for the complete lifetime of the integer operation.
+            // IQで選択した整数命令はALU直前のactiveレジスタへ取り込みます。現在の命令がwrite-backするまでは
+            // 次の整数命令をlaunchせず、activeレジスタがROB tag、destination物理tag、制御情報、2つの
+            // オペランドを演算完了まで一貫して保持します。これは制御を単純化しFPGAタイミングを安定させます。
             if (alu_select_valid && !alu_active) begin
                 iq[alu_select_idx].valid <= 1'b0;
                 alu_active              <= 1'b1;
@@ -779,10 +899,20 @@ module PSC_InstructionUnit #(
             end
 
             // Integer execution and physical-register write-back.
+            // The completed result is recorded in the ROB and, when applicable, forwarded
+            // to the speculative physical destination through the ALU write-back port.
+            // 整数ALUの完了処理と物理レジスタへのwrite-backを行います。演算結果はROBへ記録され、
+            // destinationを持つ命令ではALU write-backポート経由で投機物理レジスタにも反映されます。
+            // ROB側には後続のcommit、分岐判定、メモリアドレス処理に必要な情報を保持します。
             if (alu_wb_valid) begin
                 alu_active <= 1'b0;
                 // Only stores and CSR operations need a source value after
                 // execution.  Branch comparison consumes both values here.
+                // Preserve only the operand that must survive until commit; ordinary ALU
+                // instructions no longer need their original sources after execution.
+                // 実行完了後もsource値を保持する必要があるのはSTOREとCSR書き込みだけです。STOREでは書き込みデータ、
+                // CSRではrs1値をcommit時の副作用実行までROBに残します。分岐比較はこの時点で両operandを消費済みであり、
+                // 通常のALU命令も実行後に元のsource値を保持する必要がないため、不要なROBビット幅を増やしません。
                 if (alu_active_ctrl.is_store)
                     rob[alu_wb_rob_tag].side_effect_value <=
                         alu_active_src2;
@@ -803,6 +933,11 @@ module PSC_InstructionUnit #(
             end
 
             // Launch and complete the independent MUL/DIV lane.
+            // MUL/DIV has its own active state and can progress independently of the integer
+            // lane, allowing a long-latency operation to overlap with unrelated ALU work.
+            // MUL/DIVは整数ALUとは独立した実行レーンとしてlaunch・完了管理します。専用のactive状態を持つため、
+            // 長レイテンシのMUL/DIV実行中でも、依存しない整数ALU命令を別レーンで進めることができます。
+            // 完了時には結果を対応ROBエントリへ記録し、destinationがあれば物理レジスタにもwrite-backします。
             if (md_select_valid && !md_active) begin
                 iq[md_select_idx].valid <= 1'b0;
                 md_active            <= 1'b1;
@@ -820,6 +955,11 @@ module PSC_InstructionUnit #(
             end
 
             // Head-only memory completion.
+            // Since memory operations execute only at rob_head, their completion can update
+            // the head entry directly without a separate memory-operation tag.
+            // メモリ命令はROB先頭だけが実行される設計なので、LOAD/STORE完了時には別途メモリ命令tagを
+            // 持たなくてもrob_headのエントリを直接更新できます。LOADは読み出し結果をROBへ保存してcompletedにし、
+            // STOREは実メモリ書き込み完了かつpage faultなしの場合にcompletedとして扱います。
             if (load_wb_valid) begin
                 rob[rob_head].result <= load_wb_value;
                 rob[rob_head].completed <= 1'b1;
@@ -828,6 +968,12 @@ module PSC_InstructionUnit #(
                 rob[rob_head].completed <= 1'b1;
 
             // Registered wake-up; selection observes these changes next cycle.
+            // Matching ALU, MUL/DIV, or load write-back tags mark waiting IQ operands ready
+            // and capture the produced value, but same-cycle reselection is intentionally avoided.
+            // IQ内で待機しているsource tagとALU、MUL/DIV、LOADのwrite-back tagを比較し、一致したoperandを
+            // readyへ更新すると同時に生成値を取り込みます。このwake-upはレジスタ更新として行うため、
+            // その同じサイクル中には再selectせず、次サイクルから発行候補になります。これにより
+            // write-back→wake-up→select→executeの長い組み合わせ経路を避けています。
             for (i = 0; i < IQ_DEPTH; i = i + 1) begin
                 if (iq[i].valid && !iq[i].src1_ready) begin
                     if (alu_wb_valid && alu_wb_has_dest &&
