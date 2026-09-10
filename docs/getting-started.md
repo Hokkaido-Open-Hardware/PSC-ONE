@@ -1,75 +1,97 @@
-<p align="center">
-  <a href="https://github.com/QPSC-Design/PSC-ONE">
-    <img src="images/PSC-ONE_Logo.png" width="100%">
-  </a>
-</p>
-
 # Getting Started with PSC-ONE
 
-This guide provides a quick introduction to building, simulating, and running **PSC-ONE**.
+This guide explains the basic steps required to build, simulate, and run **PSC-ONE** on a **Tang Nano 20K** FPGA board.
 
-PSC-ONE is an FPGA-based RISC-V SoC project featuring a custom RISC-V CPU, PSC-OS, external SDRAM, peripherals, and hardware accelerators.
+PSC-ONE is an experimental FPGA-based SoC consisting of a custom RISC-V CPU (**PSC_RV32**), PSC-OS, external SDRAM, peripherals, and the **PSC-NPU / SynapEngine** hardware accelerator.
 
-The goal of this guide is to get PSC-ONE running first.
+The recommended procedure is:
 
-For detailed information about the architecture and implementation, see the main [README](../README.md).
+1. Set up the simulation environment and confirm that the CPU tests pass.
+2. Install Gowin EDA.
+3. Create a Tang Nano 20K FPGA project and add the PSC-ONE RTL sources and CST constraints.
+4. Compile the FPGA design.
+5. Prepare an SD card containing `kernel.mem` and `user.mem`.
+6. Connect a UART terminal.
+7. Configure the Tang Nano 20K from Gowin EDA.
+8. Confirm that PSC-OS boots.
+
+The first goal is simply to get the following prompt:
+
+```text
+PSC_OS>
+```
 
 ---
 
-## 1. Hardware
+# 1. Requirements
 
-PSC-ONE currently targets the **Tang Nano 20K** FPGA development board.
+## Hardware
 
-Main components used by PSC-ONE include:
+The minimum hardware required to run PSC-ONE is:
 
 * Tang Nano 20K FPGA board
-* Custom PSC_RV32 RISC-V CPU
-* External SDRAM
-* UART
-* SD card
-* I2S microphone
-* SPI LCD
-* PSC-NPU / SynapEngine matrix accelerator
+* USB cable
+* microSD card
+* PC for Gowin EDA and UART communication
 
-Not all peripherals are required for the basic tests.
+Additional peripherals such as the I2S microphone and LCD are not required for the initial boot test.
 
-For the first test, the Tang Nano 20K and a UART connection are sufficient.
+## Software
+
+The development environment requires:
+
+* Git
+* Make
+* Verilator
+* Python 3
+* cocotb
+* RISC-V GCC toolchain
+* Gowin EDA
+* UART terminal software
+
+A Linux environment is recommended for simulation and software development.
+
+Gowin EDA can be used to synthesize, place-and-route, generate the FPGA bitstream, and configure the Tang Nano 20K.
 
 ---
 
-## 2. Get the Source Code
+# 2. Get the Source Code
 
-Clone the repository:
+Clone the PSC-ONE repository:
 
 ```bash
 git clone https://github.com/QPSC-Design/PSC-ONE.git
 cd PSC-ONE
 ```
 
-The main directory structure is:
+The important directories are approximately:
 
 ```text
 PSC-ONE/
 ├── docs/
 ├── hardware/
 │   ├── rtl/
+│   │   └── top/
+│   │       └── PSC_ONE_Chip.v
 │   └── sim/
 ├── software/
 │   └── os/
 └── README.md
 ```
 
-The `hardware/rtl` directory contains the FPGA RTL implementation.
+The top-level FPGA design is:
 
-The `hardware/sim` directory contains the Verilator/cocotb simulation environment.
+```text
+hardware/rtl/top/PSC_ONE_Chip.v
+```
 
-The `software/os` directory contains PSC-OS and related software.
+PSC-ONE is primarily implemented in Verilog/SystemVerilog.
 
 ---
 
-# 3. Run the CPU Simulation
+# 3. Set Up the Simulation Environment
 
-Before programming the FPGA, the PSC_RV32 CPU can be tested using simulation.
+Before using the FPGA board, first confirm that the PSC_RV32 CPU operates correctly in simulation.
 
 Move to the simulation directory:
 
@@ -77,27 +99,41 @@ Move to the simulation directory:
 cd hardware/sim
 ```
 
-Run the RISC-V CPU tests:
+Set up the environment required by the `Makefile.cpu` family of tests.
 
-```bash
-make -f Makefile.riscv.sim simulate_RISCV_TESTS
+The simulation environment uses tools such as:
+
+```text
+Verilator
+Python
+cocotb
+RISC-V GCC toolchain
+Make
 ```
 
-PSC-ONE uses **Verilator** and **cocotb** for RTL simulation.
+Run the CPU tests provided by the `Makefile.cpu` environment.
 
-The tests execute RISC-V programs on the actual SystemVerilog implementation of the PSC_RV32 CPU.
+The exact target may depend on the current version of the repository, so check the available targets in `Makefile.cpu` and related Makefiles.
 
-A successful test should finish with a PASS result.
+The important point at this stage is that the CPU test suite completes successfully with:
+
+```text
+PASS
+```
+
+Do not proceed to FPGA debugging until the basic CPU tests pass in simulation.
+
+This separates RTL/software problems from FPGA board, pin assignment, SD card, and UART problems.
 
 ---
 
 # 4. Run PSC-OS in Simulation
 
-PSC-OS can also be booted without using the FPGA board.
+It is also recommended to confirm that PSC-OS boots in RTL simulation before programming the FPGA.
 
 From:
 
-```bash
+```text
 hardware/sim
 ```
 
@@ -107,175 +143,429 @@ run:
 make -f Makefile.pscos simulate_PSCOS SIM_FAST=1
 ```
 
-The simulation boots the PSC-ONE SoC and starts PSC-OS.
-
-When PSC-OS has successfully booted, the shell prompt appears:
+A successful boot should eventually display:
 
 ```text
 PSC_OS>
 ```
 
-For example:
-
-```text
-PSC_OS> hello
-Hello world from shell!
-```
-
-This means that the RISC-V CPU, memory system, boot process, and PSC-OS are running together in the RTL simulation.
+If this works, the CPU, memory subsystem, boot sequence, and PSC-OS are operating together in simulation.
 
 ---
 
-# 5. PSC-OS Shell
+# 5. Install Gowin EDA
 
-PSC-OS provides a small interactive shell through UART.
+Download and install **Gowin EDA** from Gowin Semiconductor.
 
-Several built-in commands are available.
+PSC-ONE currently targets the FPGA used on the **Tang Nano 20K** board.
 
-Examples include:
-
-```text
-hello
-primes
-dump
-fat32_info
-fat32_ls
-speech
-micropython
-```
-
-For example:
+Gowin EDA is used for:
 
 ```text
-PSC_OS> hello
-Hello world from shell!
-```
-
-PSC-OS also provides system calls for accessing hardware resources from user programs.
-
-These include:
-
-* UART
-* timer
-* SD card
-* FAT32 filesystem
-* I2S microphone
-* LCD
-* SynapEngine / PSC-NPU
-
----
-
-# 6. Run PSC-ONE on the FPGA
-
-After confirming the basic operation in simulation, PSC-ONE can be synthesized and programmed onto the **Tang Nano 20K** FPGA board.
-
-## 6.1 Download the RTL Source
-
-Clone or download the PSC-ONE repository:
-
-```bash
-git clone https://github.com/QPSC-Design/PSC-ONE.git
-cd PSC-ONE
-```
-
-The FPGA RTL source files are located under:
-
-```text
-hardware/rtl/
-```
-
-PSC-ONE is primarily implemented in SystemVerilog.
-
----
-
-## 6.2 Open the Project in Gowin EDA
-
-Install **Gowin EDA** and open the PSC-ONE FPGA project.
-
-The FPGA design targets the **Tang Nano 20K**, which uses a Gowin FPGA.
-
-The normal FPGA development flow is:
-
-```text
-PSC-ONE RTL
-     |
-     v
-Gowin EDA
-     |
-     v
+RTL
+ |
+ v
 Synthesis
-     |
-     v
+ |
+ v
 Place & Route
-     |
-     v
-Bitstream
-     |
-     v
+ |
+ v
+Bitstream Generation
+ |
+ v
 Tang Nano 20K
 ```
 
-Run synthesis and place-and-route in Gowin EDA to generate the FPGA bitstream.
+Confirm that Gowin EDA and Gowin Programmer can start correctly before creating the FPGA project.
 
 ---
 
-## 6.3 Connect the Tang Nano 20K
+# 6. Create the FPGA Project
 
-Connect the **Tang Nano 20K** to the PC using a USB cable.
+Create a new Gowin EDA project targeting the FPGA device used by the Tang Nano 20K.
 
-The USB connection is used to program the FPGA.
-
-Make sure the board is detected by the PC before starting the programming process.
-
----
-
-## 6.4 Program the FPGA
-
-Open the Gowin Programmer from Gowin EDA.
-
-Select the generated bitstream and program the Tang Nano 20K through the USB connection.
-
-The complete hardware flow is therefore:
+The PSC-ONE top-level module is:
 
 ```text
-Download PSC-ONE
+hardware/rtl/top/PSC_ONE_Chip.v
+```
+
+Set `PSC_ONE_Chip` as the top-level design.
+
+## Add RTL Sources
+
+Add `PSC_ONE_Chip.v` and all RTL modules instantiated below it to the Gowin EDA project.
+
+In other words, Gowin EDA must be able to resolve the complete hierarchy starting from:
+
+```text
+PSC_ONE_Chip
+```
+
+including the CPU, memory controller, peripherals, and other modules used by the current PSC-ONE configuration.
+
+The hierarchy is conceptually:
+
+```text
+PSC_ONE_Chip
+      |
+      +-- PSC_RV32 CPU
+      |
+      +-- Memory / SDRAM
+      |
+      +-- UART
+      |
+      +-- SD interface
+      |
+      +-- Timers / peripherals
+      |
+      +-- PSC-NPU / SynapEngine
+      |
+      +-- other required RTL modules
+```
+
+Make sure that all required `.v` and `.sv` source files are registered in the Gowin EDA project.
+
+If Gowin reports an unresolved or undefined module during synthesis, check whether the corresponding RTL source file has been added to the project.
+
+## Configure the PLL
+
+PSC-ONE requires a PLL generated by **Gowin EDA**.
+
+The PLL instance used by the FPGA design is referenced from:
+
+```text
+hardware/rtl/top/PSC_ONE_Chip.v
+```
+
+The PLL IP must be created in the Gowin EDA project before the design can be synthesized successfully.
+
+For the **Tang Nano 20K**, configure the PLL with the following clock frequencies:
+
+```text
+Input clock  : 27 MHz
+System clock : 80 MHz
+```
+
+The 27 MHz clock provided by the Tang Nano 20K is used as the PLL reference clock, and the PLL generates the **80 MHz PSC-ONE system clock**.
+
+The basic clock structure is:
+
+```text
+Tang Nano 20K
+   27 MHz
+      |
+      v
+  Gowin PLL
+      |
+      +------> 80 MHz System Clock
+      |
+      +------> SDRAM Clock
+```
+
+### SDRAM Clock Phase
+
+The SDRAM clock must use a phase shift relative to the main PSC-ONE system clock.
+
+The required phase setting is documented in the comments inside:
+
+```text
+hardware/rtl/top/PSC_ONE_Chip.v
+```
+
+When configuring the PLL in Gowin EDA, set the SDRAM clock output phase according to the value specified in those comments.
+
+Do not simply use the same phase as the 80 MHz system clock.
+
+The intended clock relationship is:
+
+```text
+27 MHz input
+     |
+     v
+  Gowin PLL
+     |
+     +---- 80 MHz ----> PSC-ONE logic
+     |
+     +---- 80 MHz
+           + phase shift ----> SDRAM
+```
+
+The phase shift is required to provide the appropriate timing relationship between the FPGA logic and the external SDRAM.
+
+Because the required phase may change together with the RTL implementation, **`PSC_ONE_Chip.v` should be treated as the authoritative source for the SDRAM phase setting**.
+
+### Add the PLL to the Gowin Project
+
+After generating the PLL IP in Gowin EDA:
+
+1. Add the generated PLL module to the FPGA project.
+2. Make sure the module name and ports match the PLL instance in `PSC_ONE_Chip.v`.
+3. Confirm that the PLL input is configured for **27 MHz**.
+4. Confirm that the PSC-ONE system clock output is **80 MHz**.
+5. Configure the SDRAM clock output with the phase shift specified in the comments in `PSC_ONE_Chip.v`.
+
+If the PLL module is missing or incorrectly configured, Gowin synthesis may fail, or PSC-ONE may compile but fail to operate correctly on the FPGA.
+
+## Prepare the FPGA Boot ROM Files
+
+When booting PSC-ONE on the FPGA, the BootLoader ROM in:
+
+```text
+hardware/rtl/.../PSC_ONE_Boot_axi.v
+```
+
+must use the FAT32 bootloader image.
+
+In `PSC_ONE_Boot_axi.v`, locate the BootLoader ROM module:
+
+```verilog
+//------- BootLoader ROM module -------
+// bootloader.mem
+module boot_loader_rom #(
+    parameter integer ADDR_WIDTH = 13
+)(
+    input  wire                  clock,
+    input  wire [ADDR_WIDTH-1:0] addr,
+    output reg  [31:0]           dout
+);
+    localparam integer ROM_WORD = 4500;  // 固定値にしないとFPGA内でROMと認識されない.
+    reg [31:0] Boot_Loader_rom [0:ROM_WORD-1];
+    initial $readmemh("mem/bootloader.mem", Boot_Loader_rom);
+
+    always @(posedge clock) begin
+        if (addr > ROM_WORD)
+            dout <= 32'd0;
+        else
+            dout <= Boot_Loader_rom[addr];
+    end
+endmodule
+```
+
+and change the ROM initialization file from:
+
+```verilog
+initial $readmemh("mem/bootloader.mem", Boot_Loader_rom);
+```
+
+to:
+
+```verilog
+initial $readmemh("mem/bootloader_fat32.mem", Boot_Loader_rom);
+```
+
+The FPGA build must therefore use `bootloader_fat32.mem`, not `bootloader.mem`, for the BootLoader ROM.
+
+### Generate `bootloader_fat32.mem` and `bootrom.mem`
+
+The required FPGA boot ROM files are generated under:
+
+```text
+hardware/bootloader/
+```
+
+Move to that directory and use its `Makefile` to generate the boot images:
+
+```bash
+cd hardware/bootloader
+make
+```
+
+Confirm that the build produces at least:
+
+```text
+bootloader_fat32.mem
+bootrom.mem
+```
+
+These files are part of the FPGA boot configuration and must be generated before compiling the Gowin project.
+
+### Add the Boot ROM Files to the Gowin Project
+
+Register the generated files in the FPGA project so that Gowin EDA can find them during synthesis:
+
+```text
+bootloader_fat32.mem
+bootrom.mem
+```
+
+Also make sure the project file layout or search path matches the paths used by `$readmemh(...)` in the RTL. In particular, `PSC_ONE_Boot_axi.v` must be able to resolve:
+
+```text
+mem/bootloader_fat32.mem
+```
+
+If the `.mem` file is missing or the path does not match, synthesis may succeed incorrectly or the FPGA may fail to boot PSC-OS.
+
+## Add the CST File
+
+Add the PSC-ONE **CST constraint file** to the Gowin EDA project.
+
+The CST file defines the FPGA pin assignments and I/O configuration required by the Tang Nano 20K board.
+
+Without the correct CST constraints, interfaces such as UART, SD card, SDRAM, LEDs, and other external signals will not be connected to the correct FPGA pins.
+
+Make sure the CST file matches the current PSC-ONE hardware configuration.
+
+---
+
+# 7. Compile PSC-ONE with Gowin EDA
+
+After registering the RTL source files and CST constraints, compile the project in Gowin EDA.
+
+The normal process is:
+
+```text
+PSC_ONE_Chip.v
        |
        v
-Open FPGA project in Gowin EDA
-       |
-       v
-Synthesize RTL
+   Synthesis
        |
        v
 Place & Route
        |
        v
-Generate Bitstream
-       |
-       v
-Connect Tang Nano 20K via USB
-       |
-       v
-Program FPGA
+Bitstream Generation
 ```
 
-After programming is complete, the custom **PSC_RV32 RISC-V CPU** and the rest of the PSC-ONE SoC are implemented in the FPGA.
+Check the Gowin EDA output for errors.
+
+Warnings may exist, but synthesis and place-and-route must complete successfully before programming the FPGA.
+
+It is also useful to check the timing report and confirm that the generated design satisfies the clock requirements of the current PSC-ONE configuration.
+
+After successful compilation, Gowin EDA generates the bitstream used to configure the FPGA.
 
 ---
 
-## 6.5 Start PSC-OS
+# 8. Prepare the SD Card
 
-Connect to PSC-ONE through UART and open a serial terminal on the PC.
+PSC-ONE loads its software from a microSD card.
 
-PSC-OS communicates with the host PC through UART.
+Prepare a microSD card and format it as:
 
-After PSC-ONE boots successfully, the following prompt should appear:
+```text
+FAT32
+```
+
+Copy the following files to the **root directory** of the SD card:
+
+```text
+kernel.mem
+user.mem
+```
+
+The SD card should therefore look approximately like:
+
+```text
+/
+├── kernel.mem
+└── user.mem
+```
+
+Additional files can be added later for PSC-OS and MicroPython experiments.
+
+Insert the prepared microSD card into the Tang Nano 20K before booting PSC-ONE.
+
+The names and locations of `kernel.mem` and `user.mem` are important because the PSC-ONE boot process expects to find these files on the FAT32 filesystem.
+
+---
+
+# 9. Connect the UART Terminal
+
+PSC-OS uses UART as its primary console.
+
+Connect the Tang Nano 20K to the PC and start a UART terminal application.
+
+On Windows, any standard serial terminal application capable of communicating with the board's UART can be used.
+
+Select the COM port corresponding to the Tang Nano 20K UART interface and configure the terminal using the UART settings required by the current PSC-ONE build.
+
+If no output appears after configuring the FPGA, first check:
+
+* Correct COM port
+* UART settings
+* USB connection
+* FPGA configuration
+* SD card
+* `kernel.mem`
+* `user.mem`
+
+Keep the UART terminal open while configuring or resetting the FPGA so that the boot messages can be observed.
+
+---
+
+# 10. Configure the Tang Nano 20K
+
+Connect the Tang Nano 20K to the PC through USB.
+
+Open **Gowin Programmer** from Gowin EDA.
+
+Select the bitstream generated by the FPGA compilation process and configure the Tang Nano 20K.
+
+The complete procedure is:
+
+```text
+Run CPU simulation tests
+          |
+          v
+       PASS
+          |
+          v
+Install Gowin EDA
+          |
+          v
+Create Tang Nano 20K project
+          |
+          v
+Add PSC_ONE_Chip.v
+and dependent RTL sources
+          |
+          v
+Add CST constraints
+          |
+          v
+Synthesis
+          |
+          v
+Place & Route
+          |
+          v
+Generate Bitstream
+          |
+          v
+Prepare FAT32 SD card
+          |
+          +-- kernel.mem
+          |
+          +-- user.mem
+          |
+          v
+Open UART terminal
+          |
+          v
+Configure Tang Nano 20K
+          |
+          v
+       PSC-OS
+```
+
+After configuration, PSC-ONE should begin executing on the FPGA.
+
+---
+
+# 11. Confirm PSC-OS Boot
+
+Watch the UART terminal.
+
+If PSC-ONE boots successfully, the PSC-OS shell prompt should appear:
 
 ```text
 PSC_OS>
 ```
 
-Try:
+Try the `hello` command:
 
 ```text
 PSC_OS> hello
@@ -287,12 +577,29 @@ Expected output:
 Hello world from shell!
 ```
 
-At this point, PSC-ONE is running PSC-OS on the custom PSC_RV32 processor implemented entirely inside the FPGA.
+At this point, the complete basic PSC-ONE system is running:
 
+```text
+Tang Nano 20K
+      |
+      v
+PSC-ONE FPGA SoC
+      |
+      v
+PSC_RV32 RISC-V CPU
+      |
+      v
+    PSC-OS
+      |
+      v
+ UART Shell
+```
+
+This confirms that the FPGA configuration, custom RISC-V CPU, memory subsystem, SD-card boot path, and PSC-OS are working together.
 
 ---
 
-# 7. Start MicroPython
+# 12. Start MicroPython
 
 PSC-OS includes a minimal MicroPython environment.
 
@@ -302,26 +609,24 @@ From the PSC-OS shell:
 PSC_OS> micropython
 ```
 
-The MicroPython REPL will start.
+The MicroPython REPL should start.
 
-You can then execute normal Python expressions:
+For example:
 
 ```python
 >>> 1 + 2
 3
 ```
 
-PSC-ONE also provides the `psc` module for accessing hardware functions.
-
-For example:
+PSC-ONE also provides the `psc` module:
 
 ```python
 >>> import psc
 ```
 
-The module provides interfaces to PSC-ONE hardware and PSC-OS services.
+The module provides access to PSC-ONE hardware and PSC-OS services.
 
-Examples include:
+For example:
 
 ```python
 psc.fat32_ls()
@@ -332,82 +637,61 @@ psc.timer_start(...)
 psc.timer_stop(...)
 ```
 
-This allows hardware implemented in the FPGA to be controlled directly from MicroPython.
+This makes it possible to control FPGA hardware directly from MicroPython running on the custom PSC_RV32 CPU.
 
 ---
 
-# 8. SynapEngine / PSC-NPU
+# 13. Troubleshooting
 
-PSC-ONE contains a matrix-processing accelerator called **SynapEngine**.
+If PSC-ONE does not boot, check the system step by step rather than debugging everything at once.
 
-SynapEngine can be accessed from PSC-OS and MicroPython.
+## CPU simulation fails
 
-Conceptually, the software executes:
+Confirm that:
 
-```text
-Application
-    |
-    v
-PSC-OS / MicroPython
-    |
-    v
-PSC-NPU API
-    |
-    v
-SynapEngine
-    |
-    v
-FPGA hardware
-```
+* Verilator is installed.
+* Python and cocotb are installed.
+* The RISC-V toolchain is available.
+* The required environment variables and paths are configured.
+* The `Makefile.cpu` tests pass.
 
-This makes it possible to compare software matrix operations running on PSC_RV32 with hardware-accelerated operations running on SynapEngine.
+## Gowin synthesis fails
 
----
+Check that:
 
-# 9. Speech Recognition Demo
+* `PSC_ONE_Chip.v` is set as the top-level design.
+* All instantiated RTL modules are registered in the project.
+* Both `.v` and `.sv` files required by the design are included.
+* The correct CST file is registered.
+* The correct Tang Nano 20K FPGA device is selected.
 
-PSC-ONE can also perform a small speech-recognition demonstration.
+## FPGA configures but PSC-OS does not start
 
-The system uses:
+Check:
 
-```text
-I2S Microphone
-      |
-      v
-   PSC-ONE
-      |
-      v
-Feature Extraction
-      |
-      v
-PSC-NPU / SynapEngine
-      |
-      v
-Neural Network
-      |
-      v
-Recognition Result
-```
+* SD card is inserted.
+* SD card is FAT32 formatted.
+* `kernel.mem` exists in the root directory.
+* `user.mem` exists in the root directory.
+* The correct FPGA bitstream was programmed.
+* UART is connected to the correct COM port.
+* UART settings match PSC-ONE.
 
-The demonstration performs the entire recognition pipeline using the PSC-ONE FPGA platform.
+## UART output is unreadable
 
-From PSC-OS, the speech-recognition function can be started with:
+Incorrect UART settings are a common cause of garbled output.
 
-```text
-PSC_OS> speech
-```
-
-The I2S microphone captures audio, PSC-ONE processes the input, and the neural network produces the recognition result.
+Check the baud rate and other serial settings against the current PSC-ONE RTL configuration.
 
 ---
 
-# 10. Where to Go Next
+# 14. Where to Go Next
 
-Once the basic system is running, the following areas are good starting points for exploring PSC-ONE:
+Once the basic system is running, PSC-ONE can be explored at several levels.
 
 **CPU**
 
-Study the PSC_RV32 RISC-V CPU implementation in:
+Study and modify the PSC_RV32 RISC-V CPU implementation under:
 
 ```text
 hardware/rtl/
@@ -415,7 +699,7 @@ hardware/rtl/
 
 **Simulation**
 
-Run and modify the Verilator/cocotb tests in:
+Run and modify the Verilator/cocotb test environment under:
 
 ```text
 hardware/sim/
@@ -423,7 +707,7 @@ hardware/sim/
 
 **Operating System**
 
-Explore PSC-OS in:
+Explore PSC-OS under:
 
 ```text
 software/os/
@@ -431,15 +715,22 @@ software/os/
 
 **MicroPython**
 
-Start the MicroPython REPL from PSC-OS and experiment with the `psc` hardware interface.
+Start MicroPython from PSC-OS and experiment with the `psc` module.
 
-**Hardware Acceleration**
+**SynapEngine / PSC-NPU**
 
-Experiment with SynapEngine / PSC-NPU and compare hardware-accelerated matrix operations with software execution.
+Use the hardware matrix accelerator and compare its execution with software running on PSC_RV32.
 
-**Speech Recognition**
+**Peripherals**
 
-Connect an I2S microphone and run the speech-recognition demonstration.
+PSC-ONE also provides interfaces for experimenting with hardware such as:
+
+* SD card / FAT32
+* I2S microphone
+* SPI LCD
+* timers
+* UART
+* SynapEngine / PSC-NPU
 
 ---
 
@@ -447,18 +738,27 @@ Connect an I2S microphone and run the speech-recognition demonstration.
 
 PSC-ONE is intended as an experimental platform for exploring the complete stack of a small computer system:
 
+<img src="images/PSC-ONE_board.jpg" width="600">
+
 ```text
 Application
      |
+     v
 MicroPython / C
      |
+     v
    PSC-OS
      |
- Custom RISC-V CPU
+     v
+PSC_RV32 RISC-V CPU
      |
+     v
 FPGA SoC + Hardware Accelerators
      |
-    FPGA
+     v
+Tang Nano 20K
 ```
 
-Because the CPU, operating system, peripherals, and hardware accelerators are developed together, PSC-ONE can be used to experiment with both software and hardware at every level of the system.
+The CPU, operating system, peripherals, and hardware accelerators are developed together.
+
+Once the `PSC_OS>` prompt appears on the UART terminal, the basic PSC-ONE environment is ready for experimentation.

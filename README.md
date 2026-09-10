@@ -770,6 +770,7 @@ python3 fst_viewer.py trace.fst
 The default web interface runs on `127.0.0.1:8000`. If the port is already in use, the viewer automatically searches for the next available port.
 
 FST Viewer is intended to make PSC_RV32 CPU development and verification easier by providing a higher-level view of processor execution than conventional waveform inspection alone.
+
 ------------------------------------------------------------------------
 
 # Development Status
