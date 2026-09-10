@@ -20,6 +20,10 @@ extern "C" {
  * タイマー開始
  * ------------------------------------------------------------ */
 void timer_start(uint32_t reload);
+/* Idle-timer-only stopwatch. end returns total ms, or -1 if unavailable. */
+int timer_measure_begin(void);
+int timer_measure_end(void);
+int timer_measure_irq(void);
 
 
 /* ------------------------------------------------------------

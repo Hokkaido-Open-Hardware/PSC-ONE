@@ -6,11 +6,30 @@
 #include "timer_api.h"
 #include "mic_api.h"
 #include "led_api.h"
+#include "lcd_api.h"
+#include "jpeg_display.h"
 #include "speech_recognition_api.h"
 
 #ifndef PIO32_ADDR
 #define PIO32_ADDR (*(volatile uint32_t *)0x10001000)
 #endif
+
+/* Validate every Sv32 page before dereferencing a user rectangle.
+   Current OS uses level-0 4KiB user mappings only. */
+static int lcd_user_readable(uint32_t address, uint32_t bytes)
+{
+    if (!current_proc || !bytes || address < USER_BASE ||
+        address >= USER_STACK_TOP || bytes > USER_STACK_TOP - address) return 0;
+    uint32_t end = address + bytes - 1;
+    for (uint32_t va = address & ~(PAGE_SIZE - 1); ; va += PAGE_SIZE) {
+        uint32_t pte = current_proc->page_table[va >> 22];
+        if (!(pte & PAGE_V) || (pte & (PAGE_R | PAGE_W | PAGE_X))) return 0;
+        uint32_t *table = (uint32_t *)((pte >> 10) << 12);
+        pte = table[(va >> 12) & 1023];
+        if ((pte & (PAGE_V | PAGE_U | PAGE_R)) != (PAGE_V | PAGE_U | PAGE_R)) return 0;
+        if (va == (end & ~(PAGE_SIZE - 1))) return 1;
+    }
+}
 
 void handle_syscall(struct trap_frame *f) {
     switch (f->a3) {
@@ -104,6 +123,30 @@ void handle_syscall(struct trap_frame *f) {
         break;
     }
 
+    case SYS_LCD_RGB888_BEGIN:
+        f->a0 = lcd_begin_rgb888();
+        break;
+    case SYS_LCD_RGB888_RECT: {
+        uint32_t width = f->a2, height = f->a4;
+        if (!width || width > 16 || !height || height > 16 ||
+            f->a0 >= JPEG_LCD_WIDTH || f->a1 >= JPEG_LCD_HEIGHT || width > JPEG_LCD_WIDTH - f->a0 ||
+            height > JPEG_LCD_HEIGHT - f->a1 || !lcd_user_readable(f->a5, width * height * 3)) {
+            f->a0 = (uint32_t)-1;
+            break;
+        }
+        /* Small snapshot: no retained user pointer, no framebuffer. */
+        uint8_t rgb[16 * 16 * 3];
+        memcpy(rgb, (const void *)f->a5, width * height * 3);
+        f->a0 = lcd_write_rgb888_rect(f->a0, f->a1, width, height, rgb);
+        break;
+    }
+
+    case SYS_TIMER_MEASURE_BEGIN:
+        f->a0 = timer_measure_begin();
+        break;
+    case SYS_TIMER_MEASURE_END:
+        f->a0 = timer_measure_end();
+        break;
     case SYS_TIMER_START:
         timer_start(f->a0);
         break;

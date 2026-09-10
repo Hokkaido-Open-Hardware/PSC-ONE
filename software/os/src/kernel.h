@@ -131,3 +131,5 @@ void delay(void);
 void proc_a_entry(void);
 void proc_b_entry(void);
 void run_multitask_dummy_test(void);
+
+void enable_machine_timer_trap(void);

@@ -753,3 +753,25 @@ void start(void) {
         : [stk] "r"(__user_stack_top)
     );
 }
+int call_lcd_rgb888_begin(void)
+{
+    return (int)sd_api(SYS_LCD_RGB888_BEGIN, 0);
+}
+
+int call_lcd_rgb888_rect(uint32_t x, uint32_t y, uint32_t width,
+                        uint32_t height, const uint8_t *rgb)
+{
+    /* Existing ABI: a3 is syscall number, remaining arguments a0/a1/a2/a4/a5. */
+    register uint32_t a0 __asm__("a0") = x;
+    register uint32_t a1 __asm__("a1") = y;
+    register uint32_t a2 __asm__("a2") = width;
+    register uint32_t a3 __asm__("a3") = SYS_LCD_RGB888_RECT;
+    register uint32_t a4 __asm__("a4") = height;
+    register uint32_t a5 __asm__("a5") = (uint32_t)rgb;
+    __asm__ __volatile__("ecall" : "+r"(a0)
+        : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5) : "memory");
+    return (int)a0;
+}
+
+int call_timer_measure_begin(void) { return (int)sd_api(SYS_TIMER_MEASURE_BEGIN, 0); }
+int call_timer_measure_end(void) { return (int)sd_api(SYS_TIMER_MEASURE_END, 0); }

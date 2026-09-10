@@ -552,3 +552,10 @@ The project encourages inspection, modification, experimentation, and contributi
 PSC-OS is operational on the PSC-ONE FPGA SoC, but it remains an experimental operating system.
 
 Kernel interfaces, system calls, memory organization, device drivers, and application APIs may change as development continues.
+## PSC-OS JPEG display
+
+For the `jpeg TEST.JPG` command, initialize dependencies with
+`git submodule update --init --recursive`, then follow the
+[Phase 1 build, SD-card setup and test instructions](os/README.md).
+The TJpgDec decoder is a pinned submodule; its PSC configuration and adapters
+live outside the submodule.

@@ -41,6 +41,8 @@
 #define SYS_TIMER_IS_RUNNING      75
 #define SYS_TIMER_WAIT_US         76
 #define SYS_TIMER_WAIT_MS         77
+#define SYS_TIMER_MEASURE_BEGIN   78
+#define SYS_TIMER_MEASURE_END     79
 
 // --- LED ---
 
@@ -55,6 +57,8 @@
 // --- LCD ---
 #define SYS_LCD_INIT              90
 #define SYS_LCD_FILL_RGB          91
+#define SYS_LCD_RGB888_BEGIN      92
+#define SYS_LCD_RGB888_RECT       93
 
 // --- SYSTEM ---
 #define SYS_EXIT                  100

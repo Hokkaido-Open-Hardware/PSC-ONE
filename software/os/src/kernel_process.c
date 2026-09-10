@@ -209,8 +209,10 @@ void schedule_from_machine_trap(struct machine_context *context)
     );
 }
 
-void preemption_start(void)
+void enable_machine_timer_trap(void)
 {
+    static int installed;
+    if (installed) return;
     register uint32_t handler __asm__("a0") =
         (uint32_t)machine_trap_entry;
     register uint32_t machine_sp __asm__("a1") =
@@ -222,6 +224,12 @@ void preemption_start(void)
                          : "+r"(handler), "+r"(machine_sp), "+r"(extension)
                          :
                          : "memory");
+    installed = 1;
+}
+
+void preemption_start(void)
+{
+    enable_machine_timer_trap();
     preemption_ticks = 0u;
     preemption_active = 1u;
     timer_start_scheduler_tick();

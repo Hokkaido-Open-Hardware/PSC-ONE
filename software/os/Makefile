@@ -132,10 +132,35 @@ endif
 
 # PSC-OS user shell sources.
 # MicroPython is linked as an embedded static library.
+TJPGD_DIR := third_party/tjpgd
+TJPGD_BUILD := $(Build)/tjpgd
+JPEG_DIR := $(Src)/jpeg
+JPEG_SRCS := $(Src)/fat32_stream.c $(JPEG_DIR)/jpeg_view.c \
+             $(JPEG_DIR)/jpeg_headers.c $(JPEG_DIR)/tjpgd_port.c $(TJPGD_BUILD)/tjpgd.c
+JPEG_HEADERS := $(wildcard $(JPEG_DIR)/*.h) $(Src)/fat32.h $(Src)/jpeg_display.h
+JPEG_CPPFLAGS := -I$(Src) -I$(TJPGD_BUILD) -I../micropython/ports/psc/libc
+
+# Upstream uses a quoted, adjacent tjpgdcnf.h. -I alone cannot override it.
+# Build-directory symlinks select the PSC config without modifying/copying
+# upstream sources into this repository. Relative links also support Build=.
+$(TJPGD_DIR)/src/tjpgd.c $(TJPGD_DIR)/src/tjpgd.h:
+	@echo "TJpgDec missing: run git submodule update --init --recursive" >&2
+	@exit 1
+
+$(TJPGD_BUILD)/.ready: $(TJPGD_DIR)/src/tjpgd.c $(TJPGD_DIR)/src/tjpgd.h $(JPEG_DIR)/tjpgdcnf.h
+	mkdir -p $(TJPGD_BUILD)
+	ln -sf "$$(realpath --relative-to=$(TJPGD_BUILD) $(TJPGD_DIR)/src/tjpgd.c)" $(TJPGD_BUILD)/tjpgd.c
+	ln -sf "$$(realpath --relative-to=$(TJPGD_BUILD) $(TJPGD_DIR)/src/tjpgd.h)" $(TJPGD_BUILD)/tjpgd.h
+	ln -sf "$$(realpath --relative-to=$(TJPGD_BUILD) $(JPEG_DIR)/tjpgdcnf.h)" $(TJPGD_BUILD)/tjpgdcnf.h
+	touch $@
+
+$(TJPGD_BUILD)/tjpgd.c $(TJPGD_BUILD)/tjpgd.h $(TJPGD_BUILD)/tjpgdcnf.h: $(TJPGD_BUILD)/.ready
+
 SRCS_USER := \
 	$(Src)/shell.c \
 	$(Src)/user.c \
-	$(Src)/fat32.c
+	$(Src)/fat32.c \
+	$(JPEG_SRCS)
 
 SIM_USER ?= full
 ifeq ($(SIM_USER),minimal)
@@ -145,7 +170,7 @@ ifeq ($(SIM_USER),minimal)
   USER_OBJCOPY_FLAGS =
 else ifeq ($(SIM_USER),full)
   USER_SRCS = $(SRCS_USER)
-  USER_DEPS = $(SRCS_USER) $(MICROPY_LIB)
+  USER_DEPS = $(SRCS_USER) $(MICROPY_LIB) $(JPEG_HEADERS) $(TJPGD_BUILD)/.ready $(Src)/user.ld $(Src)/user.h $(Src)/syscall.h
   USER_LIBS = $(MICROPY_LIB) $(LIBM) $(LIBC)
   USER_OBJCOPY_FLAGS = --set-section-flags .bss=alloc,contents
 else
@@ -162,6 +187,7 @@ SRCS_KERNEL := \
 	$(Src)/synap_api.c \
 	$(Src)/sdcard_api.c \
 	$(Src)/timer_api.c \
+	$(Src)/timer_measure.c \
 	$(Src)/mic_api.c \
 	$(Src)/lcd_api.c \
 	$(Src)/led_api.c \
@@ -336,7 +362,7 @@ $(USER_ELF): \
 	$(USER_DEPS) \
 	$(Build)/divmodsi3.o
 
-	$(CC) $(CFLAGS) $(DUSERBASE) $(DEFUSERBASE) \
+	$(CC) $(CFLAGS) $(JPEG_CPPFLAGS) $(DUSERBASE) $(DEFUSERBASE) \
 		$(LDFLAGS_USER) \
 		-o $@ \
 		$(USER_SRCS) \
@@ -389,6 +415,7 @@ endif
 $(KERNEL_ELF): \
 	$(Build) \
 	$(SRCS_KERNEL) \
+	$(wildcard $(Src)/*.h) $(Src)/kernel_fpga.ld \
 	$(USER_BIN) \
 	$(Build)/divmodsi3.o
 

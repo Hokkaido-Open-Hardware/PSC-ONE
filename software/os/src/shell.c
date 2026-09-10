@@ -1,6 +1,7 @@
 // shell.c
 #include "user.h"
 #include "fat32.h"
+#include "jpeg/jpeg_view.h"
 
 // micropythonを含めるとSIM時間が長すぎる場合のオプション
 //#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
@@ -319,6 +320,23 @@ prompt:
             if (fat32_touch(argv[1]) != 0) {
                 printf("fat32_touch failed\n");
             } 
+
+        // ---- JPEG disp LCD ----
+        } else if (strcmp(argv[0], "jpeg") == 0) {
+            if (argc != 2) {
+                printf("usage: jpeg TEST.JPG\n");
+                goto prompt;
+            }
+            printf("JPEG start\n");
+            int timing = call_timer_measure_begin();
+            int jpeg_result = jpeg_view(argv[1]);
+            int elapsed_ms = timing == 0 ? call_timer_measure_end() : -1;
+            if (jpeg_result) printf("JPEG error: %s\n", jpeg_error_string(jpeg_result));
+            else printf("decode OK\n");
+            if (elapsed_ms >= 0) printf("time: %d ms\n", elapsed_ms);
+            else printf("time: unavailable (timer busy)\n");
+
+        // ---- 音声認識デモ ----
         } else if (strcmp(argv[0], "speech") == 0) {
             cmd_speech();
                     
@@ -336,6 +354,7 @@ prompt:
         } else if (strcmp(argv[0], "help") == 0) {
             printf("commands:\n");
             printf("  microPython | micropython\n");
+            printf("  jpeg TEST.JPG\n");
             printf("  hello\n");
             printf("  dump [addr] [len]\n");
             printf("  primes [max]\n");

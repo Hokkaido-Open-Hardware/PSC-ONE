@@ -1,4 +1,5 @@
 #include "lcd_api.h"
+#include "jpeg_display.h"
 #include "font.h"
 #include "boot_logo.h"
 #include "kernel.h"
@@ -18,7 +19,7 @@ static inline void tiny_delay(unsigned n){
 // ============================================================
 // tft_write
 // ============================================================
-void tft_write(uint32_t data, uint32_t wait)
+static int tft_write_checked(uint32_t data, uint32_t wait)
 {
     uint32_t tft_reset = 0x01;
 
@@ -26,8 +27,7 @@ void tft_write(uint32_t data, uint32_t wait)
     uint32_t timeout = 100000u;
     while ((PSC_LCD_PIXS_ST & 0x01) == 0x00) {
         if (--timeout == 0u) {
-            s_printf("spi_idle TIMEOUT\n");
-            return;
+            return -1;
         }
         __asm__ volatile("nop");
     }
@@ -35,6 +35,12 @@ void tft_write(uint32_t data, uint32_t wait)
     PSC_LCD_PIXS_ST     = 0x01 | (tft_reset << 1);
 
     tiny_delay(wait);
+    return 0;
+}
+
+void tft_write(uint32_t data, uint32_t wait)
+{
+    if (tft_write_checked(data, wait)) s_printf("spi_idle TIMEOUT\n");
 }
 
 // ============================================================
@@ -314,65 +320,56 @@ static void lcd_write_rgb(
 // lcd_set_window
 // 描画範囲設定
 // ============================================================
-static void lcd_set_window(
-    uint32_t x_start,
-    uint32_t y_start,
-    uint32_t x_end,
-    uint32_t y_end
-)
+static int lcd_set_window(
+    uint32_t x_start, uint32_t y_start, uint32_t x_end, uint32_t y_end)
 {
-    // Column Address Set
-    tft_write(0x02A, 100);
-
-    tft_write(
-        0x100 | ((x_start >> 8) & 0xFF),
-        100
-    );
-
-    tft_write(
-        0x100 | (x_start & 0xFF),
-        100
-    );
-
-    tft_write(
-        0x100 | ((x_end >> 8) & 0xFF),
-        100
-    );
-
-    tft_write(
-        0x100 | (x_end & 0xFF),
-        100
-    );
-
-
-    // Row Address Set
-    tft_write(0x02B, 100);
-
-    tft_write(
-        0x100 | ((y_start >> 8) & 0xFF),
-        100
-    );
-
-    tft_write(
-        0x100 | (y_start & 0xFF),
-        100
-    );
-
-    tft_write(
-        0x100 | ((y_end >> 8) & 0xFF),
-        100
-    );
-
-    tft_write(
-        0x100 | (y_end & 0xFF),
-        100
-    );
-
-
-    // Memory Write
-    tft_write(0x02C, 100);
+    const uint32_t words[] = {
+        0x02A, 0x100 | (x_start >> 8), 0x100 | (x_start & 255),
+        0x100 | (x_end >> 8), 0x100 | (x_end & 255),
+        0x02B, 0x100 | (y_start >> 8), 0x100 | (y_start & 255),
+        0x100 | (y_end >> 8), 0x100 | (y_end & 255), 0x02C
+    };
+    for (unsigned i = 0; i < sizeof(words) / sizeof(words[0]); i++)
+        if (tft_write_checked(words[i], 100)) return -1;
+    return 0;
 }
 
+/* Explicit boot-logo landscape state, independent of text scroll state.
+   MV exchanges axes in hardware: CASET still takes x, PASET still takes y.
+   Scroll area remains the panel's native 480 rows even with MV set.
+   Colour order and IPS inversion remain identical to lcd_write_rgb(). */
+int lcd_begin_rgb888(void)
+{
+    const uint32_t words[] = {
+        0x03A, 0x166, 0x036, 0x100 | JPEG_LCD_MADCTL,
+        0x033, 0x100, 0x100, 0x101, 0x1E0, 0x100, 0x100,
+        0x037, 0x100, 0x100
+    };
+    for (unsigned i = 0; i < sizeof(words) / sizeof(words[0]); i++)
+        if (tft_write_checked(words[i], 100)) return -1;
+    lcd_scroll_y = 0;
+    lcd_cursor_x = lcd_cursor_y = 0;
+    return 0;
+}
+
+int lcd_write_rgb888_rect(uint32_t x, uint32_t y, uint32_t width,
+                         uint32_t height, const uint8_t *rgb)
+{
+    if (!rgb || !width || !height || x >= JPEG_LCD_WIDTH || y >= JPEG_LCD_HEIGHT ||
+        width > JPEG_LCD_WIDTH - x || height > JPEG_LCD_HEIGHT - y ||
+        width > 16 || height > 16) return -1;
+    if (lcd_set_window(x, y, x + width - 1, y + height - 1)) return -1;
+    for (uint32_t i = 0; i < width * height * 3; i++) {
+        uint32_t value = rgb[i];
+        if (IPS_MODE == 1) value = 255 - value;
+        if (tft_write_checked(0x100 | value, 10)) return -1;
+    }
+    /* Include completion of the final byte in this synchronous syscall. */
+    uint32_t timeout = 100000u;
+    while (!(PSC_LCD_PIXS_ST & 1u))
+        if (--timeout == 0) return -1;
+    return 0;
+}
 
 // ============================================================
 // lcd_draw_char

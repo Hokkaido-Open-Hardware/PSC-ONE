@@ -1,5 +1,7 @@
 // user.h
 #pragma once
+#include <stdint.h>
+#include <stddef.h>
 
 #ifndef USER_BASE
 #define USER_BASE 0x00400000u
@@ -12,22 +14,20 @@ void uart_init(void);
 #endif
 
 typedef int bool;
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
-typedef unsigned long long uint64_t;
-typedef uint32_t size_t;
-typedef uint32_t uintptr_t;
 typedef uint32_t paddr_t;
 typedef uint32_t vaddr_t;
 
 #define true  1
 #define false 0
+#ifndef NULL
 #define NULL  ((void *) 0)
+#endif
 
 #define align_up(value, align)   __builtin_align_up(value, align)
 #define is_aligned(value, align) __builtin_is_aligned(value, align)
+#ifndef offsetof
 #define offsetof(type, member)   __builtin_offsetof(type, member)
+#endif
 
 #define va_list  __builtin_va_list
 #define va_start __builtin_va_start
@@ -83,3 +83,10 @@ int parse_hex(const char *s, uintptr_t *out);
 uint32_t poll_switch_api(void);
 void printf(const char *fmt, ...);
 __attribute__((noreturn)) void exit(void);
+
+int call_lcd_rgb888_begin(void);
+int call_lcd_rgb888_rect(uint32_t x, uint32_t y, uint32_t width,
+                        uint32_t height, const uint8_t *rgb);
+
+int call_timer_measure_begin(void);
+int call_timer_measure_end(void);

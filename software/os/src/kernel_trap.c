@@ -106,6 +106,7 @@ void machine_trap_entry(void) {
 __attribute__((used)) void handle_machine_trap(struct machine_context *context)
 {
     if (context->mcause == MCAUSE_TIMER_IRQ) {
+        if (timer_measure_irq()) return;
         schedule_from_machine_trap(context);
         timer_clear_scheduler_irq();
         return;
