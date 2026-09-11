@@ -9,6 +9,6 @@
 	path = hardware/sim/yosys
 	url = https://github.com/YosysHQ/yosys.git
 [submodule "software/os/third_party/tjpgd"]
-        path = software/os/third_party/tjpgd
-        url = https://github.com/Bodmer/TJpg_Decoder.git
+	path = software/os/third_party/tjpgd
+	url = https://github.com/Bodmer/TJpg_Decoder.git
 
