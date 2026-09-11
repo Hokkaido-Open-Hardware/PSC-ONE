@@ -1,5 +1,22 @@
 # How to Use
 
+## CoreMark
+
+```bash
+# リポジトリのルートでsubmoduleを取得
+git submodule update --init --recursive
+
+cd PSC-ONE/hardware/sim
+make -f Makefile.coremark
+```
+
+CoreMarkのビルド、MEM生成、RTL simulation、CRC validation、性能結果表示を実行します。
+デフォルトはCPU v1 / 100 MHz / GCC / RV32IM / ILP32 / `-O2`です。
+UARTログは`log_uart/coremark_*.log`、ビルド生成物と集計結果は`build/coremark/`に保存します。
+標準の10秒以上のターゲット実行時間を確保するため、RTL simulationは長時間になります。
+
+設定、個別操作、計測方法は[CoreMark実行ガイド](coremark_psc/README.md)を参照してください。
+
 ---
 
 ## Run PE simulation
@@ -131,5 +148,4 @@ WARNING: ../rtl/boot/PSC_ONE_Boot_axi.v:504: $readmemh(mem/bootrom.mem): Not eno
 ```bash
 make -f Makefile.ai clean
 ```
-
 

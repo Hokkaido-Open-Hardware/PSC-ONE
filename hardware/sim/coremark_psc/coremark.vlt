@@ -1,0 +1,7 @@
+`verilator_config
+// cocotbで操作・観測する信号だけを公開する。RTLの回路構成は変更しない。
+public_flat_rw -module "PSC_ONE_Chip_sim" -var "*"
+public_flat_rd -module "PSC_ONE_Chip" -var "sdram_init_fin"
+public_flat_rd -module "PSC_ONE_Chip" -var "Boot_rom_done"
+public_flat_rd -module "PSC_RV32IS_MMapped_IO" -var "PIO_out_reg"
+public_flat_rd -module "PSC_RV32IS_TIMER" -var "running"

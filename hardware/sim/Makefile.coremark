@@ -1,0 +1,171 @@
+# ============================================================
+# Usage
+# ============================================================
+
+# PSC-ONE/hardware/sim で実行してください。
+#make -f Makefile.coremark
+#make -f Makefile.coremark build
+#make -f Makefile.coremark run CPU_VERSION=v1
+#make -f Makefile.coremark run CPU_VERSION=v2
+#make -f Makefile.coremark COREMARK_RUN=VALIDATION
+#make -f Makefile.coremark clean
+
+# ============================================================
+# 実行設定
+# ============================================================
+# デフォルトターゲット: ビルド → MEM生成 → RTL simulation → 結果表示
+
+.DEFAULT_GOAL := run
+COREMARK_SIM_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+ROOT := $(abspath $(COREMARK_SIM_DIR)/../../..)
+export PATH := $(ROOT)/myenv/bin:$(PATH)
+CPU_VERSION ?= v1
+SIM_FAST ?= 1
+COREMARK_VPI ?= minimal
+ITERATIONS ?= 400
+COREMARK_RUN ?= PERFORMANCE
+RUN_CYCLES ?= 3000000000
+export RUN_CYCLES
+
+# ============================================================
+# 既存Makefileの設定を再利用
+# ============================================================
+# Makefile.cpu: CPU切り替え、RTLソース、simulation設定
+# cpp/Makefile: GCC、-march、-mabi、最適化、linker、startup設定
+# cpp/Makefileは変更せず、設定値だけを取得する。
+
+include $(COREMARK_SIM_DIR)/Makefile.cpu
+include $(COREMARK_SIM_DIR)/build/coremark/firmware-settings.mk
+RISCV_PREFIX ?= $(CM_REF_RISCV_PREFIX)
+CC := $(RISCV_PREFIX)gcc
+OBJCOPY := $(RISCV_PREFIX)objcopy
+COREMARK_DIR := $(COREMARK_SIM_DIR)/coremark
+PORT_DIR := $(COREMARK_SIM_DIR)/coremark_psc
+OS_DIR := $(abspath $(COREMARK_SIM_DIR)/../../software/os/src)
+BUILD := $(COREMARK_SIM_DIR)/build/coremark/$(CPU_VERSION)/$(MODE)/$(COREMARK_RUN)-$(ITERATIONS)
+
+# ビルド生成物はbuild/coremark、UARTログはlog_uartに保存する。
+RUN_DIR := $(BUILD)/sim
+COREMARK_RTL_BUILD := $(COREMARK_SIM_DIR)/build/coremark/$(CPU_VERSION)/$(MODE)/sim_build_o3
+
+# minimal: cocotbが必要とする信号だけを公開し、Verilatorの最適化を有効にする。
+# full: 既存Makefileと同じ全信号公開。デバッグ時に指定する。
+ifeq ($(MODE):$(COREMARK_VPI),verilator:minimal)
+COREMARK_RTL_BUILD := $(COREMARK_SIM_DIR)/build/coremark/$(CPU_VERSION)/$(MODE)/sim_build_minimal
+CM_VPI_ARGS := --no-public-flat-rw $(PORT_DIR)/coremark.vlt
+endif
+CM_UART_LOG := $(COREMARK_SIM_DIR)/log_uart/coremark_$(CPU_VERSION)_$(MODE)_$(COREMARK_RUN)_$(ITERATIONS)_$(shell date +%Y%m%d_%H%M%S).log
+LINKER := $(COREMARK_SIM_DIR)/cpp/$(CM_REF_LINKER)
+STARTUP := $(COREMARK_SIM_DIR)/cpp/$(CM_REF_STARTUP)
+
+$(COREMARK_SIM_DIR)/build/coremark/firmware-settings.mk: $(COREMARK_SIM_DIR)/cpp/Makefile $(PORT_DIR)/support.py
+	python3 $(PORT_DIR)/support.py settings $(COREMARK_SIM_DIR)/cpp $@
+
+ifneq ($(filter $(COREMARK_RUN),PERFORMANCE VALIDATION),$(COREMARK_RUN))
+$(error COREMARK_RUN must be PERFORMANCE or VALIDATION)
+endif
+
+# ============================================================
+# コンパイル / リンク設定
+# ============================================================
+# C++ firmwareの設定から、Cでも使用するフラグを取得する。
+# 既存startupではgpを初期化しないため、linker relaxationを無効にする。
+# PSC-OSからUART / timer / trap処理だけをリンクし、未使用sectionを除外する。
+
+CM_CFLAGS := $(filter -march=% -mabi=% -O% -g -ffreestanding -nostdlib -mstrict-align,$(CM_REF_CXXFLAGS)) \
+	-std=c11 -mno-relax -ffunction-sections -fdata-sections -Wall -Wextra
+CM_CPPFLAGS := -I$(PORT_DIR) -I$(COREMARK_DIR) -I$(OS_DIR) -I$(PORT_DIR)/os_include \
+	-include $(PORT_DIR)/os_include/compat.h \
+	-DITERATIONS=$(ITERATIONS) -D$(COREMARK_RUN)_RUN=1 -DTOTAL_DATA_SIZE=2000
+CM_LDFLAGS := -Wl,-T,$(LINKER) -Wl,--gc-sections,--no-relax,--no-warn-rwx-segment \
+	-Wl,-Map,$(BUILD)/coremark.map
+CORE_SOURCES := core_list_join.c core_main.c core_matrix.c core_state.c core_util.c
+PORT_SOURCES := core_portme.c runtime.c console.c
+OS_SOURCES := kernel.c common.c timer_api.c timer_measure.c kernel_trap.c
+OBJECTS := $(addprefix $(BUILD)/,$(CORE_SOURCES:.c=.o) $(PORT_SOURCES:.c=.o) $(OS_SOURCES:.c=.o))
+vpath %.c $(COREMARK_DIR) $(PORT_DIR) $(OS_DIR)
+
+# ============================================================
+# CoreMarkビルド
+# ============================================================
+.PHONY: build run clean config check-source
+build: $(BUILD)/coremark.mem
+
+$(COREMARK_DIR)/coremark.h:
+	@echo 'CoreMark missing: run git submodule update --init --recursive' >&2
+	@exit 1
+
+# コンパイラとフラグを結果出力用ヘッダに記録する。
+# 設定内容が変わった場合だけヘッダを更新する。
+config:
+	@mkdir -p $(BUILD)
+	@CC='$(CC)' FLAGS='$(CM_CFLAGS) $(CM_CPPFLAGS)' OUT='$(BUILD)/config.h' \
+		python3 $(PORT_DIR)/support.py config
+
+$(BUILD)/%.o: %.c $(COREMARK_DIR)/coremark.h $(PORT_DIR)/core_portme.h config
+	$(CC) $(CM_CFLAGS) $(CM_CPPFLAGS) -include $(BUILD)/config.h -c $< -o $@
+
+$(BUILD)/startup.o: $(STARTUP) config
+	$(CC) $(CM_CFLAGS) -c $< -o $@
+
+# ELF生成と、起動アドレス / BSS境界 / stack領域の確認
+$(BUILD)/coremark.elf: $(BUILD)/startup.o $(OBJECTS) $(LINKER)
+	$(CC) $(CM_CFLAGS) $(CM_LDFLAGS) $(filter %.o,$^) -lgcc -o $@
+	$(RISCV_PREFIX)size $@
+	$(RISCV_PREFIX)nm -n $@ > $(BUILD)/coremark.nm
+	python3 $(PORT_DIR)/support.py layout $(BUILD)/coremark.nm
+
+# バイナリ生成
+$(BUILD)/coremark.bin: $(BUILD)/coremark.elf
+	$(OBJCOPY) -O binary $< $@
+
+# MEM生成: 既存cpp/Makefileの変換処理をビルド専用ディレクトリで実行する。
+# boot ROMの容量は4096ワード。既存mem/test_program.memは上書きしない。
+$(BUILD)/coremark.mem: $(BUILD)/coremark.bin
+	@test $$(wc -c < $<) -le 16384 || { echo 'Image exceeds existing 4096-word boot ROM'; exit 1; }
+	@mkdir -p $(BUILD)/cpp
+	$(MAKE) -C $(BUILD)/cpp -f $(COREMARK_SIM_DIR)/cpp/Makefile \
+		TARGET=coremark OBJ= MEM_WORDS=4096 \
+		ELF=$(BUILD)/coremark.elf BIN=$< MEM=$@ coremark
+
+# ============================================================
+# RTL simulation / CRC validation / 性能結果
+# ============================================================
+# 既存PSC_ONE_Chip_simとcocotbを使用する。
+# FST_UART_MODE: 既存の高速UART設定。UARTデコードは1bit=40ns。
+# CPU実行時間はターゲット側timerで測定する。
+# Verilatorのホスト側C++も-O3でビルドし、長時間simulationを高速化する。
+
+run: build
+	@mkdir -p $(RUN_DIR)/mem $(RUN_DIR)/wave $(COREMARK_SIM_DIR)/log_uart
+	@echo 'UART log: $(CM_UART_LOG)'
+	cp $(BUILD)/coremark.mem $(RUN_DIR)/mem/test_program.mem
+	cd $(RUN_DIR) && PYTHONPATH='$(PORT_DIR):$(COREMARK_SIM_DIR)' \
+		CLK_PERIOD_NS=10 UART_BIT_NS=40 \
+		PSC_UART_LOGFILE='$(CM_UART_LOG)' \
+		COREMARK_RESULT_DIR='$(BUILD)' \
+		COCOTB_TEST_MODULES=cocotb_tb.coremark.coremark_test \
+		TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog SIM=$(SIM) \
+		SIM_BUILD='$(COREMARK_RTL_BUILD)' \
+		CUSTOM_COMPILE_DEPS='$(COREMARK_SIM_DIR)/Makefile.coremark $(PORT_DIR)/coremark.vlt' \
+		BUILD_ARGS='OPT_FAST=-O3 OPT_SLOW=-O3 OPT_GLOBAL=-O3' \
+		VERILOG_SOURCES='$(foreach f,$(INPUT_FILE_PSCONE),$(abspath $(f)))' \
+		COMPILE_ARGS='$(TOP_COMPILE_ARGS) -DFST_UART_MODE' EXTRA_ARGS='$(EXTRA_ARGS) $(VDEF) $(CM_VPI_ARGS)' \
+		$(MAKE) --no-print-directory -f $(COCOTB_MAKEFILE)
+	python3 $(PORT_DIR)/support.py report $(CM_UART_LOG) $(BUILD)/result.json
+
+# ============================================================
+# CoreMark公式ソースの確認
+# ============================================================
+
+check-source:
+	$(MAKE) -C $(COREMARK_DIR) check
+
+# ============================================================
+# Clean
+# ============================================================
+# build/coremarkの生成物だけを削除する。UARTログは残す。
+# 既存Makefileのcleanは呼び出さない。
+
+clean:
+	python3 $(PORT_DIR)/support.py clean $(COREMARK_SIM_DIR)/build/coremark

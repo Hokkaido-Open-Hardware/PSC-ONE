@@ -15,3 +15,6 @@
         path = hardware/sim/coremark
         url = https://github.com/eembc/coremark.git
 
+[submodule "hardware/sim/coremark"]
+	path = hardware/sim/coremark
+	url = https://github.com/eembc/coremark.git
