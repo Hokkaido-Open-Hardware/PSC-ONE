@@ -369,7 +369,7 @@ Move to that directory and use its `Makefile` to generate the boot images:
 
 ```bash
 cd hardware/bootloader
-make
+make bootloader_fat32 
 ```
 
 Confirm that the build produces at least:
@@ -380,6 +380,23 @@ bootrom.mem
 ```
 
 These files are part of the FPGA boot configuration and must be generated before compiling the Gowin project.
+
+### Generate `kernel.mem` and `user.mem`
+
+The required PSC-OS files are generated in:
+
+```text
+hardware/firmware/
+```
+
+Navigate to the directory and use the `Makefile` to generate the boot images:
+
+```bash
+cd hardware/firmware
+make firmware_fat32
+```
+
+After the build completes, copy `./mem/kernel.mem` and `./mem/user.mem` to the root directory of the FAT32-formatted SD card.
 
 ### Add the Boot ROM Files to the Gowin Project
 

@@ -6,6 +6,9 @@
 // micropythonを含めるとSIM時間が長すぎる場合のオプション
 //#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
 
+// JPEG LCD表示なしの場合のオプション
+//#define PSC_OS_DEBUG_WITHOUT_JPEGLCD
+
 extern int psc_micropython_run(void);
 
 void main(void) {
@@ -322,6 +325,7 @@ prompt:
             } 
 
         // ---- JPEG disp LCD ----
+#ifndef PSC_OS_DEBUG_WITHOUT_JPEGLCD
         } else if (strcmp(argv[0], "jpeg") == 0) {
             if (argc != 2) {
                 printf("usage: jpeg TEST.JPG\n");
@@ -335,6 +339,7 @@ prompt:
             else printf("decode OK\n");
             if (elapsed_ms >= 0) printf("time: %d ms\n", elapsed_ms);
             else printf("time: unavailable (timer busy)\n");
+#endif
 
         // ---- 音声認識デモ ----
         } else if (strcmp(argv[0], "speech") == 0) {

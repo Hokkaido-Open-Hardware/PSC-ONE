@@ -610,7 +610,11 @@ This video shows a live demonstration of the PSC system running on FPGA hardware
 It highlights real-time interaction between the CPU, SD card interface, and UART output.  
 The system successfully boots and executes software on a fully integrated hardware platform.
 
-[![Watch the demo](https://img.youtube.com/vi/aRCHluWXozY/maxresdefault.jpg)](https://youtube.com/shorts/aRCHluWXozY?si=T0kp_dv_nBH07tnj)
+<a href="https://www.youtube.com/watch?v=O8GDUTijPA8">
+  <img src="https://img.youtube.com/vi/O8GDUTijPA8/maxresdefault.jpg"
+       alt="Watch the demo"
+       width="500">
+</a>
 
 ------------------------------------------------------------------------
 
@@ -620,7 +624,11 @@ This video demonstrates the PSC system running `PSC-OS` on FPGA hardware after b
 It shows prime number computation executed on the custom `PSC_RV32` CPU, with results transmitted over UART.  
 The demo highlights a fully functional hardware-software stack, from boot to program execution.
 
-[![Watch the demo](https://img.youtube.com/vi/lV74ni7FAt4/maxresdefault.jpg)](https://youtu.be/lV74ni7FAt4?si=_Xm8yCdqHN_oQzrs)
+<a href="https://youtu.be/lV74ni7FAt4">
+  <img src="https://img.youtube.com/vi/lV74ni7FAt4/maxresdefault.jpg"
+       alt="Watch the demo"
+       width="500">
+</a>
 
 ------------------------------------------------------------------------
 
@@ -845,6 +853,7 @@ FST Viewer is intended to make PSC_RV32 CPU development and verification easier 
 - [x] SD Card Test
 - [x] FAT32 File Browser (`ls`, `cat`)
 - [x] FAT32 File Write
+- [x] JPEG Image Viewer (jpeg) — 480×320 LCD Display
 - [x] AI Inference Demo
 - [x] Audio Processing Demo
 - [x] Speech Recognition Demo

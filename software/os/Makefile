@@ -21,17 +21,16 @@ OBJDUMP := riscv64-unknown-elf-objdump
 # sim / fpga_mem / sbi / psc
 MODE ?= sim
 
-ifeq ($(MODE),sim)
+ifneq ($(filter $(MODE),sim fpga_mem),)
   BOOT_FLOW     := direct
   RUN_QEMU      := 1
-  KCPPFLAGS     := -DBSS_CLEAR_OFF=1
   USER_BASE_VAL := 0x00400000
 
-else ifeq ($(MODE),fpga_mem)
-  BOOT_FLOW     := direct
-  RUN_QEMU      := 1
-  KCPPFLAGS     := -DBSS_CLEAR_OFF=0
-  USER_BASE_VAL := 0x00400000
+  ifeq ($(MODE),sim)
+    KCPPFLAGS   := -DBSS_CLEAR_OFF=1
+  else
+    KCPPFLAGS   := -DBSS_CLEAR_OFF=0
+  endif
 
 else ifeq ($(MODE),sbi)
   BOOT_FLOW     := direct
@@ -140,9 +139,6 @@ JPEG_SRCS := $(Src)/fat32_stream.c $(JPEG_DIR)/jpeg_view.c \
 JPEG_HEADERS := $(wildcard $(JPEG_DIR)/*.h) $(Src)/fat32.h $(Src)/jpeg_display.h
 JPEG_CPPFLAGS := -I$(Src) -I$(TJPGD_BUILD) -I../micropython/ports/psc/libc
 
-# Upstream uses a quoted, adjacent tjpgdcnf.h. -I alone cannot override it.
-# Build-directory symlinks select the PSC config without modifying/copying
-# upstream sources into this repository. Relative links also support Build=.
 $(TJPGD_DIR)/src/tjpgd.c $(TJPGD_DIR)/src/tjpgd.h:
 	@echo "TJpgDec missing: run git submodule update --init --recursive" >&2
 	@exit 1
