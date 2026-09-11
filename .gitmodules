@@ -11,4 +11,7 @@
 [submodule "software/os/third_party/tjpgd"]
 	path = software/os/third_party/tjpgd
 	url = https://github.com/Bodmer/TJpg_Decoder.git
+[submodule "sim/coremark"]
+        path = hardware/sim/coremark
+        url = https://github.com/eembc/coremark.git
 
