@@ -1,0 +1,90 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Tue Jul 21 06:59:10 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_ONE_Chip_test.fst"
+[dumpfile_mtime] "Tue Jul 21 06:58:54 2026"
+[dumpfile_size] 417079
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.nn_test2.gtkw"
+[timestart] 560300000
+[size] 2705 1217
+[pos] -1 -1
+*-21.493692 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.
+[sst_width] 388
+[signals_width] 416
+[sst_expanded] 1
+[sst_vpaned_height] 372
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.busy
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.busy_out
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.c_write_addr[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.c_write_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.c_write_valid
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.c_write_wdata[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.clock
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.cur_a_data[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.cur_b_data[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.data_clear
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.done
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.done_out
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.en_b_shift_bottom
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.en_shift_right
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.i_idx[7:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.j_idx[7:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.k_idx[7:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.matrix_addr_C__Vstatic__element_idx[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.matrix_addr_C__Vstatic__global_col[7:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.matrix_addr_C__Vstatic__global_row[7:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.matrix_addr_C__Vstatic__local_col[7:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.matrix_addr_C__Vstatic__local_row[7:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.matrix_size[7:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.ps_acc_out[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.rd_read_addr[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.rd_read_data[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.rd_read_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.rd_read_valid
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.read_end
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.read_start
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.reset_n
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.row_s[5:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.sa_clear
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.sa_os_instruction[3:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.sa_req_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.sa_state_reset
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.start
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.start_pulse
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_systolic.state[5:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.csr_SA_ADDR_A[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.csr_SA_ADDR_B[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.csr_SA_ADDR_C[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.csr_SA_CTRL[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.csr_SA_MODE[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.csr_SA_STATUS[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.mem_write_sel[2:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.data_mem_write_valid
+@23
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.mem_write_address[31:0]
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.mem_write_data[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.data_mem_write_ready
+[pattern_trace] 1
+[pattern_trace] 0

@@ -1,0 +1,60 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Wed Jul 22 15:05:37 2026
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.core.gtkw"
+[timestart] 9741200
+[size] 2642 1103
+[pos] -1 -1
+*-16.983717 10099500 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_RV32ISP_core.
+[treeopen] PSC_RV32ISP_core.u_execute_state.
+[treeopen] PSC_RV32ISP_core.u_execute_state.u_PSC_CELL.
+[treeopen] PSC_RV32ISP_core.u_fetch_state.
+[sst_width] 278
+[signals_width] 383
+[sst_expanded] 1
+[sst_vpaned_height] 332
+@22
+PSC_RV32ISP_core.u_fetch_state.fetch_state[3:0]
+@28
+PSC_RV32ISP_core.u_fetch_state.u_fetch.fetch_enb
+PSC_RV32ISP_core.u_fetch_state.u_fetch.done
+[color] 1
+PSC_RV32ISP_core.u_fetch_state.fifo_flush
+@22
+PSC_RV32ISP_core.u_fetch_state.pc[31:0]
+PSC_RV32ISP_core.u_fetch_state.next_pc[31:0]
+@28
+PSC_RV32ISP_core.u_fetch_state.fetch_busy
+PSC_RV32ISP_core.u_execute_state.execute_task_busy
+[color] 3
+PSC_RV32ISP_core.u_fetch_state.execute_task_done
+PSC_RV32ISP_core.u_execute_state.pc_sel2
+PSC_RV32ISP_core.u_fetch_state.program_mem_read_valid
+@22
+PSC_RV32ISP_core.u_fetch_state.program_mem_read_address[31:0]
+@28
+PSC_RV32ISP_core.u_fetch_state.program_mem_read_ready
+@22
+PSC_RV32ISP_core.u_fetch_state.fetch_pc[31:0]
+@28
+PSC_RV32ISP_core.u_fetch_state.full
+PSC_RV32ISP_core.u_fetch_state.empty
+PSC_RV32ISP_core.u_fetch_state.u_fetch_fifo.pop
+PSC_RV32ISP_core.u_fetch_state.u_fetch_fifo.push
+@22
+PSC_RV32ISP_core.u_execute_state.u_PSC_CELL.u_PSC_CELL_STATE_0.execute_state[3:0]
+PSC_RV32ISP_core.u_execute_state.u_PSC_CELL.u_PSC_PC.branch_target_pc[31:0]
+PSC_RV32ISP_core.u_fetch_state.u_fetch_fifo.out_pc_data[31:0]
+PSC_RV32ISP_core.u_fetch_state.u_fetch_fifo.out_data[31:0]
+@28
+PSC_RV32ISP_core.u_fetch_state.fetch_state_fifo_flush
+@22
+PSC_RV32ISP_core.u_fetch_state.u_fetch_fifo.mem_0[31:0]
+PSC_RV32ISP_core.u_fetch_state.u_fetch_fifo.mem_1[31:0]
+PSC_RV32ISP_core.u_fetch_state.u_fetch_fifo.mem_2[31:0]
+PSC_RV32ISP_core.u_fetch_state.u_fetch_fifo.mem_3[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

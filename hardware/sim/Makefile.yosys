@@ -1,0 +1,72 @@
+# ============================================================
+# Usage
+# ============================================================
+
+# make -f Makefile.cpu -f Makefile.yosys yosys_cpu
+# make -f Makefile.cpu -f Makefile.yosys yosys_se
+
+# ============================================================
+# yosys：合成可否チェック（プロジェクト一括）
+# ============================================================
+
+# SDRAMモデル除外（超重要）
+# SystolicArray2x2_Ctrl.v内部のバス表記がyosysエラー
+YOSYS_INPUT := $(filter-out \
+    $(SA_FILE) \
+    $(SDRAM_MODEL), \
+    $(CPU_FILES))
+
+YOSYS_TOP := PSC_RV32ISP_core
+YOSYS_LOG := ./log/yosys_$(YOSYS_TOP).log
+
+yosys_check:
+	@mkdir -p ./log_yosys
+	yosys -l $(YOSYS_LOG) -p "\
+		read_verilog -sv -noautowire -defer $(YOSYS_INPUT); \
+		hierarchy -top $(YOSYS_TOP) -check; \
+		proc; opt; fsm; opt; \
+		memory; opt; \
+		tee -o ./log_yosys/wreduce.log wreduce -keepdc; \
+		opt -full; \
+		clean -purge; \
+		techmap; opt; \
+		abc -fast; \
+		check -assert; \
+		stat"
+
+# ============================================================
+# yosys：PSC_RV32ISP ロジック規模見積もり
+# ============================================================
+
+# PSC_RV32ISP_coreファイル
+CPU_YOSYS_INPUT := $(CPU_CORE_FILES)
+
+CPU_YOSYS_TOP := PSC_RV32ISP_core
+CPU_YOSYS_LOG := ./log_yosys/yosys_$(CPU_YOSYS_TOP).log
+
+yosys_cpu:
+	@mkdir -p ./log_yosys
+	yosys -l $(CPU_YOSYS_LOG) -p "\
+		read_verilog -sv $(CPU_YOSYS_INPUT); \
+		hierarchy -top $(CPU_YOSYS_TOP); \
+		proc; opt; \
+		stat"
+
+# ============================================================
+# yosys：SynapEngine ロジック規模見積もり
+# ============================================================
+
+# SynapEngineファイル
+SE_YOSYS_INPUT := $(SA_FILE)
+
+SE_YOSYS_TOP := SystolicArray4x4_Ctrl
+SE_YOSYS_LOG := ./log_yosys/yosys_$(SE_YOSYS_TOP).log
+
+# SystolicArray4x4_Ctrl.v内部のバス表記がyosysエラー
+yosys_se:
+	@mkdir -p ./log_yosys
+	yosys -l $(SE_YOSYS_LOG) -p "\
+		read_verilog -sv $(SE_YOSYS_INPUT); \
+		hierarchy -top $(SE_YOSYS_TOP); \
+		proc; opt; \
+		stat"

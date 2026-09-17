@@ -1,0 +1,77 @@
+# ============================================================
+# Usage
+# ============================================================
+#make -f Makefile.cpu.core simulate_MMU 
+
+# ============================================================
+#  MODE で一括切り替え（verilator / icarus）
+# ============================================================
+# デフォルトはicarus
+MODE = verilator
+#MODE = icarus
+
+# ============================================================
+#  シミュレーションモードに応じた設定
+# ============================================================
+ifeq ($(MODE),verilator)
+SIM          		= verilator
+TOP_COMPILE_ARGS 	= -DCPU_MMU_SIM -DCOCOTB_SIM
+
+ifeq ($(SIM_FAST),1)
+EXTRA_ARGS = \
+	-O3 --bbox-sys --x-assign fast --x-initial fast \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+else
+EXTRA_ARGS = \
+	-O3 --trace --trace-fst \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+endif
+
+endif
+
+ifeq ($(MODE),icarus)
+SIM          		= icarus
+
+EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
+TOP_COMPILE_ARGS 	= -DCPU_MMU_SIM -DCOCOTB_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_VCD
+
+endif
+
+# ============================================================
+#  以下、元の Makefile の変数定義など（SDRAM_MODEL を置き換え）
+# ============================================================
+
+MMU_TOP 	 = MMU
+MMU_SRC_DIR  = ../rtl/cpu_v1/src
+
+MMU_FILES = \
+	$(MMU_SRC_DIR)/MMU.sv
+
+COCOTB_CFG       := $(shell which cocotb-config)
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+SIM_BUILD        ?= sim_build
+
+.PHONY: compile_cpp
+	
+# ============================================================
+#  Cocotb simulation targets
+# ============================================================
+simulate_MMU:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_RV32ISP MMU test)"
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+	$(MAKE) clean
+	@mkdir -p ./wave
+	COCOTB_TEST_MODULES=cocotb_tb.cpu.RV32ISP_mmu_test \
+	TOPLEVEL=$(MMU_TOP) TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(MMU_FILES)" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+	VLOG_ARGS="$(VLOG_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	make -f $(COCOTB_MAKEFILE)
+
+
+

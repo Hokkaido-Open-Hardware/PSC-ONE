@@ -1,0 +1,86 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Tue Jul 21 03:14:47 2026
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.fence_i.gtkw.gtkw"
+[timestart] 472916000
+[size] 2519 1248
+[pos] -1 -1
+*-18.847483 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.
+[sst_width] 278
+[signals_width] 246
+[sst_expanded] 1
+[sst_vpaned_height] 383
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.clock
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.clr_meip
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.clr_msip
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.clr_mtip
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.counter[31:0]
+@100000028
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.cpu_state[3:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.cpu_stop
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.csr_valid
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.d_pf
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.data_mem_read_address[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.data_mem_read_data[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.data_mem_read_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.data_mem_read_valid
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.data_mem_req_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.data_mem_write_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.data_mem_write_valid
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.decoder_ctrl[126:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.ecall_m
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.ecall_s
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.ecall_u
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.exception
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.execute_state_sig
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.execute_task_done
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.execute_vaddr[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.fetch_pc[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.fetch_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.fetch_valid
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.fifo_empty
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.fifo_flush_sig
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.fifo_full
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.fifo_opcode_data[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.fifo_read_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.fifo_read_state_sig
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.i_pf
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.illegal_instruction
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.interrupt
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.irq_ext
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.is_fence_i
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.is_sfence_vma
+@100000028
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.fetch_state[2:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.program_mem_read_valid
+@29
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.data_mem_read_valid
+@100000028
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.state[3:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.fetch_enb
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.busy
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.clock
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.done
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.program_mem_req_ready
+[pattern_trace] 1
+[pattern_trace] 0

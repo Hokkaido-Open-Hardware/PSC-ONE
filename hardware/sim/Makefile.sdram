@@ -1,0 +1,85 @@
+# ============================================================
+# Usage
+# ============================================================
+
+#TBD
+
+# ============================================================
+#  SIMULATOR 切り替え (MODE=icarus / verilator)
+# ============================================================
+MODE  = icarus
+#MODE  = verilator
+SIM  := $(MODE)
+
+# ------------------------------------------------------------
+#  Verilator / Icarus ごとの設定
+# ------------------------------------------------------------
+ifeq ($(MODE),verilator)
+SIM          		= verilator
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v
+TOP_COMPILE_ARGS 	= -DSDRAM_CNT_SIM -DCOCOTB_SIM
+
+ifeq ($(SIM_FAST),1)
+EXTRA_ARGS = \
+	-O3 --bbox-sys --x-assign fast --x-initial fast \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+else
+EXTRA_ARGS = \
+	-O3 --trace --trace-fst \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+endif
+
+endif
+
+ifeq ($(MODE),icarus)
+SIM          		= icarus
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v
+
+EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
+TOP_COMPILE_ARGS 	= -DSDRAM_CNT_SIM -DCOCOTB_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_VCD
+
+endif
+
+# ============================================================
+#  Cocotb / コンパイル共通設定
+# ============================================================
+DEFS += COCOTB_SIM=1
+ifeq ($(READ_MEM),1)
+DEFS += READ_MEM
+endif
+
+# -D マクロ & SystemVerilog 有効化（Icarus / Verilator 両対応）
+VLOG_ARGS = -g2012 $(addprefix -D,$(DEFS))
+
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+
+# ============================================================
+#  ソース一覧
+# ============================================================
+SRC_SIMTOP = \
+	../rtl/sdram_controller/sim_sdram_controller.v
+SRC_SDRAM_CNT = \
+	../rtl/sdram_controller/sdram_controller.sv \
+
+SIM_SRC = $(SRC_SIMTOP) $(SRC_SDRAM_CNT) $(GW2AR_SDRAM_MODEL)
+	
+# ============================================================
+#  Cocotb simulation targets
+# ============================================================
+simulate_SDRAM:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_SDRAM_CONTROLLER test)"
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+	@echo "TOP_COMPILE_ARGS=$(TOP_COMPILE_ARGS)"
+	$(MAKE) clean
+	@mkdir -p ./wave
+	COCOTB_TEST_MODULES=cocotb_tb.sdram.sdram_test \
+	TOPLEVEL=sim_sdram_controller TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(SIM_SRC)" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+	VLOG_ARGS="$(VLOG_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	make -f $(COCOTB_MAKEFILE)

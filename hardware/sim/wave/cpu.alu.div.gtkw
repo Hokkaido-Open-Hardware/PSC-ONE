@@ -1,0 +1,67 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Thu Jul  2 23:09:45 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_ONE_Chip_test.fst"
+[dumpfile_mtime] "Thu Jul  2 23:08:32 2026"
+[dumpfile_size] 159001
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.alu.div.gtkw"
+[timestart] 478328000
+[size] 2581 1250
+[pos] -1 -1
+*-19.242447 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.
+[sst_width] 278
+[signals_width] 190
+[sst_expanded] 1
+[sst_vpaned_height] 383
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.busy
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.clk
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.count[5:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.dividend[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.dividend_abs[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.dividend_abs_w[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.dividend_is_neg
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.divisor[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.divisor_abs[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.divisor_abs_w[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.divisor_is_neg
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.done
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.quotient[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.quotient_neg
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.quotient_neg_w
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.quotient_out[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.quotient_reg[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.rem_ge_div_w
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.rem_shift_w[32:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.rem_sub_w[32:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.remainder[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.remainder_neg
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.remainder_neg_w
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.remainder_out[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.remainder_reg[32:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.reset_n
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.signed_mode
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.start
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_divider.state[3:0]
+[pattern_trace] 1
+[pattern_trace] 0

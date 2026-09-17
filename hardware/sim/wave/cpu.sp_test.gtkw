@@ -1,0 +1,63 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Tue Jul 21 07:20:13 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_ONE_Chip_test.fst"
+[dumpfile_mtime] "Tue Jul 21 07:16:18 2026"
+[dumpfile_size] 173438
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.sp_test.gtkw"
+[timestart] 467184000
+[size] 2585 1144
+[pos] -1 -1
+*-19.335663 469725000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_PSC_CELL.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.
+[sst_width] 291
+[signals_width] 206
+[sst_expanded] 1
+[sst_vpaned_height] 346
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.pc[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.opcode[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_PSC_CELL.u_regfile.registers[0][31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_PSC_CELL.u_regfile.registers[1][31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_PSC_CELL.u_regfile.registers[2][31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_PSC_CELL.u_regfile.registers[3][31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_PSC_CELL.u_regfile.registers[4][31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.fetch_pc[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.next_pc[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.pc[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.execute_task_done
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.opcode[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.fetch_enb
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.program_mem_read_valid
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.fifo_read_valid
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.opcode[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.paddr[31:0]
+@29
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.program_mem_req_ready
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch.fetch_address[31:0]
+@100000028
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_PSC_CELL.execute_state[3:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_PSC_CELL.fifo_empty
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch_fifo.mem[0][31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch_fifo.mem[1][31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch_fifo.empty
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch_fifo.flush
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.u_fetch_fifo.push
+[pattern_trace] 1
+[pattern_trace] 0

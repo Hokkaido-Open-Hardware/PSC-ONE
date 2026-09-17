@@ -1,0 +1,70 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Mon Jul  6 08:37:33 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_SD_test.fst"
+[dumpfile_mtime] "Mon Jul  6 08:35:32 2026"
+[dumpfile_size] 40065
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/mmio.sd.gtkw"
+[timestart] 5992700000
+[size] 2831 1195
+[pos] -1 -1
+*-27.266378 6726445002 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] sim_PSC_SDCard.
+[treeopen] sim_PSC_SDCard.u_sd.
+[sst_width] 278
+[signals_width] 297
+[sst_expanded] 1
+[sst_vpaned_height] 792
+@28
+sim_PSC_SDCard.u_sd.reset_n
+@22
+sim_PSC_SDCard.u_sd.cpu_waddr[31:0]
+sim_PSC_SDCard.u_sd.cpu_wdata[31:0]
+@28
+sim_PSC_SDCard.u_sd.cpu_wready
+sim_PSC_SDCard.u_sd.cpu_wvalid
+sim_PSC_SDCard.u_sd.cpu_wvalid_latch
+@24
+[color] 1
+sim_PSC_SDCard.u_sd.state[4:0]
+sim_PSC_SDCard.u_sd.sector_reg[31:0]
+@28
+sim_PSC_SDCard.u_sd.fifo_empty
+sim_PSC_SDCard.u_sd.fifo_flush
+sim_PSC_SDCard.u_sd.fifo_full
+sim_PSC_SDCard.u_sd.fifo_pop
+sim_PSC_SDCard.u_sd.fifo_push
+@22
+sim_PSC_SDCard.u_sd.fifo_W_wr_ptr[8:0]
+sim_PSC_SDCard.u_sd.fifo_W_rd_ptr[8:0]
+@28
+sim_PSC_SDCard.u_sd.fifo_wdata_push
+sim_PSC_SDCard.u_sd.fifo_wdata_pop
+@22
+sim_PSC_SDCard.u_sd.fifo_wd0[7:0]
+sim_PSC_SDCard.u_sd.fifo_wd1[7:0]
+sim_PSC_SDCard.u_sd.fifo_wd2[7:0]
+sim_PSC_SDCard.u_sd.fifo_wd3[7:0]
+@28
+sim_PSC_SDCard.u_sd.write_start
+@24
+sim_PSC_SDCard.u_sd.byte_cnt[9:0]
+@28
+sim_PSC_SDCard.u_sd.busy
+@22
+sim_PSC_SDCard.u_sd_model.cmd0[7:0]
+sim_PSC_SDCard.u_sd.spi_tx_data[7:0]
+sim_PSC_SDCard.u_sd.rx_cmd_sd_card[7:0]
+@24
+sim_PSC_SDCard.u_sd.cmd_i[6:0]
+@22
+sim_PSC_SDCard.u_sd.fifo_write_data[7:0]
+@24
+sim_PSC_SDCard.u_sd_model.cmd_idx[2:0]
+@28
+sim_PSC_SDCard.u_sd.busy
+sim_PSC_SDCard.u_sd.spi_tx_start
+sim_PSC_SDCard.u_sd.clock
+[pattern_trace] 1
+[pattern_trace] 0

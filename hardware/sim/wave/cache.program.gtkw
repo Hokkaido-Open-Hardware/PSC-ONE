@@ -1,0 +1,42 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Wed Jul  8 08:17:30 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_CASHE_test.vcd"
+[dumpfile_mtime] "Wed Jul  8 08:15:45 2026"
+[dumpfile_size] 90669316
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cache.program.gtkw"
+[timestart] 0
+[size] 2578 1183
+[pos] -1 -1
+*-25.452106 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] sim_cache_dma_controller.
+[sst_width] 278
+[signals_width] 198
+[sst_expanded] 1
+[sst_vpaned_height] 783
+@22
+sim_cache_dma_controller.u_program_dma_ctrl.state[3:0]
+@28
+sim_cache_dma_controller.u_program_dma_ctrl.cpu_valid
+@29
+sim_cache_dma_controller.u_program_dma_ctrl.cpu_ready
+@28
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_cache_clear
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_cache_clear_d1
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_cache_clear_latch
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_cache_wb
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_cache_wb_d1
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_cache_wb_latch
+@22
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_data[31:0]
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_data_latch[31:0]
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_data_out[31:0]
+@28
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_req_ready
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_valid
+sim_cache_dma_controller.u_data_dma_ctrl.cpu_valid_latch
+sim_cache_dma_controller.u_program_dma_ctrl.cache_hit_pulse
+sim_cache_dma_controller.u_program_dma_ctrl.cache_miss_pulse
+[pattern_trace] 1
+[pattern_trace] 0

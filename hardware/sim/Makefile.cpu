@@ -1,0 +1,509 @@
+# ============================================================
+# Usage
+# ============================================================
+
+#make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=basic
+#or
+#make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=legacy TEST_PROGRAM_LIST=basic
+
+# ============================================================
+#  MODE で一括切り替え（verilator / icarus）
+# ============================================================
+# デフォルトはicarus
+MODE = verilator
+#MODE = icarus
+
+# ============================================================
+#  シミュレーションモードに応じた設定
+# ============================================================
+ifeq ($(MODE),verilator)
+SIM          		= verilator
+SDRAM_MODEL  		= ../rtl/SDRAM_model/w9825g6kh_verilator.v
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v 
+SDCARD_MODEL 		= ../rtl/SDCARD_model/sdcard_spi_model.v 
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+
+ifeq ($(SIM_FAST),1)
+EXTRA_ARGS = \
+	-O3 --bbox-sys --x-assign fast --x-initial fast \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
+else
+EXTRA_ARGS = \
+	-O3 --trace --trace-fst \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
+endif
+
+endif
+
+ifeq ($(MODE),icarus)
+SIM          		= icarus
+SDRAM_MODEL    		= ./SDRAM_model/w9825g6kh.v 	# ← Icarus 用 Micron モデルに修正
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram.v 
+SDCARD_MODEL		= ../rtl/SDCARD_model/sdcard_spi_model.v 
+EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_VCD
+
+endif
+
+ifeq ($(SDRAM_MODEL),)
+$(error MODE=$(MODE) は不正です。MODE=verilator または MODE=icarus を指定してください)
+endif
+
+# ============================================================
+#  以下、元の Makefile の変数定義など（SDRAM_MODEL を置き換え）
+# ============================================================
+
+TOP          = PSC_RV32IS_Chip_sim
+PSCONE_TOP   = PSC_ONE_Chip_sim
+
+CPU_SRC_DIR  = ../rtl/cpu/src
+TOP_SRC_DIR  = ../rtl/top
+CACHE_DIR    = ../rtl/cache/src
+
+PSCONE_SIM_TOP_FILE = \
+	$(TOP_SRC_DIR)/PSC_ONE_Chip_sim.v \
+
+PSCONE_TOP_FILE = \
+	$(TOP_SRC_DIR)/PSC_ONE_Chip.v
+
+# RV32ISP_core
+CPU_CORE_FILES = \
+	$(CPU_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Execute.v \
+	$(CPU_SRC_DIR)/Fetch_Fifo.v \
+	$(CPU_SRC_DIR)/Fetch.v \
+	$(CPU_SRC_DIR)/Decorder.v \
+	$(CPU_SRC_DIR)/Execute.v \
+	$(CPU_SRC_DIR)/Execute_Divider.v \
+	$(CPU_SRC_DIR)/Execute_Mul.v \
+	$(CPU_SRC_DIR)/Branch.v \
+	$(CPU_SRC_DIR)/MemoryStore.v \
+	$(CPU_SRC_DIR)/Register.v \
+	$(CPU_SRC_DIR)/MMU.v \
+	$(CPU_SRC_DIR)/Csr.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
+
+# RV32ISP_core
+CPU_V1_CORE_FILES = \
+	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionFSM.sv \
+	$(CPU_V1_SRC_DIR)/Fetch.sv \
+	$(CPU_V1_SRC_DIR)/Decorder.sv \
+	$(CPU_V1_SRC_DIR)/Execute.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V1_SRC_DIR)/Branch.sv \
+	$(CPU_V1_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V1_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V1_SRC_DIR)/MMU.sv \
+	$(CPU_V1_SRC_DIR)/Csr.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_Monitor.v
+	
+CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+
+# RV32ISP_core(V2)
+CPU_V2_CORE_FILES = \
+	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_core.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V2_SRC_DIR)/PSC_InstructionFSM.sv \
+	$(CPU_V2_SRC_DIR)/Fetch.sv \
+	$(CPU_V2_SRC_DIR)/Decorder.sv \
+	$(CPU_V2_SRC_DIR)/Execute.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V2_SRC_DIR)/Branch.sv \
+	$(CPU_V2_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V2_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V2_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V2_SRC_DIR)/MMU.sv \
+	$(CPU_V2_SRC_DIR)/Csr.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+MMIO_DIR	= ../rtl/mmio/MMIO
+UART_DIR	= ../rtl/mmio/UART
+LED_DIR		= ../rtl/mmio/LED
+
+# ============================================================
+# CPUコアの切り替え（v1 / legacy）
+# ============================================================
+# デフォルトはV1
+CPU_VERSION ?= v1
+
+ifeq ($(CPU_VERSION),v1)
+SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)
+else ifeq ($(CPU_VERSION),v2)
+SELECTED_CPU_CORE_FILES = $(CPU_V2_CORE_FILES)
+else ifeq ($(CPU_VERSION),legacy)
+SELECTED_CPU_CORE_FILES = $(CPU_CORE_FILES)
+else
+$(error CPU_VERSION=$(CPU_VERSION) は不正です。v1 または legacy を指定してください)
+endif
+
+# CPU core + Cache
+CPU_FILES = \
+	$(SELECTED_CPU_CORE_FILES) \
+	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
+	$(UART_DIR)/PSC_RV32IS_UART.v \
+	$(LED_DIR)/PSC_RV32IS_LED.v \
+	$(CACHE_DIR)/cache_dma_controller.sv \
+	$(CACHE_DIR)/cache_dma_controller_io.sv \
+	$(CACHE_DIR)/dm_cache_data.v \
+	$(CACHE_DIR)/dm_cache_tag.v \
+	$(TOP_SRC_DIR)/Delay_N.v
+
+AXI_DIR			= ../rtl/axi
+SDRAM_CNT_DIR	= ../rtl/sdram_controller
+BOOT_SRC_DIR	= ../rtl/boot
+DMA_SRC_DIR		= ../rtl/dma
+
+SDRAM_32bit_AXI_FILES = \
+	$(AXI_DIR)/sdram_32bit_to_128bit_axi_bridge.v \
+	$(AXI_DIR)/sdram_4port_controller_axi_slave_bX_32bit.v \
+	$(SDRAM_CNT_DIR)/sdram_controller.sv \
+	$(GW2AR_SDRAM_MODEL)
+
+PSC_ONE_BOOT_FILE = $(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v
+
+PSC_ONE_DMA_FILE =  $(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
+
+# Systolic Array (not use)
+SA_DIR   = ../rtl/ai/src
+SA_FILE  = \
+	$(SA_DIR)/SystolicArray_Ctrl.v \
+	$(SA_DIR)/SystolicArray_ReadCtrl.v \
+	$(SA_DIR)/SystolicArray4x4.v \
+	$(SA_DIR)/PE_INT.v \
+	$(SA_DIR)/PE_mult.v
+
+MMIO_BASE_DIR	= ../rtl/mmio
+
+# LCD
+PSCONELCD_FILE = \
+	$(MMIO_BASE_DIR)/LCD/PSC_ONE_LCD.v \
+	$(MMIO_BASE_DIR)/LCD/tft_clock_divider.v \
+	$(MMIO_BASE_DIR)/LCD/tft_ili9488.v \
+	$(MMIO_BASE_DIR)/LCD/tft_ili9488_spi.v
+
+# SD Card Reader
+SD_READER_FILE = \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard.v \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard_SPI.v 
+
+# PSC Phase Flow Engine
+FPE_DIR  = ../rtl/pfe/src
+FPE_FILE = \
+	$(FPE_DIR)/PSC_PFE.v
+
+# Timer
+TIMER_FILE = $(MMIO_BASE_DIR)/TIMER/PSC_RV32IS_TIMER.v
+
+# I2S Rx
+I2S_RX_FILE = \
+	$(MMIO_BASE_DIR)/I2S_RX/PSC_I2SRX.v \
+
+I2S_MIC_MODEL = ../rtl/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v 
+
+LCD_ILI9488_MODEL = ../rtl/LCD_model/PSC_LCD_ILI9488_MODEL.v 
+
+INPUT_32bit_FILE = \
+	$(PSCONE_SIM_TOP_FILE) $(PSCONE_TOP_FILE) $(CPU_FILES) $(SDRAM_32bit_AXI_FILES) \
+	$(PSC_ONE_BOOT_FILE) $(PSC_ONE_DMA_FILE) \
+	$(SA_FILE) $(PSCONELCD_FILE) $(SD_READER_FILE) $(TIMER_FILE) \
+	$(I2S_RX_FILE) $(I2S_MIC_MODEL) $(LCD_ILI9488_MODEL) \
+	$(FPE_FILE) \
+	$(SDCARD_MODEL)
+
+INPUT_FILE_PSCONE = \
+	$(INPUT_32bit_FILE)
+
+COCOTB_CFG       := $(shell which cocotb-config)
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+SIM_BUILD        ?= sim_build
+
+.PHONY: compile_cpp
+
+# ============================================================
+# 単体テスト定義
+# tang 20k 
+# ============================================================
+# PSC-ONE テスト
+
+PSCONE_SINGLE_TEST = \
+	led_test1:RV32ISP_chip_test:./mem/led_test1.mem:0x00000022 \
+
+# ============================================================
+# 複数テスト定義
+# format:
+#   test_name:cocotb_module:mem_file:expected
+# ============================================================
+# List
+
+PSCONE_BASIC_TESTS = \
+	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
+	add_test2:RV32ISP_chip_test:./mem/add_test2.mem:0x00000000 \
+	pfe_test1:RV32ISP_chip_test:./mem/pfe_test1.mem:0x00000000 \
+	fetch_test1:RV32ISP_chip_test:./mem/fetch_test1.mem:0xcd1023bb \
+	csr_test1:RV32ISP_chip_test:./mem/csr_test1.mem:0x00000022 \
+	timer_test1:RV32ISP_chip_test:./mem/timer_test1.mem:0x00000123 \
+	sub_test1:RV32ISP_chip_test:./mem/sub_test1.mem:0x0000006e \
+	mem_write1:RV32ISP_chip_test:./mem/mem_write1.mem:0x00000037 \
+	trap_test1:RV32ISP_chip_test:./mem/trap_test1.mem:0xCAFEBABE \
+	shift_test1:RV32ISP_chip_test:./mem/shift_test1.mem:0x00001234 \
+	jump_test1:RV32ISP_chip_test:./mem/jump_test1.mem:0x12345678 \
+	lui_test1:RV32ISP_chip_test:./mem/lui_test1.mem:0x12345000 \
+	prime_test1:RV32ISP_chip_test:./mem/prime_test1.mem:0x00000061 \
+	divmod_test1:RV32ISP_chip_test:./mem/divmod_test1.mem:0x00000e02 \
+	ecall_test1:RV32ISP_chip_test:./mem/ecall_test1.mem:0x00000321 \
+	audipc_test1:RV32ISP_chip_test:./mem/audipc_test1.mem:0xFFFFFFF8 \
+	fft_test1:RV32ISP_chip_test:./mem/fft_test1.mem:0x0000beef \
+	q15_fft_test1:RV32ISP_chip_test:./mem/q15_fft_test1.mem:0x0000beef \
+	fft_N8_test1:RV32ISP_chip_test:./mem/fft_N8_test1.mem:0x0000beef \
+	sbwrite_test1:RV32ISP_chip_test:./mem/sbwrite_test1.mem:0xE500000F \
+	jal_test1:RV32ISP_chip_test:./mem/jal_test1.mem:0x12345678 \
+	jalr_test1:RV32ISP_chip_test:./mem/jalr_test1.mem:0x00005AA5 \
+	mul_test1:RV32ISP_chip_test:./mem/mul_test1.mem:0x00000063 \
+	mul_test2:RV32ISP_chip_test:./mem/mul_test2.mem:0x00000033 \
+	nn_test1:RV32ISP_chip_test:./mem/nn_test1.mem:0x00000170 \
+	nn_test2:RV32ISP_chip_test:./mem/nn_test2.mem:0x00000170 \
+	nn_test3:RV32ISP_chip_test:./mem/nn_test3.mem:0x00000170 \
+	sa_test3:RV32ISP_chip_test:./mem/sa_test3.mem:0x0000BEEF \
+	sa_test2:RV32ISP_chip_test:./mem/sa_test2.mem:0x0000BEEF \
+	sa_test1:RV32ISP_chip_test:./mem/sa_test1.mem:0x0000BEEF \
+	matrix_test1:RV32ISP_chip_test:./mem/matrix_test1.mem:0x0000ABCD \
+	montepi_test1:RV32ISP_chip_test:./mem/montepi_test1.mem:0x0000beef \
+	uart_tx:RV32ISP_chip_test:./mem/uart_tx.mem:0x00000123 \
+	mret_test1:RV32ISP_chip_test:./mem/mret_test1.mem:0x0000DCBA \
+	rem_test1:RV32ISP_chip_test:./mem/rem_test1.mem:0x00000001 \
+	sa_matrix_test1:RV32ISP_chip_test:./mem/sa_matrix_test1.mem:0x0000BEEF \
+	mulsi3_test1:RV32ISP_chip_test:./mem/mulsi3_test1.mem:0x00000015 \
+	xor_test1:RV32ISP_chip_test:./mem/xor_test1.mem:0x00003344 \
+	cachewb_test1:RV32ISP_chip_test:./mem/cachewb_test1.mem:0x00000000 \
+	ret_test1:RV32ISP_chip_test:./mem/ret_test1.mem:0x12345678 \
+	led_test1:RV32ISP_chip_test:./mem/led_test1.mem:0x00000022 \
+	lw_test1:RV32ISP_chip_test:./mem/lw_test1.mem:0xC0DEC0DE \
+	cache_RW_test1:RV32ISP_chip_test:./mem/cache_RW_test1.mem:0x600DCAFE \
+	pio_test1:RV32ISP_chip_test:./mem/pio_test1.mem:0x00000022 \
+	uart_test1:RV32ISP_chip_test:./mem/uart_test1.mem:0x00000077 \
+	sp_test1:RV32ISP_chip_test:./mem/sp_test1.mem:0x00005AA5 \
+	csr_test2:RV32ISP_chip_test:./mem/csr_test2.mem:0x00000321 \
+	alu_mul_test1:RV32ISP_chip_test:./mem/alu_mul_test1.mem:0x00000000 \
+
+# ============================================================
+# Long Test List
+# ============================================================
+
+PSCONE_LONG_TESTS = \
+	pio_uart_test1:RV32ISP_chip_test:./mem/pio_uart_test1.mem:0x00001212 \
+	fencei_test1:RV32ISP_chip_test:./mem/fencei_test1.mem:0xabcd5678 \
+	sret_test1:RV32ISP_chip_test:./mem/sret_test1.mem:0x0000DC12 \
+	nn_64x16x1_test1:RV32ISP_chip_test:./mem/nn_64x16x1_test1.mem:0x00000780 \
+	mmu_test1:RV32ISP_chip_test:./mem/mmu_test1.mem:0x00000033 \
+	i2s_test1:RV32ISP_chip_test:./mem/i2s_test1.mem:0x0abc0123 \
+	nn_test4:RV32ISP_chip_test:./mem/nn_test4.mem:0x001c2000 \
+	memcpy_test1:RV32ISP_chip_test:./mem/memcpy_test1.mem:0x00002521 \
+	pipeline_test1:RV32ISP_chip_test:./mem/pipeline_test1.mem:0x0000009d \
+	pipeline_test2:RV32ISP_chip_test:./mem/pipeline_test2.mem:0xfc1667c7 \
+	boot_test1:RV32ISP_chip_test:./mem/boot_test1.mem:0x00001321 \
+	boot_test2:RV32ISP_chip_test:./mem/boot_test2.mem:0x00002321 \
+	pagefault_test1:RV32ISP_chip_test:./mem/pagefault_test1.mem:0x0000EF99 \
+	sfence_test1:RV32ISP_chip_test:./mem/sfence_test1.mem:0x00000F01 \
+	lcd_test1:RV32ISP_chip_test:./mem/lcd_test1.mem:0x00000012 \
+	dma_test1:RV32ISP_chip_test:./mem/dma_test1.mem:0x00000000 \
+	sd_card_test1:RV32ISP_chip_test:./mem/sd_card_test1.mem:0x000000e0 \
+	cpu_monitor_test1:RV32ISP_chip_test:./mem/cpu_monitor_test1.mem:0x00000022 \
+	i2s_test1:RV32ISP_chip_test:./mem/i2s_test1.mem:0x0abc0123 \
+
+# ============================================================
+# Voice Test List
+# ============================================================
+
+PSCONE_VOICE_TESTS = \
+	audio_feature_test1:RV32ISP_chip_test:./mem/audio_feature_test1.mem:0x00001212 \
+	audio_nn_test1:RV32ISP_chip_test:./mem/audio_nn_test1.mem:0x00001213 \
+	voice_test1:RV32ISP_chip_test:./mem/voice_test1.mem:0x00001214 \
+	voice_test2:RV32ISP_chip_test:./mem/voice_test2.mem:0x00001215 \
+	voice_test3:RV32ISP_chip_test:./mem/voice_test3.mem:0x00001216 \
+
+# ============================================================
+# Rust test settings
+# ============================================================
+# hardware/sim/rust/*.rs を自動検出して順番に実行する。
+# 例: RUST_TESTS="add_test1 add_test2" と指定して絞り込み可能。
+RUST_DIR            ?= ./rust
+RUST_MAKEFILE       ?= Makefile.rust
+RUST_TESTS          ?= $(basename $(notdir $(wildcard $(RUST_DIR)/*.rs)))
+RUST_COCOTB_MODULE  ?= RV32ISP_chip_test
+RUST_EXPECTED       ?= 0x12345678
+
+# ============================================================
+# テストプログラムの切り替え（basic / long / voice / single）
+# ============================================================
+# デフォルトはbasic
+TEST_PROGRAM_LIST ?= basic
+
+ifeq ($(TEST_PROGRAM_LIST),basic)
+PSCONE_TESTS = $(PSCONE_BASIC_TESTS)
+else ifeq ($(TEST_PROGRAM_LIST),long)
+PSCONE_TESTS = $(PSCONE_LONG_TESTS)
+else ifeq ($(TEST_PROGRAM_LIST),voice)
+PSCONE_TESTS = $(PSCONE_VOICE_TESTS)
+else ifeq ($(TEST_PROGRAM_LIST),single)
+PSCONE_TESTS = $(PSCONE_SINGLE_TEST)
+else
+$(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic または long, voice, single を指定してください)
+endif
+
+# run test
+.PHONY: simulate_PSC_ONE_TESTS
+simulate_PSC_ONE_TESTS:
+	@mkdir -p ./wave
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST)"
+	@set -e; \
+	mkdir -p log; \
+	run_log=log/test_result_$$(date +%Y%m%d_%H%M%S).log; \
+	echo "[INFO] LOG FILE = $$run_log"; \
+	for t in $(PSCONE_TESTS); do \
+		name=$$(echo $$t | cut -d: -f1); \
+		cocotb_file=$$(echo $$t | cut -d: -f2); \
+		mem_file=$$(echo $$t | cut -d: -f3); \
+		expected=$$(echo $$t | cut -d: -f4); \
+		echo ""; \
+		echo "========================================"; \
+		echo "[TEST] $$name"; \
+		echo "[MEM ] $$mem_file"; \
+		echo "[EXP ] $$expected"; \
+		echo "[LOG ] $$run_log"; \
+		echo "========================================"; \
+		$(MAKE) clean; \
+		$(MAKE) -C ./cpp clean; \
+		$(MAKE) -C ./cpp $$name; \
+		tmp=$$(mktemp); \
+		head -n 4096 "$$mem_file" > $$tmp; \
+		cp $$tmp ./mem/test_program.mem; \
+		rm -f $$tmp; \
+		COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
+		TEST_NAME=$$name \
+		PSC_LOGFILE=$$run_log \
+		PROGRAM_FILE=$$mem_file \
+		EXPECTED_RESULT=$$expected \
+		TOPLEVEL=$(PSCONE_TOP) \
+		TOPLEVEL_LANG=verilog \
+		SIM=$(SIM) \
+		VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
+		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+		make --silent -f $(COCOTB_MAKEFILE); \
+	done; \
+	printf '\a'; \
+	echo ""; \
+	echo "========================================"; \
+	echo "✅ All PSC-ONE tests completed"; \
+	echo "📄 Log : $$run_log"; \
+	echo "========================================"
+
+
+
+
+# ============================================================
+# Rust tests
+#
+# rust/ 内の *.rs を
+#   Rust -> ELF -> BIN -> MEM
+# に変換し、その MEM を既存の PSC-ONE cocotb テストで実行する。
+#
+# Usage:
+#   make -f Makefile.cpu simulate_PSC_ONE_RUST CPU_VERSION=v2
+#
+# 1本だけ実行:
+#   make -f Makefile.cpu simulate_PSC_ONE_RUST \
+#       CPU_VERSION=v2 RUST_TESTS=add_test1
+#
+# 期待値を変更:
+#   make -f Makefile.cpu simulate_PSC_ONE_RUST \
+#       CPU_VERSION=v2 RUST_TESTS=add_test1 RUST_EXPECTED=0x12345678
+# ============================================================
+.PHONY: simulate_PSC_ONE_RUST
+simulate_PSC_ONE_RUST:
+	@mkdir -p ./wave ./log ./mem
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "RUST_TESTS=$(RUST_TESTS)"
+	@echo "RUST_EXPECTED=$(RUST_EXPECTED)"
+	@set -e; \
+	if [ -z "$(strip $(RUST_TESTS))" ]; then \
+		echo "[ERROR] $(RUST_DIR) に *.rs がありません"; \
+		exit 1; \
+	fi; \
+	run_log=log/rust_test_result_$$(date +%Y%m%d_%H%M%S).log; \
+	echo "[INFO] LOG FILE = $$run_log"; \
+	for name in $(RUST_TESTS); do \
+		echo ""; \
+		echo "========================================"; \
+		echo "[RUST TEST] $$name"; \
+		echo "[SRC ] $(RUST_DIR)/$$name.rs"; \
+		echo "[MEM ] ./mem/$$name.mem"; \
+		echo "[EXP ] $(RUST_EXPECTED)"; \
+		echo "[LOG ] $$run_log"; \
+		echo "========================================"; \
+		if [ ! -f "$(RUST_DIR)/$$name.rs" ]; then \
+			echo "[ERROR] Rust source not found: $(RUST_DIR)/$$name.rs"; \
+			exit 1; \
+		fi; \
+		if [ ! -f "$(RUST_DIR)/$$name.x" ]; then \
+			echo "[ERROR] Linker script not found: $(RUST_DIR)/$$name.x"; \
+			exit 1; \
+		fi; \
+		$(MAKE) -C $(RUST_DIR) -f $(RUST_MAKEFILE) clean TARGET=$$name; \
+		$(MAKE) -C $(RUST_DIR) -f $(RUST_MAKEFILE) mem TARGET=$$name; \
+		mem_file=./mem/$$name.mem; \
+		if [ ! -f "$$mem_file" ]; then \
+			echo "[ERROR] MEM file was not generated: $$mem_file"; \
+			exit 1; \
+		fi; \
+		tmp=$$(mktemp); \
+		head -n 4096 "$$mem_file" > $$tmp; \
+		cp $$tmp ./mem/test_program.mem; \
+		rm -f $$tmp; \
+		$(MAKE) clean; \
+		COCOTB_TEST_MODULES=cocotb_tb.cpu.$(RUST_COCOTB_MODULE) \
+		TEST_NAME=$$name \
+		PSC_LOGFILE=$$run_log \
+		PROGRAM_FILE=$$mem_file \
+		EXPECTED_RESULT=$(RUST_EXPECTED) \
+		TOPLEVEL=$(PSCONE_TOP) \
+		TOPLEVEL_LANG=verilog \
+		SIM=$(SIM) \
+		VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
+		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+		make --silent -f $(COCOTB_MAKEFILE); \
+	done; \
+	printf '\a'; \
+	echo ""; \
+	echo "========================================"; \
+	echo "✅ All PSC-ONE Rust tests completed"; \
+	echo "📄 Log : $$run_log"; \
+	echo "========================================"

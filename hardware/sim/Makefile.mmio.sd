@@ -1,0 +1,71 @@
+# ============================================================
+# Usage
+# ============================================================
+
+#make -f Makefile.mmio.sd simulate_PSC_SD MODE=icarus
+#or
+#make -f Makefile.mmio.sd simulate_PSC_SD MODE=verilator
+
+# ============================================================
+#  SIMULATOR 切り替え (MODE=icarus / verilator)
+# ============================================================
+#MODE  = icarus
+MODE  = verilator
+SIM  := $(MODE)
+
+# ------------------------------------------------------------
+#  Verilator / Icarus ごとの設定
+# ------------------------------------------------------------
+ifeq ($(MODE),verilator)
+EXTRA_ARGS = \
+	-O3 --trace --trace-fst \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+else ifeq ($(MODE),icarus)
+EXTRA_ARGS  = 
+VCD_COMPILE_ARGS = -DDUMP_VCD
+else
+$(error MODE=$(MODE) は不正です。MODE=icarus または MODE=verilator を指定してください)
+endif
+
+# ============================================================
+#  Cocotb / コンパイル共通設定
+# ============================================================
+DEFS += COCOTB_SIM=1
+ifeq ($(READ_MEM),1)
+DEFS += READ_MEM
+endif
+
+# -D マクロ & SystemVerilog 有効化（Icarus / Verilator 両対応）
+VLOG_ARGS = -g2012 $(addprefix -D,$(DEFS))
+
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+
+# ============================================================
+#  ソース一覧
+# ============================================================
+SDCARD_MODEL = ../rtl/SDCARD_model/sdcard_spi_model.v 
+MMIO_DIR = ../rtl/mmio/PSC_SDCARD
+
+SRC_SD = \
+	$(MMIO_DIR)/src/sim_PSC_SDCard.v \
+	$(MMIO_DIR)/src/PSC_SDCard.v \
+	$(MMIO_DIR)/src/PSC_SDCard_SPI.v \
+	$(SDCARD_MODEL)
+	
+# ============================================================
+#  Cocotb simulation targets
+# ============================================================
+simulate_PSC_SD:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_SD_READER test)"
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+	$(MAKE) clean
+	@mkdir -p ./wave
+	COCOTB_TEST_MODULES=cocotb_tb.mmio.sd_test \
+	TOPLEVEL=sim_PSC_SDCard TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(SRC_SD)" \
+	COMPILE_ARGS="-DCOCOTB_SIM $(VCD_COMPILE_ARGS)" \
+	VLOG_ARGS="$(VLOG_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	make -f $(COCOTB_MAKEFILE)

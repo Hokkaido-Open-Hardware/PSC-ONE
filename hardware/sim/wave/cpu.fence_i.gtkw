@@ -1,0 +1,51 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Tue Jun 30 03:46:40 2026
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.fence_i.gtkw"
+[timestart] 0
+[size] 2402 1054
+[pos] -1 -1
+*-33.049492 9710000000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.
+[sst_width] 375
+[signals_width] 310
+[sst_expanded] 1
+[sst_vpaned_height] 689
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.is_fence_i
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_program_dma_ctrl.cpu_cache_clear
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_program_dma_ctrl.cpu_cache_clear_d1
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_program_dma_ctrl.cpu_cache_clear_latch
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_program_dma_ctrl.state[3:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_program_dma_ctrl.cpu_req_ready
+@24
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_program_dma_ctrl.init_idx[9:0]
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.pc[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_program_dma_ctrl.cpu_req_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.fetch_fifo_flush
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.fifo_flush_sig
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.fifo_empty
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_program_dma_ctrl.cpu_valid
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_program_dma_ctrl.cpu_ready
+@200
+-
+@23
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.pc[31:0]
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.fetch_pc[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.fetch_state[3:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.program_mem_read_valid
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.program_mem_read_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_fetch_state.execute_ready
+[pattern_trace] 1
+[pattern_trace] 0

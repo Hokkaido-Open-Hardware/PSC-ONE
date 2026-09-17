@@ -1,0 +1,105 @@
+# ============================================================
+# Usage
+# ============================================================
+
+#TBD
+
+# ============================================================
+#  SIMULATOR 切り替え (MODE=icarus / verilator)
+# ============================================================
+MODE  = icarus
+#MODE  = verilator
+SIM  := $(MODE)
+
+# ------------------------------------------------------------
+#  Verilator / Icarus ごとの設定
+# ------------------------------------------------------------
+ifeq ($(MODE),verilator)
+# verilator
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v
+
+EXTRA_ARGS = \
+	--trace --trace-fst --Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+else ifeq ($(MODE),icarus)
+# icarus
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram.v 
+
+EXTRA_ARGS  =
+VCD_COMPILE_ARGS = -DDUMP_VCD
+else
+$(error MODE=$(MODE) は不正です。MODE=icarus または MODE=verilator を指定してください)
+endif
+
+# ============================================================
+#  Cocotb / コンパイル共通設定
+# ============================================================
+DEFS += COCOTB_SIM=1
+ifeq ($(READ_MEM),1)
+DEFS += READ_MEM
+endif
+
+# -D マクロ & SystemVerilog 有効化（Icarus / Verilator 両対応）
+VLOG_ARGS = -g2012 $(addprefix -D,$(DEFS))
+
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+
+# ============================================================
+#  ソース一覧
+# ============================================================
+SRC_SIMTOP = \
+	../rtl/cache/src/sim_cache_dma_controller.v
+SRC_CASHE = \
+	../rtl/cache/src/cache_dma_controller.sv \
+	../rtl/cache/src/cache_dma_controller_io.sv \
+	../rtl/cache/src/dm_cache_data.v \
+	../rtl/cache/src/dm_cache_tag.v
+SRC_BRIDGE = \
+	../rtl/axi/sdram_32bit_to_128bit_axi_bridge.v
+SRC_AXI_SDRAM_CNT = \
+	../rtl/axi/sdram_4port_controller_axi_slave_bX_32bit.v \
+	../rtl/sdram_controller/sdram_controller.sv
+
+SIM_SRC = $(SRC_SIMTOP) $(SRC_CASHE) $(SRC_BRIDGE) $(SRC_AXI_SDRAM_CNT) $(GW2AR_SDRAM_MODEL)
+	
+# ============================================================
+#  Cocotb simulation targets
+# ============================================================
+.PHONY: simulate_CACHE simulate_IDCACHE simulate_ICACHE
+
+simulate_CACHE: simulate_IDCACHE simulate_ICACHE
+
+# cache test
+simulate_IDCACHE:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_DM_CACHE test)"
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+	$(MAKE) clean
+	@mkdir -p ./wave
+	COCOTB_TEST_MODULES=cocotb_tb.cache.dm_cache_test \
+	TOPLEVEL=sim_cache_dma_controller TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(SIM_SRC)" \
+	COMPILE_ARGS="-DCOCOTB_SIM $(VCD_COMPILE_ARGS)" \
+	VLOG_ARGS="$(VLOG_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	make -f $(COCOTB_MAKEFILE)
+
+# I-cache test
+# burstt mode
+simulate_ICACHE:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_DM_CACHE test)"
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+	$(MAKE) clean
+	@mkdir -p ./wave
+	COCOTB_TEST_MODULES=cocotb_tb.cache.I_cache_test \
+	TOPLEVEL=sim_cache_dma_controller TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(SIM_SRC)" \
+	COMPILE_ARGS="-DCOCOTB_SIM $(VCD_COMPILE_ARGS)" \
+	VLOG_ARGS="$(VLOG_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	make -f $(COCOTB_MAKEFILE)
+
+
+
+

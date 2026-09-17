@@ -1,0 +1,103 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Wed Jul  1 02:16:24 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_ONE_Chip_test.fst"
+[dumpfile_mtime] "Wed Jul  1 02:15:26 2026"
+[dumpfile_size] 604463
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.dma.gtkw"
+[timestart] 0
+[size] 2778 1275
+[pos] -1 -1
+*-27.817293 547935000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.
+[sst_width] 279
+[signals_width] 198
+[sst_expanded] 1
+[sst_vpaned_height] 850
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.out_DMA_CTRL[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.out_DMA_DST[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.out_DMA_SRC[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.out_DMA_WORDS[31:0]
+PSC_ONE_Chip_sim.u_chip.u_dma.BASE_ADDR_READ[31:0]
+PSC_ONE_Chip_sim.u_chip.u_dma.BASE_ADDR_WRITE[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_data_dma_ctrl.cpu_req_ready
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.opcode[31:0]
+@23
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.csr_rdata[31:0]
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.st[3:0]
+@420
+PSC_ONE_Chip_sim.u_chip.u_dma.DATA_WIDTH
+PSC_ONE_Chip_sim.u_chip.u_dma.ID_WIDTH
+PSC_ONE_Chip_sim.u_chip.u_dma.ST_AR
+PSC_ONE_Chip_sim.u_chip.u_dma.ST_AW
+PSC_ONE_Chip_sim.u_chip.u_dma.ST_B
+PSC_ONE_Chip_sim.u_chip.u_dma.ST_DONE
+PSC_ONE_Chip_sim.u_chip.u_dma.ST_IDLE
+PSC_ONE_Chip_sim.u_chip.u_dma.ST_R
+PSC_ONE_Chip_sim.u_chip.u_dma.ST_W
+@28
+PSC_ONE_Chip_sim.u_chip.u_dma.ar_fire
+PSC_ONE_Chip_sim.u_chip.u_dma.aw_fire
+PSC_ONE_Chip_sim.u_chip.u_dma.b_fire
+PSC_ONE_Chip_sim.u_chip.u_dma.clock
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.st[3:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_start
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_busy
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_done
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_araddr[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_arburst[1:0]
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_arid[0]
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_arlen[7:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_arready
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_arsize[2:0]
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_arvalid
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_awaddr[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_awburst[1:0]
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_awid[0]
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_awlen[7:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_awready
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_awsize[2:0]
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_awvalid
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_bid[0]
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_bready
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_bresp[1:0]
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_bvalid
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_rdata[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_rid[0]
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_rlast
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_rready
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_rresp[1:0]
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_rvalid
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_wdata[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_wlast
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_wready
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_wstrb[3:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_axi_wvalid
+@22
+PSC_ONE_Chip_sim.u_chip.u_dma.dma_buf[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

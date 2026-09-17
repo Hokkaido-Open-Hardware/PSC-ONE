@@ -1,0 +1,117 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Sat Jun 27 10:50:48 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_MIC_test.vcd"
+[dumpfile_mtime] "Sat Jun 27 10:48:58 2026"
+[dumpfile_size] 356733
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/mmio.mic.gtkw"
+[timestart] 0
+[size] 2942 1293
+[pos] -1 -1
+*-23.812973 42810000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] sim_PSC_I2SRX.
+[treeopen] sim_PSC_I2SRX.u_i2s_if.
+[sst_width] 278
+[signals_width] 190
+[sst_expanded] 1
+[sst_vpaned_height] 734
+@28
+sim_PSC_I2SRX.I2S_LR
+sim_PSC_I2SRX.I2S_SCK
+sim_PSC_I2SRX.I2S_SD
+sim_PSC_I2SRX.I2S_WS
+@420
+sim_PSC_I2SRX.PSC_I2S_ADDR_RX
+sim_PSC_I2SRX.PSC_I2S_ADDR_ST
+@28
+sim_PSC_I2SRX.clock
+@22
+sim_PSC_I2SRX.cpu_raddr[31:0]
+sim_PSC_I2SRX.cpu_rdata[31:0]
+@28
+sim_PSC_I2SRX.cpu_rready
+sim_PSC_I2SRX.cpu_rvalid
+sim_PSC_I2SRX.reset_n
+sim_PSC_I2SRX.u_i2s_if.clock
+sim_PSC_I2SRX.u_i2s_if.reset_n
+@22
+sim_PSC_I2SRX.u_i2s_if.fifo_count[8:0]
+sim_PSC_I2SRX.u_mic_model.flame_cnt[23:0]
+sim_PSC_I2SRX.u_i2s_if.fifo_d0[31:0]
+sim_PSC_I2SRX.u_i2s_if.fifo_d1[31:0]
+sim_PSC_I2SRX.u_i2s_if.fifo_d2[31:0]
+sim_PSC_I2SRX.u_i2s_if.fifo_d3[31:0]
+@28
+sim_PSC_I2SRX.u_i2s_if.fifo_empty
+sim_PSC_I2SRX.u_i2s_if.fifo_flush
+sim_PSC_I2SRX.u_i2s_if.fifo_full
+sim_PSC_I2SRX.u_i2s_if.fifo_pop
+sim_PSC_I2SRX.u_i2s_if.I2S_LR
+sim_PSC_I2SRX.u_i2s_if.I2S_SCK
+@420
+sim_PSC_I2SRX.u_i2s_if.I2S_SCK_DIV
+@28
+sim_PSC_I2SRX.u_i2s_if.I2S_SD
+sim_PSC_I2SRX.u_i2s_if.I2S_SD_d
+sim_PSC_I2SRX.u_i2s_if.I2S_WS
+@23
+[color] 5
+sim_PSC_I2SRX.u_i2s_if.i2s_rsv_data[31:0]
+@c00022
+sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+@28
+(0)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(1)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(2)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(3)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(4)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(5)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(6)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(7)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(8)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(9)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(10)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(11)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(12)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(13)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(14)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(15)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(16)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(17)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(18)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(19)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(20)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(21)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(22)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(23)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(24)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(25)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(26)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(27)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(28)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(29)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(30)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+(31)sim_PSC_I2SRX.u_mic_model.shift_reg[31:0]
+@1401200
+-group_end
+@28
+sim_PSC_I2SRX.u_mic_model.LR_i
+sim_PSC_I2SRX.u_mic_model.LR_d
+@22
+sim_PSC_I2SRX.u_mic_model.sample_l[31:0]
+sim_PSC_I2SRX.u_mic_model.sample_r[31:0]
+@24
+sim_PSC_I2SRX.u_mic_model.bit_cnt[5:0]
+sim_PSC_I2SRX.u_i2s_if.i2s_data_divcnt[7:0]
+@28
+sim_PSC_I2SRX.u_i2s_if.fifo_push_sig
+sim_PSC_I2SRX.u_i2s_if.fifo_empty
+sim_PSC_I2SRX.u_i2s_if.fifo_pop
+@22
+sim_PSC_I2SRX.u_i2s_if.fifo_d0[31:0]
+sim_PSC_I2SRX.u_i2s_if.fifo_d1[31:0]
+sim_PSC_I2SRX.u_i2s_if.fifo_d2[31:0]
+sim_PSC_I2SRX.u_i2s_if.fifo_d3[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

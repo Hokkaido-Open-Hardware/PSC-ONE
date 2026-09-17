@@ -1,0 +1,185 @@
+#--------------------------------------------------
+# MODE
+#--------------------------------------------------
+#MODE = verilator
+MODE = icarus
+
+#--------------------------------------------------
+# 共通 define
+#--------------------------------------------------
+DEFS := COCOTB_SIM=1
+
+#--------------------------------------------------
+# simulator 別
+#--------------------------------------------------
+ifeq ($(MODE),verilator)
+
+SIM := verilator
+
+SIM_ARG_NAME := EXTRA_ARGS
+
+SIM_ARGS := \
+	$(addprefix -D,$(DEFS)) \
+	--trace \
+	--trace-fst \
+	--Wno-ASCRANGE \
+	--Wno-INITIALDLY \
+	--Wno-COMBDLY \
+	--Wno-WIDTHEXPAND \
+	--Wno-WIDTHTRUNC \
+	--Wno-REALCVT
+
+endif
+
+
+ifeq ($(MODE),icarus)
+
+SIM := icarus
+
+SIM_ARG_NAME := COMPILE_ARGS
+
+SIM_ARGS := \
+	$(addprefix -D,$(DEFS)) \
+	-DDUMP_VCD=1
+
+endif
+
+#--------------------------------------------------
+# defineを最後に展開
+#--------------------------------------------------
+SIM_COMPILE_ARGS := $(addprefix -D,$(DEFS))
+
+#--------------------------------------------------
+# MODE チェック
+#--------------------------------------------------
+ifeq ($(SIM),)
+$(error MODE=$(MODE) は不正です。MODE=verilator または MODE=icarus を指定してください)
+endif
+
+#--------------------------------------------------
+# 子 make へ環境変数として渡す
+#--------------------------------------------------
+export SIM_COMPILE_ARGS
+export EXTRA_ARGS
+
+#--------------------------------------------------
+# Cocotb Makefile
+#--------------------------------------------------
+COCOTB_MAKEFILE := $(shell cocotb-config --makefiles)/Makefile.sim
+
+#--------------------------------------------------
+# Variables
+#--------------------------------------------------
+
+# Variables
+SRC_DIR = ../rtl/ai/src
+PE_FILE = $(SRC_DIR)/PE_INT.v \
+		  $(SRC_DIR)/PE_mult.v \
+		  $(SRC_DIR)/sim_PE_top.v
+
+VERILOG_FILE_SA 	= $(SRC_DIR)/SystolicArray2x2.v $(PE_FILE)
+VERILOG_FILE_SA_4x4 = $(SRC_DIR)/SystolicArray4x4.v $(PE_FILE)
+VERILOG_FILE_CTRL 	= $(SRC_DIR)/SystolicArray_Ctrl.v \
+					  $(SRC_DIR)/SystolicArray_ReadCtrl.v \
+					  $(SRC_DIR)/SystolicArray4x4.v \
+					  $(PE_FILE) 
+
+COCOTB_FILE_SA_Ctrl		= int8_SA_Ctrl_test
+COCOTB_FILE_SA 			= int8_SA_test
+COCOTB_FILE_SA_4x4		= int8_SA_4x4_test
+COCOTB_FILE_PE 			= int8_PE_test
+
+COCOTB_CFG       := $(shell which cocotb-config)
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+SIM_BUILD        ?= sim_build
+
+#--------------------------------------------------
+# Targets
+#--------------------------------------------------
+.PHONY: simulate_all 
+
+# まとめて実行
+simulate_all: simulate_PE simulate_SA simulate_SA_Ctrl simulate_SA_multicycle_Ctrl
+		
+# Output Stationary.
+simulate_SA_Ctrl: 
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
+	make clean
+	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_CTRL=1" \
+	make -f $(COCOTB_MAKEFILE) \
+	    SIM=$(SIM) \
+	    COCOTB_TEST_MODULES=cocotb_tb.ai.$(COCOTB_FILE_SA_Ctrl) \
+	    TOPLEVEL=SystolicArray4x4_Ctrl \
+	    TOPLEVEL_LANG=verilog \
+	    VERILOG_SOURCES="$(VERILOG_FILE_CTRL)"
+
+# Output Stationary.
+simulate_SA:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
+	make clean
+	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_SA=1" \
+	make -f $(COCOTB_MAKEFILE) \
+	    SIM=$(SIM) \
+	    COCOTB_TEST_MODULES=cocotb_tb.ai.$(COCOTB_FILE_SA) \
+	    TOPLEVEL=SystolicArray2x2 \
+	    TOPLEVEL_LANG=verilog \
+	    VERILOG_SOURCES="$(VERILOG_FILE_SA)"
+
+# Output Stationary.
+simulate_SA_4x4:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
+	make clean
+	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_SA=1" \
+	make -f $(COCOTB_MAKEFILE) \
+	    SIM=$(SIM) \
+	    COCOTB_TEST_MODULES=cocotb_tb.ai.$(COCOTB_FILE_SA_4x4) \
+	    TOPLEVEL=SystolicArray4x4 \
+	    TOPLEVEL_LANG=verilog \
+	    VERILOG_SOURCES="$(VERILOG_FILE_SA_4x4)"
+
+simulate_PE:
+	make clean
+	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_PE=1" \
+	make -f $(COCOTB_MAKEFILE) \
+	    SIM=$(SIM) \
+	    COCOTB_TEST_MODULES=cocotb_tb.ai.$(COCOTB_FILE_PE) \
+	    TOPLEVEL=sim_PE_top \
+	    TOPLEVEL_LANG=verilog \
+	    VERILOG_SOURCES="$(PE_FILE)"
+
+#--------------------------------------------------
+# Yosys
+#--------------------------------------------------
+
+YOSYS ?= yosys
+
+YOSYS_OUT_DIR := ../rtl/ai/yosys_out
+
+YOSYS_TOP_SAT_2x2 := SystolicArray2x2
+YOSYS_LOG_SAT_2x2 := $(YOSYS_OUT_DIR)/sa_2x2.log
+YOSYS_JSON_SAT_2x2 := $(YOSYS_OUT_DIR)/sa_2x2.json
+
+# Output Stationary
+yosys_SA_2x2:
+	@echo "========================================"
+	@echo "[YOSYS] TOP=$(YOSYS_TOP_SAT_2x2)"
+	@echo "[YOSYS] PE=4, MUL=2"
+	@echo "========================================"
+	@mkdir -p $(YOSYS_OUT_DIR)
+	$(YOSYS) -l $(YOSYS_LOG_SAT_2x2) -p " \
+		read_verilog -sv $(VERILOG_FILE_SA); \
+		hierarchy -check -top $(YOSYS_TOP_SAT_2x2); \
+		proc; \
+		opt; \
+		flatten; \
+		opt; \
+		memory; \
+		opt; \
+		techmap; \
+		opt; \
+		stat -top $(YOSYS_TOP_SAT_2x2); \
+		write_json $(YOSYS_JSON_SAT_2x2); \
+	"
+
+yosys_clean:
+	rm -rf $(YOSYS_OUT_DIR)

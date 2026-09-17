@@ -1,0 +1,58 @@
+[*]
+[*] GTKWave Analyzer v3.3.126 (w)1999-2026 BSI
+[*] Thu Aug  6 18:52:24 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_LCD_test.vcd"
+[dumpfile_mtime] "Thu Aug  6 18:51:00 2026"
+[dumpfile_size] 9483055
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.mmio.lcd.gtkw"
+[timestart] 2447057000
+[size] 2503 1206
+[pos] -1 -1
+*-20.787981 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] sim_PSC_ONE_LCD.
+[treeopen] sim_PSC_ONE_LCD.u_lcd.
+[treeopen] sim_PSC_ONE_LCD.u_lcd.u_tft.
+[sst_width] 278
+[signals_width] 190
+[sst_expanded] 1
+[sst_vpaned_height] 368
+@28
+sim_PSC_ONE_LCD.u_lcd.clock
+@22
+sim_PSC_ONE_LCD.u_lcd.cpu_byte_raddr[31:0]
+sim_PSC_ONE_LCD.u_lcd.cpu_byte_waddr[31:0]
+sim_PSC_ONE_LCD.u_lcd.cpu_if_data[8:0]
+@28
+sim_PSC_ONE_LCD.u_lcd.cpu_if_ready
+sim_PSC_ONE_LCD.u_lcd.cpu_if_valid
+@22
+sim_PSC_ONE_LCD.u_lcd.cpu_raddr[31:0]
+sim_PSC_ONE_LCD.u_lcd.cpu_rdata[31:0]
+@28
+sim_PSC_ONE_LCD.u_lcd.cpu_rready
+sim_PSC_ONE_LCD.u_lcd.cpu_rvalid
+sim_PSC_ONE_LCD.u_lcd.cpu_rvalid_latch
+@22
+sim_PSC_ONE_LCD.u_lcd.cpu_waddr[31:0]
+sim_PSC_ONE_LCD.u_lcd.cpu_wdata[31:0]
+@28
+sim_PSC_ONE_LCD.u_lcd.cpu_wready
+sim_PSC_ONE_LCD.u_lcd.cpu_wvalid
+sim_PSC_ONE_LCD.u_lcd.cpu_wvalid_latch
+sim_PSC_ONE_LCD.u_lcd.div_clk
+sim_PSC_ONE_LCD.u_lcd.reset_n
+sim_PSC_ONE_LCD.u_lcd.spi_idle
+sim_PSC_ONE_LCD.u_lcd.tft_cs
+sim_PSC_ONE_LCD.u_lcd.tft_dc
+@29
+sim_PSC_ONE_LCD.u_lcd.tft_reset
+@28
+sim_PSC_ONE_LCD.u_lcd.tft_sck
+sim_PSC_ONE_LCD.u_lcd.tft_sdi
+sim_PSC_ONE_LCD.u_lcd.tft_sdo
+sim_PSC_ONE_LCD.u_lcd.u_tft.dataAvailable
+@22
+sim_PSC_ONE_LCD.u_lcd.u_tft.spi.dataShift[0:7]
+[pattern_trace] 1
+[pattern_trace] 0

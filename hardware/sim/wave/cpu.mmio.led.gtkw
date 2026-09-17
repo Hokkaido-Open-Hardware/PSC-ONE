@@ -1,0 +1,45 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Sun Jun 28 20:51:31 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_ONE_Chip_test.vcd"
+[dumpfile_mtime] "Sun Jun 28 20:50:13 2026"
+[dumpfile_size] 15732736
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.mmio.led.gtkw"
+[timestart] 485455000
+[size] 2330 1076
+[pos] -1 -1
+*-16.714773 485885000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[sst_width] 278
+[signals_width] 190
+[sst_expanded] 1
+[sst_vpaned_height] 705
+@22
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.LED_ADDRESS
+@420
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.ADDR_WIDTH
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.LED_NUMBER
+@22
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.LED_out[7:0]
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.MMIO_out_reg[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.clock
+@22
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.cpu_waddr[31:0]
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.cpu_wdata[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.cpu_wready
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.cpu_wvalid
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.cpu_rvalid
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.cpu_rready
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.cpu_wvalid_latch
+PSC_ONE_Chip_sim.u_chip.u_mmap_led.reset_n
+PSC_ONE_Chip_sim.u_chip.mmio_valid
+PSC_ONE_Chip_sim.u_chip.mmio_ready
+PSC_ONE_Chip_sim.u_chip.mmio_rw
+@22
+PSC_ONE_Chip_sim.u_chip.mmio_addr[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

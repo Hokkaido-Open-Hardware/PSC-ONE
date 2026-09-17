@@ -1,0 +1,34 @@
+# Python
+myenv/
+__pycache__/
+*.pyc
+
+# Build
+build/
+sim_build/
+results.xml
+
+# Paralell
+parallel_run/
+
+# FPGA
+*.vvp
+*.vcd
+*.fst
+
+# Compiler
+*.o
+*.elf
+*.bin
+*.mem
+*.S
+
+# Vosk models
+vosk-model*/
+
+# Audio samples
+*.wav
+
+# Simulation logs and RISC-V test build outputs
+hardware/sim/log/test_result_*.log
+hardware/sim/riscv_build/

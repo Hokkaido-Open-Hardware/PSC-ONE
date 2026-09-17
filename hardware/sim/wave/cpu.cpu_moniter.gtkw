@@ -1,0 +1,48 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Wed Jul  8 09:14:43 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_ONE_Chip_test.fst"
+[dumpfile_mtime] "Wed Jul  8 09:11:32 2026"
+[dumpfile_size] 315506
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.cpu_moniter.gtkw"
+[timestart] 878277700
+[size] 2564 1146
+[pos] -1 -1
+*-17.434793 879015000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.
+[sst_width] 278
+[signals_width] 381
+[sst_expanded] 1
+[sst_vpaned_height] 347
+@420
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.CLK_FREQ_MHz
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.PSC_CPU_MON_CTRL[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.PSC_CPU_MON_CYCLE[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.clock
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.data_cache_hit_count[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.data_cache_hit_pulse
+@23
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.data_cache_miss_count[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.data_cache_miss_pulse
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.program_cache_hit_count[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.program_cache_hit_pulse
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.program_cache_miss_count[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.program_cache_miss_pulse
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_cpu_monitor.reset_n
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_csr.csr_rdata[31:0]
+[pattern_trace] 1
+[pattern_trace] 0

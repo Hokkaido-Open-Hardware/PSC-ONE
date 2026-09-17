@@ -1,0 +1,95 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Mon Jul 13 19:19:49 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/SystolicArray2x2_Ctrl_test.vcd"
+[dumpfile_mtime] "Mon Jul 13 19:18:42 2026"
+[dumpfile_size] 182966
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/ai.ctrl.gtkw"
+[timestart] 0
+[size] 2494 1262
+[pos] -1 -1
+*-21.047764 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] SystolicArray2x2_Ctrl.
+[treeopen] SystolicArray2x2_Ctrl.u_sa.
+[sst_width] 278
+[signals_width] 496
+[sst_expanded] 1
+[sst_vpaned_height] 782
+@22
+SystolicArray2x2_Ctrl.b_send_idx[3:0]
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.a_data_out_cur[31:0]
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.b_data_out_cur[31:0]
+@24
+SystolicArray2x2_Ctrl.sa_max_cycle[7:0]
+@22
+SystolicArray2x2_Ctrl.cycle_idx[7:0]
+[color] 1
+SystolicArray2x2_Ctrl.row_idx[3:0]
+[color] 1
+SystolicArray2x2_Ctrl.col_idx[3:0]
+@28
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.clock
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.reset_n
+@22
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.state[3:0]
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.rd_col[3:0]
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.rd_row[3:0]
+@28
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.lower
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.upper
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.right
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.left
+@22
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.rd_read_addr[31:0]
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.rd_read_data[31:0]
+@28
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.rd_read_ready
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.rd_read_valid
+@29
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.read_valid
+@28
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.read_ready
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.reset_n
+@22
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.state[3:0]
+SystolicArray2x2_Ctrl.c_write_addr[31:0]
+@28
+SystolicArray2x2_Ctrl.c_write_ready
+SystolicArray2x2_Ctrl.c_write_valid
+@24
+SystolicArray2x2_Ctrl.c_write_wdata[31:0]
+@22
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.rd_col[3:0]
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.rd_row[3:0]
+@28
+SystolicArray2x2_Ctrl.u_systolic_array_read_ctrl.second
+SystolicArray2x2_Ctrl.u_sa.data_clear
+@24
+SystolicArray2x2_Ctrl.u_sa.ps_acc_0[31:0]
+SystolicArray2x2_Ctrl.u_sa.ps_acc_1[31:0]
+SystolicArray2x2_Ctrl.u_sa.ps_acc_2[31:0]
+SystolicArray2x2_Ctrl.u_sa.ps_acc_3[31:0]
+SystolicArray2x2_Ctrl.row_s[3:0]
+@22
+[color] 1
+SystolicArray2x2_Ctrl.matrix_addr_C.row_idx[3:0]
+SystolicArray2x2_Ctrl.matrix_addr_C.col_idx[3:0]
+SystolicArray2x2_Ctrl.matrix_addr_C.row_s[3:0]
+@420
+SystolicArray2x2_Ctrl.SHIFT_N
+@22
+SystolicArray2x2_Ctrl.matrix_addr_C.cycle_idx[3:0]
+@28
+SystolicArray2x2_Ctrl.u_sa.busy_out
+@22
+SystolicArray2x2_Ctrl.cycle_idx[7:0]
+SystolicArray2x2_Ctrl.row_idx_reg[3:0]
+SystolicArray2x2_Ctrl.matrix_addr_C.row_idx[3:0]
+@28
+SystolicArray2x2_Ctrl.start_pulse
+SystolicArray2x2_Ctrl.u_sa.start_pulse
+@24
+SystolicArray2x2_Ctrl.state[5:0]
+[pattern_trace] 1
+[pattern_trace] 0

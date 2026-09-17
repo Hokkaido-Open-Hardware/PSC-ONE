@@ -1,0 +1,68 @@
+# ============================================================
+# Usage
+# ============================================================
+
+#make -f Makefile.fpe simulate_PSC_PFE MODE=icarus
+#or
+#make -f Makefile.fpe simulate_PSC_PFE MODE=verilator
+
+# ============================================================
+#  SIMULATOR 切り替え (MODE=icarus / verilator)
+# ============================================================
+#MODE  = icarus
+MODE  = verilator
+SIM  := $(MODE)
+
+# ------------------------------------------------------------
+#  Verilator / Icarus ごとの設定
+# ------------------------------------------------------------
+ifeq ($(MODE),verilator)
+EXTRA_ARGS = \
+	-O3 --trace --trace-fst \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+else ifeq ($(MODE),icarus)
+EXTRA_ARGS  = 
+VCD_COMPILE_ARGS = -DDUMP_VCD
+else
+$(error MODE=$(MODE) は不正です。MODE=icarus または MODE=verilator を指定してください)
+endif
+
+# ============================================================
+#  Cocotb / コンパイル共通設定
+# ============================================================
+DEFS += COCOTB_SIM=1
+ifeq ($(READ_MEM),1)
+DEFS += READ_MEM
+endif
+
+# -D マクロ & SystemVerilog 有効化（Icarus / Verilator 両対応）
+VLOG_ARGS = -g2012 $(addprefix -D,$(DEFS))
+
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+
+# ============================================================
+#  ソース一覧
+# ============================================================
+FPE_DIR  = ../rtl/pfe/src
+PFE_FILE = PSC_PFE.v
+
+SRC_FPE = \
+	$(FPE_DIR)/$(PFE_FILE)
+	
+# ============================================================
+#  Cocotb simulation targets
+# ============================================================
+simulate_PSC_PFE:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_ONE_PFE test)"
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+	$(MAKE) clean
+	@mkdir -p ./wave
+	COCOTB_TEST_MODULES=cocotb_tb.pfe.pfe_test \
+	TOPLEVEL=PSC_PFE TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(SRC_FPE)" \
+	COMPILE_ARGS="-DCOCOTB_SIM $(VCD_COMPILE_ARGS)" \
+	VLOG_ARGS="$(VLOG_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	make -f $(COCOTB_MAKEFILE)

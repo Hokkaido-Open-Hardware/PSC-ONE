@@ -1,0 +1,62 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Fri Jul 17 22:39:29 2026
+[*]
+[dumpfile] "(null)"
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.nn1.gtkw"
+[timestart] 498131000
+[size] 2892 1328
+[pos] -1 -1
+*-18.492071 498525000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.
+[sst_width] 278
+[signals_width] 256
+[sst_expanded] 1
+[sst_vpaned_height] 411
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.pc[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.opcode[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.fifo_read_ready
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.fifo_flush_sig
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.norm_decode_enb
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.decode_done
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.norm_execute_enb
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.alu_done
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.norm_MMU_enb_1
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.d_mmu_done_1
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.norm_branch_enb
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.norm_MMU_enb_2
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.d_mmu_done_2
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.norm_reg_store_enb
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.norm_store_enb
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.norm_store_enb
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.memory_store_done
+@29
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.register_store_done
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.alu_start
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.mul_busy
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.mul_done
+@24
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.ex_r_addr1[4:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.ex_r_addr2[4:0]
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_multiplexer.data_1[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_multiplexer.data_2[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.u_multiplexer.mul_out[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.reg_data_addr1[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_execute.reg_data_addr2[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_regfile.registers[14][31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_regfile.registers[15][31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_regfile.registers[16][31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.is_load
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.is_store
+[pattern_trace] 1
+[pattern_trace] 0

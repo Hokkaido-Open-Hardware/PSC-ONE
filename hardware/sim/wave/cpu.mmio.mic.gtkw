@@ -1,0 +1,67 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Thu Jun 25 17:10:04 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_ONE_Chip_test.vcd"
+[dumpfile_mtime] "Thu Jun 25 17:09:23 2026"
+[dumpfile_size] 22869051
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.mmio.mic.gtkw"
+[timestart] 2206900000
+[size] 2648 1163
+[pos] -1 -1
+*-24.478355 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[sst_width] 278
+[signals_width] 190
+[sst_expanded] 1
+[sst_vpaned_height] 769
+@28
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.I2S_LR
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.I2S_SCK
+@420
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.I2S_SCK_DIV
+@28
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.I2S_SCK_d1
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.I2S_SCK_reg
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.I2S_SD
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.I2S_SD_d
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.I2S_WS
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.clock
+@22
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.cpu_raddr[31:0]
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.cpu_rdata[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.cpu_rready
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.cpu_rvalid
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.cpu_rvalid_latch
+@22
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.divcnt[15:0]
+@24
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_count[8:0]
+@22
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_d0[31:0]
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_d1[31:0]
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_d2[31:0]
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_d3[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_empty
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_flush
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_full
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_pop
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_push
+@22
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_push_data[23:0]
+@24
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_rd_ptr[7:0]
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.fifo_wr_ptr[7:0]
+@420
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.i
+@22
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.i2s_data_divcnt[7:0]
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.i2s_rsv_data[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.pos_SCK
+PSC_ONE_Chip_sim.u_chip.u_i2s_if.reset_n
+[pattern_trace] 1
+[pattern_trace] 0

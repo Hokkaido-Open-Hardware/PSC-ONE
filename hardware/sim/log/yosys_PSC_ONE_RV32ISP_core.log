@@ -1,0 +1,135 @@
+
+ /----------------------------------------------------------------------------\
+ |                                                                            |
+ |  yosys -- Yosys Open SYnthesis Suite                                       |
+ |                                                                            |
+ |  Copyright (C) 2012 - 2020  Claire Xenia Wolf <claire@yosyshq.com>         |
+ |                                                                            |
+ |  Permission to use, copy, modify, and/or distribute this software for any  |
+ |  purpose with or without fee is hereby granted, provided that the above    |
+ |  copyright notice and this permission notice appear in all copies.         |
+ |                                                                            |
+ |  THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES  |
+ |  WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF          |
+ |  MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR   |
+ |  ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES    |
+ |  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN     |
+ |  ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF   |
+ |  OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.            |
+ |                                                                            |
+ \----------------------------------------------------------------------------/
+
+ Yosys 0.33 (git sha1 2584903a060)
+
+
+-- Running command `	read_verilog -sv -noautowire -defer ../rtl/cpu/src/vdefines_file.v ../rtl/cpu/src/PSC_RV32ISP_core.v ../rtl/cpu/src/PSC_RV32ISP_Fetch.v ../rtl/cpu/src/PSC_RV32ISP_Execute.v ../rtl/cpu/src/Fetch_Fifo.v ../rtl/cpu/src/Fetch.v ../rtl/cpu/src/Decorder.v ../rtl/cpu/src/Execute.v ../rtl/cpu/src/Branch.v ../rtl/cpu/src/MemoryStore.v ../rtl/cpu/src/Register.v ../rtl/cpu/src/MMU.v ../rtl/cpu/src/Csr.v ../rtl/mmio/MMIO/PSC_RV32IS_MMapped_IO.v ../rtl/mmio/UART/PSC_RV32IS_UART.v ../rtl/mmio/LED/PSC_RV32IS_LED.v ../rtl/cache/src/cache_dma_controller.v ../rtl/cache/src/cache_dma_controller_io.v ../rtl/cache/src/dm_cache_data.v ../rtl/cache/src/dm_cache_tag.v ../rtl/top/Delay_N.v; 	hierarchy -top PSC_ONE_RV32ISP_core -check; 	proc; opt; fsm; opt; 	memory; opt; 	tee -o ./log_yosys/wreduce.log wreduce -keepdc; 	opt -full; 	clean -purge; 	techmap; opt; 	abc -fast; 	check -assert; 	stat' --
+
+1. Executing Verilog-2005 frontend: ../rtl/cpu/src/vdefines_file.v
+Parsing SystemVerilog input from `../rtl/cpu/src/vdefines_file.v' to AST representation.
+Successfully finished Verilog frontend.
+
+2. Executing Verilog-2005 frontend: ../rtl/cpu/src/PSC_RV32ISP_core.v
+Parsing SystemVerilog input from `../rtl/cpu/src/PSC_RV32ISP_core.v' to AST representation.
+Storing AST representation for module `$abstract\PSC_RV32ISP_core'.
+Successfully finished Verilog frontend.
+
+3. Executing Verilog-2005 frontend: ../rtl/cpu/src/PSC_RV32ISP_Fetch.v
+Parsing SystemVerilog input from `../rtl/cpu/src/PSC_RV32ISP_Fetch.v' to AST representation.
+Storing AST representation for module `$abstract\PSC_RV32ISP_Fetch'.
+Successfully finished Verilog frontend.
+
+4. Executing Verilog-2005 frontend: ../rtl/cpu/src/PSC_RV32ISP_Execute.v
+Parsing SystemVerilog input from `../rtl/cpu/src/PSC_RV32ISP_Execute.v' to AST representation.
+Storing AST representation for module `$abstract\PSC_RV32ISP_Execute'.
+Successfully finished Verilog frontend.
+
+5. Executing Verilog-2005 frontend: ../rtl/cpu/src/Fetch_Fifo.v
+Parsing SystemVerilog input from `../rtl/cpu/src/Fetch_Fifo.v' to AST representation.
+Storing AST representation for module `$abstract\Fetch_Fifo'.
+Successfully finished Verilog frontend.
+
+6. Executing Verilog-2005 frontend: ../rtl/cpu/src/Fetch.v
+Parsing SystemVerilog input from `../rtl/cpu/src/Fetch.v' to AST representation.
+Storing AST representation for module `$abstract\Fetch'.
+Successfully finished Verilog frontend.
+
+7. Executing Verilog-2005 frontend: ../rtl/cpu/src/Decorder.v
+Parsing SystemVerilog input from `../rtl/cpu/src/Decorder.v' to AST representation.
+Storing AST representation for module `$abstract\Decorder'.
+Storing AST representation for module `$abstract\Decorder_2'.
+Successfully finished Verilog frontend.
+
+8. Executing Verilog-2005 frontend: ../rtl/cpu/src/Execute.v
+Parsing SystemVerilog input from `../rtl/cpu/src/Execute.v' to AST representation.
+Storing AST representation for module `$abstract\Execute'.
+Successfully finished Verilog frontend.
+
+9. Executing Verilog-2005 frontend: ../rtl/cpu/src/Branch.v
+Parsing SystemVerilog input from `../rtl/cpu/src/Branch.v' to AST representation.
+Storing AST representation for module `$abstract\Branch'.
+Successfully finished Verilog frontend.
+
+10. Executing Verilog-2005 frontend: ../rtl/cpu/src/MemoryStore.v
+Parsing SystemVerilog input from `../rtl/cpu/src/MemoryStore.v' to AST representation.
+Storing AST representation for module `$abstract\MemoryStore'.
+Successfully finished Verilog frontend.
+
+11. Executing Verilog-2005 frontend: ../rtl/cpu/src/Register.v
+Parsing SystemVerilog input from `../rtl/cpu/src/Register.v' to AST representation.
+Storing AST representation for module `$abstract\Register'.
+Successfully finished Verilog frontend.
+
+12. Executing Verilog-2005 frontend: ../rtl/cpu/src/MMU.v
+Parsing SystemVerilog input from `../rtl/cpu/src/MMU.v' to AST representation.
+Storing AST representation for module `$abstract\MMU'.
+Successfully finished Verilog frontend.
+
+13. Executing Verilog-2005 frontend: ../rtl/cpu/src/Csr.v
+Parsing SystemVerilog input from `../rtl/cpu/src/Csr.v' to AST representation.
+Storing AST representation for module `$abstract\Csr'.
+Successfully finished Verilog frontend.
+
+14. Executing Verilog-2005 frontend: ../rtl/mmio/MMIO/PSC_RV32IS_MMapped_IO.v
+Parsing SystemVerilog input from `../rtl/mmio/MMIO/PSC_RV32IS_MMapped_IO.v' to AST representation.
+Storing AST representation for module `$abstract\PSC_RV32IS_MMapped_IO'.
+Successfully finished Verilog frontend.
+
+15. Executing Verilog-2005 frontend: ../rtl/mmio/UART/PSC_RV32IS_UART.v
+Parsing SystemVerilog input from `../rtl/mmio/UART/PSC_RV32IS_UART.v' to AST representation.
+Storing AST representation for module `$abstract\PSC_RV32IS_UART'.
+Storing AST representation for module `$abstract\UART_TX'.
+Storing AST representation for module `$abstract\UART_RX'.
+Successfully finished Verilog frontend.
+
+16. Executing Verilog-2005 frontend: ../rtl/mmio/LED/PSC_RV32IS_LED.v
+Parsing SystemVerilog input from `../rtl/mmio/LED/PSC_RV32IS_LED.v' to AST representation.
+Storing AST representation for module `$abstract\PSC_RV32IS_LED'.
+Successfully finished Verilog frontend.
+
+17. Executing Verilog-2005 frontend: ../rtl/cache/src/cache_dma_controller.v
+Parsing SystemVerilog input from `../rtl/cache/src/cache_dma_controller.v' to AST representation.
+Storing AST representation for module `$abstract\cache_dma_controller'.
+Successfully finished Verilog frontend.
+
+18. Executing Verilog-2005 frontend: ../rtl/cache/src/cache_dma_controller_io.v
+Parsing SystemVerilog input from `../rtl/cache/src/cache_dma_controller_io.v' to AST representation.
+Storing AST representation for module `$abstract\cache_dma_controller_io'.
+Successfully finished Verilog frontend.
+
+19. Executing Verilog-2005 frontend: ../rtl/cache/src/dm_cache_data.v
+Parsing SystemVerilog input from `../rtl/cache/src/dm_cache_data.v' to AST representation.
+Storing AST representation for module `$abstract\dm_cache_data'.
+Successfully finished Verilog frontend.
+
+20. Executing Verilog-2005 frontend: ../rtl/cache/src/dm_cache_tag.v
+Parsing SystemVerilog input from `../rtl/cache/src/dm_cache_tag.v' to AST representation.
+Storing AST representation for module `$abstract\dm_cache_tag'.
+Successfully finished Verilog frontend.
+
+21. Executing Verilog-2005 frontend: ../rtl/top/Delay_N.v
+Parsing SystemVerilog input from `../rtl/top/Delay_N.v' to AST representation.
+Storing AST representation for module `$abstract\delay_n'.
+Successfully finished Verilog frontend.
+
+22. Executing HIERARCHY pass (managing design hierarchy).
+ERROR: Module `PSC_ONE_RV32ISP_core' not found!

@@ -1,0 +1,428 @@
+<p align="center">
+  <a href="https://github.com/QPSC-Design/PSC-ONE">
+    <img src="../docs/images/PSC-ONE_Logo.png" width="100%">
+  </a>
+</p>
+
+# PSC-ONE Hardware
+
+This directory contains the RTL hardware design of **PSC-ONE**, a fully custom FPGA-based RISC-V SoC.
+
+---
+
+## Overview
+
+PSC-ONE is an experimental full-stack SoC that integrates:
+
+* A custom RISC-V CPU
+* Cache and memory-management units
+* SDRAM and boot memory
+* Storage and multimedia interfaces
+* Custom hardware accelerators
+* A dedicated operating system, PSC-OS
+
+The project is designed as a hardware/software co-design platform for CPU architecture, operating systems, memory systems, and application-specific accelerators.
+
+The main target platform is currently the **Tang Nano 20K**, using the FPGA's internal SDRAM as system memory.
+
+---
+
+## Main Components
+
+### PSC_RV32ISP CPU
+
+**PSC_RV32ISP** is a custom 32-bit RISC-V processor designed from scratch for PSC-ONE.
+
+The following diagram shows the internal architecture of the PSC_RV32ISP CPU and its connection to the PSC-ONE memory subsystem.
+
+The CPU integrates instruction fetch and execution logic, general-purpose registers, CSR control, privilege-mode handling, Sv32 address translation, instruction and data caches, and interfaces to system memory and memory-mapped peripherals.
+
+<img src="../docs/images/PSC_RV32ISP.jpg" width="800">
+
+Current CPU features include:
+
+* RV32I base integer instruction set
+* Zicsr CSR instructions
+* Zifencei instruction support
+* Integer multiplication support
+* Integer division and remainder support
+* Machine, Supervisor, and User privilege modes
+* Exception and interrupt handling
+* ECALL and SRET support
+* Sv32 virtual memory
+* Instruction and data caches
+* Load-use and register-dependency handling
+* Optional pipelined execution
+* Custom hardware-accelerator integration
+
+The CPU is designed to execute PSC-OS and user applications directly on the FPGA.
+
+---
+
+### PSC_RV32ISP(V1) CPU
+
+**PSC_RV32ISP_V1** is a task-driven version of the custom 32-bit RISC-V processor currently being developed for PSC-ONE.
+
+The following diagram shows the internal architecture of the PSC_RV32ISP_V1 CPU and its connection to the PSC-ONE memory subsystem.
+
+Unlike a conventional fixed-stage pipeline, PSC_RV32ISP_V1 executes each instruction as a sequence of controlled tasks. The CPU controller activates the required functional modules in order and waits for each module to report completion before advancing to the next task.
+
+The current execution sequence is:
+
+1. Instruction fetch
+2. Instruction decode
+3. Execute and effective-address calculation
+4. Branch evaluation or load processing
+5. Store, CSR, and write-back processing
+
+Each functional module uses enable and completion signals, allowing variable-latency operations such as memory access, cache misses, MMU translation, multiplication, and division to stall only the active instruction task.
+
+<img src="../docs/images/PSC_RV32ISP_V1.jpg" width="800">
+
+The task-driven design provides:
+
+* Clear separation between functional modules
+* Explicit control of instruction execution order
+* Support for variable-latency execution units
+* Simple cache and MMU wait-state handling
+* Unified handling of branches, loads, stores, CSR operations, and exceptions
+* A foundation for multiple execution slots and limited parallel execution
+* Easier extension with custom PSC-ONE hardware accelerators
+
+PSC_RV32ISP_V1 currently uses a state-controlled execution model. Future versions may hold multiple instruction tasks simultaneously and permit independent tasks to overlap when there are no register, memory, or control dependencies.
+
+## RISC-V ISA Test Results
+
+The `PSC_RV32ISP_V1` processor has been verified using the official `riscv-tests` instruction test suite.
+
+The following test groups currently pass in Verilator and cocotb simulation:
+
+* RV32I base integer instruction tests
+* RV32M multiplication, division, and remainder tests
+* Load and store instruction tests
+* Branch and jump instruction tests
+* Shift and comparison instruction tests
+* `FENCE.I` instruction test
+
+A total of **49 official RISC-V ISA tests pass** on `PSC_RV32ISP_V1`.
+
+The `rv32ui-ma_data` test is currently excluded because it requires misaligned data access support. PSC_RV32ISP_V1 currently expects naturally aligned load and store accesses.
+
+Test sources are based on:
+
+```text
+https://github.com/riscv-software-src/riscv-tests
+```
+
+The tests are executed using:
+
+```text
+Verilator
+cocotb
+RISC-V GNU Toolchain
+```
+
+---
+
+### Memory Management Unit
+
+PSC-ONE includes an Sv32-compatible virtual-memory system.
+
+The memory-management architecture includes:
+
+* Sv32 page-table translation
+* SATP register support
+* `SFENCE.VMA` support
+* Machine, Supervisor, and User address spaces
+* Memory protection through page permissions
+* Separate kernel and user memory regions
+
+The MMU allows PSC-OS to execute user programs in a protected virtual address space.
+
+---
+
+### Cache System
+
+PSC-ONE includes separate instruction and data cache paths.
+
+The cache architecture supports:
+
+* Cached instruction fetches
+* Cached data reads and writes
+* Write-back operation
+* Write-no-allocate behavior
+* Cache bypass for memory-mapped peripherals
+* Software-managed coherency with hardware accelerators
+
+SynapEngine and other accelerators share the system memory with the CPU. Software performs the required cache synchronization before and after accelerator execution.
+
+---
+
+### SDRAM System
+
+The current Tang Nano 20K implementation uses the FPGA's integrated SDRAM as the main system memory.
+
+The memory subsystem provides storage for:
+
+* PSC-OS kernel
+* User programs
+* Application data
+* Matrix input and output data
+* Audio samples
+* SD-card transfer buffers
+
+The CPU, caches, DMA-related logic, and hardware accelerators access the shared memory architecture.
+
+---
+
+### Boot System
+
+PSC-ONE contains boot ROM logic used to initialize the system and load software from an SD card.
+
+The boot process loads:
+
+* PSC-OS kernel image
+* User program image
+* Required runtime data
+
+The loaded software is copied into system memory before execution begins.
+
+---
+
+### SD Card Interface
+
+PSC-ONE includes an SPI-mode SD-card controller.
+
+Current SD-card support includes:
+
+* SD-card initialization
+* Single-sector read
+* Single-sector write
+* FAT32 filesystem access
+* Kernel and user-program loading
+* File access from PSC-OS
+* Audio and application-data storage
+
+SPI mode is used to keep the hardware implementation compact and reliable.
+
+---
+
+### SynapEngine
+
+**SynapEngine** is the matrix-processing accelerator integrated into PSC-ONE.
+
+The following diagram shows the internal architecture of SynapEngine.
+
+SynapEngine implements a logical 4×4 Output-Stationary systolic array using virtualized PE contexts. PE state and dataflow control are separated from the arithmetic units, allowing the logical PE array to share a configurable number of external multipliers.
+
+<img src="../docs/images/PSC_SynapEngine.jpg" width="800">
+
+The current implementation provides:
+
+* 4×4 logical int8 systolic array
+* Output-Stationary dataflow
+* 32-bit partial-sum accumulation
+* Virtualized Processing Elements
+* Hardware-multithreading-style PE execution
+* Shared PE control logic
+* External arithmetic units
+* Configurable number of physical multipliers
+* Support for matrices larger than 4×4 through tiled execution
+* Direct integration with the CPU cache and memory system
+* cocotb-based verification
+
+Unlike a conventional systolic array, SynapEngine does not require a dedicated multiplier inside every PE.
+
+The PE contexts maintain dataflow state and partial sums, while multiplication is performed by a configurable number of external shared multipliers.
+
+Conceptually:
+
+```text
+Logical PE contexts
+        │
+        ▼
+Arithmetic scheduler
+        │
+        ▼
+Shared multiplier units
+        │
+        ▼
+PE partial-sum accumulation
+```
+
+This architecture allows the number of physical multipliers to be selected independently of the logical 4×4 array size.
+
+Because the arithmetic units are separated from PE control and state, future versions may support arithmetic operations other than integer multiplication.
+
+Possible future extensions include:
+
+* FP16 or BF16 arithmetic
+* Alternative arithmetic operators
+* 1×16 or 16×1 logical PE arrangements
+* FIR filtering
+* One-dimensional convolution
+* Configurable PE interconnect topologies
+
+These topology-reconfiguration features are architectural concepts and are not implemented in the current version.
+
+---
+
+### PFE QUBO Engine
+
+PSC-ONE includes an experimental **PFE** accelerator for QUBO-related computation.
+
+The PFE engine provides:
+
+* Memory-mapped control
+* QUBO coefficient input
+* Binary-variable input
+* Hardware energy calculation
+* CPU-readable result and status registers
+
+This engine is used to explore non-von-Neumann and optimization-oriented hardware architectures.
+
+---
+
+### I2S Audio Interface
+
+PSC-ONE contains an I2S receive interface for digital microphone input.
+
+The current audio path supports:
+
+* Mono audio input
+* 16 kHz sampling
+* 24-bit I2S sample reception
+* FIFO-based buffering
+* PSC-OS audio capture
+* SD-card storage of recorded samples
+
+The audio interface is intended for future speech-recognition and signal-processing experiments.
+
+---
+
+### Display Interface
+
+PSC-ONE supports an ILI9488-based LCD module.
+
+The display interface is used for:
+
+* System status output
+* Application output
+* Audio and AI demonstration interfaces
+* Standalone operation without a host terminal
+
+---
+
+### UART Interface
+
+The UART interface provides:
+
+* Boot and debug output
+* PSC-OS command-line access
+* Test-result output
+* Hardware and software diagnostics
+
+UART is the primary development and debugging interface.
+
+---
+
+## Interconnect Architecture
+
+PSC-ONE uses a unified memory-mapped address architecture.
+
+The address space contains:
+
+* Boot ROM
+* SDRAM
+* Cacheable system memory
+* UART
+* SD-card controller
+* I2S interface
+* Display controller
+* SynapEngine
+* PFE accelerator
+* Other control and status registers
+
+Memory accesses are routed according to the target address.
+
+Normal memory is accessed through the cache and SDRAM paths, while peripheral regions bypass the cache and access the corresponding hardware modules directly.
+
+---
+
+## Hardware/Software Co-Design
+
+PSC-ONE hardware is developed together with PSC-OS.
+
+PSC-OS provides software interfaces for:
+
+* Process execution
+* Virtual memory
+* SD-card and FAT32 access
+* Audio capture
+* Display output
+* SynapEngine matrix multiplication
+* PFE QUBO calculation
+* Hardware diagnostics
+
+This allows new hardware features to be tested through complete software workloads rather than isolated RTL simulations alone.
+
+---
+
+## Verification
+
+PSC-ONE uses multiple levels of verification:
+
+* RTL simulation
+* cocotb testbenches
+* CPU instruction tests
+* Cache and memory-access tests
+* Full SoC boot simulation
+* SynapEngine matrix-result comparison
+* SD-card read/write tests
+* FPGA implementation tests
+
+Hardware accelerator results are compared against software reference implementations.
+
+---
+
+## Current Status
+
+The current PSC-ONE hardware supports:
+
+* Custom RV32 CPU operation
+* Machine, Supervisor, and User privilege modes
+* Sv32 virtual memory
+* Instruction and data caches
+* Internal SDRAM access
+* SD-card boot
+* FAT32 read and write
+* UART console
+* LCD output
+* I2S microphone input
+* 4×4 Output-Stationary SynapEngine
+* PFE QUBO acceleration
+* PSC-OS execution
+* User-program execution
+
+---
+
+## Notes
+
+* The current primary FPGA target is the Tang Nano 20K
+* Main memory uses the FPGA's integrated SDRAM
+* The SD-card controller operates in SPI mode
+* Peripheral and accelerator interfaces are memory-mapped
+* CPU and accelerator memory coherency is currently managed by software
+* SynapEngine currently uses a logical 4×4 Output-Stationary configuration
+* SynapEngine arithmetic units are external to the logical PE array
+* RTL interfaces and module organization may change as development continues
+
+---
+
+## Status
+
+🚧 **Active Development**
+
+PSC-ONE is operational but remains an experimental architecture.
+
+The CPU, operating system, memory subsystem, and hardware accelerators are continuously being extended and optimized.

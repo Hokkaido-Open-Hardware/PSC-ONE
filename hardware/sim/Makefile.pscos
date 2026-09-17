@@ -1,0 +1,329 @@
+# ============================================================
+#  MODE で一括切り替え（verilator / icarus）
+# ============================================================
+# PSC_OS実行のデフォルトはverilator
+MODE = verilator
+#MODE = icarus
+#MODE = icarus_os
+
+# ============================================================
+#  シミュレーションモードに応じた設定
+# ============================================================
+ifeq ($(MODE),verilator)
+SIM          		= verilator
+SDRAM_MODEL  		= ../rtl/SDRAM_model/w9825g6kh_verilator.v
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v 
+SDCARD_MODEL 		= ../rtl/SDCARD_model/sdcard_spi_model.v 
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+
+ifeq ($(SIM_FAST),1)
+EXTRA_ARGS = \
+	-O3 --bbox-sys --x-assign fast --x-initial fast \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
+else
+EXTRA_ARGS = \
+	-O3 --trace --trace-fst \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
+endif
+
+endif
+
+ifeq ($(MODE),icarus)
+SIM          		= icarus
+SDRAM_MODEL    		= ./SDRAM_model/w9825g6kh.v 	# ← Icarus 用 Micron モデルに修正
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram.v 
+SDCARD_MODEL		= ../rtl/SDCARD_model/sdcard_spi_model.v 
+
+EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_VCD
+
+endif
+
+ifeq ($(MODE),icarus_os)
+SIM          		= icarus
+SDRAM_MODEL  		= ../rtl/SDRAM_model/w9825g6kh.v  # ← Icarus 用 Micron モデルに修正
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram.v 
+SDCARD_MODEL 		= ./SDCARD_model/sdcard_spi_model.v 
+
+EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_VCD
+
+endif
+
+ifeq ($(SDRAM_MODEL),)
+$(error MODE=$(MODE) は不正です。MODE=verilator または MODE=icarus を指定してください)
+endif
+
+# ============================================================
+#  以下、元の Makefile の変数定義など（SDRAM_MODEL を置き換え）
+# ============================================================
+
+TOP          = PSC_RV32IS_Chip_sim
+PSCONE_TOP   = PSC_ONE_Chip_sim
+
+CPU_SRC_DIR  = ../rtl/cpu/src
+TOP_SRC_DIR  = ../rtl/top
+CACHE_DIR    = ../rtl/cache/src
+
+PSCONE_SIM_TOP_FILE = \
+	$(TOP_SRC_DIR)/PSC_ONE_Chip_sim.v \
+
+PSCONE_TOP_FILE = \
+	$(TOP_SRC_DIR)/PSC_ONE_Chip.v
+
+# RV32ISP_core
+CPU_CORE_FILES = \
+	$(CPU_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Execute.v \
+	$(CPU_SRC_DIR)/Fetch_Fifo.v \
+	$(CPU_SRC_DIR)/Fetch.v \
+	$(CPU_SRC_DIR)/Decorder.v \
+	$(CPU_SRC_DIR)/Execute.v \
+	$(CPU_SRC_DIR)/Execute_Divider.v \
+	$(CPU_SRC_DIR)/Execute_Mul.v \
+	$(CPU_SRC_DIR)/Branch.v \
+	$(CPU_SRC_DIR)/MemoryStore.v \
+	$(CPU_SRC_DIR)/Register.v \
+	$(CPU_SRC_DIR)/MMU.v \
+	$(CPU_SRC_DIR)/Csr.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
+
+# RV32ISP_core
+CPU_V1_CORE_FILES = \
+	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionFSM.sv \
+	$(CPU_V1_SRC_DIR)/Fetch.sv \
+	$(CPU_V1_SRC_DIR)/Decorder.sv \
+	$(CPU_V1_SRC_DIR)/Execute.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V1_SRC_DIR)/Branch.sv \
+	$(CPU_V1_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V1_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V1_SRC_DIR)/MMU.sv \
+	$(CPU_V1_SRC_DIR)/Csr.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+MMIO_DIR	= ../rtl/mmio/MMIO
+UART_DIR	= ../rtl/mmio/UART
+LED_DIR		= ../rtl/mmio/LED
+
+# ============================================================
+# CPUコアの切り替え（v1 / legacy）
+# ============================================================
+# デフォルトはV1
+CPU_VERSION ?= v1
+
+ifeq ($(CPU_VERSION),v1)
+SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)
+else ifeq ($(CPU_VERSION),legacy)
+SELECTED_CPU_CORE_FILES = $(CPU_CORE_FILES)
+else
+$(error CPU_VERSION=$(CPU_VERSION) は不正です。v1 または legacy を指定してください)
+endif
+
+# CPU_core + Cache
+CPU_FILES = \
+	$(SELECTED_CPU_CORE_FILES) \
+	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
+	$(UART_DIR)/PSC_RV32IS_UART.v \
+	$(LED_DIR)/PSC_RV32IS_LED.v \
+	$(CACHE_DIR)/cache_dma_controller.sv \
+	$(CACHE_DIR)/cache_dma_controller_io.sv \
+	$(CACHE_DIR)/dm_cache_data.v \
+	$(CACHE_DIR)/dm_cache_tag.v \
+	$(TOP_SRC_DIR)/Delay_N.v
+
+AXI_DIR			= ../rtl/axi
+SDRAM_CNT_DIR	= ../rtl/sdram_controller
+BOOT_SRC_DIR	= ../rtl/boot
+DMA_SRC_DIR		= ../rtl/dma
+
+SDRAM_32bit_AXI_FILES = \
+	$(AXI_DIR)/sdram_32bit_to_128bit_axi_bridge.v \
+	$(AXI_DIR)/sdram_4port_controller_axi_slave_bX_32bit.v \
+	$(SDRAM_CNT_DIR)/sdram_controller.sv \
+	$(GW2AR_SDRAM_MODEL)
+
+PSC_ONE_BOOT_FILE = $(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v
+
+PSC_ONE_DMA_FILE =  $(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
+
+# Systolic Array (not use)
+SA_DIR   = ../rtl/ai/src
+SA_FILE  = \
+	$(SA_DIR)/SystolicArray_Ctrl.v \
+	$(SA_DIR)/SystolicArray_ReadCtrl.v \
+	$(SA_DIR)/SystolicArray4x4.v \
+	$(SA_DIR)/PE_INT.v \
+	$(SA_DIR)/PE_mult.v
+
+MMIO_BASE_DIR	= ../rtl/mmio
+
+# LCD
+PSCONELCD_FILE = \
+	$(MMIO_BASE_DIR)/LCD/PSC_ONE_LCD.v \
+	$(MMIO_BASE_DIR)/LCD/tft_clock_divider.v \
+	$(MMIO_BASE_DIR)/LCD/tft_ili9488.v \
+	$(MMIO_BASE_DIR)/LCD/tft_ili9488_spi.v
+
+# SD Card Reader
+SD_READER_FILE = \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard.v \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard_SPI.v 
+
+# PSC Phase Flow Engine
+FPE_DIR  = ../rtl/pfe/src
+FPE_FILE = \
+	$(FPE_DIR)/PSC_PFE.v
+
+# Timer
+TIMER_FILE = $(MMIO_BASE_DIR)/TIMER/PSC_RV32IS_TIMER.v
+
+# I2S Rx
+I2S_RX_FILE = \
+	$(MMIO_BASE_DIR)/I2S_RX/PSC_I2SRX.v \
+
+I2S_MIC_MODEL = ../rtl/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v 
+
+LCD_ILI9488_MODEL = ../rtl/LCD_model/PSC_LCD_ILI9488_MODEL.v 
+
+INPUT_32bit_FILE = \
+	$(PSCONE_SIM_TOP_FILE) $(PSCONE_TOP_FILE) $(CPU_FILES) $(SDRAM_32bit_AXI_FILES) \
+	$(PSC_ONE_BOOT_FILE) $(PSC_ONE_DMA_FILE) \
+	$(SA_FILE) $(PSCONELCD_FILE) $(SD_READER_FILE) $(TIMER_FILE) \
+	$(I2S_RX_FILE) $(I2S_MIC_MODEL) $(LCD_ILI9488_MODEL) \
+	$(FPE_FILE) \
+	$(SDCARD_MODEL)
+
+INPUT_FILE_PSCONE = \
+	$(INPUT_32bit_FILE)
+
+COCOTB_CFG       := $(shell which cocotb-config)
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+SIM_BUILD        ?= sim_build
+
+.PHONY: compile_cpp
+
+# ============================================================
+# シミュレーションターゲット
+# ============================================================
+# PSC-OS テスト
+
+MODE = verilator
+
+VDEF = -DFST_UART_MODE -DOS_SIM -DDUMP_FST_FILE
+
+simulate_PSCOS: 
+	$(MAKE) clean
+	$(MAKE) -C ../../software/os sim_mem
+	cp ../../software/os/build/bootrom.mem ./mem/
+	cp ../../software/os/build/kernel.mem ./mem/
+	cp ../../software/os/build/user.mem ./mem/
+	$(MAKE) -C ../../software/os clean
+
+	test -f ./mem/bootrom.mem
+	test -f ./mem/kernel.mem
+	test -f ./mem/user.mem
+
+	grep -n -v '^00000000$$' ./mem/bootrom.mem | tail -n 1
+	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
+	grep -n -v '^00000000$$' ./mem/user.mem | tail -n 1
+
+	@tmp=$$(mktemp); \
+	head -n 128 ./mem/bootrom.mem > $$tmp; \
+	mv $$tmp ./mem/bootrom.mem
+	
+	@mkdir -p ./wave
+	@mkdir -p ./log_uart
+
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo VDEF=$(VDEF)
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
+	MODULE=cocotb_tb.psc_os.PSCONE_os_test \
+	PSC_UART_LOGFILE=./log_uart/log_$$(date +%Y_%m_%d_%H%M%S).log \
+	EXPECTED_RESULT=0xff00ff1b \
+	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+	make --silent -f $(COCOTB_MAKEFILE); \
+	printf '\a'
+
+# ============================================================
+# PSC-OS テスト from SD-Card
+
+MODE = verilator
+
+# define FPGA_BOOT_LOADER_MODE
+SD_VDEF = -DFST_UART_MODE -DOS_SIM -DDUMP_FST_FILE -DFPGA_BOOT_LOADER_MODE
+
+simulate_SD_PSCOS: 
+	$(MAKE) clean
+
+	# BOOT LOADER
+	$(MAKE) -C ../../hardware/bootloader bootloader
+
+	cp ../../hardware/bootloader/mem/bootrom.mem 	./mem/
+	cp ../../hardware/bootloader/mem/kernel.mem 	./mem/
+	cp ../../hardware/bootloader/mem/user.mem 		./mem/
+	cp ../../hardware/bootloader/mem/bootloader.mem ./mem/
+
+	test -f ./mem/bootrom.mem
+	test -f ./mem/kernel.mem
+	test -f ./mem/user.mem
+	test -f ./mem/bootloader.mem
+
+	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
+	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
+	grep -n -v '^00000000$$' ./mem/user.mem | tail -n 1
+	grep -n -v '^00000000$$' ./mem/bootloader.mem | tail -n 1
+
+	@tmp=$$(mktemp); \
+	head -n 128 ./mem/bootrom.mem > $$tmp; \
+	mv $$tmp ./mem/bootrom.mem
+
+	@tmp=$$(mktemp); \
+	head -n 4500 ./mem/bootloader.mem > $$tmp; \
+	mv $$tmp ./mem/bootloader.mem
+	
+	@mkdir -p ./wave
+	@mkdir -p ./log_uart
+
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo VDEF=$(SD_VDEF)
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
+	MODULE=cocotb_tb.psc_os.PSCONE_os_test \
+	PSC_UART_LOGFILE=./log_uart/log_$$(date +%Y_%m_%d_%H%M%S).log \
+	EXPECTED_RESULT=0xff00ff1b \
+	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS) $(SD_VDEF)" \
+	make --silent -f $(COCOTB_MAKEFILE); \
+	printf '\a'

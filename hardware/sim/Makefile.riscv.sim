@@ -1,0 +1,342 @@
+# ============================================================
+# Usage
+# ============================================================
+
+#make -f Makefile.cpu.core simulate_CPU_CORE CPU_VERSION=legacy
+#or
+#make -f Makefile.cpu.core simulate_CPU_CORE CPU_VERSION=v1
+
+# ============================================================
+#  MODE で一括切り替え（verilator / icarus）
+# ============================================================
+# デフォルトはicarus
+MODE = verilator
+#MODE = icarus
+
+# ============================================================
+#  シミュレーションモードに応じた設定
+# ============================================================
+ifeq ($(MODE),verilator)
+SIM          		= verilator
+TOP_COMPILE_ARGS 	= -DCPU_CORE_SIM -DCOCOTB_SIM
+
+ifeq ($(SIM_FAST),1)
+EXTRA_ARGS = \
+	-O3 --bbox-sys --x-assign fast --x-initial fast \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+else
+EXTRA_ARGS = \
+	-O3 --trace --trace-fst \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+endif
+
+endif
+
+ifeq ($(MODE),icarus)
+SIM          		= icarus
+
+EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
+TOP_COMPILE_ARGS 	= -DCPU_CORE_SIM -DCOCOTB_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_VCD
+
+endif
+
+# ============================================================
+#  以下、元の Makefile の変数定義など（SDRAM_MODEL を置き換え）
+# ============================================================
+
+CPU_TOP 	 = PSC_RV32ISP_core
+
+CPU_SRC_DIR  	= ../rtl/cpu/src
+CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
+CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+
+# RV32ISP_core
+CPU_CORE_FILES = \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Execute.v \
+	$(CPU_SRC_DIR)/Fetch_Fifo.v \
+	$(CPU_SRC_DIR)/Fetch.v \
+	$(CPU_SRC_DIR)/Decorder.v \
+	$(CPU_SRC_DIR)/Execute.v \
+	$(CPU_SRC_DIR)/Execute_Divider.v \
+	$(CPU_SRC_DIR)/Execute_Mul.v \
+	$(CPU_SRC_DIR)/Branch.v \
+	$(CPU_SRC_DIR)/MemoryStore.v \
+	$(CPU_SRC_DIR)/Register.v \
+	$(CPU_SRC_DIR)/MMU.v \
+	$(CPU_SRC_DIR)/Csr.v \
+	$(CPU_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+# RV32ISP_core
+CPU_V1_CORE_FILES = \
+	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionFSM.sv \
+	$(CPU_V1_SRC_DIR)/Fetch.sv \
+	$(CPU_V1_SRC_DIR)/Decorder.sv \
+	$(CPU_V1_SRC_DIR)/Execute.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V1_SRC_DIR)/Branch.sv \
+	$(CPU_V1_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V1_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V1_SRC_DIR)/MMU.sv \
+	$(CPU_V1_SRC_DIR)/Csr.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+# RV32ISP_core(V2)
+CPU_V2_CORE_FILES = \
+	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_core.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V2_SRC_DIR)/PSC_InstructionFSM.sv \
+	$(CPU_V2_SRC_DIR)/Fetch.sv \
+	$(CPU_V2_SRC_DIR)/Decorder.sv \
+	$(CPU_V2_SRC_DIR)/Execute.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V2_SRC_DIR)/Branch.sv \
+	$(CPU_V2_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V2_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V2_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V2_SRC_DIR)/MMU.sv \
+	$(CPU_V2_SRC_DIR)/Csr.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_Monitor.v
+
+# ============================================================
+# CPUコアの切り替え（v1 / legacy）
+# ============================================================
+# デフォルトはV1
+CPU_VERSION ?= v1
+
+ifeq ($(CPU_VERSION),v1)
+SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)
+else ifeq ($(CPU_VERSION),v2)
+SELECTED_CPU_CORE_FILES = $(CPU_V2_CORE_FILES)
+else ifeq ($(CPU_VERSION),legacy)
+SELECTED_CPU_CORE_FILES = $(CPU_CORE_FILES)
+else
+$(error CPU_VERSION=$(CPU_VERSION) は不正です。v1 または legacy を指定してください)
+endif
+
+INPUT_CPU_CORE_SIM_FILE = \
+	$(PSCONE_SIM_TOP_FILE) $(SELECTED_CPU_CORE_FILES)
+
+COCOTB_CFG       := $(shell which cocotb-config)
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+SIM_BUILD        ?= sim_build
+
+.PHONY: compile_cpp
+
+# ============================================================
+# 単体テスト定義
+# ============================================================
+# PSC-ONE CPU CORE単体テスト
+# tang 20k 
+RISCV_SINGLE_TEST = \
+	rv32ui-ld_st:RV32ISP_riscv_test:./riscv_build/rv32ui-ld_st.mem:0x00000001:0x00002000 \
+
+RISCV_BASIC_TEST = \
+	rv32ui-add:RV32ISP_riscv_test:./riscv_build/rv32ui-add.mem:0x00000001:0x00001000 \
+	rv32ui-addi:RV32ISP_riscv_test:./riscv_build/rv32ui-addi.mem:0x00000001:0x00001000 \
+	rv32ui-and:RV32ISP_riscv_test:./riscv_build/rv32ui-and.mem:0x00000001:0x00001000 \
+	rv32ui-andi:RV32ISP_riscv_test:./riscv_build/rv32ui-andi.mem:0x00000001:0x00001000 \
+	rv32ui-auipc:RV32ISP_riscv_test:./riscv_build/rv32ui-auipc.mem:0x00000001:0x00001000 \
+	rv32ui-lb:RV32ISP_riscv_test:./riscv_build/rv32ui-lb.mem:0x00000001:0x00001000 \
+	rv32ui-lbu:RV32ISP_riscv_test:./riscv_build/rv32ui-lbu.mem:0x00000001:0x00001000 \
+	rv32ui-lh:RV32ISP_riscv_test:./riscv_build/rv32ui-lh.mem:0x00000001:0x00001000 \
+	rv32ui-lhu:RV32ISP_riscv_test:./riscv_build/rv32ui-lhu.mem:0x00000001:0x00001000 \
+	rv32ui-lui:RV32ISP_riscv_test:./riscv_build/rv32ui-lui.mem:0x00000001:0x00001000 \
+	rv32ui-lw:RV32ISP_riscv_test:./riscv_build/rv32ui-lw.mem:0x00000001:0x00001000 \
+	rv32ui-sb:RV32ISP_riscv_test:./riscv_build/rv32ui-sb.mem:0x00000001:0x00001000 \
+	rv32ui-sh:RV32ISP_riscv_test:./riscv_build/rv32ui-sh.mem:0x00000001:0x00001000 \
+	rv32ui-fence_i:RV32ISP_riscv_test:./riscv_build/rv32ui-fence_i.mem:0x00000001:0x00001000 \
+	rv32ui-beq:RV32ISP_riscv_test:./riscv_build/rv32ui-beq.mem:0x00000001:0x00001000 \
+	rv32ui-bge:RV32ISP_riscv_test:./riscv_build/rv32ui-bge.mem:0x00000001:0x00001000 \
+	rv32ui-bgeu:RV32ISP_riscv_test:./riscv_build/rv32ui-bgeu.mem:0x00000001:0x00001000 \
+	rv32ui-blt:RV32ISP_riscv_test:./riscv_build/rv32ui-blt.mem:0x00000001:0x00001000 \
+	rv32ui-bltu:RV32ISP_riscv_test:./riscv_build/rv32ui-bltu.mem:0x00000001:0x00001000 \
+	rv32ui-bne:RV32ISP_riscv_test:./riscv_build/rv32ui-bne.mem:0x00000001:0x00001000 \
+	rv32ui-jal:RV32ISP_riscv_test:./riscv_build/rv32ui-jal.mem:0x00000001:0x00001000 \
+	rv32ui-jalr:RV32ISP_riscv_test:./riscv_build/rv32ui-jalr.mem:0x00000001:0x00001000 \
+	rv32ui-or:RV32ISP_riscv_test:./riscv_build/rv32ui-or.mem:0x00000001:0x00001000 \
+	rv32ui-ori:RV32ISP_riscv_test:./riscv_build/rv32ui-ori.mem:0x00000001:0x00001000 \
+	rv32ui-simple:RV32ISP_riscv_test:./riscv_build/rv32ui-simple.mem:0x00000001:0x00001000 \
+	rv32ui-sll:RV32ISP_riscv_test:./riscv_build/rv32ui-sll.mem:0x00000001:0x00001000 \
+	rv32ui-slli:RV32ISP_riscv_test:./riscv_build/rv32ui-slli.mem:0x00000001:0x00001000 \
+	rv32ui-slt:RV32ISP_riscv_test:./riscv_build/rv32ui-slt.mem:0x00000001:0x00001000 \
+	rv32ui-slti:RV32ISP_riscv_test:./riscv_build/rv32ui-slti.mem:0x00000001:0x00001000 \
+	rv32ui-sltiu:RV32ISP_riscv_test:./riscv_build/rv32ui-sltiu.mem:0x00000001:0x00001000 \
+	rv32ui-sltu:RV32ISP_riscv_test:./riscv_build/rv32ui-sltu.mem:0x00000001:0x00001000 \
+	rv32ui-sra:RV32ISP_riscv_test:./riscv_build/rv32ui-sra.mem:0x00000001:0x00001000 \
+	rv32ui-srai:RV32ISP_riscv_test:./riscv_build/rv32ui-srai.mem:0x00000001:0x00001000 \
+	rv32ui-srl:RV32ISP_riscv_test:./riscv_build/rv32ui-srl.mem:0x00000001:0x00001000 \
+	rv32ui-srli:RV32ISP_riscv_test:./riscv_build/rv32ui-srli.mem:0x00000001:0x00001000 \
+	rv32ui-st_ld:RV32ISP_riscv_test:./riscv_build/rv32ui-st_ld.mem:0x00000001:0x00001000 \
+	rv32ui-sub:RV32ISP_riscv_test:./riscv_build/rv32ui-sub.mem:0x00000001:0x00001000 \
+	rv32ui-sw:RV32ISP_riscv_test:./riscv_build/rv32ui-sw.mem:0x00000001:0x00001000 \
+	rv32ui-xor:RV32ISP_riscv_test:./riscv_build/rv32ui-xor.mem:0x00000001:0x00001000 \
+	rv32ui-xori:RV32ISP_riscv_test:./riscv_build/rv32ui-xori.mem:0x00000001:0x00001000 \
+	rv32um-div:RV32ISP_riscv_test:./riscv_build/rv32um-div.mem:0x00000001:0x00001000 \
+	rv32um-divu:RV32ISP_riscv_test:./riscv_build/rv32um-divu.mem:0x00000001:0x00001000 \
+	rv32um-mul:RV32ISP_riscv_test:./riscv_build/rv32um-mul.mem:0x00000001:0x00001000 \
+	rv32um-mulh:RV32ISP_riscv_test:./riscv_build/rv32um-mulh.mem:0x00000001:0x00001000 \
+	rv32um-mulhsu:RV32ISP_riscv_test:./riscv_build/rv32um-mulhsu.mem:0x00000001:0x00001000 \
+	rv32um-mulhu:RV32ISP_riscv_test:./riscv_build/rv32um-mulhu.mem:0x00000001:0x00001000 \
+	rv32um-rem:RV32ISP_riscv_test:./riscv_build/rv32um-rem.mem:0x00000001:0x00001000 \
+	rv32um-remu:RV32ISP_riscv_test:./riscv_build/rv32um-remu.mem:0x00000001:0x00001000 \
+	rv32ui-ld_st:RV32ISP_riscv_test:./riscv_build/rv32ui-ld_st.mem:0x00000001:0x00002000 \
+
+# 非アラインアクセス試験のため除外
+#rv32ui-ma_data:RV32ISP_riscv_test:./riscv_build/rv32ui-ma_data.mem:0x00000001 \
+
+# ============================================================
+# テストプログラムの切り替え（basic / single）
+# ============================================================
+# デフォルトはbasic
+TEST_PROGRAM_LIST ?= basic
+
+ifeq ($(TEST_PROGRAM_LIST),basic)
+RV32ISP_TEST = $(RISCV_BASIC_TEST)
+else ifeq ($(TEST_PROGRAM_LIST),single)
+RV32ISP_TEST = $(RISCV_SINGLE_TEST)
+else
+$(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic または long, single を指定してください)
+endif
+
+# run test
+.PHONY: simulate_RISCV_TESTS
+simulate_RISCV_TESTS:
+	$(MAKE) -f Makefile.riscv all
+	@echo "MODE=$(MODE)"
+	@echo "SIM=$(SIM)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST)"
+	@echo "TOP_COMPILE_ARGS=$(TOP_COMPILE_ARGS)"
+	@echo "COMPILE_ARGS=$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)"
+	@mkdir -p ./wave
+	@set -e; \
+	for t in $(RV32ISP_TEST); do \
+		name=$$(echo $$t | cut -d: -f1); \
+		cocotb_file=$$(echo $$t | cut -d: -f2); \
+		mem_file=$$(echo $$t | cut -d: -f3); \
+		expected=$$(echo $$t | cut -d: -f4); \
+		tohost_addr=$$(echo $$t | cut -d: -f5); \
+		echo "========================================"; \
+		echo "[TEST] $$name"; \
+		echo "[MEM ] $$mem_file"; \
+		echo "[EXP ] $$expected"; \
+		echo "========================================"; \
+		$(MAKE) clean; \
+		tmp=$$(mktemp); \
+		head -n 4096 "$$mem_file" > $$tmp; \
+		cp $$tmp ./mem/test_program.mem; \
+		rm -f $$tmp; \
+		COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
+		TOHOST_ADDR="$$tohost_addr" \
+		EXPECTED_RESULT=$$expected \
+		TOPLEVEL=$(CPU_TOP) TOPLEVEL_LANG=verilog \
+		SIM=$(SIM) \
+		VERILOG_SOURCES="$(INPUT_CPU_CORE_SIM_FILE)" \
+		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+		make --silent -f $(COCOTB_MAKEFILE); \
+	done; \
+	printf '\a'; \
+	echo ""; \
+	echo "========================================"; \
+	echo "✅ All riscv tests completed"; \
+	echo "========================================"
+	
+
+# ============================================================
+# Parallel
+# ============================================================
+JOBS ?= 16
+
+.PHONY: run_RISCV_TEST_PARALLEL
+run_RISCV_TEST_PARALLEL:
+	@set -e; \
+	t='$(TEST_ENTRY)'; \
+	name=$$(echo "$$t" | cut -d: -f1); \
+	cocotb_file=$$(echo "$$t" | cut -d: -f2); \
+	mem_file=$$(echo "$$t" | cut -d: -f3); \
+	expected=$$(echo "$$t" | cut -d: -f4); \
+	tohost_addr=$$(echo "$$t" | cut -d: -f5); \
+	run_dir="$(CURDIR)/parallel_run/$$name"; \
+	echo "========================================"; \
+	echo "[START] $$name"; \
+	echo "[MEM  ] $$mem_file"; \
+	echo "[EXP  ] $$expected"; \
+	echo "========================================"; \
+	rm -rf "$$run_dir"; \
+	mkdir -p "$$run_dir/mem"; \
+	mkdir -p "$$run_dir/wave"; \
+	head -n 4096 "$$mem_file" > "$$run_dir/mem/test_program.mem"; \
+	cd "$$run_dir"; \
+	PYTHONPATH="$(CURDIR):$$PYTHONPATH" \
+	COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
+	TOHOST_ADDR="$$tohost_addr" \
+	EXPECTED_RESULT="$$expected" \
+	TOPLEVEL="$(CPU_TOP)" \
+	TOPLEVEL_LANG=verilog \
+	SIM="$(SIM)" \
+	SIM_BUILD="sim_build" \
+	VERILOG_SOURCES="$(foreach f,$(INPUT_CPU_CORE_SIM_FILE),$(abspath $(f)))" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+	make --silent -f "$(COCOTB_MAKEFILE)" > simulation.log 2>&1; \
+	echo "[PASS] $$name"
+
+.PHONY: simulate_RISCV_TESTS_PARALLEL
+simulate_RISCV_TESTS_PARALLEL:
+	$(MAKE) -f Makefile.riscv all
+	@rm -rf ./parallel_run
+	@mkdir -p ./parallel_run
+	@echo ""
+	@echo "========================================"
+	@echo " Parallel RISC-V tests"
+	@echo "========================================"
+	@echo "MODE              = $(MODE)"
+	@echo "SIM               = $(SIM)"
+	@echo "CPU_VERSION       = $(CPU_VERSION)"
+	@echo "TEST_PROGRAM_LIST = $(TEST_PROGRAM_LIST)"
+	@echo "JOBS              = $(JOBS)"
+	@echo "========================================"
+	@printf '%s\n' $(RV32ISP_TEST) | \
+	xargs -P $(JOBS) -I {} \
+	$(MAKE) --no-print-directory \
+		-f Makefile.riscv.sim \
+		run_RISCV_TEST_PARALLEL \
+		MODE="$(MODE)" \
+		CPU_VERSION="$(CPU_VERSION)" \
+		SIM_FAST="$(SIM_FAST)" \
+		TEST_ENTRY="{}"; \
+	rc=$$?; \
+	pass=$$(grep -rl "passed" parallel_run/*/simulation.log 2>/dev/null | wc -l); \
+	total=$$(find parallel_run -name simulation.log | wc -l); \
+	fail=$$((total - pass)); \
+	echo ""; \
+	echo "========================================"; \
+	echo " RISC-V TEST RESULT"; \
+	echo "========================================"; \
+	echo "PASS=$$pass FAIL=$$fail TOTAL=$$total"; \
+	echo "========================================"; \
+	if [ $$fail -ne 0 ] || [ $$rc -ne 0 ]; then \
+		echo "❌ RISC-V tests FAILED"; \
+		exit 1; \
+	fi; \
+	echo "✅ All parallel riscv tests completed"
+	@printf '\a'

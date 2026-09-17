@@ -1,0 +1,41 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Sat Jul 25 06:47:38 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_ONE_Chip_test.fst"
+[dumpfile_mtime] "Sat Jul 25 06:47:35 2026"
+[dumpfile_size] 392034
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/cpu.pipeline2.gtkw"
+[timestart] 499024690
+[size] 2711 1188
+[pos] -1 -1
+*-14.061918 499061900 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] PSC_ONE_Chip_sim.
+[treeopen] PSC_ONE_Chip_sim.u_chip.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.
+[treeopen] PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_inst_unit.
+[sst_width] 278
+[signals_width] 273
+[sst_expanded] 1
+[sst_vpaned_height] 362
+@22
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.pc[31:0]
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.opcode[31:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_Decorder.pipeline_type_w
+@100000028
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_inst_unit.u_PSC_inst_fsm.execute_state[3:0]
+@28
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_inst_unit.ri_id_ex_issue
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_inst_unit.ri_pipeline_flush
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_inst_unit.ri_execute_valid
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_inst_unit.ri_alu_done
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_inst_unit.ri_ex_complete
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_inst_unit.ri_wb_commit
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_inst_unit.normal_wb_valid
+@23
+PSC_ONE_Chip_sim.u_chip.u_core_axi.u_core.u_execute_state.u_Decorder.w_addr_w[4:0]
+[pattern_trace] 1
+[pattern_trace] 0

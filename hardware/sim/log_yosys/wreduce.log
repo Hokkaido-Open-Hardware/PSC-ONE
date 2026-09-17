@@ -1,0 +1,215 @@
+
+30. Executing WREDUCE pass (reducing word size of cells).
+Removed top 31 bits (of 32) from port B of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:85$383 ($add).
+Removed top 29 bits (of 32) from port Y of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:85$383 ($add).
+Removed top 31 bits (of 32) from port B of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$sub$../rtl/cpu/src/Fetch_Fifo.v:89$387 ($sub).
+Removed top 29 bits (of 32) from port Y of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$sub$../rtl/cpu/src/Fetch_Fifo.v:89$387 ($sub).
+Removed top 31 bits (of 32) from port B of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:97$391 ($add).
+Removed top 29 bits (of 32) from port Y of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:97$391 ($add).
+Removed top 30 bits (of 32) from mux cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$ternary$../rtl/cpu/src/Fetch_Fifo.v:97$392 ($mux).
+Removed top 31 bits (of 32) from port B of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:98$394 ($add).
+Removed top 29 bits (of 32) from port Y of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:98$394 ($add).
+Removed top 30 bits (of 32) from mux cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$ternary$../rtl/cpu/src/Fetch_Fifo.v:98$395 ($mux).
+Removed top 1 bits (of 2) from port B of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$procmux$2750_CMP0 ($eq).
+Removed top 1 bits (of 2) from port B of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$procmux$3006_CMP0 ($eq).
+Removed top 1 bits (of 2) from port B of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$procmux$3067_CMP0 ($eq).
+Removed top 1 bits (of 3) from port Y of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:97$391 ($add).
+Removed top 1 bits (of 3) from port Y of cell $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:98$394 ($add).
+Removed top 30 bits (of 32) from wire $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:84$381_Y.
+Removed top 29 bits (of 32) from wire $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$add$../rtl/cpu/src/Fetch_Fifo.v:85$383_Y.
+Removed top 30 bits (of 32) from wire $paramod$095b84765515c3f3395f1acd550fe9c4f2ca9dc4\Fetch_Fifo.$ternary$../rtl/cpu/src/Fetch_Fifo.v:84$382_Y.
+Removed top 1 bits (of 2) from port B of cell $paramod$8b3c74cfefa0a73fcdf4892556daa87642d9adea\MemoryStore.$eq$../rtl/cpu/src/MemoryStore.v:40$573 ($eq).
+Removed top 2 bits (of 3) from port B of cell $paramod$8b3c74cfefa0a73fcdf4892556daa87642d9adea\MemoryStore.$eq$../rtl/cpu/src/MemoryStore.v:50$581 ($eq).
+Removed top 1 bits (of 3) from port B of cell $paramod$8b3c74cfefa0a73fcdf4892556daa87642d9adea\MemoryStore.$eq$../rtl/cpu/src/MemoryStore.v:51$582 ($eq).
+Removed top 1 bits (of 2) from port B of cell $paramod$8b3c74cfefa0a73fcdf4892556daa87642d9adea\MemoryStore.$eq$../rtl/cpu/src/MemoryStore.v:117$605 ($eq).
+Removed top 29 bits (of 32) from port B of cell $paramod$8b3c74cfefa0a73fcdf4892556daa87642d9adea\MemoryStore.$add$../rtl/cpu/src/MemoryStore.v:118$607 ($add).
+Removed top 2 bits (of 3) from port B of cell Branch.$procmux$1204_CMP0 ($eq).
+Removed top 1 bits (of 2) from port B of cell Branch.$procmux$1214_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Csr.$auto$opt_dff.cc:195:make_patterns_logic$6008 ($ne).
+Removed top 1 bits (of 4) from port B of cell Csr.$auto$opt_dff.cc:195:make_patterns_logic$6015 ($ne).
+Removed top 1 bits (of 4) from port B of cell Csr.$auto$opt_dff.cc:195:make_patterns_logic$6022 ($ne).
+Removed top 1 bits (of 2) from port B of cell Csr.$procmux$3074_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4709_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4716_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4724_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4733_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4743_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4754_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4766_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4779_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4793_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4925_CMP0 ($eq).
+Removed top 1 bits (of 12) from port B of cell Csr.$procmux$4926_CMP0 ($eq).
+Removed top 2 bits (of 12) from port B of cell Csr.$procmux$4927_CMP0 ($eq).
+Removed top 2 bits (of 12) from port B of cell Csr.$procmux$4928_CMP0 ($eq).
+Removed top 2 bits (of 12) from port B of cell Csr.$procmux$4929_CMP0 ($eq).
+Removed top 2 bits (of 12) from port B of cell Csr.$procmux$4930_CMP0 ($eq).
+Removed top 2 bits (of 12) from port B of cell Csr.$procmux$4931_CMP0 ($eq).
+Removed top 2 bits (of 12) from port B of cell Csr.$procmux$4932_CMP0 ($eq).
+Removed top 2 bits (of 12) from port B of cell Csr.$procmux$4933_CMP0 ($eq).
+Removed top 2 bits (of 12) from port B of cell Csr.$procmux$4934_CMP0 ($eq).
+Removed top 2 bits (of 12) from port B of cell Csr.$procmux$4935_CMP0 ($eq).
+Removed top 3 bits (of 12) from port B of cell Csr.$procmux$4936_CMP0 ($eq).
+Removed top 3 bits (of 12) from port B of cell Csr.$procmux$4938_CMP0 ($eq).
+Removed top 3 bits (of 12) from port B of cell Csr.$procmux$4939_CMP0 ($eq).
+Removed top 3 bits (of 12) from port B of cell Csr.$procmux$4940_CMP0 ($eq).
+Removed top 3 bits (of 12) from port B of cell Csr.$procmux$4941_CMP0 ($eq).
+Removed top 3 bits (of 12) from port B of cell Csr.$procmux$4942_CMP0 ($eq).
+Removed top 3 bits (of 12) from port B of cell Csr.$procmux$4943_CMP0 ($eq).
+Removed top 3 bits (of 12) from port B of cell Csr.$procmux$4944_CMP0 ($eq).
+Removed top 3 bits (of 12) from port B of cell Csr.$procmux$4980_CMP0 ($eq).
+Removed top 20 bits (of 32) from wire Csr.$0\csr_mip[31:0].
+Removed top 19 bits (of 32) from wire Csr.$0\csr_mstatus[31:0].
+Removed top 23 bits (of 32) from wire Csr.$0\csr_sstatus[31:0].
+Removed top 20 bits (of 32) from wire Csr.csr_mie.
+Removed top 20 bits (of 32) from wire Csr.csr_mip.
+Removed top 22 bits (of 32) from wire Csr.csr_sie.
+Removed top 12 bits (of 32) from wire Csr.csr_sstatus.
+Removed top 3 bits (of 7) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:81$684 ($eq).
+Removed top 3 bits (of 12) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:96$697 ($eq).
+Removed top 2 bits (of 12) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:100$701 ($eq).
+Removed top 1 bits (of 2) from port B of cell Decorder.$ne$../rtl/cpu/src/Decorder.v:104$703 ($ne).
+Removed top 3 bits (of 7) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:110$707 ($eq).
+Removed top 2 bits (of 3) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:206$766 ($eq).
+Removed top 2 bits (of 5) from mux cell Decorder.$ternary$../rtl/cpu/src/Decorder.v:253$806 ($mux).
+Removed top 6 bits (of 7) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:278$840 ($eq).
+Removed top 9 bits (of 10) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:280$844 ($eq).
+Removed top 6 bits (of 9) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:281$845 ($eq).
+Removed top 1 bits (of 3) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:282$849 ($eq).
+Removed top 1 bits (of 3) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:283$851 ($eq).
+Removed top 1 bits (of 7) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:285$863 ($eq).
+Removed top 2 bits (of 7) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:285$865 ($eq).
+Removed top 5 bits (of 7) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:304$880 ($eq).
+Removed top 1 bits (of 7) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:305$881 ($eq).
+Removed top 1 bits (of 7) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:308$882 ($eq).
+Removed top 2 bits (of 7) from port B of cell Decorder.$eq$../rtl/cpu/src/Decorder.v:311$883 ($eq).
+Removed top 2 bits (of 5) from wire Decorder.$ternary$../rtl/cpu/src/Decorder.v:253$806_Y.
+Removed top 31 bits (of 32) from mux cell Execute.$ternary$../rtl/cpu/src/Execute.v:42$667 ($mux).
+Removed top 31 bits (of 32) from mux cell Execute.$ternary$../rtl/cpu/src/Execute.v:43$669 ($mux).
+Removed top 32 bits (of 64) from port A of cell Execute.$mul$../rtl/cpu/src/Execute.v:54$676 ($mul).
+Removed top 32 bits (of 64) from port B of cell Execute.$mul$../rtl/cpu/src/Execute.v:54$676 ($mul).
+Removed top 32 bits (of 64) from port B of cell Execute.$mul$../rtl/cpu/src/Execute.v:59$678 ($mul).
+Removed top 32 bits (of 64) from port A of cell Execute.$mul$../rtl/cpu/src/Execute.v:64$680 ($mul).
+Removed top 32 bits (of 64) from port B of cell Execute.$mul$../rtl/cpu/src/Execute.v:64$680 ($mul).
+Removed top 2 bits (of 5) from port B of cell Execute.$procmux$1159_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Execute.$procmux$1160_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Execute.$procmux$1162_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Execute.$procmux$1163_CMP0 ($eq).
+Removed top 3 bits (of 5) from port B of cell Execute.$procmux$1164_CMP0 ($eq).
+Removed top 3 bits (of 5) from port B of cell Execute.$procmux$1165_CMP0 ($eq).
+Removed top 4 bits (of 5) from port B of cell Execute.$procmux$1166_CMP0 ($eq).
+Removed top 31 bits (of 32) from wire Execute.$ternary$../rtl/cpu/src/Execute.v:42$667_Y.
+Removed top 31 bits (of 32) from wire Execute.$ternary$../rtl/cpu/src/Execute.v:43$669_Y.
+Removed top 22 bits (of 34) from port B of cell MMU.$add$../rtl/cpu/src/MMU.v:204$484 ($add).
+Removed top 2 bits (of 34) from port Y of cell MMU.$add$../rtl/cpu/src/MMU.v:204$484 ($add).
+Removed top 2 bits (of 34) from port A of cell MMU.$add$../rtl/cpu/src/MMU.v:204$484 ($add).
+Removed top 22 bits (of 34) from port B of cell MMU.$add$../rtl/cpu/src/MMU.v:260$518 ($add).
+Removed top 2 bits (of 34) from port Y of cell MMU.$add$../rtl/cpu/src/MMU.v:260$518 ($add).
+Removed top 2 bits (of 34) from port A of cell MMU.$add$../rtl/cpu/src/MMU.v:260$518 ($add).
+Removed top 1 bits (of 4) from port B of cell MMU.$procmux$2591_CMP0 ($eq).
+Removed top 1 bits (of 4) from port B of cell MMU.$procmux$2592_CMP0 ($eq).
+Removed top 2 bits (of 4) from port B of cell MMU.$procmux$2611_CMP0 ($eq).
+Removed top 2 bits (of 4) from port B of cell MMU.$procmux$2612_CMP0 ($eq).
+Removed top 1 bits (of 4) from port B of cell MMU.$procmux$2666_CMP0 ($eq).
+Removed top 1 bits (of 4) from port B of cell MMU.$procmux$2699_CMP0 ($eq).
+Removed top 3 bits (of 4) from port B of cell MMU.$procmux$2706_CMP0 ($eq).
+Removed top 2 bits (of 32) from FF cell MMU.$auto$ff.cc:266:slice$5792 ($adffe).
+Removed top 2 bits (of 32) from FF cell MMU.$auto$ff.cc:266:slice$5803 ($adffe).
+Removed top 2 bits (of 32) from mux cell MMU.$procmux$2552 ($pmux).
+Removed top 2 bits (of 32) from mux cell MMU.$procmux$2572 ($pmux).
+Removed top 2 bits (of 32) from mux cell MMU.$procmux$2550 ($mux).
+Removed top 2 bits (of 32) from mux cell MMU.$procmux$2561 ($mux).
+Removed top 2 bits (of 32) from mux cell MMU.$procmux$2578 ($mux).
+Removed top 2 bits (of 32) from mux cell MMU.$procmux$2558 ($mux).
+Removed top 2 bits (of 32) from mux cell MMU.$procmux$2575 ($mux).
+Removed top 2 bits (of 32) from FF cell MMU.$auto$ff.cc:266:slice$5816 ($adffe).
+Removed top 2 bits (of 32) from mux cell MMU.$procmux$2555 ($mux).
+Removed top 2 bits (of 32) from FF cell MMU.$auto$ff.cc:266:slice$5770 ($adffe).
+Removed top 2 bits (of 32) from wire MMU.$0\pte_l0[31:0].
+Removed top 2 bits (of 32) from wire MMU.$0\pte_l1[31:0].
+Removed top 2 bits (of 32) from wire MMU.cache_pte_l0.
+Removed top 2 bits (of 32) from wire MMU.cache_pte_l1.
+Removed top 2 bits (of 32) from wire MMU.pte_l0.
+Removed top 2 bits (of 32) from wire MMU.pte_l1.
+Removed top 2 bits (of 4) from mux cell PSC_RV32ISP_Execute.$procmux$946 ($mux).
+Removed top 1 bits (of 4) from port B of cell PSC_RV32ISP_Execute.$procmux$1035_CMP0 ($eq).
+Removed top 1 bits (of 4) from port B of cell PSC_RV32ISP_Execute.$procmux$1036_CMP0 ($eq).
+Removed top 1 bits (of 4) from port B of cell PSC_RV32ISP_Execute.$procmux$1037_CMP0 ($eq).
+Removed top 1 bits (of 4) from port B of cell PSC_RV32ISP_Execute.$procmux$1038_CMP0 ($eq).
+Removed top 2 bits (of 4) from port B of cell PSC_RV32ISP_Execute.$procmux$1039_CMP0 ($eq).
+Removed top 2 bits (of 4) from port B of cell PSC_RV32ISP_Execute.$procmux$1040_CMP0 ($eq).
+Removed top 3 bits (of 4) from port B of cell PSC_RV32ISP_Execute.$procmux$1041_CMP0 ($eq).
+Removed top 2 bits (of 4) from wire PSC_RV32ISP_Execute.$7\next_state[3:0].
+Removed top 29 bits (of 32) from port B of cell PSC_RV32ISP_Fetch.$add$../rtl/cpu/src/PSC_RV32ISP_Fetch.v:163$121 ($add).
+Removed top 4 bits (of 6) from port B of cell PSC_RV32ISP_Fetch.$auto$opt_dff.cc:195:make_patterns_logic$6080 ($ne).
+Removed top 1 bits (of 4) from port B of cell PSC_RV32ISP_Fetch.$procmux$5296_CMP0 ($eq).
+Removed top 1 bits (of 4) from port B of cell PSC_RV32ISP_Fetch.$procmux$5297_CMP0 ($eq).
+Removed top 1 bits (of 4) from port B of cell PSC_RV32ISP_Fetch.$procmux$5298_CMP0 ($eq).
+Removed top 2 bits (of 4) from port B of cell PSC_RV32ISP_Fetch.$procmux$5299_CMP0 ($eq).
+Removed top 2 bits (of 4) from port B of cell PSC_RV32ISP_Fetch.$procmux$5300_CMP0 ($eq).
+Removed top 3 bits (of 4) from port B of cell PSC_RV32ISP_Fetch.$procmux$5301_CMP0 ($eq).
+Removed top 1 bits (of 2) from port B of cell PSC_RV32ISP_core.$eq$../rtl/cpu/src/PSC_RV32ISP_core.v:132$14 ($eq).
+Removed top 30 bits (of 32) from mux cell PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:149$23 ($mux).
+Removed top 28 bits (of 32) from mux cell PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:149$24 ($mux).
+Removed top 28 bits (of 32) from mux cell PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:148$25 ($mux).
+Removed top 28 bits (of 32) from mux cell PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:147$26 ($mux).
+Removed top 28 bits (of 32) from mux cell PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:146$27 ($mux).
+Removed top 28 bits (of 32) from mux cell PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:145$28 ($mux).
+Removed top 28 bits (of 32) from mux cell PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:154$29 ($mux).
+Removed top 27 bits (of 32) from port B of cell PSC_RV32ISP_core.$shiftx$../rtl/cpu/src/PSC_RV32ISP_core.v:0$37 ($shiftx).
+Removed top 29 bits (of 32) from port B of cell PSC_RV32ISP_core.$add$../rtl/cpu/src/PSC_RV32ISP_core.v:405$40 ($add).
+Removed top 2 bits (of 4) from port B of cell PSC_RV32ISP_core.$procmux$1076_CMP0 ($eq).
+Removed top 2 bits (of 4) from port B of cell PSC_RV32ISP_core.$procmux$1086_CMP0 ($eq).
+Removed top 3 bits (of 4) from port B of cell PSC_RV32ISP_core.$procmux$1089_CMP0 ($eq).
+Removed top 28 bits (of 32) from wire PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:146$27_Y.
+Removed top 28 bits (of 32) from wire PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:147$26_Y.
+Removed top 28 bits (of 32) from wire PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:148$25_Y.
+Removed top 30 bits (of 32) from wire PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:149$23_Y.
+Removed top 28 bits (of 32) from wire PSC_RV32ISP_core.$ternary$../rtl/cpu/src/PSC_RV32ISP_core.v:149$24_Y.
+Removed top 28 bits (of 32) from wire PSC_RV32ISP_core.trap_mcause.
+Removed top 28 bits (of 32) from wire PSC_RV32ISP_core.trap_scause.
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1269_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1270_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1271_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1272_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1273_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1274_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1275_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1276_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1277_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1278_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1279_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1280_CMP0 ($eq).
+Removed top 3 bits (of 5) from port B of cell Register.$procmux$1281_CMP0 ($eq).
+Removed top 3 bits (of 5) from port B of cell Register.$procmux$1282_CMP0 ($eq).
+Removed top 4 bits (of 5) from port B of cell Register.$procmux$1283_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1305_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1306_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1307_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1308_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1309_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1310_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1311_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1312_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1313_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1314_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1315_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1316_CMP0 ($eq).
+Removed top 3 bits (of 5) from port B of cell Register.$procmux$1317_CMP0 ($eq).
+Removed top 3 bits (of 5) from port B of cell Register.$procmux$1318_CMP0 ($eq).
+Removed top 4 bits (of 5) from port B of cell Register.$procmux$1319_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1621_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1646_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1672_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1699_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1727_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1756_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1786_CMP0 ($eq).
+Removed top 1 bits (of 5) from port B of cell Register.$procmux$1817_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1849_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1882_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1916_CMP0 ($eq).
+Removed top 2 bits (of 5) from port B of cell Register.$procmux$1951_CMP0 ($eq).
+Removed top 3 bits (of 5) from port B of cell Register.$procmux$1987_CMP0 ($eq).
+Removed top 3 bits (of 5) from port B of cell Register.$procmux$2024_CMP0 ($eq).
+Removed top 4 bits (of 5) from port B of cell Register.$procmux$2062_CMP0 ($eq).

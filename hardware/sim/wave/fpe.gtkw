@@ -1,0 +1,53 @@
+[*]
+[*] GTKWave Analyzer v3.3.116 (w)1999-2023 BSI
+[*] Sat Jul  4 09:14:34 2026
+[*]
+[dumpfile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/PSC_PFE_test.fst"
+[dumpfile_mtime] "Sat Jul  4 09:13:30 2026"
+[dumpfile_size] 21152
+[savefile] "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/wave/fpe.gtkw"
+[timestart] 0
+[size] 2398 1244
+[pos] -1 -1
+*-21.299999 1145000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 278
+[signals_width] 243
+[sst_expanded] 1
+[sst_vpaned_height] 381
+@28
+PSC_PFE.clock
+@22
+PSC_PFE.state[3:0]
+PSC_PFE.cpu_raddr[31:0]
+PSC_PFE.cpu_rdata[31:0]
+@28
+PSC_PFE.cpu_rready
+PSC_PFE.cpu_rvalid
+@22
+PSC_PFE.cpu_waddr[31:0]
+PSC_PFE.cpu_wdata[31:0]
+@28
+PSC_PFE.cpu_wready
+PSC_PFE.cpu_wvalid
+@200
+-
+@28
+PSC_PFE.cur_bit_i
+PSC_PFE.cur_bit_j
+@22
+PSC_PFE.cur_energy[63:0]
+PSC_PFE.cur_x[7:0]
+PSC_PFE.data_reg[31:0]
+@28
+PSC_PFE.i_idx[2:0]
+PSC_PFE.j_idx[2:0]
+@420
+PSC_PFE.k
+@22
+PSC_PFE.q_index[7:0]
+PSC_PFE.q_val[31:0]
+PSC_PFE.read_sel[3:0]
+@28
+PSC_PFE.reset_n
+[pattern_trace] 1
+[pattern_trace] 0
