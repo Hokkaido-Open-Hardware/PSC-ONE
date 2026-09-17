@@ -3,6 +3,8 @@ NISHIHARU
 */
 `timescale 1ns / 1ps
 
+`define SDRAM_Debug_log
+
 module sim_sdram_controller #(
     parameter CLK_FREQ_MHz       = 80,
 
@@ -48,11 +50,11 @@ module sim_sdram_controller #(
         `ifdef DUMP_VCD
         $display("COCOTB_SIM DUMP_VCD ENABLE");
         $dumpfile("./wave/PSC_SDRAM_test.vcd");  // 出力するVCDファイル名
-        $dumpvars(0);     // 第1引数: 階層 (0 はこのモジュールを最上位として)
+        $dumpvars(0, sim_sdram_controller);
         `else
         $display("COCOTB_SIM verilator FST ENABLE");
         $dumpfile("./wave/PSC_SDRAM_test.fst");  // 出力するVCDファイル名
-        $dumpvars(0);     // 第1引数: 階層 (0 はこのモジュールを最上位として)
+        $dumpvars(0, sim_sdram_controller);
         `endif
     end
     `endif

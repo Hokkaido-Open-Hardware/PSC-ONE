@@ -1,0 +1,311 @@
+// NISHIHARU
+
+import PSC_Types::*;
+
+module PSC_RV32_InstructionEngine #(
+    parameter logic [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,
+    parameter logic [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
+    parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0
+)(
+    input  logic        clock,
+    input  logic        reset_n,
+    input  logic        cpu_stop,
+    input  logic [3:0]  cpu_state,
+    input  logic        cpu_trap,
+
+    input  logic        timer_irq_ext,
+
+    input  logic        fifo_req_ready,
+    output logic        execute_task_busy,
+    output logic        execute_task_done,
+
+    output logic        fifo_read_state_sig,
+    output logic        execute_state_sig,
+    input  logic        fifo_read_ready,
+    output logic        fifo_flush_sig,
+
+    output logic [31:0] pc,
+    output logic [31:0] counter,
+
+    input  logic [31:0] opcode,
+    input  logic [31:0] pc_now,
+    input  logic [31:0] csr_satp,
+    input  logic [1:0]  priv_mode,
+    output logic [31:0] alu_data,
+    output logic        pc_sel2,
+    output dec_ctrl_t   decoder_ctrl,
+    input  logic        i_pf,
+    output logic        d_pf,
+    input  logic        i_pf_event,
+    input  logic        d_pf_event,
+    output logic [31:0] data_fault_pc,
+    output logic [31:0] data_fault_vaddr,
+    output logic        data_fault_is_store,
+    output logic        data_fault_misaligned,
+    input  logic [4:0]  trap_scause,
+
+    input  csr_state_t  csr_state,
+    output logic        csr_enb,
+    output logic        csr_valid,
+    output logic        timer_irq_take,
+    input  logic [31:0] csr_rdata,
+    output logic [31:0] csr_reg_data_1,
+
+    output logic        data_mem_read_valid,
+    input  logic        data_mem_read_ready,
+    output logic [31:0] data_mem_read_address,
+    input  logic [31:0] data_mem_read_data,
+    input  logic        data_mem_req_ready,
+
+    output logic        data_mem_write_valid,
+    input  logic        data_mem_write_ready,
+    output logic [31:0] data_mem_write_address,
+    output logic [31:0] data_mem_write_data,
+    output logic [2:0]  mem_write_sel,
+
+    output logic [31:0] vaddr,
+    output logic [8:0]  uart_out
+);
+
+    logic       decode_enb;
+    logic       decode_done;
+    dec_ctrl_t  decoded_ctrl;
+
+    logic        alu_execute_valid;
+    dec_ctrl_t   alu_execute_ctrl;
+    logic [31:0] alu_execute_reg_data_1;
+    logic [31:0] alu_execute_reg_data_2;
+    logic [31:0] alu_execute_data;
+    logic        alu_execute_done;
+
+    logic        md_execute_valid;
+    dec_ctrl_t   md_execute_ctrl;
+    logic [31:0] md_execute_reg_data_1;
+    logic [31:0] md_execute_reg_data_2;
+    logic [31:0] md_execute_data;
+    logic        md_execute_done;
+
+    dec_ctrl_t   memory_ctrl;
+    logic [31:0] memory_alu_data;
+    logic [31:0] memory_reg_data_1;
+    logic [31:0] memory_reg_data_2;
+    logic [31:0] memory_pc;
+    logic        load_valid;
+    logic        store_valid;
+    logic        load_done;
+    logic        store_done;
+    logic [31:0] load_read_data;
+
+    dec_ctrl_t   commit_ctrl;
+    logic [31:0] commit_alu_data;
+    logic        commit_branch_taken;
+
+    logic        mem_pending;
+    logic        mem_mmu_valid;
+    logic        mem_read_valid;
+    logic [31:0] mem_address;
+    logic        mem_done;
+    logic        d_mmu_fault;
+    logic [31:0] memory_vaddr;
+
+    logic        d_mmu_mem_valid;
+    logic        d_mmu_done;
+    logic        d_mode_sv32;
+    logic [31:0] d_mmu_mem_addr;
+    logic [31:0] d_paddr;
+    logic        d_mmu_enb;
+    logic        cpu_state_done;
+
+    logic [31:0] raw_load_data;
+    logic        is_counter_load;
+    logic        is_uart_flag_load;
+
+    assign execute_state_sig = alu_execute_valid || md_execute_valid;
+    assign decoder_ctrl      = commit_ctrl;
+    assign alu_data          = commit_alu_data;
+    assign pc_sel2           = commit_branch_taken;
+    assign mem_write_sel     = memory_ctrl.funct3;
+
+    assign is_counter_load = (memory_ctrl.funct3 == 3'b010) &&
+                             (memory_alu_data == COUNTER_MMIO_ADDR);
+    assign is_uart_flag_load = !memory_ctrl.funct3[1:0] &&
+                               (memory_alu_data == UART_MMIO_FLAG);
+    assign raw_load_data = is_counter_load   ? counter :
+                           is_uart_flag_load ? 32'd1 : data_mem_read_data;
+    assign load_read_data = raw_load_data;
+
+    // The MEM controller asserts its MMU request one cycle after accepting
+    // the ROB-head operation.  Capture the address at that boundary so the
+    // MMU input does not include the ROB read and load/store selection paths.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n)
+            memory_vaddr <= 32'd0;
+        else if (load_valid || store_valid)
+            memory_vaddr <= memory_alu_data;
+    end
+
+    assign vaddr = memory_vaddr;
+    assign data_fault_pc       = memory_pc;
+    assign data_fault_vaddr    = memory_alu_data;
+    assign data_fault_is_store = memory_ctrl.is_store;
+
+    assign d_mmu_enb = mem_mmu_valid &&
+                       (memory_ctrl.is_load || memory_ctrl.is_store);
+    assign cpu_state_done = load_done || store_done || (d_pf && d_mmu_done);
+    assign load_done = load_valid && mem_done;
+    assign store_done = store_valid && mem_done;
+    assign d_pf = d_mmu_fault || data_fault_misaligned;
+
+    assign data_mem_read_valid = d_mmu_mem_valid |
+                                 mem_read_valid;
+    assign data_mem_read_address = d_mmu_mem_valid
+                                  ? d_mmu_mem_addr
+                                  : mem_address;
+    assign data_mem_write_address = mem_address;
+
+    PSC_InstructionUnit u_inst_unit (
+        .clock                  (clock),
+        .reset_n                (reset_n),
+        .cpu_stop               (cpu_stop),
+        .cpu_trap               (cpu_trap),
+        .timer_irq_ext          (timer_irq_ext),
+        .priv_mode              (priv_mode),
+        .pc                     (pc),
+        .counter                (counter),
+        .opcode                 (opcode),
+        .pc_now                 (pc_now),
+        .fifo_req_ready         (fifo_req_ready),
+        .fifo_read_ready        (fifo_read_ready),
+        .fifo_read_valid        (fifo_read_state_sig),
+        .fifo_flush             (fifo_flush_sig),
+        .decoded_ctrl           (decoded_ctrl),
+        .decode_enb             (decode_enb),
+        .decode_done            (decode_done),
+        .alu_execute_valid      (alu_execute_valid),
+        .alu_execute_ctrl       (alu_execute_ctrl),
+        .alu_execute_reg_data_1 (alu_execute_reg_data_1),
+        .alu_execute_reg_data_2 (alu_execute_reg_data_2),
+        .alu_execute_data       (alu_execute_data),
+        .alu_execute_done       (alu_execute_done),
+        .md_execute_valid       (md_execute_valid),
+        .md_execute_ctrl        (md_execute_ctrl),
+        .md_execute_reg_data_1  (md_execute_reg_data_1),
+        .md_execute_reg_data_2  (md_execute_reg_data_2),
+        .md_execute_data        (md_execute_data),
+        .md_execute_done        (md_execute_done),
+        .memory_ctrl            (memory_ctrl),
+        .memory_alu_data        (memory_alu_data),
+        .memory_reg_data_1      (memory_reg_data_1),
+        .memory_reg_data_2      (memory_reg_data_2),
+        .memory_pc              (memory_pc),
+        .load_valid             (load_valid),
+        .store_valid            (store_valid),
+        .load_done              (load_done),
+        .store_done             (store_done),
+        .load_read_data         (load_read_data),
+        .csr_state              (csr_state),
+        .csr_rdata              (csr_rdata),
+        .csr_reg_data_1         (csr_reg_data_1),
+        .csr_enb                (csr_enb),
+        .csr_valid              (csr_valid),
+        .timer_irq_take         (timer_irq_take),
+        .commit_ctrl            (commit_ctrl),
+        .commit_alu_data        (commit_alu_data),
+        .commit_branch_taken    (commit_branch_taken),
+        .d_pf                   (d_pf),
+        .i_pf                   (i_pf),
+        .d_pf_event             (d_pf_event),
+        .i_pf_event             (i_pf_event),
+        .trap_scause            (trap_scause),
+        .execute_task_busy      (execute_task_busy),
+        .execute_task_done      (execute_task_done)
+    );
+
+    Decorder u_Decorder (
+        .clock        (clock),
+        .reset_n      (reset_n),
+        .decode_enb   (decode_enb),
+        .opcode       (opcode),
+        .in_pc        (pc_now),
+        .current_priv (priv_mode),
+        .decode_done  (decode_done),
+        .decoder_ctrl (decoded_ctrl)
+    );
+
+    Execute #(
+        .ENABLE_MUL (1'b0),
+        .ENABLE_DIV (1'b0)
+    ) u_execute_alu (
+        .clock          (clock),
+        .reset_n        (reset_n),
+        .execute_enb    (alu_execute_valid),
+        .decoder_ctrl   (alu_execute_ctrl),
+        .reg_data_addr1 (alu_execute_reg_data_1),
+        .reg_data_addr2 (alu_execute_reg_data_2),
+        .alu_data       (alu_execute_data),
+        .r_data1        (),
+        .r_data2        (),
+        .out_pc         (),
+        .busy           (),
+        .done           (alu_execute_done)
+    );
+
+    Execute #(
+        .ENABLE_MUL (1'b1),
+        .ENABLE_DIV (1'b1)
+    ) u_execute_mul_div (
+        .clock          (clock),
+        .reset_n        (reset_n),
+        .execute_enb    (md_execute_valid),
+        .decoder_ctrl   (md_execute_ctrl),
+        .reg_data_addr1 (md_execute_reg_data_1),
+        .reg_data_addr2 (md_execute_reg_data_2),
+        .alu_data       (md_execute_data),
+        .r_data1        (),
+        .r_data2        (),
+        .out_pc         (),
+        .busy           (),
+        .done           (md_execute_done)
+    );
+
+    // One MEM transaction controller for every legal RV32I load/store.
+    // No Branch/MemoryStore legacy fallback exists in the v2 backend.
+    Branch #(.UART_MMIO_ADDR(UART_MMIO_ADDR)) u_memory (
+        .clock(clock), .reset_n(reset_n), .cpu_stop(cpu_stop),
+        .valid(load_valid || store_valid), .decoder_ctrl(memory_ctrl),
+        .in_vaddr(memory_alu_data), .r_data2(memory_reg_data_2),
+        .mode_sv32(d_mode_sv32), .mmu_valid(mem_mmu_valid),
+        .mmu_ready(d_mmu_done), .access_fault(d_mmu_fault), .d_paddr(d_paddr),
+        .data_mem_address(mem_address), .data_mem_write_data(data_mem_write_data),
+        .data_mem_read_valid(mem_read_valid), .data_mem_write_valid(data_mem_write_valid),
+        .data_mem_req_ready(data_mem_req_ready),
+        .data_mem_read_ready(data_mem_read_ready),
+        .data_mem_write_ready(data_mem_write_ready),
+        .uart(uart_out), .pending(mem_pending), .done(mem_done),
+        .misaligned_fault(data_fault_misaligned)
+    );
+
+    MMU u_mmu_d (
+        .clk            (clock),
+        .reset_n        (reset_n),
+        .MMU_enb        (d_mmu_enb),
+        .vaddr          (vaddr),
+        .satp           (csr_satp),
+        .priv_mode      (priv_mode),
+        .access_r       (memory_ctrl.is_load),
+        .access_w       (memory_ctrl.is_store),
+        .access_x       (1'b0),
+        .mem_req_ready  (data_mem_req_ready),
+        .mem_rdata      (data_mem_read_data),
+        .mem_addr       (d_mmu_mem_addr),
+        .mem_valid      (d_mmu_mem_valid),
+        .mem_ready      (data_mem_read_ready),
+        .cpu_state_done (cpu_state_done),
+        .sfence_vma     (fifo_flush_sig && commit_ctrl.is_sfence_vma),
+        .paddr          (d_paddr),
+        .page_fault     (d_mmu_fault),
+        .mode_sv32      (d_mode_sv32),
+        .mmu_done       (d_mmu_done)
+    );
+
+endmodule

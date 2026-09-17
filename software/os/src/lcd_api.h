@@ -51,3 +51,7 @@ void lcd_puts(
 );
 
 void lcd_printf(const char *fmt, ...);
+/* Synchronous MCU-sized (at most 16x16), packed row-major RGB888. */
+int lcd_begin_rgb888(void);
+int lcd_write_rgb888_rect(uint32_t x, uint32_t y, uint32_t width,
+                         uint32_t height, const uint8_t *rgb);

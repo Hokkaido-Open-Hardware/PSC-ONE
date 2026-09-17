@@ -117,7 +117,7 @@ void exit(void) {
 
 // -------------------------------------------------------
 // SA実行関数
-void call_sa_api(uint32_t matrix_size)
+void call_sa_api(uint32_t matrix_size, bool option)
 {
     /*
     static uint8_t matrix_A[SA_MAT_MAX * SA_MAT_MAX];
@@ -151,7 +151,8 @@ void call_sa_api(uint32_t matrix_size)
         (uint32_t)(uintptr_t)matrix_A,
         (uint32_t)(uintptr_t)matrix_B,
         (uint32_t)(uintptr_t)matrix_C,
-        matrix_size
+        matrix_size,
+        option ? 1u : 0u
     );
 
     putchar('A');
@@ -595,13 +596,15 @@ static inline uint32_t sa_api(
     uint32_t arg0,
     uint32_t arg1,
     uint32_t arg2,
-    uint32_t arg4)
+    uint32_t arg4,
+    uint32_t arg5)
 {
     register uint32_t reg_a0 __asm__("a0") = arg0;
     register uint32_t reg_a1 __asm__("a1") = arg1;
     register uint32_t reg_a2 __asm__("a2") = arg2;
     register uint32_t reg_a3 __asm__("a3") = sysno;
     register uint32_t reg_a4 __asm__("a4") = arg4;
+    register uint32_t reg_a5 __asm__("a5") = arg5;
 
     __asm__ volatile(
         "ecall"
@@ -609,7 +612,8 @@ static inline uint32_t sa_api(
         : "r"(reg_a1),
           "r"(reg_a2),
           "r"(reg_a3),
-          "r"(reg_a4)
+          "r"(reg_a4),
+          "r"(reg_a5)
         : "memory"
     );
 
@@ -748,4 +752,41 @@ void start(void) {
         :
         : [stk] "r"(__user_stack_top)
     );
+}
+int call_lcd_rgb888_begin(void)
+{
+    return (int)sd_api(SYS_LCD_RGB888_BEGIN, 0);
+}
+
+int call_lcd_rgb888_rect(uint32_t x, uint32_t y, uint32_t width,
+                        uint32_t height, const uint8_t *rgb)
+{
+    /* Existing ABI: a3 is syscall number, remaining arguments a0/a1/a2/a4/a5. */
+    register uint32_t a0 __asm__("a0") = x;
+    register uint32_t a1 __asm__("a1") = y;
+    register uint32_t a2 __asm__("a2") = width;
+    register uint32_t a3 __asm__("a3") = SYS_LCD_RGB888_RECT;
+    register uint32_t a4 __asm__("a4") = height;
+    register uint32_t a5 __asm__("a5") = (uint32_t)rgb;
+    __asm__ __volatile__("ecall" : "+r"(a0)
+        : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5) : "memory");
+    return (int)a0;
+}
+
+int call_timer_measure_begin(void) { return (int)sd_api(SYS_TIMER_MEASURE_BEGIN, 0); }
+int call_timer_measure_end(void) { return (int)sd_api(SYS_TIMER_MEASURE_END, 0); }
+int call_timer_measure_end_us(void) { return (int)sd_api(SYS_TIMER_MEASURE_END_US, 0); }
+int call_timer_measure_read_us(void) { return (int)sd_api(SYS_TIMER_MEASURE_READ_US, 0); }
+int call_sa_matmul_int8(const int8_t *a, const int8_t *b, int32_t *c,
+                        unsigned n, psc_sa_profile_t *profile) {
+    register uint32_t a0 __asm__("a0") = (uint32_t)(uintptr_t)a;
+    register uint32_t a1 __asm__("a1") = (uint32_t)(uintptr_t)b;
+    register uint32_t a2 __asm__("a2") = (uint32_t)(uintptr_t)c;
+    register uint32_t a3 __asm__("a3") = SYS_SA_RUN;
+    register uint32_t a4 __asm__("a4") = n;
+    register uint32_t a5 __asm__("a5") = 1u | (profile ? PSC_SA_PROFILE_FLAG : 0u);
+    register uint32_t a6 __asm__("a6") = (uint32_t)(uintptr_t)profile;
+    __asm__ volatile("ecall" : "+r"(a0)
+        : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6) : "memory");
+    return (int)a0;
 }

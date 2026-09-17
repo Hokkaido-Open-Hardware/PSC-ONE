@@ -15,15 +15,22 @@ module sdram_32bit_to_128bit_axi_bridge #(
     input  wire                     clock,
     input  wire                     reset_n,
 
-    input  wire                     read_valid,
-    output reg                      read_ready,
-    input  wire [ADDR_WIDTH-1:0]    read_addr,
-    output reg  [127:0]             read_data,
+    // Cache requests are one-cycle pulses, with at most one outstanding
+    // request per cache. Address/data remain stable until completion, as in
+    // cache_dma_controller{,_io}. ready is a completion pulse, not acceptance.
+    input  wire                     i_read_valid,
+    output wire                     i_read_ready,
+    input  wire [ADDR_WIDTH-1:0]     i_read_addr,
+    output wire [127:0]              i_read_data,
 
-    input  wire                     write_valid,
-    output reg                      write_ready,
-    input  wire [ADDR_WIDTH-1:0]    write_addr,
-    input  wire [127:0]             write_data,
+    input  wire                     d_read_valid,
+    output wire                     d_read_ready,
+    input  wire [ADDR_WIDTH-1:0]     d_read_addr,
+    output wire [127:0]              d_read_data,
+    input  wire                     d_write_valid,
+    output reg                      d_write_ready,
+    input  wire [ADDR_WIDTH-1:0]     d_write_addr,
+    input  wire [127:0]              d_write_data,
 
     output reg  [ID_WIDTH-1:0]      m_axi_awid,
     output reg  [ADDR_WIDTH-1:0]    m_axi_awaddr,
@@ -92,6 +99,27 @@ module sdram_32bit_to_128bit_axi_bridge #(
     reg [1:0]                    beat;
     reg [FENCE_CNT_WIDTH-1:0]    fence_cnt;
 
+    // owner also records the last grant for round-robin arbitration.
+    // 0 = I-Cache, 1 = D-Cache. Hold it through the entire transaction/fence.
+    reg owner;
+    reg i_pending, d_pending, d_pending_write;
+    reg read_done;
+    // The caches emit one pulse per outstanding request. No busy-state
+    // feedback is needed on the direct IDLE arbitration/address-mux path.
+    wire i_new = i_read_valid;
+    wire d_new = d_read_valid || d_write_valid;
+    wire i_request = i_pending || i_new;
+    wire d_request = d_pending || d_new;
+    wire select_d = d_request && (!i_request || !owner);
+    wire select_write = select_d && (d_pending ? d_pending_write : d_write_valid);
+    wire [ADDR_WIDTH-1:0] selected_read_addr = select_d ? d_read_addr : i_read_addr;
+
+    assign i_read_ready = read_done && !owner;
+    assign d_read_ready = read_done && owner;
+    // One shared line buffer, including the final beat. Data is meaningful only with that port's ready.
+    assign i_read_data = rbuf;
+    assign d_read_data = rbuf;
+
     wire aw_fire = m_axi_awvalid & m_axi_awready;
     wire w_fire  = m_axi_wvalid  & m_axi_wready;
     wire b_fire  = m_axi_bvalid  & m_axi_bready;
@@ -100,15 +128,18 @@ module sdram_32bit_to_128bit_axi_bridge #(
 
     always @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
+            owner         <= 1'b1; // First simultaneous request favors I.
+            i_pending     <= 1'b0;
+            d_pending     <= 1'b0;
+            d_pending_write <= 1'b0;
             st            <= ST_IDLE;
             rbuf          <= 128'h0;
             wbuf          <= 128'h0;
             beat          <= 2'd0;
             fence_cnt     <= {FENCE_CNT_WIDTH{1'b0}};
 
-            read_data     <= 128'h0;
-            read_ready    <= 1'b0;
-            write_ready   <= 1'b0;
+            read_done    <= 1'b0;
+            d_write_ready <= 1'b0;
 
             m_axi_awid    <= {ID_WIDTH{1'b0}};
             m_axi_awaddr  <= {ADDR_WIDTH{1'b0}};
@@ -133,8 +164,16 @@ module sdram_32bit_to_128bit_axi_bridge #(
             m_axi_rready  <= 1'b0;
 
         end else begin
-            read_ready  <= 1'b0;
-            write_ready <= 1'b0;
+            read_done  <= 1'b0;
+            d_write_ready <= 1'b0;
+
+            // Preserve a losing pulse or a request arriving while AXI is busy.
+            // Payload stays in the requesting cache, not in a second datapath.
+            if (i_new) i_pending <= 1'b1;
+            if (d_new) begin
+                d_pending <= 1'b1;
+                d_pending_write <= d_write_valid;
+            end
 
             if (m_axi_wvalid) begin
                 m_axi_wstrb <= {(DATA_WIDTH/8){1'b1}};
@@ -152,11 +191,13 @@ module sdram_32bit_to_128bit_axi_bridge #(
 
                     if (fence_cnt != 0) begin
                         st <= ST_FENCE;
-                    end else if (write_valid) begin
-                        wbuf          <= write_data;
+                    end else if (select_write) begin
+                        owner         <= 1'b1;
+                        d_pending     <= 1'b0;
+                        wbuf          <= d_write_data;
 
                         m_axi_awid    <= {ID_WIDTH{1'b0}};
-                        m_axi_awaddr  <= align16(write_addr);
+                        m_axi_awaddr  <= align16(d_write_addr);
                         m_axi_awlen   <= 8'd3;
                         m_axi_awsize  <= 3'd2;
                         m_axi_awburst <= 2'b01;
@@ -164,9 +205,12 @@ module sdram_32bit_to_128bit_axi_bridge #(
 
                         st            <= ST_W_AW;
 
-                    end else if (read_valid) begin
+                    end else if (i_request || d_request) begin
+                        owner <= select_d;
+                        if (select_d) d_pending <= 1'b0;
+                        else          i_pending <= 1'b0;
                         m_axi_arid    <= {ID_WIDTH{1'b0}};
-                        m_axi_araddr  <= align16(read_addr);
+                        m_axi_araddr  <= align16(selected_read_addr);
                         m_axi_arlen   <= 8'd3;
                         m_axi_arsize  <= 3'd2;
                         m_axi_arburst <= 2'b01;
@@ -218,7 +262,7 @@ module sdram_32bit_to_128bit_axi_bridge #(
                 ST_W_B: begin
                     if (b_fire) begin
                         m_axi_bready <= 1'b0;
-                        write_ready  <= 1'b1;
+                        d_write_ready <= 1'b1;
 
                         fence_cnt    <= (FENCE_CYCLES == 0)
                                       ? {FENCE_CNT_WIDTH{1'b0}}
@@ -247,13 +291,12 @@ module sdram_32bit_to_128bit_axi_bridge #(
                             2'd0: rbuf[ 31:  0] <= m_axi_rdata;
                             2'd1: rbuf[ 63: 32] <= m_axi_rdata;
                             2'd2: rbuf[ 95: 64] <= m_axi_rdata;
-                            default: ;
+                            default: rbuf[127:96] <= m_axi_rdata;
                         endcase
 
                         if (m_axi_rlast || (beat == 2'd3)) begin
-                            read_data    <= {m_axi_rdata, rbuf[95:0]};
                             m_axi_rready <= 1'b0;
-                            read_ready   <= 1'b1;
+                            read_done   <= 1'b1;
                             st           <= ST_IDLE;
                         end else begin
                             beat <= beat + 2'd1;

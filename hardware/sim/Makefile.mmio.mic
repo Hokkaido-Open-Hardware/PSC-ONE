@@ -48,8 +48,8 @@ I2S_MIC_MODEL = ../rtl/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v
 MMIO_DIR = ../rtl/mmio
 
 SRC_MIC = \
-	$(MMIO_DIR)/I2S_RX/sim_PSC_I2SRX.v \
-	$(MMIO_DIR)/I2S_RX/PSC_I2SRX.v \
+	$(MMIO_DIR)/I2S_RX/sim_PSC_I2SRX.sv \
+	$(MMIO_DIR)/I2S_RX/PSC_I2SRX.sv \
 	$(I2S_MIC_MODEL)
 	
 # ============================================================

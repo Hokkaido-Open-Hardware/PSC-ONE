@@ -1,10 +1,13 @@
 #include "py/obj.h"
+#include "py/objlist.h"
 #include "py/runtime.h"
 #include "py/compile.h"
 #include "py/repl.h"
 #include "py/mperrno.h"
 
 #include "mphalport.h"
+#include <string.h>
+#include "../../../os/src/tflite/tflite_api.h"
 
 
 /* ------------------------------------------------------------
@@ -60,13 +63,14 @@ static mp_obj_t psc_run(mp_obj_t filename_obj)
      * user stackを消費しないようstatic領域を使用する。
      * 最大4KBのPythonスクリプトを読み込む。
      */
+    // Read one extra byte so an oversized file cannot look complete.
     static uint8_t buf[PSC_PY_MAX_SIZE + 1u];
     uint32_t size = 0;
 
     if (fat32_read(
             filename,
             buf,
-            PSC_PY_MAX_SIZE,
+            sizeof(buf),
             &size) != 0) {
 
         mp_raise_OSError(MP_ENOENT);
@@ -325,10 +329,350 @@ static MP_DEFINE_CONST_FUN_OBJ_0(
 
 
 /* ------------------------------------------------------------
- * psc module globals
+ * SynapEngine
  * ------------------------------------------------------------ */
 
+#ifndef PSC_SA_MAT_MAX
+#define PSC_SA_MAT_MAX 16u
+#endif
+
+extern int psc_sa_run_api(
+    const uint8_t *A,
+    const uint8_t *B,
+    uint32_t *C,
+    uint32_t n,
+    bool signed_mode
+);
+
+/* Python: psc.sa_run(A, B, signed_mode) */
+static mp_obj_t psc_sa_run(
+    mp_obj_t A_obj,
+    mp_obj_t B_obj,
+    mp_obj_t signed_mode_obj)
+{
+    size_t n = 0;
+    size_t bn = 0;
+    mp_obj_t *A_rows = NULL;
+    mp_obj_t *B_rows = NULL;
+
+    mp_obj_get_array(A_obj, &n, &A_rows);
+    mp_obj_get_array(B_obj, &bn, &B_rows);
+
+    bool signed_mode = mp_obj_is_true(signed_mode_obj);
+
+    if ((n == 0u) ||
+        (n > PSC_SA_MAT_MAX) ||
+        ((n & 3u) != 0u)) {
+
+        mp_raise_ValueError(
+            MP_ERROR_TEXT("invalid matrix size")
+        );
+    }
+
+    if (bn != n) {
+        mp_raise_ValueError(
+            MP_ERROR_TEXT("matrix size mismatch")
+        );
+    }
+
+    static uint8_t A_buf[PSC_SA_MAT_MAX * PSC_SA_MAT_MAX];
+    static uint8_t B_buf[PSC_SA_MAT_MAX * PSC_SA_MAT_MAX];
+    static uint32_t C_buf[PSC_SA_MAT_MAX * PSC_SA_MAT_MAX];
+
+    /*
+     * Matrix A
+     */
+    for (size_t i = 0; i < n; ++i) {
+        size_t cols = 0;
+        mp_obj_t *row = NULL;
+
+        mp_obj_get_array(A_rows[i], &cols, &row);
+
+        if (cols != n) {
+            mp_raise_ValueError(
+                MP_ERROR_TEXT("A must be square")
+            );
+        }
+
+        for (size_t j = 0; j < n; ++j) {
+            mp_int_t value = mp_obj_get_int(row[j]);
+
+            if (signed_mode) {
+
+                /*
+                 * Signed INT8:
+                 * -128 ... +127
+                 */
+                if ((value < -128) || (value > 127)) {
+                    mp_raise_ValueError(
+                        MP_ERROR_TEXT(
+                            "A signed value out of range"
+                        )
+                    );
+                }
+
+            } else {
+
+                /*
+                 * Unsigned UINT8:
+                 * 0 ... 255
+                 */
+                if ((value < 0) || (value > 255)) {
+                    mp_raise_ValueError(
+                        MP_ERROR_TEXT(
+                            "A unsigned value out of range"
+                        )
+                    );
+                }
+            }
+
+            /*
+             * Signed values are stored as two's-complement
+             * 8-bit values in the uint8_t buffer.
+             *
+             * Example:
+             *   -1   -> 0xFF
+             *   -128 -> 0x80
+             *   127  -> 0x7F
+             */
+            A_buf[i * n + j] = (uint8_t)value;
+        }
+    }
+
+    /*
+     * Matrix B
+     */
+    for (size_t i = 0; i < n; ++i) {
+        size_t cols = 0;
+        mp_obj_t *row = NULL;
+
+        mp_obj_get_array(B_rows[i], &cols, &row);
+
+        if (cols != n) {
+            mp_raise_ValueError(
+                MP_ERROR_TEXT("B must be square")
+            );
+        }
+
+        for (size_t j = 0; j < n; ++j) {
+            mp_int_t value = mp_obj_get_int(row[j]);
+
+            if (signed_mode) {
+
+                /*
+                 * Signed INT8:
+                 * -128 ... +127
+                 */
+                if ((value < -128) || (value > 127)) {
+                    mp_raise_ValueError(
+                        MP_ERROR_TEXT(
+                            "B signed value out of range"
+                        )
+                    );
+                }
+
+            } else {
+
+                /*
+                 * Unsigned UINT8:
+                 * 0 ... 255
+                 */
+                if ((value < 0) || (value > 255)) {
+                    mp_raise_ValueError(
+                        MP_ERROR_TEXT(
+                            "B unsigned value out of range"
+                        )
+                    );
+                }
+            }
+
+            B_buf[i * n + j] = (uint8_t)value;
+        }
+    }
+
+    /*
+     * Run SynapEngine
+     */
+    int ret = psc_sa_run_api(
+        A_buf,
+        B_buf,
+        C_buf,
+        (uint32_t)n,
+        signed_mode
+    );
+
+    if (ret != 0) {
+        mp_raise_OSError(ret);
+    }
+
+    /*
+     * Convert result matrix to MicroPython list
+     */
+    mp_obj_t result = mp_obj_new_list(n, NULL);
+    mp_obj_list_t *result_list = MP_OBJ_TO_PTR(result);
+
+    for (size_t i = 0; i < n; ++i) {
+        mp_obj_t row_obj = mp_obj_new_list(n, NULL);
+        mp_obj_list_t *row_list = MP_OBJ_TO_PTR(row_obj);
+
+        for (size_t j = 0; j < n; ++j) {
+
+            if (signed_mode) {
+                row_list->items[j] = mp_obj_new_int(
+                    (int32_t)C_buf[i * n + j]
+                );
+            } else {
+                row_list->items[j] = mp_obj_new_int_from_uint(
+                    C_buf[i * n + j]
+                );
+            }
+        }
+
+        result_list->items[i] = row_obj;
+    }
+
+    return result;
+}
+
+static MP_DEFINE_CONST_FUN_OBJ_3(
+    psc_sa_run_obj,
+    psc_sa_run
+);
+
+
+/* ------------------------------------------------------------
+ * TFLite: ユーザー側の既存C APIをPythonへ公開する。
+ * シェルと単一モデルを共有し、新しいsyscallは使用しない。
+ * ------------------------------------------------------------ */
+
+/* TFLite lives in the same user image as MicroPython. Only copy Python
+ * buffers; never retain a GC-owned pointer or expose the runtime arena. */
+/* C APIの失敗をOSErrorへ変換する。元の負のエラー番号を保持する。 */
+static void mod_psc_tflite_check(int rc)
+{
+    if (rc != 0) {
+        mp_raise_OSError(rc);
+    }
+}
+
+/* Python: psc.tflite_load("MODEL.TFL") -> None
+ * SDルートの大文字8.3形式のファイルを読み、推論を準備する。
+ * モデルはC側の静的バッファに保持される。C APIでのload失敗時も
+ * 旧モデルは無効になる。Python文字列の埋め込みNULは事前に拒否する。 */
+static mp_obj_t mod_psc_tflite_load(mp_obj_t name_obj)
+{
+    if (!mp_obj_is_str(name_obj)) {
+        mp_raise_TypeError(MP_ERROR_TEXT("filename must be str"));
+    }
+    size_t length;
+    const char *name = mp_obj_str_get_data(name_obj, &length);
+    if (memchr(name, '\0', length) != NULL) {
+        mp_raise_ValueError(MP_ERROR_TEXT("filename contains NUL"));
+    }
+    mod_psc_tflite_check(psc_tflite_load(name));
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_psc_tflite_load_obj, mod_psc_tflite_load);
+
+/* Python: psc.tflite_reset() -> None
+ * モデル・入出力・計測状態を初期化し、CPU backend / tile=4へ戻す。
+ * 過去にPythonへ返したbytesはコピーなので、この操作の影響を受けない。 */
+static mp_obj_t mod_psc_tflite_reset(void)
+{
+    mod_psc_tflite_check(psc_tflite_reset());
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mod_psc_tflite_reset_obj, mod_psc_tflite_reset);
+
+/* Python: psc.tflite_input_size() -> int
+ * 準備済みモデルが要求する入力バイト数。未ロード時はOSError。 */
+static mp_obj_t mod_psc_tflite_input_size(void)
+{
+    size_t length;
+    if (psc_tflite_get_input(&length) == NULL) {
+        mp_raise_OSError(PSC_TFLITE_ERR_GRAPH);
+    }
+    return mp_obj_new_int_from_uint(length);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mod_psc_tflite_input_size_obj, mod_psc_tflite_input_size);
+
+/* Python: psc.tflite_run(data) -> bytes
+ * 読み取り可能バッファをINT8の生バイト列（負値は2の補数）として扱う。
+ * 長さの完全一致を確認後、入力コピー→同期推論→出力コピーを行う。
+ * strはTypeError、長さ不一致はValueError、推論失敗はOSError。
+ * 返すbytesはPython所有で、内部バッファへの参照を公開しない。 */
+static mp_obj_t mod_psc_tflite_run(mp_obj_t data_obj)
+{
+    if (mp_obj_is_str(data_obj)) {
+        mp_raise_TypeError(MP_ERROR_TEXT("input must be a byte buffer"));
+    }
+    mp_buffer_info_t data;
+    mp_get_buffer_raise(data_obj, &data, MP_BUFFER_READ);
+    size_t length;
+    int8_t *input = psc_tflite_get_input(&length);
+    if (input == NULL) {
+        mp_raise_OSError(PSC_TFLITE_ERR_GRAPH);
+    }
+    if (data.len != length) {
+        mp_raise_ValueError(MP_ERROR_TEXT("TFLite input size mismatch"));
+    }
+    /* No Python allocation or callback between input copy and invoke. */
+    memcpy(input, data.buf, length);
+    mod_psc_tflite_check(psc_tflite_invoke());
+    const int8_t *output = psc_tflite_get_output(&length);
+    if (output == NULL) {
+        mp_raise_OSError(PSC_TFLITE_ERR_GRAPH);
+    }
+    return mp_obj_new_bytes((const byte *)output, length);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_psc_tflite_run_obj, mod_psc_tflite_run);
+
+/* Python: psc.tflite_set_fc_backend(backend) -> None
+ * 0=CPU、1=Synap。その他はValueError。モデルと入力は保持されるが、
+ * 内部の推論結果は無効になる。Synap失敗時のCPU自動切替は行わない。 */
+static mp_obj_t mod_psc_tflite_set_fc_backend(mp_obj_t backend_obj)
+{
+    mp_int_t backend = mp_obj_get_int(backend_obj);
+    if (backend != PSC_TFLITE_FC_CPU && backend != PSC_TFLITE_FC_SYNAP) {
+        mp_raise_ValueError(MP_ERROR_TEXT("backend must be 0 (CPU) or 1 (Synap)"));
+    }
+    mod_psc_tflite_check(psc_tflite_set_fc_backend((enum psc_tflite_fc_backend)backend));
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_psc_tflite_set_fc_backend_obj, mod_psc_tflite_set_fc_backend);
+
+/* Python: psc.tflite_set_synap_tile_size(size) -> None
+ * Synap行列演算のタイル寸法を4/8/12/16から選ぶ。その他はValueError。
+ * backend自体は変更せず、内部の推論結果を無効にする。 */
+static mp_obj_t mod_psc_tflite_set_synap_tile_size(mp_obj_t size_obj)
+{
+    mp_int_t size = mp_obj_get_int(size_obj);
+    if (size != 4 && size != 8 && size != 12 && size != 16) {
+        mp_raise_ValueError(MP_ERROR_TEXT("tile size must be 4, 8, 12 or 16"));
+    }
+    mod_psc_tflite_check(psc_tflite_set_synap_tile_size((unsigned)size));
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mod_psc_tflite_set_synap_tile_size_obj, mod_psc_tflite_set_synap_tile_size);
+
+/* Python: psc.tflite_arena_used() -> int
+ * C側arenaの使用バイト数（reset後は0）。Pythonヒープ使用量ではない。 */
+static mp_obj_t mod_psc_tflite_arena_used(void)
+{
+    return mp_obj_new_int_from_uint(psc_tflite_arena_used());
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(mod_psc_tflite_arena_used_obj, mod_psc_tflite_arena_used);
+
+/* Pythonのpscモジュールに公開する関数名と関数オブジェクトの対応表。 */
 static const mp_rom_map_elem_t psc_module_globals_table[] = {
+
+    { MP_ROM_QSTR(MP_QSTR_tflite_load), MP_ROM_PTR(&mod_psc_tflite_load_obj) },
+    { MP_ROM_QSTR(MP_QSTR_tflite_reset), MP_ROM_PTR(&mod_psc_tflite_reset_obj) },
+    { MP_ROM_QSTR(MP_QSTR_tflite_input_size), MP_ROM_PTR(&mod_psc_tflite_input_size_obj) },
+    { MP_ROM_QSTR(MP_QSTR_tflite_run), MP_ROM_PTR(&mod_psc_tflite_run_obj) },
+    { MP_ROM_QSTR(MP_QSTR_tflite_set_fc_backend), MP_ROM_PTR(&mod_psc_tflite_set_fc_backend_obj) },
+    { MP_ROM_QSTR(MP_QSTR_tflite_set_synap_tile_size), MP_ROM_PTR(&mod_psc_tflite_set_synap_tile_size_obj) },
+    { MP_ROM_QSTR(MP_QSTR_tflite_arena_used), MP_ROM_PTR(&mod_psc_tflite_arena_used_obj) },
 
     {
         MP_ROM_QSTR(MP_QSTR___name__),
@@ -424,6 +768,12 @@ static const mp_rom_map_elem_t psc_module_globals_table[] = {
     {
         MP_ROM_QSTR(MP_QSTR_led_state),
         MP_ROM_PTR(&psc_led_state_obj)
+    },
+
+    /* SynapEngine */
+    {
+        MP_ROM_QSTR(MP_QSTR_sa_run),
+        MP_ROM_PTR(&psc_sa_run_obj)
     },
 
 };

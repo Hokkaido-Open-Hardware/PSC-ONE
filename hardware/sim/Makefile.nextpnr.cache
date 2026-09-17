@@ -1,0 +1,115 @@
+# ============================================================
+# cache_dma_controller standalone timing flow
+# Yosys + nextpnr-himbaechel / Tang Nano 20K
+#
+# Usage:
+#   make -f Makefile.nextpnr.cache timing
+#   make -f Makefile.nextpnr.cache timing FREQ=81
+# ============================================================
+
+SHELL := /bin/bash
+
+YOSYS   ?= ./yosys/build/yosys
+NEXTPNR ?= nextpnr-himbaechel
+
+DEVICE ?= GW2AR-LV18QN88C8/I7
+FAMILY ?= GW2A-18C
+FREQ   ?= 81
+
+CACHE_SRC_DIR := ../rtl/cache/src
+TIMING_DIR  := ../rtl/timing
+
+CACHE_FILES := \
+	$(CACHE_SRC_DIR)/cache_dma_controller.sv \
+	$(CACHE_SRC_DIR)/dm_cache_data.v \
+	$(CACHE_SRC_DIR)/dm_cache_tag.v
+
+TIMING_WRAPPER := $(TIMING_DIR)/cache_dma_controller_TimingTop.sv
+TIMING_CST     := $(TIMING_DIR)/cache_dma_controller_TimingTop.cst
+
+TOP := cache_dma_controller_TimingTop
+
+ALL_FILES := \
+	$(CACHE_FILES) \
+	$(TIMING_WRAPPER)
+
+BUILD_DIR   ?= build_nextpnr_cache
+JSON        := $(BUILD_DIR)/cache.json
+PNR_JSON    := $(BUILD_DIR)/cache_pnr.json
+YOSYS_LOG   := $(BUILD_DIR)/yosys_cache.log
+NEXTPNR_LOG := $(BUILD_DIR)/nextpnr_cache.log
+REPORT      := $(BUILD_DIR)/timing_cache.json
+
+.PHONY: all check-tools check-files synth pnr timing report clean
+
+all: timing
+
+check-tools:
+	@command -v $(YOSYS) >/dev/null 2>&1 || { echo "[ERROR] yosys not found"; exit 1; }
+	@command -v $(NEXTPNR) >/dev/null 2>&1 || { echo "[ERROR] nextpnr-himbaechel not found"; exit 1; }
+	@echo "[OK] yosys   : $$(command -v $(YOSYS))"
+	@echo "[OK] nextpnr : $$(command -v $(NEXTPNR))"
+	@$(NEXTPNR) --version
+
+check-files:
+	@for f in $(ALL_FILES); do \
+		test -f "$$f" || { echo "[ERROR] source file not found: $$f"; exit 1; }; \
+	done
+	@test -f "$(TIMING_CST)" || { echo "[ERROR] CST not found: $(TIMING_CST)"; exit 1; }
+	@echo "[OK] TOP     : $(TOP)"
+	@echo "[OK] wrapper : $(TIMING_WRAPPER)"
+	@echo "[OK] CST     : $(TIMING_CST)"
+
+synth: check-tools check-files
+	@mkdir -p $(BUILD_DIR)
+	@echo "============================================================"
+	@echo " cache_dma_controller"
+	@echo " TOP         : $(TOP)"
+	@echo " DEVICE      : $(DEVICE)"
+	@echo " FAMILY      : $(FAMILY)"
+	@echo " TARGET FREQ : $(FREQ) MHz"
+	@echo "============================================================"
+	$(YOSYS) -l $(YOSYS_LOG) -p " \
+		read_verilog -sv $(ALL_FILES); \
+		hierarchy -check -top $(TOP); \
+		flatten; \
+		synth_gowin -top $(TOP) -family gw2a -json $(JSON); \
+		stat \
+	"
+	@echo "[OK] JSON : $(JSON)"
+	@echo "[OK] LOG  : $(YOSYS_LOG)"
+
+pnr: synth
+	@mkdir -p $(BUILD_DIR)
+	@set -o pipefail; \
+	$(NEXTPNR) \
+		--json $(JSON) \
+		--write $(PNR_JSON) \
+		--device $(DEVICE) \
+		--vopt family=$(FAMILY) \
+		--vopt cst=$(TIMING_CST) \
+		--freq $(FREQ) \
+		--report $(REPORT) \
+		2>&1 | tee $(NEXTPNR_LOG)
+	@echo "[OK] P&R JSON : $(PNR_JSON)"
+	@echo "[OK] REPORT   : $(REPORT)"
+	@echo "[OK] LOG      : $(NEXTPNR_LOG)"
+
+timing: pnr
+	@echo "============================================================"
+	@echo " cache_dma_controller nextpnr timing summary"
+	@echo "============================================================"
+	@grep -Ei 'Max frequency|MHz|critical path|slack|timing|logic utilisation|utilization|Device utilisation' \
+		$(NEXTPNR_LOG) | tail -n 200 || true
+	@echo "Full log:    $(NEXTPNR_LOG)"
+	@echo "JSON report: $(REPORT)"
+
+report:
+	@if [ ! -f "$(NEXTPNR_LOG)" ]; then \
+		echo "[ERROR] $(NEXTPNR_LOG) not found. Run timing first."; exit 1; \
+	fi
+	@grep -Ei 'Max frequency|MHz|critical path|slack|timing|logic utilisation|utilization|Device utilisation' \
+		$(NEXTPNR_LOG) | tail -n 240 || true
+
+clean:
+	rm -rf $(BUILD_DIR)

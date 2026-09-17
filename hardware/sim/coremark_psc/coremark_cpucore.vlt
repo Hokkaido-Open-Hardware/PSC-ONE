@@ -1,0 +1,11 @@
+`verilator_config
+// Only top-level CPU interface signals used by the cocotb memory model.
+public_flat_rw -module "PSC_RV32_core" -var "clock"
+public_flat_rw -module "PSC_RV32_core" -var "reset_n"
+public_flat_rw -module "PSC_RV32_core" -var "cpu_stop"
+public_flat_rw -module "PSC_RV32_core" -var "timer_irq_ext"
+public_flat_rw -module "PSC_RV32_core" -var "*mem*"
+public_flat_rw -module "PSC_RV32_core" -var "mmu_data_req_ready"
+public_flat_rw -module "PSC_RV32_core" -var "csr_DMA_STATUS"
+public_flat_rw -module "PSC_RV32_core" -var "csr_SA_STATUS"
+public_flat_rw -module "PSC_RV32_core" -var "csr_CPU_MON_CYCLE"

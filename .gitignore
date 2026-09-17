@@ -3,6 +3,9 @@ myenv/
 __pycache__/
 *.pyc
 
+# Log
+log_gowin/
+
 # Build
 build/
 sim_build/
@@ -23,6 +26,21 @@ parallel_run/
 *.mem
 *.S
 
+# RUST
+*.dump
+
+# yosys
+hardware/sim/build_nextpnr_v1/
+hardware/sim/build_nextpnr_v2/
+hardware/sim/build_nextpnr_legacy/
+hardware/sim/build_nextpnr_npu/
+hardware/sim/build_nextpnr_cache_io/
+hardware/sim/build_nextpnr_cache/
+hardware/sim/log/test_result_*.log
+
+# codex
+hardware/sim/tests/
+
 # Vosk models
 vosk-model*/
 
@@ -30,5 +48,5 @@ vosk-model*/
 *.wav
 
 # Simulation logs and RISC-V test build outputs
-hardware/sim/log/test_result_*.log
+hardware/sim/log/
 hardware/sim/riscv_build/

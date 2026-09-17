@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PSC_RV32 Trace Studio</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">P<span>32</span></div>
+      <div><h1>PSC_RV32 Trace Studio</h1><p id="sourceName">Loading trace…</p></div>
+    </div>
+    <div class="metrics">
+      <div><span id="modelName">CPU model</span><strong id="cpuType">Detecting…</strong></div>
+      <div><span>Cycles</span><strong id="metricCycles">—</strong></div>
+      <div><span>Instructions</span><strong id="metricInstructions">—</strong></div>
+      <div><span>Retired</span><strong id="metricRetired">—</strong></div>
+      <div class="status"><i></i><span>Trace loaded</span></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="toolbar panel">
+      <div class="tool-group navigation">
+        <button id="prevInstruction" title="Previous instruction (Shift+Left)">◀│</button>
+        <button id="prevCycle" title="Previous cycle (Left)">◀</button>
+        <label>Cycle <input id="cycleJump" type="number" min="0" value="0"></label>
+        <button id="jumpCycle" class="accent">Jump</button>
+        <button id="nextCycle" title="Next cycle (Right)">▶</button>
+        <button id="nextInstruction" title="Next instruction (Shift+Right)">│▶</button>
+      </div>
+      <div class="tool-group search">
+        <label>PC <input id="pcSearch" placeholder="0x00001020"></label>
+        <button id="findPc">Find</button>
+        <label>Instruction <input id="instructionSearch" placeholder="mul / lw / csr…"></label>
+        <button id="findInstruction">Find</button>
+      </div>
+      <div class="tool-group view">
+        <label>Filter
+          <select id="categoryFilter">
+            <option value="ALL">All instructions</option>
+            <option>ALU</option><option>MUL</option><option>DIV</option>
+            <option>LOAD</option><option>STORE</option><option>BRANCH</option>
+            <option>JUMP</option><option>CSR</option><option>SYSTEM</option><option>OTHER</option>
+          </select>
+        </label>
+        <button id="zoomOut" title="Zoom out">−</button>
+        <span id="zoomLabel">100%</span>
+        <button id="zoomIn" title="Zoom in">＋</button>
+      </div>
+    </section>
+
+    <div class="workspace">
+      <section class="main-column">
+        <section class="timeline panel">
+          <div class="section-title">
+            <div><h2>CPU execution timeline</h2><p>RTL states and instruction occupancy · CPU clock rising edges</p></div>
+            <div class="legend">
+              <span class="alu">ALU</span><span class="mul">MUL</span><span class="div">DIV</span>
+              <span class="mem">MEM</span><span class="flow">FLOW</span><span class="csr">CSR</span>
+            </div>
+          </div>
+          <div class="canvas-shell">
+            <div id="rowLabels" class="row-labels"></div>
+            <canvas id="timelineCanvas" tabindex="0"></canvas>
+          </div>
+          <div class="scrubber-row">
+            <span id="rangeStart">0</span>
+            <input id="scrubber" type="range" min="0" max="1" value="0">
+            <span id="rangeEnd">0</span>
+          </div>
+          <div class="hint">Wheel: pan · Ctrl/⌘ + wheel: zoom · click: inspect cycle</div>
+        </section>
+
+        <section class="instruction-panel panel">
+          <div class="section-title">
+            <div><h2>Instruction ledger</h2><p>Instructions intersecting the visible cycle range</p></div>
+            <span id="ledgerCount" class="badge">0 records</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>PC</th><th>Word</th><th>Decoded instruction</th><th>Class</th><th>Start</th><th>End</th><th>Cycles</th><th>Status</th></tr></thead>
+              <tbody id="instructionRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <aside class="details panel">
+        <div class="section-title sticky"><div><h2>Cycle inspector</h2><p id="detailTime">Select a cycle</p></div><span id="detailCycle" class="cycle-chip">—</span></div>
+        <div id="detailsBody" class="details-body">
+          <div class="empty-state"><div class="scope-icon"></div><h3>No cycle selected</h3><p>Click any timeline column to inspect CPU state, operands, ALU, memory, and flow-control signals.</p></div>
+        </div>
+      </aside>
+    </div>
+    <section class="register-panel panel" aria-label="Architectural registers">
+      <div class="section-title">
+        <div><h2>Registers · x0–x31</h2><p id="registerSource">Selected cycle · changed values highlighted against previous cycle</p></div>
+        <span id="registerCycle" class="cycle-chip">—</span>
+      </div>
+      <div id="registerGrid" class="register-grid"></div>
+    </section>
+  </main>
+  <div id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>

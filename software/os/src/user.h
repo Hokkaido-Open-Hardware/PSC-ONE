@@ -1,5 +1,7 @@
 // user.h
 #pragma once
+#include <stdint.h>
+#include <stddef.h>
 
 #ifndef USER_BASE
 #define USER_BASE 0x00400000u
@@ -12,22 +14,20 @@ void uart_init(void);
 #endif
 
 typedef int bool;
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-typedef unsigned int uint32_t;
-typedef unsigned long long uint64_t;
-typedef uint32_t size_t;
-typedef uint32_t uintptr_t;
 typedef uint32_t paddr_t;
 typedef uint32_t vaddr_t;
 
 #define true  1
 #define false 0
+#ifndef NULL
 #define NULL  ((void *) 0)
+#endif
 
 #define align_up(value, align)   __builtin_align_up(value, align)
 #define is_aligned(value, align) __builtin_is_aligned(value, align)
+#ifndef offsetof
 #define offsetof(type, member)   __builtin_offsetof(type, member)
+#endif
 
 #define va_list  __builtin_va_list
 #define va_start __builtin_va_start
@@ -38,7 +38,7 @@ uint32_t cluster_to_lba(uint32_t cluster);
 int fat32_mount(void);
 
 // Systlic Array
-void call_sa_api(uint32_t matrix_size);
+void call_sa_api(uint32_t matrix_size, bool option);
 // Mic
 void call_mic_api(unsigned count);
 void call_mic_write_api(unsigned count);
@@ -63,7 +63,13 @@ int getchar(void);
 int getchar_timeout(void);
 void print_int(int v);
 
-static inline uint32_t sa_api(uint32_t sysno, uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg4);
+static inline uint32_t sa_api(
+    uint32_t sysno,
+    uint32_t arg0,
+    uint32_t arg1,
+    uint32_t arg2,
+    uint32_t arg4,
+    uint32_t arg5);
 static inline uint32_t mic_api(uint32_t sysno, uint32_t arg0);
 
 inline static uint32_t sd_api(uint32_t sysno, uint32_t arg0);
@@ -77,3 +83,15 @@ int parse_hex(const char *s, uintptr_t *out);
 uint32_t poll_switch_api(void);
 void printf(const char *fmt, ...);
 __attribute__((noreturn)) void exit(void);
+
+int call_lcd_rgb888_begin(void);
+int call_lcd_rgb888_rect(uint32_t x, uint32_t y, uint32_t width,
+                        uint32_t height, const uint8_t *rgb);
+
+int call_timer_measure_begin(void);
+int call_timer_measure_end(void);
+int call_timer_measure_end_us(void);
+int call_timer_measure_read_us(void);
+#include "sa_transfer.h"
+int call_sa_matmul_int8(const int8_t *a, const int8_t *b, int32_t *c,
+                        unsigned n, psc_sa_profile_t *profile);

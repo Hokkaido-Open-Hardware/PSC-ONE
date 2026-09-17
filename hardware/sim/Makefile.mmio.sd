@@ -49,8 +49,8 @@ MMIO_DIR = ../rtl/mmio/PSC_SDCARD
 
 SRC_SD = \
 	$(MMIO_DIR)/src/sim_PSC_SDCard.v \
-	$(MMIO_DIR)/src/PSC_SDCard.v \
-	$(MMIO_DIR)/src/PSC_SDCard_SPI.v \
+	$(MMIO_DIR)/src/PSC_SDCard.sv \
+	$(MMIO_DIR)/src/PSC_SDCard_SPI.sv \
 	$(SDCARD_MODEL)
 	
 # ============================================================

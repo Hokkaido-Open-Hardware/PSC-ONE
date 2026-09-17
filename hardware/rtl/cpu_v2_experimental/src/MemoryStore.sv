@@ -25,6 +25,7 @@ module MemoryStore #(
     output logic        mmu_valid,
     output logic [31:0] vaddr,
     input  logic        mmu_ready,
+    input  logic        access_fault,
     input  logic [31:0] d_paddr,
 
     // Memory
@@ -130,8 +131,12 @@ module MemoryStore #(
 
                 STORE_MMU_W:
                     if (mmu_ready) begin
-                        data_mem_write_address <= d_paddr;
-                        state                  <= STORE_ACCESS;
+                        if (access_fault) begin
+                            state <= STORE_DONE;
+                        end else begin
+                            data_mem_write_address <= d_paddr;
+                            state                  <= STORE_ACCESS;
+                        end
                     end
 
                 STORE_ACCESS:

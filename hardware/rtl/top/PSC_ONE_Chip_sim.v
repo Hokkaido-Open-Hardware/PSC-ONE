@@ -45,7 +45,7 @@ module PSC_ONE_Chip_sim #(
         $dumpvars(1, u_chip);
         $dumpvars(1, u_chip.u_lcd);
         $dumpvars(1, u_chip.u_i2s_if);
-        $dumpvars(1, u_chip.u_mmap_led);
+        $dumpvars(1, u_chip.u_led);
         $dumpvars(1, u_chip.u_dma);
         $dumpvars(1, u_chip.u_timer);
         `else

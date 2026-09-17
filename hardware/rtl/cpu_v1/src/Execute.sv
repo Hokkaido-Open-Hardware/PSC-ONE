@@ -21,79 +21,69 @@ module Execute #(
     output logic        done
 );
 
-    typedef enum logic [2:0] {
-        IDLE, ALU_DIV_WAIT, ALU_DIV_DONE, ALU_MUL_WAIT
+    typedef enum logic [1:0] {
+        IDLE, DIV_WAIT, MUL_WAIT, RESULT_HOLD
     } state_t;
 
     state_t state;
 
-    logic [31:0] s_data1, s_data2;
-    logic div_start, div_busy, div_done, div_signed;
-    logic mul_start, mul_busy, mul_done;
-    logic [31:0] div_quotient, div_remainder, mul_out;
+    logic [31:0] operand_1;
+    logic [31:0] operand_2;
+    logic [31:0] multi_result;
+    logic        is_div_op;
+    logic        is_mul_op;
+    logic        div_start;
+    logic        div_busy;
+    logic        div_done;
+    logic        div_signed;
+    logic        mul_start;
+    logic        mul_busy;
+    logic        mul_done;
+    logic [31:0] div_quotient;
+    logic [31:0] div_remainder;
+    logic [31:0] mul_out;
 
-    assign s_data1 = decoder_ctrl.op1sel ? decoder_ctrl.out_pc : reg_data_addr1;
-    assign s_data2 = decoder_ctrl.op2sel ? decoder_ctrl.imm : reg_data_addr2;
+    assign operand_1 = decoder_ctrl.op1sel
+                     ? decoder_ctrl.out_pc : reg_data_addr1;
+    assign operand_2 = decoder_ctrl.op2sel
+                     ? decoder_ctrl.imm : reg_data_addr2;
 
+    assign is_div_op = ENABLE_DIV &&
+                       (decoder_ctrl.alucon[4:2] == 3'b111);
+    assign is_mul_op = ENABLE_MUL &&
+                       (decoder_ctrl.alucon[4:2] == 3'b110);
     assign div_signed = (decoder_ctrl.alucon == 5'b1_1100) ||
                         (decoder_ctrl.alucon == 5'b1_1110);
+    assign div_start = execute_enb && (state == IDLE) && is_div_op;
+    assign mul_start = execute_enb && (state == IDLE) && is_mul_op;
 
-    assign div_start =
-                ENABLE_DIV &&
-                execute_enb &&
-                (state == IDLE) &&
-                (decoder_ctrl.alucon[4:2] == 3'b111);
+    Execute_Divider u_divider (
+        .clk         (clock),
+        .reset_n     (reset_n),
+        .start       (div_start),
+        .signed_mode (div_signed),
+        .dividend    (operand_1),
+        .divisor     (operand_2),
+        .busy        (div_busy),
+        .done        (div_done),
+        .quotient    (div_quotient),
+        .remainder   (div_remainder)
+    );
 
-    assign mul_start =
-                ENABLE_MUL &&
-                execute_enb &&
-                (state == IDLE) &&
-                (decoder_ctrl.alucon[4:2] == 3'b110);
-
-generate
-    if (ENABLE_DIV) begin : g_divider
-        Execute_Divider u_divider (
-            .clk         (clock),
-            .reset_n     (reset_n),
-            .start       (div_start),
-            .signed_mode (div_signed),
-            .dividend    (s_data1),
-            .divisor     (s_data2),
-            .busy        (div_busy),
-            .done        (div_done),
-            .quotient    (div_quotient),
-            .remainder   (div_remainder)
-        );
-    end else begin : g_no_divider
-        assign div_busy      = 1'b0;
-        assign div_done      = 1'b0;
-        assign div_quotient  = 32'd0;
-        assign div_remainder = 32'd0;
-    end
-endgenerate
-
-generate
-    if (ENABLE_MUL) begin : g_multiplier
-        Execute_Mul u_multiplier (
-            .clk     (clock),
-            .reset_n (reset_n),
-            .start   (mul_start),
-            .alucon  (decoder_ctrl.alucon[1:0]),
-            .data_1  (s_data1),
-            .data_2  (s_data2),
-            .busy    (mul_busy),
-            .done    (mul_done),
-            .mul_out (mul_out)
-        );
-    end else begin : g_no_multiplier
-        assign mul_busy = 1'b0;
-        assign mul_done = 1'b0;
-        assign mul_out  = 32'd0;
-    end
-endgenerate
+    Execute_Mul u_multiplier (
+        .clk     (clock),
+        .reset_n (reset_n),
+        .start   (mul_start),
+        .alucon  (decoder_ctrl.alucon[1:0]),
+        .data_1  (operand_1),
+        .data_2  (operand_2),
+        .busy    (mul_busy),
+        .done    (mul_done),
+        .mul_out (mul_out)
+    );
 
     function automatic logic [31:0] alu_exec(
-        input logic [4:0] control,
+        input logic [4:0]  control,
         input logic [31:0] data1,
         input logic [31:0] data2
     );
@@ -112,59 +102,73 @@ endgenerate
         endcase
     endfunction
 
+    // Single-cycle ALU operations are combinational and can complete on
+    // consecutive clocks.  MUL/DIV hold the same issue-stage record until
+    // their result is accepted by the next stage.
+    always_comb begin
+        r_data1 = reg_data_addr1;
+        r_data2 = reg_data_addr2;
+        out_pc  = decoder_ctrl.out_pc;
+        busy    = (state != IDLE);
+        done    = 1'b0;
+        alu_data = alu_exec(decoder_ctrl.alucon, operand_1, operand_2);
+
+        if (state == RESULT_HOLD) begin
+            alu_data = multi_result;
+            done     = execute_enb;
+        end else if ((state == IDLE) && execute_enb &&
+                     !is_mul_op && !is_div_op) begin
+            done = 1'b1;
+        end
+    end
+
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            state    <= IDLE;
-            alu_data <= 32'd0;
-            r_data1  <= 32'd0;
-            r_data2  <= 32'd0;
-            out_pc   <= 32'd0;
-            busy     <= 1'b0;
-            done     <= 1'b0;
+            state        <= IDLE;
+            multi_result <= 32'd0;
         end else begin
-            done <= 1'b0;
-
             case (state)
                 IDLE: begin
-                    busy <= 1'b0;
-                    if (div_start && !busy) begin
-                        busy  <= 1'b1;
-                        state <= ALU_DIV_WAIT;
-                    end else if (mul_start && !busy) begin
-                        busy  <= 1'b1;
-                        state <= ALU_MUL_WAIT;
-                    end else if (execute_enb && !busy) begin
-                        alu_data <= alu_exec(decoder_ctrl.alucon, s_data1, s_data2);
-                        done     <= 1'b1;
-                    end
+                    if (div_start)
+                        state <= DIV_WAIT;
+                    else if (mul_start)
+                        state <= MUL_WAIT;
+                end
 
-                    if (execute_enb) begin
-                        r_data1 <= reg_data_addr1;
-                        r_data2 <= reg_data_addr2;
-                        out_pc  <= decoder_ctrl.out_pc;
+                DIV_WAIT: begin
+                    if (div_done) begin
+                        multi_result <= decoder_ctrl.alucon[1]
+                                      ? div_remainder : div_quotient;
+                        state <= RESULT_HOLD;
                     end
                 end
 
-                ALU_DIV_WAIT:
-                    if (div_done) state <= ALU_DIV_DONE;
-
-                ALU_DIV_DONE: begin
-                    alu_data <= decoder_ctrl.alucon[1] ? div_remainder
-                                                       : div_quotient;
-                    done     <= 1'b1;
-                    state    <= IDLE;
-                end
-
-                ALU_MUL_WAIT:
+                MUL_WAIT: begin
                     if (mul_done) begin
-                        alu_data <= mul_out;
-                        done     <= 1'b1;
-                        state    <= IDLE;
+                        multi_result <= mul_out;
+                        state <= RESULT_HOLD;
                     end
+                end
+
+                RESULT_HOLD: begin
+                    if (execute_enb)
+                        state <= IDLE;
+                end
 
                 default: state <= IDLE;
             endcase
         end
     end
+
+`ifdef PIPELINE_TRACE
+    always_ff @(posedge clock) begin
+        if (reset_n && div_start)
+            $display("DIV-START clock=%0t pc=%08x dividend=%08x divisor=%08x",
+                     $time, decoder_ctrl.out_pc, operand_1, operand_2);
+        if (reset_n && div_done)
+            $display("DIV-DONE clock=%0t quotient=%08x remainder=%08x",
+                     $time, div_quotient, div_remainder);
+    end
+`endif
 
 endmodule

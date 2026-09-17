@@ -1,5 +1,5 @@
 # =========================================================
-# PSC_RV32ISP: cocotb top test 
+# PSC_RV32: cocotb top test 
 #   - 安全な int 変換 (X/Z 解決)
 #   - レベル待ち + タイムアウト
 #   - ユーティリティ関数で見通し改善
@@ -193,15 +193,26 @@ async def RV32IS_chip_test1(dut):
     rom_write_num = dut.u_chip.u_bt_rom.ROM_WORD.value.to_unsigned()
     dut._log.info(f"PSC_RV32IS_Boot_axi ROM_WORD : {rom_write_num}")
 
+    shared_monitor = None
+    if os.getenv("CHECK_SHARED_BRIDGE") == "1":
+        from cocotb_tb.axi.shared_monitor import SharedMonitor
+        shared_monitor = SharedMonitor(dut.u_chip.u_rv32_core_axi)
+        cocotb.start_soon(shared_monitor.run())
+
     # ---- clock, rst ----
     cocotb.start_soon(generate_clock(dut, CLK_PERIOD_NS))
     await reset_dut(dut)
 
     # ---- SDRAM init level wait (timeout 付き) ----
     ok_init = await wait_level(dut.u_chip.sdram_init_fin, 1, dut.clock, timeout_cycles=SDRAM_INIT_TIMEOUT)
-
+    if not ok_init:
+        raise cocotb.result.TestFailure("[FAIL] Timeout waiting for sdram_init_fin == 1")
+    await ncycles(dut.clock, 100)
+        
     # ---- Boot_rom_done wait (timeout 付き) ----
-    ok_init = await wait_level(dut.u_chip.Boot_rom_done, 1, dut.clock, timeout_cycles=BOOT_ROM_TIMEOUT)
+    ok_boot = await wait_level(dut.u_chip.Boot_rom_done, 1, dut.clock, timeout_cycles=BOOT_ROM_TIMEOUT)
+    if not ok_boot:
+        raise cocotb.result.TestFailure("[FAIL] Timeout waiting for Boot_rom_done == 1")
     await ncycles(dut.clock, 100)
 
     # ---- SDRAM Data Dump ----
@@ -223,8 +234,8 @@ async def RV32IS_chip_test1(dut):
     while waited < timeout_cycles:
         await RisingEdge(dut.clock)
 
-        page_fault_i = dut.u_chip.u_core_axi.u_core.i_pf.value
-        page_fault_d = dut.u_chip.u_core_axi.u_core.d_pf.value
+        page_fault_i = dut.u_chip.u_rv32_core_axi.u_core.i_pf.value
+        page_fault_d = dut.u_chip.u_rv32_core_axi.u_core.d_pf.value
 
         # PageFaultでbreak
         if page_fault_i or page_fault_d:
@@ -339,7 +350,10 @@ async def RV32IS_chip_test1(dut):
             f"[FAIL] expected=0x{EXPECTED_VALUE:08x}, got=0x{pio_word:08x}"
         )
 
-    if Assert:
+    if shared_monitor is not None:
+        shared_monitor.check()
+
+    if Assert or shared_monitor is not None:
         assert ok, (
             f"[FAIL] pio data has expected value: "
             f"pio_word=0x{pio_word:08x}, "

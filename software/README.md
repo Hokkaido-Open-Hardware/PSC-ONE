@@ -20,21 +20,24 @@ PSC-ONE Software is a full-stack software environment designed specifically for 
 
 It includes:
 
-- Boot software
-- PSC-OS kernel
-- User-mode applications
-- System-call interface
-- Device-control libraries
-- FAT32 filesystem support
-- Hardware-accelerator APIs
-- Test and diagnostic programs
+* Boot software
+* PSC-OS kernel
+* User-mode applications
+* System-call interface
+* Device-control libraries
+* FAT32 filesystem support
+* Hardware-accelerator APIs
+* Limited multitasking support
+* Test and diagnostic programs
 
 The figure below illustrates the conceptual PSC-ONE software architecture, including user programs, kernel services, device drivers, and the PSC-ONE hardware platform.
 
 <img src="docs/PSC_OS.jpg" width="800">
 
-> This diagram presents the conceptual architecture of PSC-OS and PSC-ONE.  
+> This diagram presents the conceptual architecture of PSC-OS and PSC-ONE.
 > Some modules shown in the diagram may represent planned or experimental extensions.
+
+PSC-OS currently provides limited multitasking support, allowing a user program and a kernel task to run concurrently through timer-interrupt-based task switching.
 
 All major software components are developed specifically for PSC-ONE and are closely integrated with its custom hardware architecture.
 
@@ -183,25 +186,40 @@ User programs communicate with the PSC-OS kernel using `ECALL`.
 
 Current system-call services include:
 
-| Number | Service |
-| -----: | ------- |
-| 1  | Character output |
-| 2  | Character input |
-| 3  | Character input with timeout |
-| 10 | SynapEngine execution |
-| 20 | I2S microphone read |
-| 21 | I2S microphone write |
-| 30 | SD-card sector read |
-| 31 | SD-card write test |
-| 32 | SD-card sector write |
-| 33 | SD-card buffered read |
-| 40 | Memory dump |
-| 50 | Switch input read |
-| 51 | File read |
-| 52 | File write |
-| 60 | Speech recognition |
-| 90 | User-program exit |
-| 91 | Integer output |
+| Number | Service                         |
+| -----: | ------------------------------- |
+|      1 | Character output                |
+|      2 | Character input                 |
+|      3 | Character input with timeout    |
+|     10 | SynapEngine execution           |
+|     20 | I2S microphone read             |
+|     21 | I2S microphone write            |
+|     30 | SD-card sector read             |
+|     31 | SD-card write test              |
+|     32 | SD-card sector write            |
+|     33 | SD-card buffered read           |
+|     40 | Memory dump                     |
+|     50 | Switch input read               |
+|     51 | File read                       |
+|     52 | File write                      |
+|     60 | Speech recognition              |
+|     70 | Timer start                     |
+|     71 | Timer start in auto-reload mode |
+|     72 | Timer stop                      |
+|     73 | Get timer count                 |
+|     74 | Get timer status                |
+|     75 | Check whether timer is running  |
+|     76 | Wait in microseconds            |
+|     77 | Wait in milliseconds            |
+|     80 | LED write                       |
+|     81 | LED on                          |
+|     82 | LED off                         |
+|     83 | LED toggle                      |
+|     84 | Turn all LEDs on                |
+|     85 | Turn all LEDs off               |
+|     86 | Get LED state                   |
+|     90 | User-program exit               |
+|     91 | Integer output                  |
 
 The system-call interface allows user applications to use hardware and filesystem services without directly accessing privileged kernel resources.
 
@@ -534,3 +552,10 @@ The project encourages inspection, modification, experimentation, and contributi
 PSC-OS is operational on the PSC-ONE FPGA SoC, but it remains an experimental operating system.
 
 Kernel interfaces, system calls, memory organization, device drivers, and application APIs may change as development continues.
+## PSC-OS JPEG display
+
+For the `jpeg TEST.JPG` command, initialize dependencies with
+`git submodule update --init --recursive`, then follow the
+[Phase 1 build, SD-card setup and test instructions](os/README.md).
+The TJpgDec decoder is a pinned submodule; its PSC configuration and adapters
+live outside the submodule.

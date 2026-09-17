@@ -1,11 +1,20 @@
 // shell.c
 #include "user.h"
 #include "fat32.h"
+#include "jpeg/jpeg_view.h"
+#include "tflite/tflite_api.h"
+
+// micropythonを含めるとSIM時間が長すぎる場合のオプション
+//#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
+
+// JPEG LCD表示なしの場合のオプション
+//#define PSC_OS_DEBUG_WITHOUT_JPEGLCD
 
 extern int psc_micropython_run(void);
 
 void main(void) {
 
+#if 0
     //SA API call
     //printf("call sa start.\n");
     call_sa_api(0x04);
@@ -13,7 +22,7 @@ void main(void) {
 
     // DUMP API call
     //call_dump_api();
-
+#endif
 
     printf("shell start.\n");
     //cmd_primes(100);
@@ -193,7 +202,7 @@ prompt:
             //TBD
             //cmd_primes(max);
 
-        // ---- SynapEngine ----
+        // ---- PSC-NPU (SynapEngine) ----
         } else if (strcmp(argv[0], "sa_start") == 0) {
             uint32_t matrix_max = 4;
             if (argc >= 2) {
@@ -204,7 +213,7 @@ prompt:
                 }
             }
             // SA API call 
-            call_sa_api(matrix_max);
+            call_sa_api(matrix_max, true);
 
         // ---- I2S MIC READ ----
         } else if (strcmp(argv[0], "mic_read") == 0) {
@@ -315,29 +324,69 @@ prompt:
             if (fat32_touch(argv[1]) != 0) {
                 printf("fat32_touch failed\n");
             } 
+
+        // ---- tf run ----
+        } else if (strcmp(argv[0], "tflite_run") == 0) {
+            if (argc==2) cmd_tflite_run(argv[1]);
+            else if(argc==3 && strcmp(argv[2],"cpu")==0) cmd_tflite_run_backend(argv[1],PSC_TFLITE_FC_CPU);
+            else if(argc==3 && strcmp(argv[2],"npu")==0) cmd_tflite_run_backend(argv[1],PSC_TFLITE_FC_SYNAP);
+            else printf("usage: tflite_run MODEL.TFL [cpu|npu]\n");
+
+        // ---- tf bench ----
+        } else if (strcmp(argv[0], "tflite_bench") == 0) {
+            if(argc==2)cmd_tflite_bench(argv[1]);
+            else printf("usage: tflite_bench MODEL.TFL\n");
+
+        // ---- tf info ----
+        } else if (strcmp(argv[0], "tflite_info") == 0) {
+            if (argc != 2) printf("usage: tflite_info MODEL.TFL\n");
+            else cmd_tflite_info(argv[1]);
+
+        // ---- JPEG disp LCD ----
+#ifndef PSC_OS_DEBUG_WITHOUT_JPEGLCD
+        } else if (strcmp(argv[0], "jpeg") == 0) {
+            if (argc != 2) {
+                printf("usage: jpeg TEST.JPG\n");
+                goto prompt;
+            }
+            printf("JPEG start\n");
+            int timing = call_timer_measure_begin();
+            int jpeg_result = jpeg_view(argv[1]);
+            int elapsed_ms = timing == 0 ? call_timer_measure_end() : -1;
+            if (jpeg_result) printf("JPEG error: %s\n", jpeg_error_string(jpeg_result));
+            else printf("decode OK\n");
+            if (elapsed_ms >= 0) printf("time: %d ms\n", elapsed_ms);
+            else printf("time: unavailable (timer busy)\n");
+#endif
+
+        // ---- 音声認識デモ ----
         } else if (strcmp(argv[0], "speech") == 0) {
             cmd_speech();
                     
         // ---- MicroPython REPL ----
+#ifndef PSC_OS_DEBUG_WITHOUT_MICROPYTHON
         } else if (strcmp(argv[0], "microPython") == 0 ||
                    strcmp(argv[0], "micropython") == 0) {
 
             printf("\n--- MicroPython start ---\n");
             int mp_ret = psc_micropython_run();
             printf("\n--- return to PSC-OS shell (ret=%d) ---\n", mp_ret);
+#endif
 
         // ---- Helps出力 ----
         } else if (strcmp(argv[0], "help") == 0) {
             printf("commands:\n");
             printf("  microPython | micropython\n");
-            /*
+            printf("  jpeg TEST.JPG\n");
+            printf("  tflite_info MODEL.TFL (inspect only)\n");
+            printf("  tflite_run MODEL.TFL [cpu|npu]\n");
+            printf("  tflite_bench MODEL.TFL (CPU/NPU comparison)\n");
             printf("  hello\n");
             printf("  dump [addr] [len]\n");
             printf("  primes [max]\n");
             printf("  sa_start\n");
             printf("  sd_read\n");
             printf("  exit | quit | q\n");
-            */
 
         } else if (strcmp(argv[0], "exit") == 0 ||
                    strcmp(argv[0], "quit") == 0 ||

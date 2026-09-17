@@ -3,6 +3,7 @@
 module Execute_Divider(
     input  logic        clk,
     input  logic        reset_n,
+    input  logic        cancel,
     input  logic        start,
     input  logic        signed_mode,
     input  logic [31:0] dividend,
@@ -104,6 +105,10 @@ module Execute_Divider(
 
                 default: state <= IDLE;
             endcase
+            // Squashed data may finish internally; only valid state is killed.
+            if (cancel) begin
+                state <= IDLE;
+            end
         end
     end
 

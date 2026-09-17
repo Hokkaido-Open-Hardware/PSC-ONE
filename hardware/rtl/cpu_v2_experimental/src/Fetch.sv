@@ -36,7 +36,7 @@ module Fetch #(
 
     assign fifo_read_pc =
         BURST_MODE
-        ? {vaddr[31:4], 4'b0000} + {28'd0, burst_count[1:0], 2'b00}
+        ? {vaddr[31:5], 5'b00000} + {27'd0, burst_count[2:0], 2'b00}
         : vaddr;
 
     typedef enum logic [3:0] {
@@ -51,14 +51,14 @@ module Fetch #(
     state_t state;
 
     logic [2:0] burst_count;
-    logic [1:0] burst_start_word;
+    logic [2:0] burst_start_word;
 
     assign program_mem_burst_mode = BURST_MODE;
 
     // burst時は要求PCより前のwordをFIFOへ入れない
     assign fifo_read_valid =
         program_mem_read_ready &&
-        (!BURST_MODE || (burst_count[1:0] >= burst_start_word));
+        (!BURST_MODE || (burst_count[2:0] >= burst_start_word));
 
     assign fifo_read_data = program_mem_read_data;
 
@@ -73,7 +73,7 @@ module Fetch #(
             busy                     <= 1'b0;
             opcode                   <= 32'd0;
             burst_count              <= 3'd0;
-            burst_start_word         <= 2'd0;
+            burst_start_word         <= 3'd0;
         end else begin
             mmu_valid                <= 1'b0;
             program_mem_read_valid   <= 1'b0;
@@ -85,7 +85,7 @@ module Fetch #(
                         vaddr            <= fetch_address;
                         busy             <= 1'b1;
                         burst_count      <= 3'd0;
-                        burst_start_word <= fetch_address[3:2];
+                        burst_start_word <= fetch_address[4:2];
                         if (mode_sv32)
                             state        <= MMU;
                         else
@@ -104,7 +104,7 @@ module Fetch #(
                 MMU_WAIT: begin
                     if (mmu_ready) begin
                         burst_count      <= 3'd0;
-                        burst_start_word <= paddr[3:2];
+                        burst_start_word <= paddr[4:2];
                         state            <= FETCH;
                     end
                 end
@@ -114,7 +114,7 @@ module Fetch #(
                         burst_count <= 3'd0;
                         if (BURST_MODE) begin
                             program_mem_read_valid   <= 1'b1;
-                            program_mem_read_address <= {vaddr[31:4], 4'b0000};
+                            program_mem_read_address <= {vaddr[31:5], 5'b00000};
                             state                    <= FETCH_WAIT;
                         end else begin
                             program_mem_read_valid   <= 1'b1;
@@ -130,12 +130,12 @@ module Fetch #(
                         // opcodeには要求アドレスの命令を保存
                         if (!BURST_MODE) begin
                             opcode <= program_mem_read_data;
-                        end else if (burst_count[1:0] == burst_start_word) begin
+                        end else if (burst_count[2:0] == burst_start_word) begin
                             opcode <= program_mem_read_data;
                         end
 
                         if (BURST_MODE) begin
-                            if (burst_count == 3'd3) begin
+                            if (burst_count == 3'd7) begin
                                 burst_count <= 3'd0;
                                 state       <= FETCH_DONE;
                             end else begin

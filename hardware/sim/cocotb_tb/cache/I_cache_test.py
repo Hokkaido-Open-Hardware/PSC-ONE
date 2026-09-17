@@ -252,12 +252,12 @@ async def cpu_monitor_count(dut, mon):
 
 # ------------------------------------------------
 # CPU program burst read
-# 128bit cache line -> 32bit x 4
+# 256bit cache line -> 32bit x 8
 # ------------------------------------------------
 async def cpu_program_burst_read(dut, addr, timeout=1000):
 
-    # 16byte align
-    addr = addr & ~0xF
+    # 32byte align
+    addr = addr & ~0x1F
 
     # req_ready wait
     for _ in range(timeout):
@@ -278,7 +278,7 @@ async def cpu_program_burst_read(dut, addr, timeout=1000):
 
     result = []
 
-    # 32bit x 4を受信
+    # 32bit x 8を受信
     for _ in range(timeout):
         await RisingEdge(dut.clock)
         await ReadOnly()
@@ -295,7 +295,7 @@ async def cpu_program_burst_read(dut, addr, timeout=1000):
 
             result.append(int(v))
 
-            if len(result) == 4:
+            if len(result) == 8:
                 break
 
     else:
@@ -354,7 +354,7 @@ async def cache_program_test(dut):
             mode="CPU"
         )
 
-    dut._log.info("WRITE 1000 words finished")
+    dut._log.info("WRITE 256 words finished")
 
     # ------------------------------------------------
     # Data Cache -> SDRAM writeback
@@ -370,18 +370,18 @@ async def cache_program_test(dut):
     # ------------------------------------------------
     # BURST READ + CHECK
     #
-    # 1000 words / 4 words per line = 30 burst
+    # 256 words / 8 words per line = 32 bursts
     # ------------------------------------------------
-    for line in range(30):
+    for line in range(32):
 
-        base_addr = line * 16
+        base_addr = line * 32
 
         values = await cpu_program_burst_read(
             dut,
             base_addr
         )
 
-        for word in range(4):
+        for word in range(8):
 
             address = base_addr + word * 4
 
@@ -405,16 +405,16 @@ async def cache_program_test(dut):
     # BURST READ + CHECK
     # 2 times 
     # ------------------------------------------------
-    for line in range(30):
+    for line in range(32):
 
-        base_addr = line * 16
+        base_addr = line * 32
 
         values = await cpu_program_burst_read(
             dut,
             base_addr
         )
 
-        for word in range(4):
+        for word in range(8):
 
             address = base_addr + word * 4
 
@@ -431,7 +431,7 @@ async def cache_program_test(dut):
             )
 
     dut._log.info(
-        "BURST READ 250 lines / 1000 words CHECK PASS"
+        "BURST READ 32 lines / 256 words CHECK PASS"
     )
 
     for _ in range(1000):

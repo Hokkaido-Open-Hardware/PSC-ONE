@@ -1,85 +1,87 @@
 `timescale 1ns / 1ps
 module Csr (
-    input  logic             clock,
-    input  logic             reset_n,
-    input  logic             csr_enb,
-    input  logic             csr_valid,
+    input  logic        clock,
+    input  logic        reset_n,
+    input  logic        csr_enb,
+    input  logic        csr_valid,
 
     // ==== from pipeline (CSR ops) ====
-    input  logic             csr_wr,              // CSRRW/CSRRS/CSRRC (*I含む)
-    input  logic [1:0]       csr_cmd,             // 0:RW, 1:RS(OR), 2:RC(ANDN)
-    input  logic             csr_use_imm,         // *I (zimm)
-    input  logic [11:0]      csr_addr,            // CSR address
-    input  logic [31:0]      csr_rs1_val,         // rs1 value
-    input  logic [4:0]       csr_zimm,            // zimm (0..31)
-    output logic  [31:0]     csr_rdata,           // old value to rd
+    input  logic        csr_wr,              // CSRRW/CSRRS/CSRRC (*I含む)
+    input  logic [1:0]  csr_cmd,             // 0:RW, 1:RS(OR), 2:RC(ANDN)
+    input  logic        csr_use_imm,         // *I (zimm)
+    input  logic [11:0] csr_addr,            // CSR address
+    input  logic [11:0] csr_read_addr,       // pipelined read address
+    input  logic [31:0] csr_old_value,       // old value captured before commit
+    input  logic [31:0] csr_rs1_val,         // rs1 value
+    input  logic [4:0]  csr_zimm,            // zimm (0..31)
+    output logic [31:0] csr_rdata,           // old value to rd
 
     // ==== Supervisor trap in/out ====
-    input  logic             set_trap,
-    input  logic [31:0]      trap_sepc,
-    input  logic [31:0]      trap_scause,
-    input  logic [31:0]      trap_stval,
-    input  logic             do_sret,
+    input  logic        set_trap,
+    input  logic [31:0] trap_sepc,
+    input  logic [31:0] trap_scause,
+    input  logic [31:0] trap_stval,
+    input  logic        do_sret,
 
     // ==== Machine trap in/out ====
-    input  logic             set_mtrap,           // TBD
-    input  logic [31:0]      trap_mepc,
-    input  logic [31:0]      trap_mcause,
-    input  logic             do_mret,
+    input  logic        set_mtrap,           // TBD
+    input  logic [31:0] trap_mepc,
+    input  logic [31:0] trap_mcause,
+    input  logic        do_mret,
 
     // ==== mip (pending) ====
-    input  logic             set_msip,
-    input  logic             clr_msip,
-    input  logic             set_mtip,
-    input  logic             clr_mtip,
-    input  logic             set_meip,
-    input  logic             clr_meip,
+    input  logic        set_msip,
+    input  logic        clr_msip,
+    input  logic        set_mtip,
+    input  logic        clr_mtip,
+    input  logic        set_meip,
+    input  logic        clr_meip,
 
     // ==== current privilege mode ====
-    output logic [1:0]        priv_mode,
+    output logic [1:0]  priv_mode,
 
     // ==== observes (not used by the CPP test, but kept) ====
-    output logic [31:0]       out_mstatus,
-    output logic [31:0]       out_medeleg,
-    output logic [31:0]       out_mie,
-    output logic [31:0]       out_mip,
-    output logic [31:0]       out_mtvec,
-    output logic [31:0]       out_mepc,
-    output logic [31:0]       out_mcause,
+    output logic [31:0] out_mstatus,
+    output logic [31:0] out_medeleg,
+    output logic [31:0] out_mie,
+    output logic [31:0] out_mip,
+    output logic [31:0] out_mtvec,
+    output logic [31:0] out_mepc,
+    output logic [31:0] out_mcause,
 
-    output logic [31:0]       out_sstatus,
-    output logic [31:0]       out_stvec,
-    output logic [31:0]       out_sepc,
-    output logic [31:0]       out_scause,
-    output logic [31:0]       out_stval,
-    output logic [31:0]       out_satp,
+    output logic [31:0] out_sstatus,
+    output logic [31:0] out_stvec,
+    output logic [31:0] out_sepc,
+    output logic [31:0] out_scause,
+    output logic [31:0] out_stval,
+    output logic [31:0] out_satp,
 
     // to Data-Cache
-    output logic [31:0]       out_DCACHE_CTRL,
+    output logic [31:0] out_DCACHE_CTRL,
 
     // to DMA
-    output logic [31:0]       out_DMA_CTRL,
-    output logic [31:0]       out_DMA_WORDS,
-    output logic [31:0]       out_DMA_SRC,
-    output logic [31:0]       out_DMA_DST,
-    input  logic [31:0]       in_DMA_STATUS,
+    output logic [31:0] out_DMA_CTRL,
+    output logic [31:0] out_DMA_WORDS,
+    output logic [31:0] out_DMA_SRC,
+    output logic [31:0] out_DMA_DST,
+    input  logic [31:0] in_DMA_STATUS,
 
     // to SynapEngine
-    output logic [31:0]       out_SA_CTRL,
-    output logic [31:0]       out_SA_MODE,
-    input  logic [31:0]       in_SA_STATUS,
-    output logic [31:0]       out_SA_ADDR_A,
-    output logic [31:0]       out_SA_ADDR_B,
-    output logic [31:0]       out_SA_ADDR_C,
+    output logic [31:0] out_SA_CTRL,
+    output logic [31:0] out_SA_MODE,
+    input  logic [31:0] in_SA_STATUS,
+    output logic [31:0] out_SA_ADDR_A,
+    output logic [31:0] out_SA_ADDR_B,
+    output logic [31:0] out_SA_ADDR_C,
 
     // to CPU Monitor
-    output logic [31:0]       out_CPU_MON_CTRL,
-    input  logic [31:0]       in_CPU_MON_CYCLE
+    output logic [31:0] out_CPU_MON_CTRL,
+    input  logic [31:0] in_CPU_MON_CYCLE
 );
     // SA ADDRESS (TBD)
-    localparam logic [31:0]  SA_ADDR_A = 32'h0002_0000;
-    localparam logic [31:0]  SA_ADDR_B = 32'h0002_0010;
-    localparam logic [31:0]  SA_ADDR_C = 32'h0002_0020;
+    localparam logic [31:0] SA_ADDR_A = 32'h0002_0000;
+    localparam logic [31:0] SA_ADDR_B = 32'h0002_0010;
+    localparam logic [31:0] SA_ADDR_C = 32'h0002_0020;
 
     // Privilege level encoding (RISC-V spec)
     localparam logic [1:0] PRIV_U = 2'b00;
@@ -87,47 +89,47 @@ module Csr (
     localparam logic [1:0] PRIV_M = 2'b11;
 
     // ---------------- Machine CSRs ----------------
-    logic  [31:0] csr_mstatus;
-    logic  [31:0] csr_medeleg;
+    logic [31:0] csr_mstatus;
+    logic [31:0] csr_medeleg;
     localparam logic [31:0] CSR_MISA = 32'h4014_0100; // RV32 + I,S,U
-    logic  [31:0] csr_mie;
-    logic  [31:0] csr_mip;
-    logic  [31:0] csr_mtvec;
-    logic  [31:0] csr_mscratch;
-    logic  [31:0] csr_mepc;
-    logic  [31:0] csr_mcause;
-    logic  [31:0] csr_mtval;
+    logic [31:0] csr_mie;
+    logic [31:0] csr_mip;
+    logic [31:0] csr_mtvec;
+    logic [31:0] csr_mscratch;
+    logic [31:0] csr_mepc;
+    logic [31:0] csr_mcause;
+    logic [31:0] csr_mtval;
 
     // ---------------- Supervisor CSRs ----------------
-    logic  [31:0] csr_sstatus;   // ★独立CSR（SIE=bit1 等）
-    logic  [31:0] csr_sie;       // ★独立CSR（SSIP=1, STIP=5, SEIP=9）
-    logic  [31:0] csr_stvec;
-    logic  [31:0] csr_sscratch;
-    logic  [31:0] csr_sepc;
-    logic  [31:0] csr_scause;
-    logic  [31:0] csr_stval;
-    logic  [31:0] csr_satp;
+    logic [31:0] csr_sstatus;   // ★独立CSR（SIE=bit1 等）
+    logic [31:0] csr_sie;       // ★独立CSR（SSIP=1, STIP=5, SEIP=9）
+    logic [31:0] csr_stvec;
+    logic [31:0] csr_sscratch;
+    logic [31:0] csr_sepc;
+    logic [31:0] csr_scause;
+    logic [31:0] csr_stval;
+    logic [31:0] csr_satp;
 
-    logic [1:0]   csr_priv_mode;
+    logic [1:0] csr_priv_mode;
 
     // ---------------- DMA CSRs ----------------
-    logic  [31:0] csr_DCACHE_CTRL;
-    logic  [31:0] csr_DMA_CTRL;
-    logic  [31:0] csr_DMA_WORDS;
-    logic  [31:0] csr_DMA_SRC;
-    logic  [31:0] csr_DMA_DST;
-    logic  [31:0] csr_DMA_STATUS;
+    logic [31:0] csr_DCACHE_CTRL;
+    logic [31:0] csr_DMA_CTRL;
+    logic [31:0] csr_DMA_WORDS;
+    logic [31:0] csr_DMA_SRC;
+    logic [31:0] csr_DMA_DST;
+    logic [31:0] csr_DMA_STATUS;
 
     // ---------------- SynapEngine CSRs ----------------
-    logic  [31:0] csr_SA_CTRL;
-    logic  [31:0] csr_SA_MODE;
-    logic  [31:0] csr_SA_STATUS;
-    logic  [31:0] csr_SA_ADDR_A;
-    logic  [31:0] csr_SA_ADDR_B;
-    logic  [31:0] csr_SA_ADDR_C;
+    logic [31:0] csr_SA_CTRL;
+    logic [31:0] csr_SA_MODE;
+    logic [31:0] csr_SA_STATUS;
+    logic [31:0] csr_SA_ADDR_A;
+    logic [31:0] csr_SA_ADDR_B;
+    logic [31:0] csr_SA_ADDR_C;
 
     // ---------------- CPU Monitor CSRs ----------------
-    logic  [31:0] csr_CPU_MON_CTRL;
+    logic [31:0] csr_CPU_MON_CTRL;
 
     // ---------------- constants ----------------
     localparam int S_SIE_BIT  = 1;
@@ -184,7 +186,7 @@ module Csr (
 
     // CSR apply (RW/RS/RC)
     logic [31:0] csr_wr_val;
-    logic        side_effect_none_rs;
+    logic side_effect_none_rs;
 
     assign csr_wr_val =
         csr_use_imm ? {27'b0, csr_zimm} : csr_rs1_val;
@@ -192,7 +194,7 @@ module Csr (
         csr_use_imm ? (csr_zimm == 5'd0) : (csr_rs1_val == 32'd0);
 
     function automatic logic [31:0] csr_apply(
-        input logic [1:0]  cmd,
+        input logic [1:0] cmd,
         input logic no_side_effect_rs,
         input logic [31:0] oldv,
         input logic [31:0] wv
@@ -213,77 +215,47 @@ module Csr (
         (priv_mode != PRIV_M) && csr_medeleg[trap_scause];
 
     // ---------------- outputs ----------------
+    // The CSR registers are already the architectural state.  Driving a
+    // second bank of output flops duplicated hundreds of bits and created a
+    // global csr_valid clock-enable network.  Expose the state directly and
+    // retain registers only for status inputs that must be sampled.
+    always_comb begin
+        out_mstatus = csr_mstatus;
+        out_medeleg = csr_medeleg;
+        out_mie     = csr_mie;
+        out_mip     = csr_mip;
+        out_mtvec   = csr_mtvec;
+        out_mepc    = csr_mepc;
+        out_mcause  = csr_mcause;
+
+        out_sstatus = csr_sstatus;
+        out_stvec   = csr_stvec;
+        out_sepc    = csr_sepc;
+        out_scause  = csr_scause;
+        out_stval   = csr_stval;
+        out_satp    = csr_satp;
+        priv_mode   = csr_priv_mode;
+
+        out_DCACHE_CTRL = csr_DCACHE_CTRL;
+        out_DMA_CTRL    = csr_DMA_CTRL;
+        out_DMA_WORDS   = csr_DMA_WORDS;
+        out_DMA_SRC     = csr_DMA_SRC;
+        out_DMA_DST     = csr_DMA_DST;
+        out_SA_CTRL     = csr_SA_CTRL;
+        out_SA_MODE     = csr_SA_MODE;
+        out_SA_ADDR_A   = csr_SA_ADDR_A;
+        out_SA_ADDR_B   = csr_SA_ADDR_B;
+        out_SA_ADDR_C   = csr_SA_ADDR_C;
+        out_CPU_MON_CTRL = csr_CPU_MON_CTRL;
+    end
+
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            out_mstatus <= 32'd0;
-            out_medeleg <= 32'd0;
-            out_mie     <= 32'd0;
-            out_mip     <= 32'd0;
-            out_mtvec   <= 32'd0;
-            out_mepc    <= 32'd0;
-            out_mcause  <= 32'd0;
-
-            out_sstatus <= 32'd0;
-            out_stvec   <= 32'd0;
-            out_sepc    <= 32'd0;
-            out_scause  <= 32'd0;
-            out_stval   <= 32'd0;
-            out_satp    <= 32'd0;
-
-            priv_mode   <= 2'b0;
-
-            out_DCACHE_CTRL <= 32'd0;
-
-            out_DMA_CTRL    <= 32'd0;
-            out_DMA_WORDS   <= 32'd0;
-            out_DMA_SRC     <= 32'd0;
-            out_DMA_DST     <= 32'd0;
-
-            out_SA_CTRL     <= 32'd0;
-            out_SA_ADDR_A   <= 32'd0;
-            out_SA_ADDR_B   <= 32'd0;
-            out_SA_ADDR_C   <= 32'd0;
-
-            out_CPU_MON_CTRL <= 32'd0;
-            
-            csr_DMA_STATUS  <= 32'd0;
-            csr_SA_STATUS   <= 32'd0;
-        end else begin
-            if(csr_valid) begin
-                out_mstatus <= csr_mstatus;
-                out_medeleg <= csr_medeleg;
-                out_mie     <= csr_mie;
-                out_mip     <= csr_mip;
-                out_mtvec   <= csr_mtvec;
-                out_mepc    <= csr_mepc;
-                out_mcause  <= csr_mcause;
-
-                out_sstatus <= csr_sstatus;
-                out_stvec   <= csr_stvec;
-                out_sepc    <= csr_sepc;
-                out_scause  <= csr_scause;
-                out_stval   <= csr_stval;
-                out_satp    <= csr_satp;
-
-                out_DCACHE_CTRL  <= csr_DCACHE_CTRL;
-
-                out_DMA_CTRL  <= csr_DMA_CTRL;
-                out_DMA_WORDS <= csr_DMA_WORDS;
-                out_DMA_SRC   <= csr_DMA_SRC;
-                out_DMA_DST   <= csr_DMA_DST;
-
-                out_SA_CTRL   <= csr_SA_CTRL;
-                out_SA_MODE   <= csr_SA_MODE;
-                out_SA_ADDR_A <= csr_SA_ADDR_A;
-                out_SA_ADDR_B <= csr_SA_ADDR_B;
-                out_SA_ADDR_C <= csr_SA_ADDR_C;
-
-                out_CPU_MON_CTRL <= csr_CPU_MON_CTRL;
-
-                priv_mode     <= csr_priv_mode;
-                csr_DMA_STATUS <= in_DMA_STATUS;
-                csr_SA_STATUS  <= in_SA_STATUS;
-            end
+            csr_DMA_STATUS <= 32'd0;
+            csr_SA_STATUS  <= 32'd0;
+        end else if (csr_valid) begin
+            csr_DMA_STATUS <= in_DMA_STATUS;
+            csr_SA_STATUS  <= in_SA_STATUS;
         end
     end
 
@@ -310,6 +282,7 @@ module Csr (
                 12'h340: csr_read_mux = csr_mscratch;
                 12'h341: csr_read_mux = csr_mepc;
                 12'h342: csr_read_mux = csr_mcause;
+                12'h343: csr_read_mux = csr_mtval;
                 12'h344: csr_read_mux = (csr_mip & MIRQ_MASK);
                 // DMA
                 12'h7F0: csr_read_mux = csr_DMA_STATUS;
@@ -327,16 +300,14 @@ module Csr (
     //reg [31:0] oldv, newv;
     logic [31:0] oldv, newv;
 
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            csr_rdata <= 32'd0;
-        end else begin
-            if (csr_wr & csr_enb)
-                csr_rdata <= csr_read_mux(csr_addr);
-        end
+    // Read the CSR before commit and register it in the pipeline.  This keeps
+    // the address decoder and the read mux out of the commit-stage CSR update
+    // and register-file write-back paths.
+    always_comb begin
+        csr_rdata = csr_read_mux(csr_read_addr);
     end
 
-    assign  oldv = csr_read_mux(csr_addr);
+    assign  oldv = csr_old_value;
     assign  newv = csr_apply(csr_cmd, side_effect_none_rs, oldv, csr_wr_val);
 
     always_ff @(posedge clock or negedge reset_n) begin
@@ -353,6 +324,7 @@ module Csr (
             csr_mscratch  <= 32'b0;
             csr_mepc      <= 32'b0;
             csr_mcause    <= 32'b0;
+            csr_mtval     <= 32'b0;
             csr_mip       <= 32'b0;
             // S
             csr_sstatus   <= 32'b0;
@@ -409,6 +381,7 @@ module Csr (
                     12'h340: csr_mscratch <= newv;
                     12'h341: csr_mepc     <= pack_epc(newv);
                     12'h342: csr_mcause   <= newv;
+                    12'h343: csr_mtval    <= newv;
                     12'h344: csr_mip      <= (newv & MIRQ_MASK);
 
                     // ===== DATA CACHE =====
@@ -435,10 +408,9 @@ module Csr (
                 endcase
             end
 
-            if (csr_enb) begin
-                // set_trap = is_ecall || illegal_instruction || i_pf || d_pf;
-                if (set_trap) begin
-                    if (set_trap) begin
+            // Faults are not normal commits.  Accept the trap event directly;
+            // ecall and illegal-instruction still arrive with csr_enb asserted.
+            if (set_trap) begin
                         if (trap_to_s) begin
                             // ---- S trap ----
                             csr_priv_mode  <= PRIV_S;
@@ -463,8 +435,9 @@ module Csr (
                             csr_mstatus[3]     <= 1'b0;             // MIE  <- 0
                             csr_mstatus[12:11] <= priv_mode;        // MPP  <- 元のモード
                         end
-                    end
-                end
+            end
+
+            if (csr_enb) begin
                 // ---- Supervisor trap in/out (SRET) ----
                 if (do_sret) begin
                     csr_priv_mode <= {1'b0, csr_sstatus[S_SPP_BIT]}; // 0 or 1
@@ -484,12 +457,18 @@ module Csr (
                     csr_mstatus[7]  <= 1'b1;            // MPIE <- 1
                     csr_mstatus[12:11] <= 2'b00;        // ★ MPP <- U (必須)
                 end
-                if (set_mtrap) begin
-                    csr_mepc       <= pack_epc(trap_mepc);
-                    csr_mcause     <= trap_mcause;
-                    csr_mstatus[7] <= csr_mstatus[3];   // MPIE <- MIE
-                    csr_mstatus[3] <= 1'b0;             // MIE  <- 0
-                end
+            end
+
+            // Machine interrupts are accepted at a precise pipeline boundary,
+            // where there is no committing CSR instruction and csr_enb is low.
+            // Therefore trap entry must not be gated by the CSR commit enable.
+            if (set_mtrap) begin
+                csr_priv_mode       <= PRIV_M;
+                csr_mepc            <= pack_epc(trap_mepc);
+                csr_mcause          <= trap_mcause;
+                csr_mstatus[7]      <= csr_mstatus[3]; // MPIE <- MIE
+                csr_mstatus[3]      <= 1'b0;           // MIE  <- 0
+                csr_mstatus[12:11]  <= priv_mode;      // MPP  <- prior mode
             end
 
             // ---- mip pending ----

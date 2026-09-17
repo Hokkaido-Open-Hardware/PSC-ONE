@@ -20,6 +20,12 @@ extern "C" {
  * タイマー開始
  * ------------------------------------------------------------ */
 void timer_start(uint32_t reload);
+/* Idle-timer-only stopwatch. end returns total ms, or -1 if unavailable. */
+int timer_measure_begin(void);
+int timer_measure_end(void);
+int timer_measure_end_us(void);
+int timer_measure_read_us(void);
+int timer_measure_irq(void);
 
 
 /* ------------------------------------------------------------
@@ -27,6 +33,11 @@ void timer_start(uint32_t reload);
  * ------------------------------------------------------------ */
 void timer_start_auto(uint32_t reload);
 
+/* Start the 1ms autoreload timer used by the preemptive scheduler. */
+void timer_start_scheduler_tick(void);
+
+/* Clear the scheduler timer's level-sensitive interrupt pending state. */
+void timer_clear_scheduler_irq(void);
 
 /* ------------------------------------------------------------
  * タイマー停止

@@ -11,10 +11,63 @@ PSC-ONE integrates a custom CPU, memory subsystem, peripherals,
 operating system, and AI accelerator into a unified architecture,
 enabling end-to-end hardware/software co-design.
 
-The SynapEngine accelerator is controlled directly through custom
+The PSC-NPU (SynapEngine) accelerator is controlled directly through custom
 RISC-V CSR registers and accesses matrix data through the shared
 cache/memory subsystem. This reduces explicit data transfers and
 redundant memory copies during matrix operations and future neural-network workloads.
+
+## Table of Contents
+
+- [What is PSC-ONE?](#what-is-psc-one)
+- [PSC-ONE SoC Architecture](#psc-one-soc-architecture)
+- [Repository Structure](#repository-structure)
+- [Hardware Components](#hardware-components)
+- [Software Stack](#software-stack)
+- [CPU (PSC_RV32)](#cpu-psc_rv32)
+  - [CPU Architecture](#cpu-architecture)
+- [CPU (PSC_RV32_V1)](#cpu-psc_rv32_v1)
+  - [CPU Architecture](#cpu-architecture-1)
+- [CPU (PSC_RV32_V2)](#cpu-psc_rv32_v2)
+  - [Experimental Dual-Issue / Out-of-Order Architecture](#experimental-dual-issue--out-of-order-architecture)
+  - [Verification](#verification)
+  - [RISC-V ISA Test Results](#risc-v-isa-test-results)
+  - [CoreMark (CPU Core Only)](#coremark-cpu-core-only)
+  - [PSC_RV32 vs PicoRV32 (Yosys Analysis)](#psc_rv32-vs-picorv32-yosys-analysis)
+  - [Architectural Features](#architectural-features)
+- [PSC-ONE AI](#psc-one-ai)
+  - [PSC-ONE AI Architecture](#psc-one-ai-architecture)
+  - [PSC-ONE AI Features](#psc-one-ai-features)
+  - [8×8 Matrix Multiplication Performance](#88-matrix-multiplication-performance)
+  - [PSC-NPU and PicoRV32 Resource Scale Comparison](#psc-npu-and-picorv32-resource-scale-comparison)
+  - [PSC-ONE AI Goals](#psc-one-ai-goals)
+  - [PSC-ONE AI Future Work](#psc-one-ai-future-work)
+- [PSC-OS](#psc-os)
+  - [MicroPython on PSC-OS](#micropython-on-psc-os)
+- [Demo](#demo)
+  - [PSC-OS LCD Demo](#psc-os-lcd-demo)
+  - [PSC-OS Boot](#psc-os-boot)
+  - [PSC-OS Boot from SD Card](#psc-os-boot-from-sd-card)
+- [PSC-ONE Speech Recognition Project](#psc-one-speech-recognition-project)
+  - [Background](#background)
+  - [Image](#image)
+  - [Equipment](#equipment)
+  - [Results](#results)
+- [FST Viewer](#fst-viewer)
+- [Development Status](#development-status)
+  - [Hardware](#hardware)
+  - [Software](#software)
+  - [Verification](#verification-1)
+  - [Documentation](#documentation)
+  - [Future Goals](#future-goals)
+- [Future Work](#future-work)
+  - [Demonstration Robot](#demonstration-robot)
+  - [PFE](#pfe)
+- [Getting Started](#getting-started)
+- [Repository Status](#repository-status)
+- [License](#license)
+
+------------------------------------------------------------------------
+
   
 The current PSC-ONE prototype hardware.  
   
@@ -38,21 +91,21 @@ It aims to build a fully custom edge computing platform from the ground up, incl
 - A memory subsystem, including an SDRAM controller, caches, and an Sv32 MMU
 - An SD card boot and storage interface
 - Memory-mapped peripheral interfaces
-- An AI acceleration engine, SynapEngine, based on a systolic array architecture
+- An AI acceleration engine, PSC-NPU, based on a systolic array architecture
 - A custom operating system, PSC-OS
 
 PSC-ONE is not just a CPU core, but a complete experimental SoC platform for research, edge AI development, and architectural exploration.
 
----
+------------------------------------------------------------------------
 
 ## PSC-ONE SoC Architecture
 
 <img src="docs/images/PSC_ONE_SoC_Block.jpg" width="800">
 
 This section presents the overall PSC-ONE SoC architecture, including the
-PSC_RV32ISP CPU, memory subsystem, peripherals, PSC-OS, and PSC-ONE AI.
+PSC_RV32 CPU, memory subsystem, peripherals, PSC-OS, and PSC-ONE AI.
 
----
+------------------------------------------------------------------------
 
 ## Repository Structure
 
@@ -60,17 +113,17 @@ PSC_RV32ISP CPU, memory subsystem, peripherals, PSC-OS, and PSC-ONE AI.
 - `software/` - PSC-OS, boot code, and user-side software
 - `docs/` - Architecture diagrams and supporting documentation
 
----
+------------------------------------------------------------------------
 
 ## Hardware Components
 
 The hardware side of PSC-ONE currently includes:
 
-- `PSC_RV32ISP` custom RISC-V CPU core
+- `PSC_RV32` custom RISC-V CPU core
 - SDRAM controller
 - SD card interface (SPI mode)
 - Memory-mapped peripheral system
-- SynapEngine AI accelerator
+- PSC-NPU (SynapEngine) AI accelerator
 
 ---
 
@@ -82,28 +135,28 @@ The software side of PSC-ONE currently includes:
 - Boot and initialization flow for FPGA-based execution
 - User programs and runtime experiments, including UART-based output demos
 
----
+------------------------------------------------------------------------
 
-# CPU (PSC_RV32ISP)
+# CPU (PSC_RV32)
 
 ## CPU Architecture
 
 This diagram presents the top-level architecture of the PSC system.  
-It shows how the PSC_RV32ISP CPU core is integrated with memory and peripheral components, including UART, SDRAM, and the SD card interface.  
+It shows how the PSC_RV32 CPU core is integrated with memory and peripheral components, including UART, SDRAM, and the SD card interface.  
 Most peripherals are connected through memory-mapped interfaces.
-The SynapEngine accelerator is controlled directly through custom RISC-V
+The PSC-NPU accelerator is controlled directly through custom RISC-V
 CSR registers and accesses matrix data through the shared cache/memory subsystem.
   
-A key feature of the PSC architecture is the tightly coupled integration of the SynapEngine accelerator with the CPU.  
-Both the PSC_RV32ISP core and the SynapEngine access memory through
+A key feature of the PSC architecture is the tightly coupled integration of the PSC-NPU accelerator with the CPU.  
+Both the PSC_RV32 core and the PSC-NPU access memory through
 the shared cache and memory subsystem.
 Unlike loosely coupled accelerator designs that require explicit DMA transfers
-for every operation, SynapEngine can directly access data through the shared
+for every operation, PSC-NPU can directly access data through the shared
 cache/memory subsystem, reducing redundant memory copies.
   
 This tightly coupled architecture improves overall efficiency by reducing memory access overhead and is particularly suitable for data-intensive workloads such as matrix operations and future neural-network inference.
 
-<img src="docs/images/PSC_RV32ISP.jpg" width="800">
+<img src="docs/images/PSC_RV32.jpg" width="800">
 
 Current CPU features include:
 
@@ -121,43 +174,121 @@ Current CPU features include:
 * Optional pipelined execution
 * Custom hardware-accelerator integration
 
----
+------------------------------------------------------------------------
 
-# CPU (PSC_RV32ISP_V1)
+# CPU (PSC_RV32_V1)
 
 ## CPU Architecture
 
-The following diagram shows the internal architecture of the PSC_RV32ISP_V1 CPU and its connection to the PSC-ONE memory subsystem.
+The following diagram shows the internal architecture of the PSC_RV32_V1 CPU and its connection to the PSC-ONE memory subsystem.
 
-PSC_RV32ISP_V1 is a redesigned version of the original PSC_RV32ISP processor.  
-Its execution logic is divided into independent functional modules, including instruction fetch, decode, arithmetic execution, branch processing, memory access, CSR control, and register write-back.
+PSC_RV32_V1 is the primary RISC-V CPU core used in PSC-ONE.
 
-A central control unit dispatches operations to these modules and waits for their completion.  
-This task-oriented organization replaces a tightly coupled monolithic state machine with a clearer and more modular architecture.
+The CPU uses a **pipelined execution architecture** designed to overlap instruction processing and reduce the number of cycles required per instruction.
 
-Instruction control information generated by the decoder is transferred between modules using a packed SystemVerilog structure.  
-This reduces the number of individual control signals and makes the CPU easier to extend and maintain.
+Instruction fetch is handled by a dedicated fetch unit with **branch prediction**, allowing the CPU to continue fetching from a predicted program counter before the branch result is known.
 
-The CPU currently operates as a multi-cycle state-machine processor.  
-However, the separation of execution modules provides a foundation for future pipelined execution, multiple instruction slots, and multithreaded operation.
+Arithmetic, branch, LOAD, and STORE operations are integrated into the pipelined execution flow. Forwarding and pipeline control logic are used to handle dependencies and maintain correct instruction execution.
 
-<img src="docs/images/PSC_RV32ISP_V1.jpg" width="800">
+The core implements **RV32I** together with CSR and fence instructions, integer multiplication, and division/remainder operations.
 
-The task-driven design provides:
+PSC_RV32_V1 supports **Machine, Supervisor, and User privilege modes** and **Sv32 virtual memory translation**. Instruction and data accesses use separate cache paths connected to the PSC-ONE memory subsystem.
 
-* Clear separation between functional modules
-* Explicit control of instruction execution order
-* Support for variable-latency execution units
-* Simple cache and MMU wait-state handling
-* Unified handling of branches, loads, stores, CSR operations, and exceptions
-* A foundation for multiple execution slots and limited parallel execution
-* Easier extension with custom PSC-ONE hardware accelerators
+<img src="docs/images/PSC_RV32_V1.jpg" width="800">
 
-PSC_RV32ISP_V1 currently uses a state-controlled execution model. Future versions may hold multiple instruction tasks simultaneously and permit independent tasks to overlap when there are no register, memory, or control dependencies.
+The PSC_RV32_V1 architecture provides:
+
+* Pipelined instruction execution
+* Branch prediction and speculative instruction fetch
+* Pipeline forwarding and dependency handling
+* Pipelined LOAD and STORE execution
+* RV32I integer instructions
+* Integer multiplication and division/remainder
+* CSR and fence instructions
+* Machine, Supervisor, and User privilege modes
+* Sv32 virtual memory translation
+* Separate instruction and data caches
+* Exception and interrupt processing
+* Memory-mapped PSC-ONE peripheral and accelerator access
+
+PSC_RV32_V1 is designed to provide a relatively simple FPGA-oriented RISC-V implementation while achieving substantially higher instruction throughput than the original PSC-ONE CPU architecture.
+
+------------------------------------------------------------------------
+
+# CPU (PSC_RV32_V2)
+
+## Experimental Dual-Issue / Out-of-Order Architecture
+
+<img src="docs/images/PSC_RV32_V2.jpg" width="800">
+
+`PSC_RV32_V2` is an experimental CPU architecture derived from `PSC_RV32_V1`.
+
+While V1 uses a state-controlled execution model in which instruction processing is largely serialized, V2 explores overlapping instruction execution, dual instruction slots, register renaming, and limited out-of-order execution.
+
+The primary goal of V2 is not to build a large superscalar processor, but to investigate how much instruction-level parallelism can be introduced into a small FPGA-oriented RISC-V CPU with relatively simple hardware.
+
+The current development focuses on allowing Fetch, Decode, Execute, and Commit operations to overlap instead of waiting for each instruction to complete the entire execution sequence.
+
+### Architecture Goals
+
+The V2 architecture explores:
+
+* Dual instruction slots
+* Overlapped Fetch / Decode / Execute / Commit
+* Limited out-of-order execution
+* In-order retirement
+* Register renaming
+* Register dependency detection
+* RAW / WAR / WAW hazard handling
+* Independent execution of instructions without dependencies
+* Variable-latency execution units such as MUL / DIV / REM
+* Forwarding between pipeline stages
+* Pipeline stalls and bubbles when dependencies cannot be resolved
+
+A particularly important target is hiding the latency of long-running operations.
+
+For example, when a DIV or REM instruction is waiting for completion, an independent arithmetic instruction may be allowed to execute first. Architectural state is still committed in program order so that externally visible CPU behavior remains consistent with sequential RISC-V execution.
+
+### FPGA-Oriented Design
+
+Unlike large commercial out-of-order processors, PSC_RV32_V2 intentionally keeps the scheduling window and execution resources small.
+
+The design is intended for FPGA implementation and therefore prioritizes:
+
+* Small scheduling logic
+* Limited instruction window
+* Simple dependency checking
+* Minimal register-renaming hardware
+* Low LUT and flip-flop overhead
+* Short timing-critical paths
+* Compatibility with the existing PSC-ONE cache, MMU, and memory subsystem
+
+Load/store, branch, CSR, exception, and other complex operations may still be serialized when required.
+
+The architecture is being developed incrementally: first overlapping simple R/I-type instructions, then extending parallel execution to MUL/DIV and other instruction classes while continuously verifying compatibility with the existing CPU.
+
+## Verification
+
+PSC_RV32_V2 is verified using the same simulation infrastructure as V1, including Verilator, cocotb, and the official RISC-V ISA tests.
+
+The development requirement is that architectural optimizations must not break the existing instruction tests.
+
+The main regression tests are:
+
+```text
+make -f Makefile.riscv.sim simulate_RISCV_TESTS_PARALLEL CPU_VERSION=v2
+
+make -f Makefile.cpu.core simulate_CPU_CORE CPU_VERSION=v2
+```
+
+V2 remains an experimental architecture and is actively being refined.
+
+The long-term objective is to determine how far a relatively small FPGA RISC-V processor can move from a traditional multi-cycle CPU toward a lightweight superscalar / out-of-order architecture without introducing the complexity of a modern high-performance desktop CPU.
+
 
 ## RISC-V ISA Test Results
 
-The `PSC_RV32ISP_V1` processor has been verified using the official `riscv-tests` instruction test suite.
+The `PSC_RV32_V1` processor has been verified using the official `riscv-tests` instruction test suite.
 
 The following test groups currently pass in Verilator and cocotb simulation:
 
@@ -168,9 +299,9 @@ The following test groups currently pass in Verilator and cocotb simulation:
 * Shift and comparison instruction tests
 * `FENCE.I` instruction test
 
-A total of **49 official RISC-V ISA tests pass** on `PSC_RV32ISP_V1`.
+A total of **49 official RISC-V ISA tests pass** on `PSC_RV32_V1`.
 
-The `rv32ui-ma_data` test is currently excluded because it requires misaligned data access support. PSC_RV32ISP_V1 currently expects naturally aligned load and store accesses.
+The `rv32ui-ma_data` test is currently excluded because it requires misaligned data access support. PSC_RV32_V1 currently expects naturally aligned load and store accesses.
 
 Test sources are based on:
 
@@ -186,14 +317,40 @@ cocotb
 RISC-V GNU Toolchain
 ```
 
+------------------------------------------------------------------------
 
----
+## CoreMark (CPU Core Only)
 
-## PSC_RV32ISP vs PicoRV32 (Yosys Analysis)
+CoreMark was also measured with the SDRAM/cache path removed and replaced by a 1-cycle cocotb memory model.
+This isolates the CPU core from SDRAM wait states, cache misses, and refill latency.
+
+```text
+CPU       CoreMark    CoreMark/MHz    Execution Time    CRC Validation
+-----------------------------------------------------------------------
+cpu_v1    80.879974   0.808800        12.364 s          PASS
+cpu_v2    39.987204   0.399872        12.504 s          PASS
+```
+
+Measurement conditions:
+
+- 100 MHz
+- GCC 14.2.0
+- 500 CoreMark iterations
+- 1-cycle memory response
+- No SDRAM wait states
+- No cache-miss or refill penalty
+- Identical CoreMark binary for `cpu_v1` and `cpu_v2`
+- CRC Validation: PASS
+
+These results represent the current CPU-core-only CoreMark performance under an idealized 1-cycle memory model.
+
+------------------------------------------------------------------------
+
+## PSC_RV32 vs PicoRV32 (Yosys Analysis)
 
 ### Resource Comparison
 
-| Metric           | PSC_RV32ISP          | PicoRV32 |
+| Metric           | PSC_RV32             | PicoRV32 |
 |------------------|----------------------|----------|
 | Cells            | 1385                 | 515      |
 | Adders           | 15                   | 8        |
@@ -203,11 +360,11 @@ RISC-V GNU Toolchain
 | Comparators      | 354                  | 69       |
 | Registers (FF)   | 217                  | 105      |
 
----
+------------------------------------------------------------------------
 
 ## Architectural Features
 
-| Feature                       | PSC_RV32ISP | PicoRV32 |
+| Feature                       | PSC_RV32    | PicoRV32 |
 | ----------------------------- | :---------: | :------: |
 | RV32I                         |      ✓      |     ✓    |
 | Zicsr / CSR Support           |      ✓      | Optional |
@@ -226,7 +383,7 @@ RISC-V GNU Toolchain
 > technology mapping. PicoRV32 results depend on the selected configuration.
 > Multiplexer counts include Yosys `$mux` cells only and exclude `$pmux` cells.
 
----
+------------------------------------------------------------------------
 
 # PSC-ONE AI
 
@@ -244,16 +401,16 @@ which integrates:
 The project focuses on exploring efficient dataflow architectures
 under constrained memory bandwidth for edge AI systems.
 
----
+------------------------------------------------------------------------
 
 ## PSC-ONE AI Architecture
 
-<img src="docs/images/PSC_SynapEngine.jpg" width="800">
+<img src="docs/images/PSC_NPU.jpg" width="800">
 
-The system integrates the SynapEngine systolic array
+The system integrates the PSC-NPU systolic array
 with the PSC-ONE SoC platform.
 
----
+------------------------------------------------------------------------
 
 ## PSC-ONE AI Features
 
@@ -261,40 +418,40 @@ with the PSC-ONE SoC platform.
 - Output-Stationary (OS) dataflow
 - Direct control through custom RISC-V CSR registers
 - Direct matrix data access through the CPU cache/memory subsystem
-- Integrated with the custom PSC-RV32ISP processor
+- Integrated with the custom PSC-RV32 processor
 - Experimental hardware/software co-design platform
 
----
+------------------------------------------------------------------------
 
 ## 8×8 Matrix Multiplication Performance
 
-The following results compare the execution time of an 8×8 matrix multiplication across different PSC-RV32ISP configurations and the systolic array accelerator.
+The following results compare the execution time of an 8×8 matrix multiplication across different PSC-RV32 configurations and the systolic array accelerator.
 
 ### Execution Time Comparison
 
 | Configuration                                  | Execution Time | Performance vs. V1 |
 | ---------------------------------------------- | -------------: | -----------------: |
-| PSC_RV32ISP                                    |         591 µs |       ~1.80× faster |
-| PSC_RV32ISP_V1                                 |        1066 µs |           Baseline |
+| PSC_RV32                                       |         591 µs |       ~1.80× faster |
+| PSC_RV32_V1                                    |        1066 µs |           Baseline |
 | Systolic Array                                 |          44 µs |       ~24.2× faster |
-| PSC_RV32ISP_V1 (Fetch FIFO enabled)            |         742 µs |       ~1.44× faster |
-| PSC_RV32ISP_V1 (R/I-Type pipeline enabled)     |         651 µs |       ~1.64× faster |
+| PSC_RV32_V1 (Fetch FIFO enabled)               |         742 µs |       ~1.44× faster |
+| PSC_RV32_V1 (R/I-Type pipeline enabled)        |         651 µs |       ~1.64× faster |
 
 ### Results
 
-The systolic array completed the 8×8 matrix multiplication in **44 µs**, approximately **24.2× faster** than the baseline PSC_RV32ISP_V1 processor.
+The systolic array completed the 8×8 matrix multiplication in **44 µs**, approximately **24.2× faster** than the baseline PSC_RV32_V1 processor.
 
-Enabling the Fetch FIFO reduced the PSC_RV32ISP_V1 execution time from **1066 µs to 742 µs**. Enabling the R/I-Type pipeline further reduced it to **651 µs**, approaching the performance of the original PSC_RV32ISP processor at **591 µs**.
+Enabling the Fetch FIFO reduced the PSC_RV32_V1 execution time from **1066 µs to 742 µs**. Enabling the R/I-Type pipeline further reduced it to **651 µs**, approaching the performance of the original PSC_RV32 processor at **591 µs**.
 
 These results demonstrate that both instruction-fetch optimization and R/I-Type pipelining significantly improve CPU performance. However, the dedicated systolic array still provides a much larger performance advantage for matrix multiplication workloads.
 
----
+------------------------------------------------------------------------
 
-## Systolic Array and PicoRV32 Resource Scale Comparison
+## PSC-NPU and PicoRV32 Resource Scale Comparison
 
 ### Resource Comparison
 
-| Metric         | Systolic Array (4×4) | PicoRV32 |
+| Metric         | PSC-NPU (4×4)        | PicoRV32 |
 | -------------- | -------------------: | -------: |
 | Cells          |                  555 |      515 |
 | Multipliers    |                **2** |    **0** |
@@ -308,7 +465,7 @@ These results demonstrate that both instruction-fetch optimization and R/I-Type 
 - A **dataflow-oriented compute engine (Systolic Array)**
 - A **control-oriented general-purpose CPU (PicoRV32)**
 
----
+------------------------------------------------------------------------
 
 ## PSC-ONE AI Goals
 
@@ -322,7 +479,7 @@ Instead, the goal is to explore:
 - Hardware/software integration techniques
 - Experimental SoC architecture research
 
----
+------------------------------------------------------------------------
 
 ## PSC-ONE AI Future Work
 
@@ -332,13 +489,13 @@ Instead, the goal is to explore:
 - Expansion of the systolic array architecture
 - DMA and memory subsystem improvements
 
----
+------------------------------------------------------------------------
 
 # PSC-OS
 
 PSC-OS is a custom operating system developed specifically for the PSC-ONE platform.
 
-Unlike Linux, BSD, or existing RTOSes, PSC-OS is designed together with the PSC_RV32ISP CPU, memory subsystem, peripherals, and hardware accelerators, providing a tightly integrated hardware/software co-design environment.
+Unlike Linux, BSD, or existing RTOSes, PSC-OS is designed together with the PSC_RV32 CPU, memory subsystem, peripherals, and hardware accelerators, providing a tightly integrated hardware/software co-design environment.
 
 The following diagram illustrates the software architecture of PSC-OS, including user applications, the kernel, device drivers, and the underlying PSC-ONE hardware platform.
 
@@ -357,13 +514,13 @@ Current PSC-OS features include:
 - SD-card boot and storage
 - User-program loading and execution
 - Device drivers for UART, LCD, I2S microphone, and SD card
-- Native support for the SynapEngine and PFE hardware accelerators
+- Native support for the PSC-NPU and PFE hardware accelerators
 
 PSC-OS serves both as the runtime environment for the PSC-ONE SoC and as an experimental platform for operating-system, CPU, and hardware/software co-design research.
 
 ## MicroPython on PSC-OS
 
-MicroPython has been ported to PSC-OS and can run as a user-space application on the custom PSC_RV32ISP CPU.
+MicroPython has been ported to PSC-OS and can run as a user-space application on the custom PSC_RV32 CPU.
 The following console output is an excerpt from an actual execution on PSC-ONE.
 
 ```text
@@ -475,7 +632,7 @@ Hello from SD card
 
 This demonstrates that the PSC-ONE software stack can execute an interactive Python environment directly on the custom RISC-V processor, including integer arithmetic, list comprehensions, generators, and floating-point math functions provided by MicroPython.
 
----
+------------------------------------------------------------------------
 
 # Demo
 
@@ -485,19 +642,27 @@ This video shows a live demonstration of the PSC system running on FPGA hardware
 It highlights real-time interaction between the CPU, SD card interface, and UART output.  
 The system successfully boots and executes software on a fully integrated hardware platform.
 
-[![Watch the demo](https://img.youtube.com/vi/aRCHluWXozY/maxresdefault.jpg)](https://youtube.com/shorts/aRCHluWXozY?si=T0kp_dv_nBH07tnj)
+<a href="https://www.youtube.com/watch?v=O8GDUTijPA8">
+  <img src="https://img.youtube.com/vi/O8GDUTijPA8/maxresdefault.jpg"
+       alt="Watch the demo"
+       width="500">
+</a>
 
----
+------------------------------------------------------------------------
 
 ## PSC-OS Boot
 
 This video demonstrates the PSC system running `PSC-OS` on FPGA hardware after boot.  
-It shows prime number computation executed on the custom `PSC_RV32ISP` CPU, with results transmitted over UART.  
+It shows prime number computation executed on the custom `PSC_RV32` CPU, with results transmitted over UART.  
 The demo highlights a fully functional hardware-software stack, from boot to program execution.
 
-[![Watch the demo](https://img.youtube.com/vi/lV74ni7FAt4/maxresdefault.jpg)](https://youtu.be/lV74ni7FAt4?si=_Xm8yCdqHN_oQzrs)
+<a href="https://youtu.be/lV74ni7FAt4">
+  <img src="https://img.youtube.com/vi/lV74ni7FAt4/maxresdefault.jpg"
+       alt="Watch the demo"
+       width="500">
+</a>
 
----
+------------------------------------------------------------------------
 
 ## PSC-OS Boot from SD Card
 
@@ -511,7 +676,142 @@ If an error is detected, the system automatically retries the read operation, en
 
 [![Watch the demo](https://img.youtube.com/vi/FILxQiaqKrk/maxresdefault.jpg)](https://youtu.be/FILxQiaqKrk?si=9KQKO3LVkketo0ZM)
 
----
+
+
+------------------------------------------------------------------------
+
+# PSC-ONE Speech Recognition Project
+
+## Background
+
+This speech-recognition project started from PSC-ONE.
+
+In June 2026, I wrote **"PSC-ONEによる音声認識①（キックオフ編）"**.
+
+<img src="docs/images/PSC_ONE_voice_anime_en.png" width="700">
+
+About two months have passed since then.
+
+The project has finally reached an important milestone, so the current
+results are summarized here.
+
+## Image
+
+The PC is connected to the PSC-ONE board via UART.
+Speech recognition is performed by speaking into the microphone connected to PSC-ONE, 
+while the recognition results are displayed on the PC through the UART console.  
+
+<img src="docs/images/PSC_speech_demo.jpg" width="800">
+
+## Equipment
+
+-   PSC-ONE FPGA platform
+-   Custom PSC_RV32 RISC-V CPU
+-   PSC-OS
+-   I2S microphone
+-   PSC-NPU (SynapEngine) AI accelerator
+
+## Results
+
+The following output is from an actual speech-recognition test running
+on PSC-ONE.
+
+### UP
+
+``` text
+PSC_OS> speech
+Speech recognition start
+
+（私の声でアップ）
+
+SPEECH RECORD START samples=48000
+SPEECH RECORD END samples=48000
+VOICE RANGE start=0 end=32000
+SCORE UP=22776 DOWN=-71191 UNKNOWN=-14509
+SPEECH RESULT=UP
+RESULT: UP
+```
+
+### DOWN
+
+``` text
+PSC_OS> speech
+Speech recognition start
+
+（私の声でダウン）
+
+SPEECH RECORD START samples=48000
+SPEECH RECORD END samples=48000
+VOICE RANGE start=0 end=32000
+SCORE UP=-85630 DOWN=5339 UNKNOWN=-9757
+SPEECH RESULT=DOWN
+```
+
+In the current implementation, speech recognition succeeds approximately
+**70% of the time**.
+
+This marks the completion of the first working PSC-ONE
+speech-recognition implementation.
+
+------------------------------------------------------------------------
+
+# FST Viewer
+
+<img src="docs/images/FST_viewer_image1.jpg" width="800">
+
+PSC-ONE includes **FST Viewer (PSC_RV32 Trace Studio)**, a Python-based browser GUI for visualizing CPU execution traces generated by simulation.
+
+The viewer reads FST/VCD waveform files and presents CPU activity at the instruction and architectural level rather than displaying only raw RTL signals. It is designed specifically for the PSC_RV32 processor family and does not require any modification to the RTL.
+
+Currently supported CPU architectures are:
+
+- `PSC_RV32` (legacy FSM architecture)
+- `PSC_RV32_V1` (valid/ready pipeline architecture)
+- `PSC_RV32_V2` (experimental out-of-order architecture)
+
+The CPU architecture is automatically detected from the trace structure.
+
+FST Viewer provides:
+
+- Instruction-level execution timeline
+- CPU pipeline and execution-stage visualization
+- Instruction tracking across multiple cycles
+- PC and instruction search
+- Instruction filtering
+- Instruction Ledger with PC, instruction word, disassembly, execution cycles, and retire status
+- Cycle Inspector for register operands, execution results, memory accesses, hazards, and CPU state
+- Architectural register display (`x0`–`x31`) with ABI names and value-change highlighting
+- MUL/DIV execution and wait-state visualization
+- Support for legacy, V1, and experimental V2 CPU architectures
+
+The horizontal axis represents CPU clock cycles, allowing execution behavior to be inspected cycle by cycle.
+
+For example, the viewer can show how an instruction moves through the CPU, how long it remains in each execution stage, when register values change, and where pipeline stalls or long-latency MUL/DIV operations occur.
+
+The viewer runs locally using Python and a standard JavaScript/Canvas-capable web browser.
+
+```bash
+cd tool/FST_viewer
+python3 fst_viewer.py
+```
+
+When no trace file is specified, the viewer automatically selects the latest FST/VCD file generated in:
+
+```text
+hardware/sim/wave/
+```
+
+A specific trace can also be opened directly:
+
+```bash
+python3 fst_viewer.py trace.fst
+```
+
+The default web interface runs on `127.0.0.1:8000`. If the port is already in use, the viewer automatically searches for the next available port.
+
+FST Viewer is intended to make PSC_RV32 CPU development and verification easier by providing a higher-level view of processor execution than conventional waveform inspection alone.
+
+------------------------------------------------------------------------
 
 # Development Status
 
@@ -528,7 +828,7 @@ If an error is detected, the system automatically retries the read operation, en
 - [x] CSR Support
 - [x] ECALL / SRET Support
 - [x] MMU (Sv32)
-- [ ] Interrupt Controller
+- [x] Interrupt Controller
 
 ### Memory System
 - [x] SDRAM Controller
@@ -538,7 +838,7 @@ If an error is detected, the system automatically retries the read operation, en
 - [x] DMA Engine
 
 ### AI Accelerator
-- [x] SynapEngine Architecture
+- [x] PSC-NPU Architecture
 - [x] 4×4 INT8 Systolic Array
 - [x] Matrix Multiplication API
 - [x] Shared Memory Integration
@@ -585,9 +885,10 @@ If an error is detected, the system automatically retries the read operation, en
 - [x] SD Card Test
 - [x] FAT32 File Browser (`ls`, `cat`)
 - [x] FAT32 File Write
-- [ ] AI Inference Demo
-- [ ] Audio Processing Demo
-- [ ] Speech Recognition Demo
+- [x] JPEG Image Viewer (jpeg) — 480×320 LCD Display
+- [x] AI Inference Demo
+- [x] Audio Processing Demo
+- [x] Speech Recognition Demo
 
 ## Verification
 
@@ -606,7 +907,7 @@ If an error is detected, the system automatically retries the read operation, en
 - [x] PSC-OS Boot
 - [x] UART Console
 - [x] SD Card Boot
-- [x] SynapEngine Execution
+- [x] PSC-NPU Execution
 - [ ] Long-Term Stability Test
 
 ## Documentation
@@ -622,28 +923,14 @@ If an error is detected, the system automatically retries the read operation, en
 ## Future Goals
 
 - [ ] PSC-ONE v1.0 Release
-- [ ] Neural Network Inference on SynapEngine
+- [ ] Neural Network Inference on PSC-NPU
 - [ ] Audio Recognition Demo
 - [ ] Self-Balancing Robot Demo
 - [ ] Custom ASIC Prototype
 
----
+------------------------------------------------------------------------
 
 # Future Work
-
-## Demonstration FPGA board
-
-A demonstration FPGA board is currently under development.
-Future work includes speech recognition and robotic control using the AI accelerator.
-
-<img src="docs/images/PSC-ONE_RedBoard.png" width="700">
-
-## Speech Recognition Demo
-
-This demo showcases real-time speech recognition running on the PSC-ONE platform.  
-An external microphone captures voice input, which is processed by the onboard SynapEngine AI accelerator. The recognized text is then displayed directly on the LCD screen in real time.  
-
-<img src="docs/images/PSC_ONE_voice_anime_en.png" width="700">
 
 ## Demonstration Robot
 
@@ -664,11 +951,12 @@ Location:
 hardware/pfe/
 ```
 
----
+------------------------------------------------------------------------
 
 # Getting Started
 
-A more detailed setup guide will be added as the project evolves.  
+A more detailed setup guide will be added as the project evolves.
+
 At a high level, the workflow is as follows:
 
 1. Build the hardware design
@@ -676,7 +964,9 @@ At a high level, the workflow is as follows:
 3. Prepare the boot image or software binaries
 4. Run the system and observe output through the available interfaces
 
----
+For detailed instructions, see the [Getting Started Guide](docs/getting-started.md).
+
+------------------------------------------------------------------------
 
 # Repository Status
 
@@ -685,13 +975,13 @@ and is under active development.
 
 RTL, software, and architecture may change frequently.
 
----
+------------------------------------------------------------------------
 
 # License
 
 MIT License
 
----
+------------------------------------------------------------------------
 
 ## 🚧 Work in Progress
 

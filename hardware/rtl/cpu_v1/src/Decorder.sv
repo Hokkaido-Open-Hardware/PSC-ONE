@@ -3,15 +3,15 @@
 import PSC_Types::*;
 
 module Decorder (
-    input  logic          clock,
-    input  logic          reset_n,
-    input  logic          decode_enb,
-    input  logic [31:0]   opcode,
-    input  logic [31:0]   in_pc,
-    input  logic [1:0]    current_priv,
-    output logic          decode_done,
+    input  logic        clock,
+    input  logic        reset_n,
+    input  logic        decode_enb,
+    input  logic [31:0] opcode,
+    input  logic [31:0] in_pc,
+    input  logic [1:0]  current_priv,
+    output logic        decode_done,
 
-    output dec_ctrl_t     decoder_ctrl
+    output dec_ctrl_t   decoder_ctrl
 );
 
     // Privilege level encoding (RISC-V spec)
@@ -309,7 +309,7 @@ module Decorder (
 
     assign is_nop = (opcode == 32'h0000_0013);
 
-    // パイプライン対象外となるM拡張命令
+    // （MULDIV除外テスト時に）パイプライン対象外となるM拡張命令
     wire is_mul_div_w =
         is_mul    |
         is_mulh   |
@@ -321,10 +321,22 @@ module Decorder (
         is_remu;
         //is_nop;
 
-    // 通常のR-typeとI-Typeだけパイプライン対象
-    wire pipeline_type_w =
-        (is_R_type_w || is_op_imm_w) &&
-        !is_mul_div_w;
+    // -------------------------------------------------------------------------
+    // Pipeline execution instructions (single-cycle EX, blocking memory):
+    // R-Type : ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND
+    // I-Type : ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI
+    // Load   : LB, LH, LW, LBU, LHU
+    // Store  : SB, SH, SW
+    // -------------------------------------------------------------------------
+    wire is_pipeline_memory_w =
+        (is_load_w && ((funct3_w == 3'b000) || (funct3_w == 3'b001) ||
+                       (funct3_w == 3'b010) || (funct3_w == 3'b100) ||
+                       (funct3_w == 3'b101))) ||
+        (is_store_w && ((funct3_w == 3'b000) || (funct3_w == 3'b001) ||
+                        (funct3_w == 3'b010)));
+    wire pipeline_type_w      =
+            //(is_R_type_w && !is_mul_div_w) || is_op_imm_w || is_pipeline_memory_w;
+            is_R_type_w || is_op_imm_w || is_pipeline_memory_w;
 
     // =============================================================================
     // 構造体へまとめた次段デコード結果
@@ -369,20 +381,12 @@ module Decorder (
                                     raise_illegal_instruction_alu;
     end
 
-    // =============================================================================
-    // パイプラインレジスタ
-    // =============================================================================
-    always @(posedge clock or negedge reset_n) begin
-        if(!reset_n) begin
-            decoder_ctrl <= '0;
-            decode_done  <= 1'b0;
-        end else if (decode_enb) begin
-            decoder_ctrl <= decoder_ctrl_next;
-            decode_done  <= 1'b1;
-        end else begin
-            // decode_doneだけ1クロックのパルスにし、ほかの結果は保持する。
-            decode_done  <= 1'b0;
-        end
+    // The v2 issue stage consumes the FIFO head directly.  Keep decode
+    // combinational so a new independent R/I instruction can be dispatched
+    // on every clock; the issue/slow-path registers provide the state hold.
+    always_comb begin
+        decoder_ctrl = decoder_ctrl_next;
+        decode_done  = decode_enb;
     end
 
 endmodule

@@ -1,10 +1,10 @@
 // ===============================================================
-// dm_cache_data : 128bit line data RAM (sync read, write-first)
+// dm_cache_data : 256bit line data RAM (sync read, write-first)
 // ===============================================================
 `timescale 1ns/1ps
 
 module dm_cache_data #(
-    parameter DATA_WIDTH  = 128,
+    parameter DATA_WIDTH  = 256,
     parameter INDEX_WIDTH = 10,
     parameter DEPTH       = (1 << INDEX_WIDTH)
 )(

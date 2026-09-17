@@ -1,0 +1,22 @@
+
+ /----------------------------------------------------------------------------\
+ |  yosys -- Yosys Open SYnthesis Suite                                       |
+ |  Copyright (C) 2012 - 2025  Claire Xenia Wolf <claire@yosyshq.com>         |
+ |  Distributed under an ISC-like license, type "license" to see terms        |
+ \----------------------------------------------------------------------------/
+ Yosys 0.52 (git sha1 fee39a3284c90249e1d9684cf6944ffbbcbb8f90)
+
+-- Running command `	read_verilog -sv ../rtl/cpu_v1/src/PSC_ONE_RV32_core.v ../rtl/cpu_v1/src/PSC_Types.sv ../rtl/cpu_v1/src/PSC_RV32_core.sv ../rtl/cpu_v1/src/PSC_RV32_FetchUnit.sv ../rtl/cpu_v1/src/Fetch_Fifo.sv ../rtl/cpu_v1/src/PSC_RV32_InstructionEngine.sv ../rtl/cpu_v1/src/PSC_InstructionUnit.sv ../rtl/cpu_v1/src/Fetch.sv ../rtl/cpu_v1/src/Decorder.sv ../rtl/cpu_v1/src/Execute.sv ../rtl/cpu_v1/src/Execute_Divider.sv ../rtl/cpu_v1/src/Execute_Mul.sv ../rtl/cpu_v1/src/Branch.sv ../rtl/cpu_v1/src/MemoryStore.sv ../rtl/cpu_v1/src/PSC_Register.sv ../rtl/cpu_v1/src/PSC_PC.sv ../rtl/cpu_v1/src/MMU.sv ../rtl/cpu_v1/src/Csr.sv ../rtl/cpu_v1/src/PSC_RV32_Monitor.v; 	hierarchy -top PSC_RV32_core; 	proc; opt; 	stat' --
+
+1. Executing Verilog-2005 frontend: ../rtl/cpu_v1/src/PSC_ONE_RV32_core.v
+Parsing SystemVerilog input from `../rtl/cpu_v1/src/PSC_ONE_RV32_core.v' to AST representation.
+Generating RTLIL representation for module `\PSC_ONE_RV32_core'.
+Successfully finished Verilog frontend.
+
+2. Executing Verilog-2005 frontend: ../rtl/cpu_v1/src/PSC_Types.sv
+Parsing SystemVerilog input from `../rtl/cpu_v1/src/PSC_Types.sv' to AST representation.
+Successfully finished Verilog frontend.
+
+3. Executing Verilog-2005 frontend: ../rtl/cpu_v1/src/PSC_RV32_core.sv
+Parsing SystemVerilog input from `../rtl/cpu_v1/src/PSC_RV32_core.sv' to AST representation.
+../rtl/cpu_v1/src/PSC_RV32_core.sv:61: ERROR: syntax error, unexpected TOK_PACKAGESEP, expecting '(' or '['

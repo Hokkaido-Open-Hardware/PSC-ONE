@@ -18,27 +18,19 @@ ifeq ($(MODE),verilator)
 SIM          		= verilator
 GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v
 TOP_COMPILE_ARGS 	= -DSDRAM_CNT_SIM -DCOCOTB_SIM
-
-ifeq ($(SIM_FAST),1)
-EXTRA_ARGS = \
-	-O3 --bbox-sys --x-assign fast --x-initial fast \
-	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
-	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
-else
 EXTRA_ARGS = \
 	-O3 --trace --trace-fst \
 	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
 	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
-endif
 
 endif
 
 ifeq ($(MODE),icarus)
 SIM          		= icarus
-GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram.v
 
-EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
-TOP_COMPILE_ARGS 	= -DSDRAM_CNT_SIM -DCOCOTB_SIM
+EXTRA_ARGS =
+TOP_COMPILE_ARGS 	= -DSDRAM_CNT_SIM -DCOCOTB_SIM 
 VCD_COMPILE_ARGS 	= -DDUMP_VCD
 
 endif
@@ -75,6 +67,8 @@ simulate_SDRAM:
 	@echo "TOP_COMPILE_ARGS=$(TOP_COMPILE_ARGS)"
 	$(MAKE) clean
 	@mkdir -p ./wave
+	# clean already forces a rebuild/run. Avoid the recursive sim target,
+	# which re-exports COMPILE_ARGS and appends Icarus cmds.f a second time.
 	COCOTB_TEST_MODULES=cocotb_tb.sdram.sdram_test \
 	TOPLEVEL=sim_sdram_controller TOPLEVEL_LANG=verilog \
 	SIM=$(SIM) \
@@ -82,4 +76,4 @@ simulate_SDRAM:
 	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 	VLOG_ARGS="$(VLOG_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
-	make -f $(COCOTB_MAKEFILE)
+	$(MAKE) -f $(COCOTB_MAKEFILE) regression

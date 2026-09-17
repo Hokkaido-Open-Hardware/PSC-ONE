@@ -7,7 +7,7 @@
 #define READSECTOR_WAIT 100
 #define READDATA_WAIT    50
 
-#define TIMEOUT_CYCLE   50000
+#define TIMEOUT_CYCLE   100000
 
 static inline void tiny_delay(unsigned n){
     while (n--) {

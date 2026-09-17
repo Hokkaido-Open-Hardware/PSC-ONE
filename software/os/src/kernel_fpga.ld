@@ -29,6 +29,13 @@ SECTIONS {
 
     . = ALIGN(4096);
     __free_ram = .;
-    . += 1 * 1024 * 1024; /* 1MB */
-    __free_ram_end = .;
+    /* Do not allocate over the external shell image while copying it.
+       Keep the existing kernel/user bases; cap only the page pool. */
+    __free_ram_end = MIN(__free_ram + 1 * 1024 * 1024,
+                         _binary_shell_bin_start);
+    ASSERT(__free_ram < __free_ram_end, "kernel overlaps shell load area")
+    /* Shell copy + separately mapped stack + page tables for idle/shell. */
+    ASSERT(__free_ram + ALIGN(_binary_shell_bin_end - _binary_shell_bin_start, 4096)
+           + 128 * 1024 + 8 * 4096 <= __free_ram_end,
+           "insufficient page pool for shell and stack")
 }

@@ -1,7 +1,7 @@
 // ===================================================================
 // cache_dma_controller  (for packed dm_cache_tag / write-first RAMs)
-//   - 16B line, Direct-Mapped, Write-back / Write-no-allocate
-//   - Sync-read 1clk (tag/data) に整合（ISSUE → READ → COMPARE）
+//   - 32B line, Direct-Mapped, Write-back / zero-filled store-miss allocation
+//   - Sync-read 1clk; tag判定を保持（IDLE → [ISSUE] → READ → COMPARE）
 //   - mem_req_ready で外部要求をゲート
 //   - FPGA向け：BRAMはリセットせず、起動時に S_INIT で全ライン invalid 化
 //
@@ -9,8 +9,8 @@
 //   通常32bit READ
 //
 // burst_mode = 1:
-//   READ HIT / READ ALLOC後に128bit lineを32bit x 4連続返却
-//   cpu_readyを4clk連続assert
+//   READ HIT / READ ALLOC後に256bit lineを32bit x 8連続返却
+//   cpu_readyを8clk連続assert
 //
 // NISHIHARU
 // ===================================================================
@@ -19,8 +19,8 @@
 module cache_dma_controller #(
     parameter int ADDR_WIDTH          = 32,
     parameter int CPU_DATA_WIDTH      = 32,
-    parameter int CACHE_DATA_WIDTH    = 128,
-    parameter int MAIN_MEM_DATA_WIDTH = 128,
+    parameter int CACHE_DATA_WIDTH    = 256,
+    parameter int MAIN_MEM_DATA_WIDTH = 256,
     parameter int CPU_MON_COUNT_WIDTH = 32,
     parameter int TAGMSB              = 31,
     parameter int TAGLSB              = 14,
@@ -49,8 +49,13 @@ module cache_dma_controller #(
     output logic                           cache_miss_pulse
 );
 
-    localparam int INDEX_WIDTH_BA = TAGLSB - 4;
-    localparam int USED_BITS_BA   = TAG_WIDTH + INDEX_WIDTH_BA + 4;
+    localparam integer LINE_BYTES = CACHE_DATA_WIDTH / 8;
+    localparam integer LINE_WORDS = CACHE_DATA_WIDTH / CPU_DATA_WIDTH;
+    localparam integer OFFSET_BITS = $clog2(LINE_BYTES);
+    localparam integer WORD_BITS = $clog2(LINE_WORDS);
+
+    localparam int INDEX_WIDTH_BA = TAGLSB - OFFSET_BITS;
+    localparam int USED_BITS_BA   = TAG_WIDTH + INDEX_WIDTH_BA + OFFSET_BITS;
     localparam int DEPTH          = (1 << INDEX_WIDTH_BA);
 
     typedef enum logic [3:0] {
@@ -61,34 +66,32 @@ module cache_dma_controller #(
         S_COMPARE      = 4'd4,
         S_WRITEBACK    = 4'd5,
         S_ALLOC_WAIT   = 4'd6,
-        S_ALLOC_RESP   = 4'd7,
         S_POST_WBALLOC = 4'd8,
         S_BURST_RESP   = 4'd9
     } state_t;
 
     state_t state;
 
-    assign cpu_req_ready = (state == S_IDLE);
+    assign cpu_req_ready  = (state == S_IDLE);
 
     logic [INDEX_WIDTH_BA-1:0] init_idx;
 
     logic                      req_is_write;
     logic [ADDR_WIDTH-1:0]     req_addr_w;
     logic [CPU_DATA_WIDTH-1:0] req_wdata;
-    logic [1:0]                req_word_sel_r;
+    logic [WORD_BITS-1:0]                req_word_sel_r;
     logic                      req_burst_mode;
 
-    logic [CACHE_DATA_WIDTH-1:0] burst_line_r;
-    logic [1:0]                  burst_word_idx;
+    // Word 0 is returned immediately; only the remaining seven words are held.
+    logic [CACHE_DATA_WIDTH-33:0]                burst_tail_r;
+    logic [WORD_BITS-1:0]                  burst_word_idx;
 
     logic cpu_cache_clear_d1;
     logic cpu_cache_clear_slot;
 
     logic [ADDR_WIDTH-1:0] cpu_byte_addr;
-    logic [ADDR_WIDTH-1:0] cpu_word_addr;
 
-    assign cpu_byte_addr = {cpu_addr[ADDR_WIDTH-1:2], 2'b00};
-    assign cpu_word_addr = cpu_addr >> 2;
+    assign cpu_byte_addr  = {cpu_addr[ADDR_WIDTH-1:2], 2'b00};
 
     logic [INDEX_WIDTH_BA-1:0] cur_index_r;
     logic [TAG_WIDTH-1:0]      cur_tag_r;
@@ -109,48 +112,18 @@ module cache_dma_controller #(
     logic [CACHE_DATA_WIDTH-1:0] data_write;
     logic [CACHE_DATA_WIDTH-1:0] data_read;
 
-    logic [TAG_WIDTH-1:0]        victim_tag_r;
-    logic                        victim_valid_r;
-    logic                        victim_dirty_r;
-    logic [CACHE_DATA_WIDTH-1:0] line_read_r;
-    logic [CACHE_DATA_WIDTH-1:0] fill_line_r;
-
     logic                      cpu_req_slot_valid;
-    logic [ADDR_WIDTH-1:0]     cpu_word_addr_slot;
     logic [ADDR_WIDTH-1:0]     cpu_byte_addr_slot;
     logic                      cpu_rw_slot;
     logic [CPU_DATA_WIDTH-1:0] cpu_data_slot;
     logic                      cpu_burst_mode_slot;
 
     function automatic [31:0] pick_word(
-        input [127:0] line,
-        input [1:0]   sel
+        input [CACHE_DATA_WIDTH-1:0] line,
+        input [WORD_BITS-1:0] sel
     );
         begin
-            case (sel)
-                2'b00: pick_word = line[31:0];
-                2'b01: pick_word = line[63:32];
-                2'b10: pick_word = line[95:64];
-                default: pick_word = line[127:96];
-            endcase
-        end
-    endfunction
-
-    function automatic [127:0] place_word(
-        input [127:0] line,
-        input [1:0]   sel,
-        input [31:0]  w
-    );
-        logic [127:0] t;
-        begin
-            t = line;
-            case (sel)
-                2'b00: t[31:0]   = w;
-                2'b01: t[63:32]  = w;
-                2'b10: t[95:64]  = w;
-                2'b11: t[127:96] = w;
-            endcase
-            place_word = t;
+            pick_word = line[sel*CPU_DATA_WIDTH +: CPU_DATA_WIDTH];
         end
     endfunction
 
@@ -158,7 +131,7 @@ module cache_dma_controller #(
         input [ADDR_WIDTH-1:0] addr
     );
         begin
-            alloc_addr_ba_f = {addr[ADDR_WIDTH-1:4], 4'b0000};
+            alloc_addr_ba_f = {addr[ADDR_WIDTH-1:OFFSET_BITS], {OFFSET_BITS{1'b0}}};
         end
     endfunction
 
@@ -167,77 +140,157 @@ module cache_dma_controller #(
         input [INDEX_WIDTH_BA-1:0] index_i
     );
         begin
-            wb_addr_ba_f = {
+            wb_addr_ba_f    = {
                 {(ADDR_WIDTH-USED_BITS_BA){1'b0}},
                 tag_i,
                 index_i,
-                4'b0000
+                {OFFSET_BITS{1'b0}}
             };
         end
     endfunction
 
     logic [ADDR_WIDTH-1:0]      victim_addr_ba;
-    logic [CACHE_DATA_WIDTH-1:0] ZERO_LINE;
 
-    assign victim_addr_ba = wb_addr_ba_f(victim_tag_r, cur_index_r);
-    assign ZERO_LINE      = '0;
+    assign victim_addr_ba = wb_addr_ba_f(tag_read_tag, cur_index_r);
+
+    // Read the next tag during IDLE when the single RAM port is free.
+    // A pending tag write (including the final INIT write) must keep the old
+    // index and gets one extra ISSUE cycle. Data RAM retains its original
+    // registered address schedule in both cases.
+    wire early_tag_read                       = (state == S_IDLE) && cpu_req_slot_valid && !tag_we;
+    wire [INDEX_WIDTH_BA-1:0] tag_index       = early_tag_read
+        ? cpu_byte_addr_slot[TAGLSB-1:OFFSET_BITS] : cur_index_r;
+    logic lookup_hit_r;
+    logic lookup_dirty_r;
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            lookup_hit_r         <= 1'b0;
+            lookup_dirty_r       <= 1'b0;
+        end else if (state == S_LOOKUP_READ) begin
+            lookup_hit_r         <= tag_read_valid && (tag_read_tag == cur_tag_r);
+            lookup_dirty_r       <= tag_read_valid && tag_read_dirty;
+        end
+    end
+
+    // Disjoint events keep FSM priorities out of the wide register enables.
+    wire cache_match                          = lookup_hit_r;
+    wire dirty_victim                         = lookup_dirty_r;
+    wire compare_hit                          = (state == S_COMPARE) && cache_match;
+    wire compare_miss                         = (state == S_COMPARE) && !cache_match;
+    wire write_hit                            = compare_hit && req_is_write;
+    wire write_new                            = req_is_write &&
+        ((compare_miss && !dirty_victim) ||
+         ((state == S_WRITEBACK) && mem_ready));
+    wire cache_fill                           = (state == S_ALLOC_WAIT) && mem_ready;
+    wire write_event                          = write_hit || write_new || cache_fill;
+
+    // A store miss installs the selected word with zero in the other words.
+    // A store hit preserves the other words. Decode each lane only once.
+    wire preserve_line                        = (state == S_COMPARE) && cache_match;
+    wire [CACHE_DATA_WIDTH-1:0] store_base    =
+        data_read & {CACHE_DATA_WIDTH{preserve_line}};
+    wire [CACHE_DATA_WIDTH-1:0] store_line;
+    genvar word_lane;
+    generate
+        for (word_lane = 0; word_lane < LINE_WORDS; word_lane = word_lane + 1) begin: g_store
+            assign store_line[word_lane*32 +: 32] = (req_word_sel_r == word_lane)
+                ? req_wdata : store_base[word_lane*32 +: 32];
+        end
+    endgenerate
+    wire [CACHE_DATA_WIDTH-1:0] write_data    = req_is_write ? store_line : mem_data_in;
+
+    wire eviction_request                     = compare_miss && dirty_victim && mem_req_ready;
+    wire allocation_request                   = mem_req_ready &&
+        ((compare_miss && !dirty_victim && !req_is_write) || (state == S_POST_WBALLOC));
+    wire memory_request                       = eviction_request || allocation_request;
+    wire [ADDR_WIDTH-1:0] memory_request_addr = eviction_request
+        ? victim_addr_ba : alloc_addr_ba_f(req_addr_w);
+
+    wire read_hit                             = compare_hit && !req_is_write;
+    wire read_response                        = read_hit || cache_fill || (state == S_BURST_RESP);
+    wire response_valid                       = write_hit || write_new || read_response;
+    wire [CPU_DATA_WIDTH-1:0] response_data   =
+        ({CPU_DATA_WIDTH{state == S_COMPARE}} & pick_word(data_read, req_burst_mode ? {WORD_BITS{1'b0}} : req_word_sel_r)) |
+        ({CPU_DATA_WIDTH{state == S_ALLOC_WAIT}} & pick_word(mem_data_in, req_burst_mode ? {WORD_BITS{1'b0}} : req_word_sel_r)) |
+        ({CPU_DATA_WIDTH{state == S_BURST_RESP}} & pick_word({burst_tail_r, 32'b0}, burst_word_idx));
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            state                 <= S_INIT;
-            init_idx              <= '0;
-            cpu_req_slot_valid    <= 1'b0;
-            cpu_word_addr_slot    <= '0;
-            cpu_byte_addr_slot    <= '0;
-            cpu_rw_slot           <= 1'b0;
-            cpu_data_slot         <= '0;
-            cpu_burst_mode_slot   <= 1'b0;
-            mem_valid             <= 1'b0;
-            mem_rw                <= 1'b0;
-            mem_addr              <= '0;
-            mem_data_out          <= '0;
-            cpu_ready             <= 1'b0;
-            cpu_data_out          <= '0;
-            cpu_cache_clear_d1    <= 1'b0;
-            cpu_cache_clear_slot  <= 1'b0;
-            tag_we                <= 1'b0;
-            tag_write             <= '0;
-            data_we               <= 1'b0;
-            data_write            <= '0;
-            req_is_write          <= 1'b0;
-            req_addr_w            <= '0;
-            req_wdata             <= '0;
-            req_word_sel_r        <= 2'b00;
-            req_burst_mode        <= 1'b0;
-            cur_index_r           <= '0;
-            cur_tag_r             <= '0;
-            victim_tag_r          <= '0;
-            victim_valid_r        <= 1'b0;
-            victim_dirty_r        <= 1'b0;
-            line_read_r           <= '0;
-            fill_line_r           <= '0;
-            burst_line_r          <= '0;
-            burst_word_idx        <= 2'd0;
-            cache_hit_pulse       <= 1'b0;
-            cache_miss_pulse      <= 1'b0;
+            data_write           <= '0;
+            data_we              <= 1'b0;
+            tag_write            <= '0;
+            tag_we               <= 1'b0;
+            mem_valid            <= 1'b0;
+            mem_rw               <= 1'b0;
+            mem_addr             <= '0;
+            mem_data_out         <= '0;
+            cpu_ready            <= 1'b0;
+            cpu_data_out         <= '0;
+            cache_hit_pulse      <= 1'b0;
+            cache_miss_pulse     <= 1'b0;
         end else begin
-            mem_valid             <= 1'b0;
-            cpu_ready             <= 1'b0;
-            tag_we                <= 1'b0;
-            data_we               <= 1'b0;
-            cache_hit_pulse       <= 1'b0;
-            cache_miss_pulse      <= 1'b0;
+            // RAM consumes this register only with data_we; no hold mux or CE.
+            data_write           <= write_data;
+            data_we              <= write_event;
+            tag_we               <= (state == S_INIT) || write_event;
+            if (state == S_INIT)
+                tag_write            <= '0;
+            else if (write_event)
+                tag_write            <= {cur_tag_r, 1'b1, !cache_fill};
 
+            mem_valid            <= memory_request;
+            if (memory_request) begin
+                mem_rw               <= eviction_request;
+                mem_addr             <= memory_request_addr;
+            end
+            if (eviction_request)
+                mem_data_out         <= data_read;
+
+            cpu_ready            <= response_valid;
+            if (read_response)
+                cpu_data_out         <= response_data;
+            cache_hit_pulse      <= compare_hit;
+            cache_miss_pulse     <= compare_miss &&
+                (dirty_victim ? mem_req_ready : (req_is_write || mem_req_ready));
+        end
+    end
+
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            state                <= S_INIT;
+            init_idx             <= '0;
+            cpu_req_slot_valid   <= 1'b0;
+
+            cpu_byte_addr_slot   <= '0;
+            cpu_rw_slot          <= 1'b0;
+            cpu_data_slot        <= '0;
+            cpu_burst_mode_slot  <= 1'b0;
+
+            cpu_cache_clear_d1   <= 1'b0;
+            cpu_cache_clear_slot <= 1'b0;
+
+            req_is_write         <= 1'b0;
+            req_addr_w           <= '0;
+            req_wdata            <= '0;
+            req_word_sel_r       <= '0;
+            req_burst_mode       <= 1'b0;
+            cur_index_r          <= '0;
+            cur_tag_r            <= '0;
+
+            burst_tail_r         <= '0;
+            burst_word_idx       <= '0;
+
+        end else begin
             if (cpu_valid) begin
                 cpu_req_slot_valid   <= 1'b1;
-                cpu_word_addr_slot   <= cpu_word_addr;
+
                 cpu_byte_addr_slot   <= cpu_byte_addr;
                 cpu_rw_slot          <= cpu_rw;
                 cpu_data_slot        <= cpu_data;
                 cpu_burst_mode_slot  <= burst_mode;
             end
 
-            cpu_cache_clear_d1 <= cpu_cache_clear;
+            cpu_cache_clear_d1   <= cpu_cache_clear;
 
             if (cpu_cache_clear && !cpu_cache_clear_d1) begin
                 cpu_cache_clear_slot <= 1'b1;
@@ -246,27 +299,26 @@ module cache_dma_controller #(
             case (state)
                 S_INIT: begin
                     cur_index_r <= init_idx;
-                    tag_write   <= '0;
-                    tag_we      <= 1'b1;
+
                     if (init_idx == DEPTH-1) begin
-                        init_idx <= '0;
-                        state    <= S_IDLE;
+                        init_idx             <= '0;
+                        state                <= S_IDLE;
                     end else begin
-                        init_idx <= init_idx + 1'b1;
+                        init_idx             <= init_idx + 1'b1;
                     end
                 end
 
                 S_IDLE: begin
                     if (cpu_req_slot_valid) begin
-                        cpu_req_slot_valid <= 1'b0;
-                        req_is_write       <= cpu_rw_slot;
-                        req_addr_w         <= cpu_byte_addr_slot;
-                        req_wdata          <= cpu_data_slot;
-                        req_word_sel_r     <= cpu_word_addr_slot[1:0];
-                        req_burst_mode     <= cpu_burst_mode_slot;
-                        cur_index_r        <= cpu_byte_addr_slot[TAGLSB-1:4];
-                        cur_tag_r          <= cpu_byte_addr_slot[TAGMSB:TAGLSB];
-                        state              <= S_LOOKUP_ISSUE;
+                        cpu_req_slot_valid   <= 1'b0;
+                        req_is_write         <= cpu_rw_slot;
+                        req_addr_w           <= cpu_byte_addr_slot;
+                        req_wdata            <= cpu_data_slot;
+                        req_word_sel_r       <= cpu_byte_addr_slot[OFFSET_BITS-1:2];
+                        req_burst_mode       <= cpu_burst_mode_slot;
+                        cur_index_r          <= cpu_byte_addr_slot[TAGLSB-1:OFFSET_BITS];
+                        cur_tag_r            <= cpu_byte_addr_slot[TAGMSB:TAGLSB];
+                        state                <= tag_we ? S_LOOKUP_ISSUE : S_LOOKUP_READ;
                     end else if (cpu_cache_clear_slot) begin
                         init_idx             <= '0;
                         cpu_cache_clear_slot <= 1'b0;
@@ -275,85 +327,37 @@ module cache_dma_controller #(
                 end
 
                 S_LOOKUP_ISSUE: begin
-                    state <= S_LOOKUP_READ;
+                    state       <= S_LOOKUP_READ;
                 end
 
                 S_LOOKUP_READ: begin
-                    victim_tag_r    <= tag_read_tag;
-                    victim_valid_r  <= tag_read_valid;
-                    victim_dirty_r  <= tag_read_dirty;
-                    line_read_r     <= data_read;
-                    state           <= S_COMPARE;
+                    state       <= S_COMPARE;
                 end
 
                 S_COMPARE: begin
-                    if (victim_valid_r && (victim_tag_r == cur_tag_r)) begin
+                    if (cache_match) begin
                         if (req_is_write) begin
-                            data_write        <= place_word(
-                                line_read_r,
-                                req_word_sel_r,
-                                req_wdata
-                            );
-                            data_we           <= 1'b1;
-                            tag_write         <= {
-                                victim_tag_r,
-                                1'b1,
-                                1'b1
-                            };
-                            tag_we            <= 1'b1;
-                            cpu_ready         <= 1'b1;
-                            cache_hit_pulse   <= 1'b1;
-                            state             <= S_IDLE;
+                            state          <= S_IDLE;
                         end else begin
                             if (req_burst_mode) begin
-                                burst_line_r       <= line_read_r;
-                                burst_word_idx     <= 2'd0;
-                                cache_hit_pulse    <= 1'b1;
-                                state              <= S_BURST_RESP;
+                                burst_tail_r   <= data_read[CACHE_DATA_WIDTH-1:32];
+                                burst_word_idx <= 1;
+                                state          <= S_BURST_RESP;
                             end else begin
-                                cpu_data_out       <= pick_word(
-                                    line_read_r,
-                                    req_word_sel_r
-                                );
-                                cpu_ready          <= 1'b1;
-                                cache_hit_pulse    <= 1'b1;
-                                state              <= S_IDLE;
+                                state          <= S_IDLE;
                             end
                         end
                     end else begin
-                        if (victim_valid_r && victim_dirty_r) begin
+                        if (dirty_victim) begin
                             if (mem_req_ready) begin
-                                mem_valid           <= 1'b1;
-                                mem_rw              <= 1'b1;
-                                mem_addr            <= victim_addr_ba;
-                                mem_data_out        <= line_read_r;
-                                cache_miss_pulse    <= 1'b1;
-                                state               <= S_WRITEBACK;
+                                state          <= S_WRITEBACK;
                             end
                         end else if (!req_is_write) begin
                             if (mem_req_ready) begin
-                                mem_valid           <= 1'b1;
-                                mem_rw              <= 1'b0;
-                                mem_addr            <= alloc_addr_ba_f(req_addr_w);
-                                cache_miss_pulse    <= 1'b1;
-                                state               <= S_ALLOC_WAIT;
+                                state          <= S_ALLOC_WAIT;
                             end
                         end else begin
-                            data_write         <= place_word(
-                                ZERO_LINE,
-                                req_word_sel_r,
-                                req_wdata
-                            );
-                            data_we            <= 1'b1;
-                            tag_write          <= {
-                                cur_tag_r,
-                                1'b1,
-                                1'b1
-                            };
-                            tag_we             <= 1'b1;
-                            cpu_ready          <= 1'b1;
-                            cache_miss_pulse   <= 1'b1;
-                            state              <= S_IDLE;
+                            state          <= S_IDLE;
                         end
                     end
                 end
@@ -361,85 +365,42 @@ module cache_dma_controller #(
                 S_WRITEBACK: begin
                     if (mem_ready) begin
                         if (!req_is_write) begin
-                            state <= S_POST_WBALLOC;
+                            state          <= S_POST_WBALLOC;
                         end else begin
-                            data_write       <= place_word(
-                                ZERO_LINE,
-                                req_word_sel_r,
-                                req_wdata
-                            );
-                            data_we          <= 1'b1;
-                            tag_write        <= {
-                                cur_tag_r,
-                                1'b1,
-                                1'b1
-                            };
-                            tag_we           <= 1'b1;
-                            cpu_ready        <= 1'b1;
-                            state            <= S_IDLE;
+                            state          <= S_IDLE;
                         end
                     end
                 end
 
                 S_POST_WBALLOC: begin
                     if (mem_req_ready) begin
-                        mem_valid   <= 1'b1;
-                        mem_rw      <= 1'b0;
-                        mem_addr    <= alloc_addr_ba_f(req_addr_w);
-                        state       <= S_ALLOC_WAIT;
+                        state                <= S_ALLOC_WAIT;
                     end
                 end
 
                 S_ALLOC_WAIT: begin
                     if (mem_ready) begin
-                        fill_line_r       <= mem_data_in;
-                        data_write        <= mem_data_in;
-                        data_we           <= 1'b1;
-                        tag_write         <= {
-                            cur_tag_r,
-                            1'b1,
-                            1'b0
-                        };
-                        tag_we            <= 1'b1;
                         if (req_burst_mode) begin
-                            burst_line_r   <= mem_data_in;
-                            burst_word_idx <= 2'd0;
+                            burst_tail_r   <= mem_data_in[CACHE_DATA_WIDTH-1:32];
+                            burst_word_idx <= 1;
                             state          <= S_BURST_RESP;
                         end else begin
-                            state          <= S_ALLOC_RESP;
+                            state          <= S_IDLE;
                         end
                     end
                 end
 
-                S_ALLOC_RESP: begin
-                    cpu_data_out <= pick_word(
-                        fill_line_r,
-                        req_word_sel_r
-                    );
-                    cpu_ready    <= 1'b1;
-                    state        <= S_IDLE;
-                end
-
                 S_BURST_RESP: begin
-                    cpu_ready <= 1'b1;
-
-                    case (burst_word_idx)
-                        2'd0: cpu_data_out <= burst_line_r[31:0];
-                        2'd1: cpu_data_out <= burst_line_r[63:32];
-                        2'd2: cpu_data_out <= burst_line_r[95:64];
-                        2'd3: cpu_data_out <= burst_line_r[127:96];
-                    endcase
-
-                    if (burst_word_idx == 2'd3) begin
-                        burst_word_idx <= 2'd0;
-                        state          <= S_IDLE;
+                    if (burst_word_idx == LINE_WORDS-1) begin
+                        burst_word_idx       <= '0;
+                        state                <= S_IDLE;
                     end else begin
-                        burst_word_idx <= burst_word_idx + 2'd1;
+                        burst_word_idx       <= burst_word_idx + 1'b1;
                     end
                 end
 
                 default: begin
-                    state <= S_IDLE;
+                    state       <= S_IDLE;
                 end
             endcase
         end
@@ -451,7 +412,7 @@ module cache_dma_controller #(
     ) u_tag (
         .clk         (clock),
         .we          (tag_we),
-        .index       (cur_index_r),
+        .index       (tag_index),
         .tag_write   (tag_write),
         .tag_read    (tag_read)
     );

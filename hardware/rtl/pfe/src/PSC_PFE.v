@@ -134,6 +134,8 @@ module PSC_PFE #(
         end
     end
 
+`ifdef COCOTB_SIM
+
     // ---------------- QUBO Engine ----------------
     always @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
@@ -223,5 +225,7 @@ module PSC_PFE #(
             end
         end
     end
+
+`endif
 
 endmodule

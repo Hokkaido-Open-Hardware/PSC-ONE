@@ -93,20 +93,20 @@ module sim_cache_dma_controller #(
     end
     `endif
 
-    // cache <-> bridge（128bit ライン側）
-    wire         p_mem_valid128;
-    wire         p_mem_rw128;
-    wire         p_mem_ready128;
-    wire [127:0] p_mem_rdata128;
-    wire [31:0]  p_mem_addr128;
-    wire [127:0] p_mem_wdata128;
+    // cache <-> bridge（256bit ライン側）
+    wire         p_mem_valid256;
+    wire         p_mem_rw256;
+    wire         p_mem_ready256;
+    wire [255:0] p_mem_rdata256;
+    wire [31:0]  p_mem_addr256;
+    wire [255:0] p_mem_wdata256;
 
     /* cache controller */
     cache_dma_controller #(
         .ADDR_WIDTH          (32),
         .CPU_DATA_WIDTH      (32),
-        .CACHE_DATA_WIDTH    (128),
-        .MAIN_MEM_DATA_WIDTH (128),
+        .CACHE_DATA_WIDTH    (256),
+        .MAIN_MEM_DATA_WIDTH (256),
         .TAGMSB              (31),
         `ifdef ICache_W256
         .TAGLSB              (12)
@@ -125,59 +125,50 @@ module sim_cache_dma_controller #(
         .cpu_data_out       (program_mem_read_data),
         .cpu_req_ready      (cpu_req_ready),
         .cpu_cache_clear    (cpu_cache_clear),
-        // 128b 側
+        // 256b 側
         .mem_req_ready      (1'b1),             // 1'b1 fix
-        .mem_valid          (p_mem_valid128),
-        .mem_rw             (p_mem_rw128),
-        .mem_ready          (p_mem_ready128),
-        .mem_data_in        (p_mem_rdata128),
-        .mem_addr           (p_mem_addr128),
-        .mem_data_out       (p_mem_wdata128),
+        .mem_valid          (p_mem_valid256),
+        .mem_rw             (p_mem_rw256),
+        .mem_ready          (p_mem_ready256),
+        .mem_data_in        (p_mem_rdata256),
+        .mem_addr           (p_mem_addr256),
+        .mem_data_out       (p_mem_wdata256),
         // CACHE MONITOR
         .cache_hit_pulse    (program_cache_hit_pulse),
         .cache_miss_pulse   (program_cache_miss_pulse)
     );
 
     // ============================================================
-    // Bridge (128b ⇄ AXI4-M(32b)) と AXI配線
+    // Bridge (256b ⇄ AXI4-M(32b)) と AXI配線
     // ============================================================
     localparam integer SYS_ADDR_WIDTH = 32;
     localparam integer AXI_ID_WIDTH   = 1;
     localparam integer AXI_DATA_WIDTH = 32;
 
-    // cache(128b)側とブリッジの接続（wireで分岐）
-    wire                     p_cache_rd_valid = p_mem_valid128 & ~p_mem_rw128;
-    wire                     p_cache_wr_valid = p_mem_valid128 &  p_mem_rw128;
-    wire [31:0]              p_cache_rd_addr  = p_mem_addr128;
-    wire [31:0]              p_cache_wr_addr  = p_mem_addr128;
-    wire [127:0]             p_cache_wr_data  = p_mem_wdata128;
-    wire [127:0]             p_cache_rd_data;
-    wire                     p_cache_rd_ready;
-    wire                     p_cache_wr_ready;
 
-    // 完了は Read/Write どちらでも1clkパルスを返す
-    assign p_mem_ready128 = p_cache_rd_ready | p_cache_wr_ready;
-    assign p_mem_rdata128 = p_cache_rd_data;
 
     // ---------------- Bridge (AXI Master, 32-bit) ----------------
-    sdram_32bit_to_128bit_axi_bridge #(
+    sdram_32bit_to_256bit_axi_bridge #(
         .ADDR_WIDTH         (SYS_ADDR_WIDTH),
         .ID_WIDTH           (AXI_ID_WIDTH),
         .DATA_WIDTH         (AXI_DATA_WIDTH)
-    ) p_axi_bridge (
+    ) shared_axi_bridge (
         .clock              (clock),
         .reset_n            (reset_n),
 
-        // Cache side (128b)
-        .read_valid         (p_cache_rd_valid),
-        .read_ready         (p_cache_rd_ready),
-        .read_addr          (p_cache_rd_addr),
-        .read_data          (p_cache_rd_data),
-
-        .write_valid        (p_cache_wr_valid),
-        .write_ready        (p_cache_wr_ready),
-        .write_addr         (p_cache_wr_addr),
-        .write_data         (p_cache_wr_data),
+        // Independent cache line ports; all transactions use p_axi_*.
+        .i_read_valid       (p_mem_valid256 & ~p_mem_rw256),
+        .i_read_ready       (p_mem_ready256),
+        .i_read_addr        (p_mem_addr256),
+        .i_read_data        (p_mem_rdata256),
+        .d_read_valid       (d_mem_valid256 & ~d_mem_rw256),
+        .d_read_ready       (d_cache_rd_ready),
+        .d_read_addr        (d_mem_addr256),
+        .d_read_data        (d_mem_rdata256),
+        .d_write_valid      (d_mem_valid256 & d_mem_rw256),
+        .d_write_ready      (d_cache_wr_ready),
+        .d_write_addr       (d_mem_addr256),
+        .d_write_data       (d_mem_wdata256),
 
         // AXI4 Master (to SDRAM AXI-S)
         .m_axi_awid         (p_axi_awid),
@@ -219,14 +210,12 @@ module sim_cache_dma_controller #(
     // ===========================================================
     //  Data キャッシュ（D-Cache 相当）
     // ===========================================================
-    wire [31:0]  cpu_data_addr = (data_mem_write_valid) ? data_mem_write_address[31:0] : data_mem_read_address[31:0];
-
-    wire         d_mem_valid128;
-    wire         d_mem_rw128;
-    wire         d_mem_ready128;
-    wire [127:0] d_mem_rdata128;
-    wire [31:0]  d_mem_addr128;
-    wire [127:0] d_mem_wdata128;
+    wire         d_mem_valid256;
+    wire         d_mem_rw256;
+    wire         d_mem_ready256;
+    wire [255:0] d_mem_rdata256;
+    wire [31:0]  d_mem_addr256;
+    wire [255:0] d_mem_wdata256;
 
     wire dcache_ready;
 
@@ -248,8 +237,8 @@ module sim_cache_dma_controller #(
         .PROTECT_ADDR        (PROTECT_ADDR),
         .ADDR_WIDTH          (32),
         .CPU_DATA_WIDTH      (32),
-        .CACHE_DATA_WIDTH    (128),
-        .MAIN_MEM_DATA_WIDTH (128),
+        .CACHE_DATA_WIDTH    (256),
+        .MAIN_MEM_DATA_WIDTH (256),
         .TAGMSB              (31),
         `ifdef DCache_W256
         .TAGLSB              (12),
@@ -280,10 +269,12 @@ module sim_cache_dma_controller #(
         .clock              (clock),
         .reset_n            (reset_n),
         // CPU Data
-        .cpu_valid          (data_mem_read_valid | data_mem_write_valid),
+        .cpu_rvalid         (data_mem_read_valid),
+        .cpu_wvalid         (data_mem_write_valid),
         .cpu_rw             (data_mem_write_valid),
         .cpu_write_sel      (mem_write_sel),
-        .cpu_addr           (cpu_data_addr),
+        .cpu_raddr          (data_mem_read_address),
+        .cpu_waddr          (data_mem_write_address),
         .cpu_data           (mem_write_data),
         .cpu_ready          (dcache_ready),
         .cpu_data_out       (data_mem_read_data),
@@ -311,92 +302,48 @@ module sim_cache_dma_controller #(
         .mmio_rdata         (),
         .mmio_ready         (1'b0),
         .mmio_wdata         (),
-        // 128b 側
+        // 256b 側
         .mem_req_ready      (1'b1),             // 1'b1 fix
-        .mem_valid          (d_mem_valid128),
-        .mem_rw             (d_mem_rw128),
-        .mem_ready          (d_mem_ready128),
-        .mem_data_in        (d_mem_rdata128),
-        .mem_addr           (d_mem_addr128),
-        .mem_data_out       (d_mem_wdata128),
+        .mem_valid          (d_mem_valid256),
+        .mem_rw             (d_mem_rw256),
+        .mem_ready          (d_mem_ready256),
+        .mem_data_in        (d_mem_rdata256),
+        .mem_addr           (d_mem_addr256),
+        .mem_data_out       (d_mem_wdata256),
         // CACHE MONITOR
         .cache_hit_pulse    (data_cache_hit_pulse),
         .cache_miss_pulse   (data_cache_miss_pulse)
     );
 
     // ============================================================
-    // Bridge (128b ⇄ AXI4-M(16b)) と AXI配線
+    // D-Cache completion and unused AXI tie-offs
     // ============================================================
 
-    // cache(128b)側とブリッジの接続（wireで分岐）
-    wire                     d_cache_rd_valid = d_mem_valid128 & ~d_mem_rw128;
-    wire                     d_cache_wr_valid = d_mem_valid128 &  d_mem_rw128;
-    wire [31:0]              d_cache_rd_addr  = d_mem_addr128;
-    wire [31:0]              d_cache_wr_addr  = d_mem_addr128;
-    wire [127:0]             d_cache_wr_data  = d_mem_wdata128;
-    wire [127:0]             d_cache_rd_data;
-    wire                     d_cache_rd_ready;
-    wire                     d_cache_wr_ready;
+    wire d_cache_rd_ready;
+    wire d_cache_wr_ready;
+    assign d_mem_ready256 = d_cache_rd_ready | d_cache_wr_ready;
 
-    // 完了は Read/Write どちらでも1clkパルスを返す
-    assign d_mem_ready128 = d_cache_rd_ready | d_cache_wr_ready;
-    assign d_mem_rdata128 = d_cache_rd_data;
+    // Compatibility only: the former D-Cache AXI master is inactive.
+    // No d_axi_* input participates in the shared bridge's control.
+    assign d_axi_awid = '0;
+    assign d_axi_awaddr = '0;
+    assign d_axi_awlen = '0;
+    assign d_axi_awsize = '0;
+    assign d_axi_awburst = '0;
+    assign d_axi_awvalid = '0;
+    assign d_axi_wdata = '0;
+    assign d_axi_wstrb = '0;
+    assign d_axi_wlast = '0;
+    assign d_axi_wvalid = '0;
+    assign d_axi_bready = '0;
+    assign d_axi_arid = '0;
+    assign d_axi_araddr = '0;
+    assign d_axi_arlen = '0;
+    assign d_axi_arsize = '0;
+    assign d_axi_arburst = '0;
+    assign d_axi_arvalid = '0;
+    assign d_axi_rready = '0;
 
-    // ---------------- Bridge (AXI Master, 32-bit) ----------------
-    sdram_32bit_to_128bit_axi_bridge #(
-        .ADDR_WIDTH         (SYS_ADDR_WIDTH),
-        .ID_WIDTH           (AXI_ID_WIDTH),
-        .DATA_WIDTH         (32)
-    ) d_axi_bridge (
-        .clock              (clock),
-        .reset_n            (reset_n),
-
-        // Cache side (128b)
-        .read_valid         (d_cache_rd_valid),
-        .read_ready         (d_cache_rd_ready),
-        .read_addr          (d_cache_rd_addr),
-        .read_data          (d_cache_rd_data),
-
-        .write_valid        (d_cache_wr_valid),
-        .write_ready        (d_cache_wr_ready),
-        .write_addr         (d_cache_wr_addr),
-        .write_data         (d_cache_wr_data),
-
-        // AXI4 Master (to SDRAM AXI-S)
-        .m_axi_awid         (d_axi_awid),
-        .m_axi_awaddr       (d_axi_awaddr),
-        .m_axi_awlen        (d_axi_awlen),
-        .m_axi_awsize       (d_axi_awsize),
-        .m_axi_awburst      (d_axi_awburst),
-        .m_axi_awvalid      (d_axi_awvalid),
-        .m_axi_awready      (d_axi_awready),
-
-        .m_axi_wdata        (d_axi_wdata),
-        .m_axi_wstrb        (d_axi_wstrb),
-        .m_axi_wlast        (d_axi_wlast),
-        .m_axi_wvalid       (d_axi_wvalid),
-        .m_axi_wready       (d_axi_wready),
-
-        .m_axi_bid          (d_axi_bid),
-        .m_axi_bresp        (d_axi_bresp),
-        .m_axi_bvalid       (d_axi_bvalid),
-        .m_axi_bready       (d_axi_bready),
-
-        .m_axi_arid         (d_axi_arid),
-        .m_axi_araddr       (d_axi_araddr),
-        .m_axi_arlen        (d_axi_arlen),
-        .m_axi_arsize       (d_axi_arsize),
-        .m_axi_arburst      (d_axi_arburst),
-        .m_axi_arvalid      (d_axi_arvalid),
-        .m_axi_arready      (d_axi_arready),
-
-        .m_axi_rid          (d_axi_rid),
-        .m_axi_rdata        (d_axi_rdata),
-        .m_axi_rresp        (d_axi_rresp),
-        .m_axi_rlast        (d_axi_rlast),
-        .m_axi_rvalid       (d_axi_rvalid),
-        .m_axi_rready       (d_axi_rready)
-    );
     
     // =========================================================
     // Program-side AXI (32-bit) — SLAVE-facing ports of DUT
@@ -580,7 +527,7 @@ module sim_cache_dma_controller #(
     //wire [1:0]          dummy_O_sdram_addr;
     wire   sdram_init_fin;
 
-    sdram_4port_controller_axi_slave_bX_32bit #(
+    sdram_axi_controller #(
         .CLK_FREQ_MHz       (100),
         .ADDR_WIDTH         (24),
         .DATA_WIDTH         (32),

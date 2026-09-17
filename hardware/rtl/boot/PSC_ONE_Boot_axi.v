@@ -30,12 +30,12 @@ module PSC_ONE_Boot_axi #(
     parameter integer ROM_WORD         = 128,
     parameter integer BOOT_LOADER_WORD = 4500,
     parameter integer KERNEL_ROM_WORD  = 200000,
-    parameter integer USER_ROM_WORD    = 150000
+    parameter integer USER_ROM_WORD    = 180000
 `elsif FPGA_BOOT_LOADER_MODE
     parameter integer ROM_WORD         = 128,
     parameter integer BOOT_LOADER_WORD = 4500,
     parameter integer KERNEL_ROM_WORD  = 200000,
-    parameter integer USER_ROM_WORD    = 150000
+    parameter integer USER_ROM_WORD    = 180000
 `else
     parameter integer ROM_WORD         = 4096,
     parameter integer BOOT_LOADER_WORD = ROM_WORD,
@@ -474,27 +474,6 @@ module test_rom #(
     end
 endmodule
 
-//------- BootLoader ROM module -------
-// bootloader.mem
-module boot_loader_rom #(
-    parameter integer ADDR_WIDTH = 13
-)(
-    input  wire                  clock,
-    input  wire [ADDR_WIDTH-1:0] addr,
-    output reg  [31:0]           dout
-);
-    localparam integer ROM_WORD = 4500;  // 固定値にしないとFPGA内でROMと認識されない.
-    reg [31:0] Boot_Loader_rom [0:ROM_WORD-1];
-    initial $readmemh("mem/bootloader.mem", Boot_Loader_rom);
-
-    always @(posedge clock) begin
-        if (addr > ROM_WORD)
-            dout <= 32'd0;
-        else
-            dout <= Boot_Loader_rom[addr];
-    end
-endmodule
-
 //------- PSC_OS ROM module -------
 // boot.mem
 module boot_rom #(
@@ -513,6 +492,27 @@ module boot_rom #(
             dout <= 32'd0;
         else
             dout <= Boot_rom[addr];
+    end
+endmodule
+
+//------- BootLoader ROM module -------
+// bootloader.mem
+module boot_loader_rom #(
+    parameter integer ADDR_WIDTH = 13
+)(
+    input  wire                  clock,
+    input  wire [ADDR_WIDTH-1:0] addr,
+    output reg  [31:0]           dout
+);
+    localparam integer ROM_WORD = 4500;  // 固定値にしないとFPGA内でROMと認識されない.
+    reg [31:0] Boot_Loader_rom [0:ROM_WORD-1];
+    initial $readmemh("mem/bootloader.mem", Boot_Loader_rom);
+
+    always @(posedge clock) begin
+        if (addr > ROM_WORD)
+            dout <= 32'd0;
+        else
+            dout <= Boot_Loader_rom[addr];
     end
 endmodule
 
@@ -544,7 +544,7 @@ module user_rom #(
     input  wire [ADDR_WIDTH-1:0] addr,
     output reg  [31:0]           dout
 );
-    localparam integer ROM_WORD = 150000;
+    localparam integer ROM_WORD = 180000;
     reg [31:0] mem [0:ROM_WORD-1];
     initial $readmemh("mem/user.mem", mem);
 

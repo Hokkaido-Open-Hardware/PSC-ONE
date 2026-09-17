@@ -2,9 +2,9 @@
 # Usage
 # ============================================================
 
-#make -f Makefile.cpu.core simulate_CPU_CORE CPU_VERSION=legacy
+#make -f Makefile.riscv.sim simulate_CPU_CORE CPU_VERSION=legacy
 #or
-#make -f Makefile.cpu.core simulate_CPU_CORE CPU_VERSION=v1
+#make -f Makefile.riscv.sim simulate_CPU_CORE CPU_VERSION=v1
 
 # ============================================================
 #  MODE で一括切り替え（verilator / icarus）
@@ -47,17 +47,18 @@ endif
 #  以下、元の Makefile の変数定義など（SDRAM_MODEL を置き換え）
 # ============================================================
 
-CPU_TOP 	 = PSC_RV32ISP_core
+CPU_TOP 	 = PSC_RV32_core
 
 CPU_SRC_DIR  	= ../rtl/cpu/src
 CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
 CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
 
-# RV32ISP_core
+# RV32_core
 CPU_CORE_FILES = \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_core.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_Fetch.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_Execute.v \
+	$(CPU_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Execute.v \
 	$(CPU_SRC_DIR)/Fetch_Fifo.v \
 	$(CPU_SRC_DIR)/Fetch.v \
 	$(CPU_SRC_DIR)/Decorder.v \
@@ -69,17 +70,20 @@ CPU_CORE_FILES = \
 	$(CPU_SRC_DIR)/Register.v \
 	$(CPU_SRC_DIR)/MMU.v \
 	$(CPU_SRC_DIR)/Csr.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_Monitor.v
+	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
 
-# RV32ISP_core
+CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
+
+# RV32_core
 CPU_V1_CORE_FILES = \
+	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32_core.v \
 	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_core.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_FetchPredict.sv \
 	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
 	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
-	$(CPU_V1_SRC_DIR)/PSC_InstructionFSM.sv \
 	$(CPU_V1_SRC_DIR)/Fetch.sv \
 	$(CPU_V1_SRC_DIR)/Decorder.sv \
 	$(CPU_V1_SRC_DIR)/Execute.sv \
@@ -91,17 +95,19 @@ CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
 	$(CPU_V1_SRC_DIR)/MMU.sv \
 	$(CPU_V1_SRC_DIR)/Csr.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_Monitor.v
+	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
 
-# RV32ISP_core(V2)
+CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+
+# RV32_core(V2)
 CPU_V2_CORE_FILES = \
+	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32_core.v \
 	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_core.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_FetchUnit.sv \
 	$(CPU_V2_SRC_DIR)/Fetch_Fifo.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
 	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
-	$(CPU_V2_SRC_DIR)/PSC_InstructionFSM.sv \
 	$(CPU_V2_SRC_DIR)/Fetch.sv \
 	$(CPU_V2_SRC_DIR)/Decorder.sv \
 	$(CPU_V2_SRC_DIR)/Execute.sv \
@@ -113,7 +119,7 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/PSC_PC.sv \
 	$(CPU_V2_SRC_DIR)/MMU.sv \
 	$(CPU_V2_SRC_DIR)/Csr.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_Monitor.v
+	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
 
 # ============================================================
 # CPUコアの切り替え（v1 / legacy）
@@ -217,6 +223,8 @@ $(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic または
 endif
 
 # run test
+RISCV_RUN_DIR ?= $(CURDIR)/build/riscv-$(CPU_VERSION)
+
 .PHONY: simulate_RISCV_TESTS
 simulate_RISCV_TESTS:
 	$(MAKE) -f Makefile.riscv all
@@ -226,7 +234,7 @@ simulate_RISCV_TESTS:
 	@echo "TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST)"
 	@echo "TOP_COMPILE_ARGS=$(TOP_COMPILE_ARGS)"
 	@echo "COMPILE_ARGS=$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)"
-	@mkdir -p ./wave
+	@mkdir -p ./wave "$(RISCV_RUN_DIR)"
 	@set -e; \
 	for t in $(RV32ISP_TEST); do \
 		name=$$(echo $$t | cut -d: -f1); \
@@ -239,11 +247,9 @@ simulate_RISCV_TESTS:
 		echo "[MEM ] $$mem_file"; \
 		echo "[EXP ] $$expected"; \
 		echo "========================================"; \
-		$(MAKE) clean; \
-		tmp=$$(mktemp); \
-		head -n 4096 "$$mem_file" > $$tmp; \
-		cp $$tmp ./mem/test_program.mem; \
-		rm -f $$tmp; \
+		SIM_BUILD="$(RISCV_RUN_DIR)/sim_build" \
+		COCOTB_RESULTS_FILE="$(RISCV_RUN_DIR)/$$name-results.xml" \
+		PROGRAM_FILE="$(CURDIR)/$$mem_file" \
 		COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
 		TOHOST_ADDR="$$tohost_addr" \
 		EXPECTED_RESULT=$$expected \
@@ -265,6 +271,11 @@ simulate_RISCV_TESTS:
 # Parallel
 # ============================================================
 JOBS ?= 16
+# Keep large parallel builds off /tmp (often a size-limited tmpfs).
+# Each invocation gets its own run root without creating directories at parse time.
+ifndef PARALLEL_RUN_DIR
+PARALLEL_RUN_DIR := $(CURDIR)/parallel_run/$(CPU_VERSION)-$(shell date +%Y%m%d-%H%M%S-%N)
+endif
 
 .PHONY: run_RISCV_TEST_PARALLEL
 run_RISCV_TEST_PARALLEL:
@@ -275,17 +286,18 @@ run_RISCV_TEST_PARALLEL:
 	mem_file=$$(echo "$$t" | cut -d: -f3); \
 	expected=$$(echo "$$t" | cut -d: -f4); \
 	tohost_addr=$$(echo "$$t" | cut -d: -f5); \
-	run_dir="$(CURDIR)/parallel_run/$$name"; \
+	run_dir="$(abspath $(PARALLEL_RUN_DIR))/$$name"; \
 	echo "========================================"; \
 	echo "[START] $$name"; \
 	echo "[MEM  ] $$mem_file"; \
 	echo "[EXP  ] $$expected"; \
 	echo "========================================"; \
-	rm -rf "$$run_dir"; \
 	mkdir -p "$$run_dir/mem"; \
 	mkdir -p "$$run_dir/wave"; \
+	mkdir -p "$$run_dir/tmp"; \
 	head -n 4096 "$$mem_file" > "$$run_dir/mem/test_program.mem"; \
 	cd "$$run_dir"; \
+	TMPDIR="$$run_dir/tmp" \
 	PYTHONPATH="$(CURDIR):$$PYTHONPATH" \
 	COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
 	TOHOST_ADDR="$$tohost_addr" \
@@ -302,9 +314,8 @@ run_RISCV_TEST_PARALLEL:
 
 .PHONY: simulate_RISCV_TESTS_PARALLEL
 simulate_RISCV_TESTS_PARALLEL:
-	$(MAKE) -f Makefile.riscv all
-	@rm -rf ./parallel_run
-	@mkdir -p ./parallel_run
+	@mkdir -p "$(PARALLEL_RUN_DIR)/tmp"
+	TMPDIR="$(abspath $(PARALLEL_RUN_DIR))/tmp" $(MAKE) -f Makefile.riscv all
 	@echo ""
 	@echo "========================================"
 	@echo " Parallel RISC-V tests"
@@ -314,6 +325,7 @@ simulate_RISCV_TESTS_PARALLEL:
 	@echo "CPU_VERSION       = $(CPU_VERSION)"
 	@echo "TEST_PROGRAM_LIST = $(TEST_PROGRAM_LIST)"
 	@echo "JOBS              = $(JOBS)"
+	@echo "PARALLEL_RUN_DIR  = $(PARALLEL_RUN_DIR)"
 	@echo "========================================"
 	@printf '%s\n' $(RV32ISP_TEST) | \
 	xargs -P $(JOBS) -I {} \
@@ -323,10 +335,11 @@ simulate_RISCV_TESTS_PARALLEL:
 		MODE="$(MODE)" \
 		CPU_VERSION="$(CPU_VERSION)" \
 		SIM_FAST="$(SIM_FAST)" \
+		PARALLEL_RUN_DIR="$(PARALLEL_RUN_DIR)" \
 		TEST_ENTRY="{}"; \
 	rc=$$?; \
-	pass=$$(grep -rl "passed" parallel_run/*/simulation.log 2>/dev/null | wc -l); \
-	total=$$(find parallel_run -name simulation.log | wc -l); \
+	pass=$$(grep -rl "passed" $(PARALLEL_RUN_DIR)/*/simulation.log 2>/dev/null | wc -l); \
+	total=$$(find "$(PARALLEL_RUN_DIR)" -name simulation.log | wc -l); \
 	fail=$$((total - pass)); \
 	echo ""; \
 	echo "========================================"; \

@@ -5,3 +5,16 @@
 [submodule "software/micropython/micropython"]
 	path = software/micropython/micropython
 	url = https://github.com/micropython/micropython.git
+[submodule "hardware/sim/yosys"]
+	path = hardware/sim/yosys
+	url = https://github.com/YosysHQ/yosys.git
+[submodule "software/os/third_party/tjpgd"]
+	path = software/os/third_party/tjpgd
+	url = https://github.com/Bodmer/TJpg_Decoder.git
+[submodule "sim/coremark"]
+        path = hardware/sim/coremark
+        url = https://github.com/eembc/coremark.git
+
+[submodule "hardware/sim/coremark"]
+	path = hardware/sim/coremark
+	url = https://github.com/eembc/coremark.git

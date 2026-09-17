@@ -5,6 +5,8 @@
 #make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=basic
 #or
 #make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=legacy TEST_PROGRAM_LIST=basic
+#or
+#make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=basic RUN_CYCLES=30000
 
 # ============================================================
 #  MODE で一括切り替え（verilator / icarus）
@@ -19,8 +21,8 @@ MODE = verilator
 ifeq ($(MODE),verilator)
 SIM          		= verilator
 SDRAM_MODEL  		= ../rtl/SDRAM_model/w9825g6kh_verilator.v
-GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v 
-SDCARD_MODEL 		= ../rtl/SDCARD_model/sdcard_spi_model.v 
+GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v
+SDCARD_MODEL 		= ../rtl/SDCARD_model/sdcard_spi_model.v
 TOP_COMPILE_ARGS 	= -DTOP_SIM
 
 ifeq ($(SIM_FAST),1)
@@ -71,12 +73,12 @@ PSCONE_SIM_TOP_FILE = \
 PSCONE_TOP_FILE = \
 	$(TOP_SRC_DIR)/PSC_ONE_Chip.v
 
-# RV32ISP_core
+# RV32_core
 CPU_CORE_FILES = \
-	$(CPU_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_core.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_Fetch.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_Execute.v \
+	$(CPU_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Execute.v \
 	$(CPU_SRC_DIR)/Fetch_Fifo.v \
 	$(CPU_SRC_DIR)/Fetch.v \
 	$(CPU_SRC_DIR)/Decorder.v \
@@ -88,20 +90,20 @@ CPU_CORE_FILES = \
 	$(CPU_SRC_DIR)/Register.v \
 	$(CPU_SRC_DIR)/MMU.v \
 	$(CPU_SRC_DIR)/Csr.v \
-	$(CPU_SRC_DIR)/PSC_RV32ISP_Monitor.v
+	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
 
 CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
 
-# RV32ISP_core
+# RV32_core
 CPU_V1_CORE_FILES = \
-	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32_core.v \
 	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_core.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_FetchPredict.sv \
 	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
 	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
-	$(CPU_V1_SRC_DIR)/PSC_InstructionFSM.sv \
 	$(CPU_V1_SRC_DIR)/Fetch.sv \
 	$(CPU_V1_SRC_DIR)/Decorder.sv \
 	$(CPU_V1_SRC_DIR)/Execute.sv \
@@ -113,20 +115,19 @@ CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
 	$(CPU_V1_SRC_DIR)/MMU.sv \
 	$(CPU_V1_SRC_DIR)/Csr.sv \
-	$(CPU_V1_SRC_DIR)/PSC_RV32ISP_Monitor.v
-	
+	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
+
 CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
 
-# RV32ISP_core(V2)
+# RV32_core(V2)
 CPU_V2_CORE_FILES = \
-	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32ISP_core.v \
+	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32_core.v \
 	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_core.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_FetchUnit.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_FetchUnit.sv \
 	$(CPU_V2_SRC_DIR)/Fetch_Fifo.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_InstructionEngine.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
 	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
-	$(CPU_V2_SRC_DIR)/PSC_InstructionFSM.sv \
 	$(CPU_V2_SRC_DIR)/Fetch.sv \
 	$(CPU_V2_SRC_DIR)/Decorder.sv \
 	$(CPU_V2_SRC_DIR)/Execute.sv \
@@ -138,7 +139,7 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/PSC_PC.sv \
 	$(CPU_V2_SRC_DIR)/MMU.sv \
 	$(CPU_V2_SRC_DIR)/Csr.sv \
-	$(CPU_V2_SRC_DIR)/PSC_RV32ISP_Monitor.v
+	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
 
 MMIO_DIR	= ../rtl/mmio/MMIO
 UART_DIR	= ../rtl/mmio/UART
@@ -178,8 +179,8 @@ BOOT_SRC_DIR	= ../rtl/boot
 DMA_SRC_DIR		= ../rtl/dma
 
 SDRAM_32bit_AXI_FILES = \
-	$(AXI_DIR)/sdram_32bit_to_128bit_axi_bridge.v \
-	$(AXI_DIR)/sdram_4port_controller_axi_slave_bX_32bit.v \
+	$(AXI_DIR)/sdram_32bit_to_256bit_axi_bridge.v \
+	$(AXI_DIR)/sdram_axi_controller.v \
 	$(SDRAM_CNT_DIR)/sdram_controller.sv \
 	$(GW2AR_SDRAM_MODEL)
 
@@ -187,14 +188,42 @@ PSC_ONE_BOOT_FILE = $(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v
 
 PSC_ONE_DMA_FILE =  $(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
 
-# Systolic Array (not use)
-SA_DIR   = ../rtl/ai/src
-SA_FILE  = \
-	$(SA_DIR)/SystolicArray_Ctrl.v \
-	$(SA_DIR)/SystolicArray_ReadCtrl.v \
-	$(SA_DIR)/SystolicArray4x4.v \
-	$(SA_DIR)/PE_INT.v \
-	$(SA_DIR)/PE_mult.v
+# ============================================================
+# NPU implementation selection (v1 / legacy)
+# ============================================================
+
+# デフォルトはNPU_V1
+NPU_VERSION ?= legacy
+
+NPU_LEGACY_DIR = ../rtl/npu/src
+NPU_V1_DIR     = ../rtl/npu_v1/src
+
+# NPU V1: 4 MUL -> 4 fixed WB lanes -> 16 ACC bank
+NPU_V1_FILES = \
+	$(NPU_V1_DIR)/PSC_NPU_Controller.v \
+	$(NPU_V1_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_V1_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_V1_DIR)/PSC_NPU_MACScheduler.sv \
+	$(NPU_V1_DIR)/PSC_NPU_Mul4.sv \
+	$(NPU_V1_DIR)/PSC_NPU_AccBank.sv
+
+# Legacy NPU
+NPU_LEGACY_FILES = \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Controller.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_PE_INT.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_PE_Mult.sv
+
+ifeq ($(NPU_VERSION),v1)
+SA_DIR  = $(NPU_V1_DIR)
+SA_FILE = $(NPU_V1_FILES)
+else ifeq ($(NPU_VERSION),legacy)
+SA_DIR  = $(NPU_LEGACY_DIR)
+SA_FILE = $(NPU_LEGACY_FILES)
+else
+$(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 または legacy を指定してください)
+endif
 
 MMIO_BASE_DIR	= ../rtl/mmio
 
@@ -207,8 +236,8 @@ PSCONELCD_FILE = \
 
 # SD Card Reader
 SD_READER_FILE = \
-	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard.v \
-	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard_SPI.v 
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard.sv \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard_SPI.sv 
 
 # PSC Phase Flow Engine
 FPE_DIR  = ../rtl/pfe/src
@@ -220,7 +249,7 @@ TIMER_FILE = $(MMIO_BASE_DIR)/TIMER/PSC_RV32IS_TIMER.v
 
 # I2S Rx
 I2S_RX_FILE = \
-	$(MMIO_BASE_DIR)/I2S_RX/PSC_I2SRX.v \
+	$(MMIO_BASE_DIR)/I2S_RX/PSC_I2SRX.sv \
 
 I2S_MIC_MODEL = ../rtl/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v 
 
@@ -250,7 +279,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	led_test1:RV32ISP_chip_test:./mem/led_test1.mem:0x00000022 \
+	timer_irq_test1:RV32ISP_chip_test:./mem/timer_irq_test1.mem:0x00000321 \
 
 # ============================================================
 # 複数テスト定義
@@ -262,6 +291,10 @@ PSCONE_SINGLE_TEST = \
 PSCONE_BASIC_TESTS = \
 	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
 	add_test2:RV32ISP_chip_test:./mem/add_test2.mem:0x00000000 \
+	timer_irq_test1:RV32ISP_chip_test:./mem/timer_irq_test1.mem:0x00000321 \
+	timer_irq_test2:RV32ISP_chip_test:./mem/timer_irq_test2.mem:0x00000322 \
+	forwarding_test1:RV32ISP_chip_test:./mem/forwarding_test1.mem:0x00000011 \
+	forwarding_timing_test1:RV32ISP_chip_test:./mem/forwarding_timing_test1.mem:0x00008000 \
 	pfe_test1:RV32ISP_chip_test:./mem/pfe_test1.mem:0x00000000 \
 	fetch_test1:RV32ISP_chip_test:./mem/fetch_test1.mem:0xcd1023bb \
 	csr_test1:RV32ISP_chip_test:./mem/csr_test1.mem:0x00000022 \
@@ -287,6 +320,7 @@ PSCONE_BASIC_TESTS = \
 	nn_test1:RV32ISP_chip_test:./mem/nn_test1.mem:0x00000170 \
 	nn_test2:RV32ISP_chip_test:./mem/nn_test2.mem:0x00000170 \
 	nn_test3:RV32ISP_chip_test:./mem/nn_test3.mem:0x00000170 \
+	sa_test4:RV32ISP_chip_test:./mem/sa_test4.mem:0x0000BEEF \
 	sa_test3:RV32ISP_chip_test:./mem/sa_test3.mem:0x0000BEEF \
 	sa_test2:RV32ISP_chip_test:./mem/sa_test2.mem:0x0000BEEF \
 	sa_test1:RV32ISP_chip_test:./mem/sa_test1.mem:0x0000BEEF \
@@ -319,7 +353,6 @@ PSCONE_LONG_TESTS = \
 	sret_test1:RV32ISP_chip_test:./mem/sret_test1.mem:0x0000DC12 \
 	nn_64x16x1_test1:RV32ISP_chip_test:./mem/nn_64x16x1_test1.mem:0x00000780 \
 	mmu_test1:RV32ISP_chip_test:./mem/mmu_test1.mem:0x00000033 \
-	i2s_test1:RV32ISP_chip_test:./mem/i2s_test1.mem:0x0abc0123 \
 	nn_test4:RV32ISP_chip_test:./mem/nn_test4.mem:0x001c2000 \
 	memcpy_test1:RV32ISP_chip_test:./mem/memcpy_test1.mem:0x00002521 \
 	pipeline_test1:RV32ISP_chip_test:./mem/pipeline_test1.mem:0x0000009d \
@@ -339,6 +372,9 @@ PSCONE_LONG_TESTS = \
 # ============================================================
 
 PSCONE_VOICE_TESTS = \
+	speech_recog_test1:RV32ISP_chip_test:./mem/speech_recog_test1.mem:0x00000002 \
+	speech_recog_down_test1:RV32ISP_chip_test:./mem/speech_recog_down_test1.mem:0x00000001 \
+	speech_recog_down_sa_test1:RV32ISP_chip_test:./mem/speech_recog_down_sa_test1.mem:0x00000001 \
 	audio_feature_test1:RV32ISP_chip_test:./mem/audio_feature_test1.mem:0x00001212 \
 	audio_nn_test1:RV32ISP_chip_test:./mem/audio_nn_test1.mem:0x00001213 \
 	voice_test1:RV32ISP_chip_test:./mem/voice_test1.mem:0x00001214 \
@@ -375,13 +411,18 @@ $(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic または
 endif
 
 # run test
+TEST_BUILD_ROOT ?= /tmp
+
 .PHONY: simulate_PSC_ONE_TESTS
 simulate_PSC_ONE_TESTS:
 	@mkdir -p ./wave
 	@echo "MODE=$(MODE)"
 	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "NPU_VERSION=$(NPU_VERSION)"
 	@echo "TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST)"
 	@set -e; \
+	mkdir -p "$(TEST_BUILD_ROOT)"; \
+	build_dir=$$(mktemp -d "$(TEST_BUILD_ROOT)/psc-line-test-XXXXXX"); \
 	mkdir -p log; \
 	run_log=log/test_result_$$(date +%Y%m%d_%H%M%S).log; \
 	echo "[INFO] LOG FILE = $$run_log"; \
@@ -397,13 +438,10 @@ simulate_PSC_ONE_TESTS:
 		echo "[EXP ] $$expected"; \
 		echo "[LOG ] $$run_log"; \
 		echo "========================================"; \
-		$(MAKE) clean; \
-		$(MAKE) -C ./cpp clean; \
-		$(MAKE) -C ./cpp $$name; \
-		tmp=$$(mktemp); \
-		head -n 4096 "$$mem_file" > $$tmp; \
-		cp $$tmp ./mem/test_program.mem; \
-		rm -f $$tmp; \
+		$(MAKE) -B -C ./cpp $$name; \
+		head -n 4096 "$$mem_file" > ./mem/test_program.mem; \
+		SIM_BUILD=$$build_dir/sim_build \
+		COCOTB_RESULTS_FILE=$$build_dir/$$name-results.xml \
 		COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
 		TEST_NAME=$$name \
 		PSC_LOGFILE=$$run_log \

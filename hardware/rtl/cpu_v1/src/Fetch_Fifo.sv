@@ -41,14 +41,20 @@ module Fetch_Fifo #(
     assign push          = in_valid && in_ready;
     assign pop           = out_valid && out_req_ready;
 
+    // First-word fall-through output.  The instruction at the head of the
+    // FIFO is visible before it is popped, allowing decode and dispatch to
+    // accept one instruction on every clock.
+    always_comb begin
+        out_data    = mem[rptr];
+        out_pc_data = pc_mem[rptr];
+        out_ready   = pop;
+    end
+
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             wptr        <= '0;
             rptr        <= '0;
             count       <= '0;
-            out_data    <= '0;
-            out_pc_data <= '0;
-            out_ready   <= 1'b0;
             for (i = 0; i < DEPTH; i++) begin
                 mem[i]    <= '0;
                 pc_mem[i] <= '0;
@@ -57,14 +63,11 @@ module Fetch_Fifo #(
             wptr      <= '0;
             rptr      <= '0;
             count     <= '0;
-            out_ready <= 1'b0;
             for (i = 0; i < DEPTH; i++) begin
                 mem[i]    <= '0;
                 pc_mem[i] <= '0;
             end
         end else begin
-            out_ready <= 1'b0;
-
             case ({push, pop})
                 2'b10: begin
                     mem[wptr]    <= in_data;
@@ -74,9 +77,6 @@ module Fetch_Fifo #(
                 end
 
                 2'b01: begin
-                    out_data    <= mem[rptr];
-                    out_pc_data <= pc_mem[rptr];
-                    out_ready   <= 1'b1;
                     rptr        <= (rptr == ADDR_BITS'(DEPTH-1)) ? '0 : rptr + 1'b1;
                     count       <= count - 1'b1;
                 end
@@ -84,9 +84,6 @@ module Fetch_Fifo #(
                 2'b11: begin
                     mem[wptr]    <= in_data;
                     pc_mem[wptr] <= in_pc_data;
-                    out_data     <= mem[rptr];
-                    out_pc_data  <= pc_mem[rptr];
-                    out_ready    <= 1'b1;
                     wptr         <= (wptr == ADDR_BITS'(DEPTH-1)) ? '0 : wptr + 1'b1;
                     rptr         <= (rptr == ADDR_BITS'(DEPTH-1)) ? '0 : rptr + 1'b1;
                 end

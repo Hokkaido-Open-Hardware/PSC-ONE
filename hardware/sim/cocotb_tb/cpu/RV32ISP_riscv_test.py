@@ -363,9 +363,9 @@ async def watch_tohost_result(
 # DUT入力初期化
 # ------------------------------------------------
 def initialize_dut_inputs(dut):
-    dut.reset_n.value = 0
-    dut.cpu_stop.value = 0
-    dut.irq_ext.value = 0
+    dut.reset_n.value   = 0
+    dut.cpu_stop.value  = 0
+    dut.timer_irq_ext.value = 0
 
     # Program memory
     dut.program_mem_read_ready.value = 0
@@ -405,9 +405,9 @@ async def program_memory_model(
         32bit x 1word
 
     program_mem_burst_mode == 1:
-        32bit x 4word burst
-        readyを4クロック連続assert
-        address +0,+4,+8,+12 を返す
+        32bit x 8word burst
+        readyを8クロック連続assert
+        address +0,+4,...,+28 を返す
 
     read_delay_cycles:
         0以下 : valid検出時に即時応答
@@ -469,7 +469,7 @@ async def program_memory_model(
                 dut.program_mem_read_ready.value = 1
 
                 if pending_burst:
-                    if burst_index == 3:
+                    if burst_index == 7:
                         pending = False
                         pending_burst = False
                         burst_index = 0

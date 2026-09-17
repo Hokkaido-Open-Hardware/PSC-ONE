@@ -23,8 +23,6 @@ module PSC_Register #(
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            reg_data_1 <= 32'd0;
-            reg_data_2 <= 32'd0;
             for (i = 0; i < 32; i++)
                 registers[i] <= 32'd0;
                 
@@ -32,22 +30,17 @@ module PSC_Register #(
             // WB
             if (register_wenb && rf_wen && (w_addr != 5'd0))
                 registers[w_addr] <= w_data;
-
-            // ID＋WB→ID forwarding
-            reg_data_1 <=
-                (r_addr1 == 5'd0) ? 32'd0 :
-                (register_wenb && rf_wen &&
-                (w_addr != 5'd0) &&
-                (w_addr == r_addr1)) ? w_data :
-                registers[r_addr1];
-
-            reg_data_2 <=
-                (r_addr2 == 5'd0) ? 32'd0 :
-                (register_wenb && rf_wen &&
-                (w_addr != 5'd0) &&
-                (w_addr == r_addr2)) ? w_data :
-                registers[r_addr2];
         end
+    end
+
+    // Combinational read ports let the v2 issue stage consume the current
+    // FIFO head without adding a register-read bubble.  A same-cycle commit
+    // dependency is interlocked in PSC_InstructionUnit; keeping that bypass
+    // out of the register file prevents commit write data from feeding the
+    // issue operand path combinationally.
+    always_comb begin
+        reg_data_1 = (r_addr1 == 5'd0) ? 32'd0 : registers[r_addr1];
+        reg_data_2 = (r_addr2 == 5'd0) ? 32'd0 : registers[r_addr2];
     end
 
 endmodule

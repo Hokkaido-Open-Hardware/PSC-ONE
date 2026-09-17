@@ -16,6 +16,11 @@
 _start:
     la      sp, _mstack_top
 
+    # mscratch always holds the M-mode interrupt stack while S/U code runs.
+    # machine_trap_entry swaps it with the interrupted task's sp atomically.
+    la      t0, _mstack_top
+    csrw    mscratch, t0
+
     # mtvec = trap handler
     la      t0, m_trap_vector
     csrw    mtvec, t0
@@ -82,7 +87,23 @@ sbi_ecall:
     li t1, 2
     beq a7, t1, sbi_getchar
 
+    # PSC-OS extension 3: install the kernel's full machine-trap entry and
+    # enable Machine Timer Interrupts.  mret copies MPIE to MIE, therefore
+    # both MIE and MPIE are set here before returning to supervisor mode.
+    li t1, 3
+    beq a7, t1, sbi_timer_setup
+
     j illegal
+
+sbi_timer_setup:
+    csrw mtvec, a0
+    csrw mscratch, a1
+    li   t1, (1 << 7)
+    csrs mie, t1
+    li   t1, ((1 << 7) | (1 << 3))
+    csrs mstatus, t1
+    li   a0, 0
+    j    sbi_ret
 
 
 /* ------------------------------------------------------------

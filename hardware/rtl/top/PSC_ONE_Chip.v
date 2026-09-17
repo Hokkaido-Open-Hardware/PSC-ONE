@@ -6,7 +6,7 @@
 //
 //  Brief
 //      PSC-ONE プロジェクト向け SoC トップレベルモジュール。
-//      RV32ISP CPU コア、SDRAM コントローラ、キャッシュ、Boot ROM、
+//      RV32 CPU コア、SDRAM コントローラ、キャッシュ、Boot ROM、
 //      UART、Timer、LCD、SD Card、I2S、および SynapEngine AI
 //      アクセラレータを統合する。
 //
@@ -16,7 +16,7 @@
 //      提供し、メモリ初期化やデバッグを容易にする。
 //
 //  Main Components
-//      - PSC RV32ISP CPU Core
+//      - PSC RV32 CPU Core
 //      - SDR SDRAM Controller
 //      - DMA Cache Controller
 //      - Boot AXI Interface
@@ -41,13 +41,18 @@
 // Phase Flow Engine OFF mode
 //`define PFE_OFF
 
+// Yosys mode
+//`define YOSYS
+
 module PSC_ONE_Chip #(
     parameter integer CLK_FREQ     = 80,
     parameter integer ADDR_WIDTH   = 32,
     parameter integer ID_WIDTH     = 1,
     parameter integer DATA_WIDTH   = 32,   // AXI Data bus. fixed 32bit Bus
 
-    // PIO アドレス（0なら無効）
+    // MMIO MASK BITS
+    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS     = 32'h1000_F00F,
+    // MMIO アドレス（0なら無効）
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_TX     = 32'h1000_0000,
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_RX     = 32'h1000_0004,
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_ST     = 32'h1000_0008,
@@ -201,6 +206,8 @@ module PSC_ONE_Chip #(
     wire [31:0] mmio_rdata_i2s;
     wire [31:0] mmio_rdata_pfe;
 
+    wire [31:0] addr_mmio_masked = mmio_addr & MMMIO_BASK_BITS;
+    
     always @(*) begin
         case(mmio_addr)    // byte address.
             PIO_ADDRESS:         mmio_rdata = mmio_rdata_pio;
@@ -437,10 +444,15 @@ module PSC_ONE_Chip #(
     wire        dma_done;
     wire [31:0] csr_DMA_STATUS = {30'd0, dma_busy, dma_done};
 
-    PSC_ONE_RV32ISP_core #(
+    // irq
+    wire        irq_tx;
+
+    PSC_ONE_RV32_core #(
         .ADDR_WIDTH         (ADDR_W),
         .ID_WIDTH           (ID_W),
         .DATA_WIDTH         (DW),
+        // MMIO MASK BITS
+        .MMMIO_BASK_BITS     (MMMIO_BASK_BITS),
         // MMIO ADDRESS
         .UART_ADDRESS_TX     (UART_ADDRESS_TX),
         .UART_ADDRESS_RX     (UART_ADDRESS_RX),
@@ -462,10 +474,11 @@ module PSC_ONE_Chip #(
         .PSC_I2S_ADDR_ST     (PSC_I2S_ADDR_ST),
         .PSC_PFE_IF_DATA     (PSC_PFE_IF_DATA),
         .PSC_PFE_IF_CTRL     (PSC_PFE_IF_CTRL)
-    ) u_core_axi (
+    ) u_rv32_core_axi (
         .clock              (clock_100MHz),
         .reset_n            (reset_n),
         .cpu_stop           (cpu_stop),
+        .timer_irq_ext      (irq_tx),
         .uart_out           (),
 
         // ---- 外部 IO ----
@@ -561,7 +574,7 @@ module PSC_ONE_Chip #(
     wire   sdram_init_fin;
     assign O_sdram_cke   = 1'b1;
 
-    sdram_4port_controller_axi_slave_bX_32bit #(
+    sdram_axi_controller #(
         .CLK_FREQ_MHz       (CLK_FREQ),
         .ADDR_WIDTH         (24),
         .DATA_WIDTH         (32),
@@ -957,7 +970,7 @@ module PSC_ONE_Chip #(
         .cpu_rready       (mmio_rready_timer),
 
         // 割り込み出力
-        .irq_tx           ()
+        .irq_tx           (irq_tx)
     );
 
     //==========================================================
@@ -1113,3 +1126,40 @@ module PSC_ONE_Chip #(
     );
 
 endmodule
+
+`ifdef YOSYS
+
+// ============================================================
+// Gowin_rPLL passthrough wrapper for nextpnr / Yosys
+// ============================================================
+
+module Gowin_rPLL (
+    output wire clkout,
+    output wire clkoutp,
+    input  wire clkin
+);
+
+    // No PLL for timing synthesis.
+    // Pass the input clock directly through.
+    assign clkout  = clkin;
+    assign clkoutp = clkin;
+
+endmodule
+
+// ============================================================
+// Gowin_CLKDIV passthrough wrapper for nextpnr / Yosys
+// ============================================================
+
+module Gowin_CLKDIV (
+    output wire clkout,
+    input  wire hclkin,
+    input  wire resetn
+);
+
+    // nextpnr timing analysis:
+    // bypass Gowin CLKDIV primitive.
+    assign clkout = hclkin;
+
+endmodule
+
+`endif

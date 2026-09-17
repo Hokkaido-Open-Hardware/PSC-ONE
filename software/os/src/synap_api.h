@@ -41,7 +41,16 @@ void sa_run(
     const uint8_t *in_A,
     const uint8_t *in_B,
     uint8_t matrix_N,
-    uint32_t *out_C
+    uint32_t *out_C,
+    bool signed_mode
 );
+/* Status-returning variant: 0 success, -1 arguments, -2 timeout, -3 busy.
+   Legacy sa_run remains source compatible. Output is untouched on failure. */
+int sa_run_checked(const uint8_t *in_A, const uint8_t *in_B,
+                   uint8_t matrix_N, uint32_t *out_C, bool signed_mode);
 
-void s_call_sa_api(uint8_t matrix_N, bool verify);
+void s_call_sa_api(
+    uint8_t matrix_N,
+    bool verify,
+    bool signed_mode)
+;

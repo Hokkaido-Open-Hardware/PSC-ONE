@@ -2,7 +2,7 @@
 # Usage
 # ============================================================
 
-#TBD
+#make -f Makefile.cache simulate_CACHE 
 
 # ============================================================
 #  SIMULATOR 切り替え (MODE=icarus / verilator)
@@ -55,9 +55,9 @@ SRC_CASHE = \
 	../rtl/cache/src/dm_cache_data.v \
 	../rtl/cache/src/dm_cache_tag.v
 SRC_BRIDGE = \
-	../rtl/axi/sdram_32bit_to_128bit_axi_bridge.v
+	../rtl/axi/sdram_32bit_to_256bit_axi_bridge.v
 SRC_AXI_SDRAM_CNT = \
-	../rtl/axi/sdram_4port_controller_axi_slave_bX_32bit.v \
+	../rtl/axi/sdram_axi_controller.v \
 	../rtl/sdram_controller/sdram_controller.sv
 
 SIM_SRC = $(SRC_SIMTOP) $(SRC_CASHE) $(SRC_BRIDGE) $(SRC_AXI_SDRAM_CNT) $(GW2AR_SDRAM_MODEL)
@@ -65,6 +65,8 @@ SIM_SRC = $(SRC_SIMTOP) $(SRC_CASHE) $(SRC_BRIDGE) $(SRC_AXI_SDRAM_CNT) $(GW2AR_
 # ============================================================
 #  Cocotb simulation targets
 # ============================================================
+CACHE_BUILD_ROOT ?= $(CURDIR)/build/cache-regression
+
 .PHONY: simulate_CACHE simulate_IDCACHE simulate_ICACHE
 
 simulate_CACHE: simulate_IDCACHE simulate_ICACHE
@@ -73,8 +75,8 @@ simulate_CACHE: simulate_IDCACHE simulate_ICACHE
 simulate_IDCACHE:
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_DM_CACHE test)"
 	@echo EXTRA_ARGS=$(EXTRA_ARGS)
-	$(MAKE) clean
 	@mkdir -p ./wave
+	SIM_BUILD="$(CACHE_BUILD_ROOT)/dcache" COCOTB_RESULTS_FILE="$(CACHE_BUILD_ROOT)/dcache-results.xml" \
 	COCOTB_TEST_MODULES=cocotb_tb.cache.dm_cache_test \
 	TOPLEVEL=sim_cache_dma_controller TOPLEVEL_LANG=verilog \
 	SIM=$(SIM) \
@@ -89,8 +91,8 @@ simulate_IDCACHE:
 simulate_ICACHE:
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_DM_CACHE test)"
 	@echo EXTRA_ARGS=$(EXTRA_ARGS)
-	$(MAKE) clean
 	@mkdir -p ./wave
+	SIM_BUILD="$(CACHE_BUILD_ROOT)/icache" COCOTB_RESULTS_FILE="$(CACHE_BUILD_ROOT)/icache-results.xml" \
 	COCOTB_TEST_MODULES=cocotb_tb.cache.I_cache_test \
 	TOPLEVEL=sim_cache_dma_controller TOPLEVEL_LANG=verilog \
 	SIM=$(SIM) \
@@ -100,6 +102,8 @@ simulate_ICACHE:
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
 	make -f $(COCOTB_MAKEFILE)
 
-
-
+# Python test
+cache_regression:
+	python ../rtl/cache/tests/run_cache_regression.py
+	python ../rtl/cache/tests/run_cache_io_regression.py
 

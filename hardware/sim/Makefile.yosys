@@ -2,8 +2,98 @@
 # Usage
 # ============================================================
 
-# make -f Makefile.cpu -f Makefile.yosys yosys_cpu
-# make -f Makefile.cpu -f Makefile.yosys yosys_se
+# Makefile.yosys yosys_cpu
+# Makefile.yosys yosys_npu
+
+# ============================================================
+#  以下、元の Makefile の変数定義など（SDRAM_MODEL を置き換え）
+# ============================================================
+
+CPU_SRC_DIR  = ../rtl/cpu/src
+
+# RV32_core
+CPU_CORE_FILES = \
+	$(CPU_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Execute.v \
+	$(CPU_SRC_DIR)/Fetch_Fifo.v \
+	$(CPU_SRC_DIR)/Fetch.v \
+	$(CPU_SRC_DIR)/Decorder.v \
+	$(CPU_SRC_DIR)/Execute.v \
+	$(CPU_SRC_DIR)/Execute_Divider.v \
+	$(CPU_SRC_DIR)/Execute_Mul.v \
+	$(CPU_SRC_DIR)/Branch.v \
+	$(CPU_SRC_DIR)/MemoryStore.v \
+	$(CPU_SRC_DIR)/Register.v \
+	$(CPU_SRC_DIR)/MMU.v \
+	$(CPU_SRC_DIR)/Csr.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
+
+CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
+
+# RV32_core
+CPU_V1_CORE_FILES = \
+	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_FetchPredict.sv \
+	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V1_SRC_DIR)/Fetch.sv \
+	$(CPU_V1_SRC_DIR)/Decorder.sv \
+	$(CPU_V1_SRC_DIR)/Execute.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V1_SRC_DIR)/Branch.sv \
+	$(CPU_V1_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V1_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V1_SRC_DIR)/MMU.sv \
+	$(CPU_V1_SRC_DIR)/Csr.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
+
+CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+
+# RV32_core(V2)
+CPU_V2_CORE_FILES = \
+	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_FetchUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
+	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch.sv \
+	$(CPU_V2_SRC_DIR)/Decorder.sv \
+	$(CPU_V2_SRC_DIR)/Execute.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V2_SRC_DIR)/Branch.sv \
+	$(CPU_V2_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V2_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V2_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V2_SRC_DIR)/MMU.sv \
+	$(CPU_V2_SRC_DIR)/Csr.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
+
+# ============================================================
+# CPUコアの切り替え（v1 / legacy）
+# ============================================================
+# デフォルトはV1
+CPU_VERSION ?= v1
+
+ifeq ($(CPU_VERSION),v1)
+SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)
+else ifeq ($(CPU_VERSION),v2)
+SELECTED_CPU_CORE_FILES = $(CPU_V2_CORE_FILES)
+else ifeq ($(CPU_VERSION),legacy)
+SELECTED_CPU_CORE_FILES = $(CPU_CORE_FILES)
+else
+$(error CPU_VERSION=$(CPU_VERSION) は不正です。v1 または legacy を指定してください)
+endif
 
 # ============================================================
 # yosys：合成可否チェック（プロジェクト一括）
@@ -16,7 +106,7 @@ YOSYS_INPUT := $(filter-out \
     $(SDRAM_MODEL), \
     $(CPU_FILES))
 
-YOSYS_TOP := PSC_RV32ISP_core
+YOSYS_TOP := PSC_RV32_core
 YOSYS_LOG := ./log/yosys_$(YOSYS_TOP).log
 
 yosys_check:
@@ -35,19 +125,24 @@ yosys_check:
 		stat"
 
 # ============================================================
-# yosys：PSC_RV32ISP ロジック規模見積もり
+# yosys：PSC_RV32 ロジック規模見積もり
 # ============================================================
 
 # PSC_RV32ISP_coreファイル
-CPU_YOSYS_INPUT := $(CPU_CORE_FILES)
+CPU_YOSYS_INPUT := $(SELECTED_CPU_CORE_FILES)
 
-CPU_YOSYS_TOP := PSC_RV32ISP_core
+CPU_YOSYS_TOP := PSC_RV32_core
 CPU_YOSYS_LOG := ./log_yosys/yosys_$(CPU_YOSYS_TOP).log
 
+SV2V ?= sv2v
+CPU_YOSYS_BUILD_DIR ?= ./build_yosys
+CPU_YOSYS_CONVERTED := $(CPU_YOSYS_BUILD_DIR)/cpu_yosys.v
+
 yosys_cpu:
-	@mkdir -p ./log_yosys
+	@mkdir -p ./log_yosys $(CPU_YOSYS_BUILD_DIR)
+	$(SV2V) $(CPU_YOSYS_INPUT) > $(CPU_YOSYS_CONVERTED)
 	yosys -l $(CPU_YOSYS_LOG) -p "\
-		read_verilog -sv $(CPU_YOSYS_INPUT); \
+		read_verilog $(CPU_YOSYS_CONVERTED); \
 		hierarchy -top $(CPU_YOSYS_TOP); \
 		proc; opt; \
 		stat"
@@ -59,11 +154,11 @@ yosys_cpu:
 # SynapEngineファイル
 SE_YOSYS_INPUT := $(SA_FILE)
 
-SE_YOSYS_TOP := SystolicArray4x4_Ctrl
+SE_YOSYS_TOP := PSC_NPU_Controller
 SE_YOSYS_LOG := ./log_yosys/yosys_$(SE_YOSYS_TOP).log
 
-# SystolicArray4x4_Ctrl.v内部のバス表記がyosysエラー
-yosys_se:
+# PSC_NPU_Controller.v内部のバス表記がyosysエラー
+yosys_npu:
 	@mkdir -p ./log_yosys
 	yosys -l $(SE_YOSYS_LOG) -p "\
 		read_verilog -sv $(SE_YOSYS_INPUT); \

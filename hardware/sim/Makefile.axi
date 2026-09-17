@@ -67,3 +67,15 @@ simulate_32bit_to_128bit_axi_bridge:
 	VLOG_ARGS="$(VLOG_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
 	make -f $(COCOTB_MAKEFILE)
+
+# sdram_32bit_to_256bit_axi_bridge test
+simulate_32bit_to_256bit_axi_bridge:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (sdram_32bit_to_256bit_axi_bridge test)"
+	$(MAKE) clean
+	COCOTB_TEST_MODULES=cocotb_tb.axi.bridge_test_32bit_to_256bit \
+	TOPLEVEL=sdram_32bit_to_256bit_axi_bridge TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(SRC_BRIDGE)" \
+	VLOG_ARGS="$(VLOG_ARGS)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	make -f $(COCOTB_MAKEFILE)

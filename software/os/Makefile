@@ -21,17 +21,16 @@ OBJDUMP := riscv64-unknown-elf-objdump
 # sim / fpga_mem / sbi / psc
 MODE ?= sim
 
-ifeq ($(MODE),sim)
+ifneq ($(filter $(MODE),sim fpga_mem),)
   BOOT_FLOW     := direct
   RUN_QEMU      := 1
-  KCPPFLAGS     := -DBSS_CLEAR_OFF=1
   USER_BASE_VAL := 0x00400000
 
-else ifeq ($(MODE),fpga_mem)
-  BOOT_FLOW     := direct
-  RUN_QEMU      := 1
-  KCPPFLAGS     := -DBSS_CLEAR_OFF=0
-  USER_BASE_VAL := 0x00400000
+  ifeq ($(MODE),sim)
+    KCPPFLAGS   := -DBSS_CLEAR_OFF=1
+  else
+    KCPPFLAGS   := -DBSS_CLEAR_OFF=0
+  endif
 
 else ifeq ($(MODE),sbi)
   BOOT_FLOW     := direct
@@ -98,6 +97,12 @@ LDFLAGS_KERNEL := \
 	-Wl,-Map=$(Build)/kernel.map \
 	-Wl,--no-relax
 
+# kernel.c分割後もalloc_pages/map_pageを跨いだ最適化を維持する。
+KERNEL_CFLAGS := $(CFLAGS) -flto
+# RV32I validation supplies its matching libgcc for software multiplication.
+# The default RV32IM kernel keeps its existing self-contained link.
+KERNEL_BUILTINS ?=
+
 # ========================
 # Builtins
 # ========================
@@ -129,24 +134,105 @@ endif
 
 # PSC-OS user shell sources.
 # MicroPython is linked as an embedded static library.
+TJPGD_DIR := third_party/tjpgd
+TJPGD_BUILD := $(Build)/tjpgd
+JPEG_DIR := $(Src)/jpeg
+JPEG_SRCS := $(Src)/fat32_stream.c $(JPEG_DIR)/jpeg_view.c \
+             $(JPEG_DIR)/jpeg_headers.c $(JPEG_DIR)/tjpgd_port.c $(TJPGD_BUILD)/tjpgd.c
+JPEG_HEADERS := $(wildcard $(JPEG_DIR)/*.h) $(Src)/fat32.h $(Src)/jpeg_display.h
+JPEG_CPPFLAGS := -I$(Src) -I$(TJPGD_BUILD) -I../micropython/ports/psc/libc
+
+# Header-only official FlatBuffers reader, isolated from C-only user.h/libc.
+# No C++ runtime linkage: the inspection path uses neither heap nor exceptions.
+CXX := clang++
+TFLITE_DIR := $(Src)/tflite
+TFLITE_VENDOR := third_party/tflite
+TFLITE_CXX_ROOT ?= /usr/include/newlib/c++/$(shell $(GCC_PREFIX)-gcc -dumpversion)
+TFLITE_CPPFLAGS := -I$(TFLITE_DIR) -I$(TFLITE_VENDOR) \
+	-I$(TFLITE_VENDOR)/flatbuffers/include -I$(TFLITE_VENDOR)/gemmlowp \
+	-isystem $(TFLITE_CXX_ROOT) \
+	-isystem $(TFLITE_CXX_ROOT)/riscv64-unknown-elf/rv32im/ilp32 \
+	-isystem /usr/lib/picolibc/riscv64-unknown-elf/include \
+	-DFLATBUFFERS_LOCALE_INDEPENDENT=0 -DTFLITE_SINGLE_ROUNDING=0 -DNDEBUG
+TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/sa_transfer.h \
+	$(shell rg --files $(TFLITE_VENDOR)/tensorflow $(TFLITE_VENDOR)/gemmlowp) \
+	$(TFLITE_VENDOR)/schema_generated.h \
+	$(wildcard $(TFLITE_VENDOR)/flatbuffers/include/flatbuffers/*.h)
+TFLITE_OBJ := $(Build)/tflite_inspect.o $(Build)/tflite_runtime.o $(Build)/tflite_synap.o $(Build)/tflite_quant.o
+
+.PHONY: tflite_vendor_check
+tflite_vendor_check:
+	python3 tests/tflite/check_vendor.py
+
+# libstdc++ 14 declarations require hosted preprocessing even though we link
+# no hosted C++ runtime. -fno-builtin and -nostdlib remain; audit undefined symbols.
+$(Build)/tflite_inspect.o $(Build)/tflite_runtime.o $(Build)/tflite_synap.o: $(Build)/%.o: $(TFLITE_DIR)/%.cc $(TFLITE_HEADERS) Makefile | $(Build) tflite_vendor_check
+	$(CXX) $(filter-out -std=c11 -ffreestanding,$(CFLAGS)) -std=c++17 -Os -fno-builtin \
+		-fno-exceptions -fno-rtti -fno-threadsafe-statics \
+		-fstack-usage $(TFLITE_CPPFLAGS) -c $< -o $@
+
+# Prune only the imported helper translation unit, leaving shell link behavior
+# unchanged. No unrelated float operators from common/quantization_util survive.
+$(Build)/tflite_quant.o: $(TFLITE_DIR)/tflite_quant.cc $(TFLITE_DIR)/tflite_quant.h $(TFLITE_HEADERS) Makefile | $(Build) tflite_vendor_check
+	$(CXX) $(filter-out -std=c11 -ffreestanding,$(CFLAGS)) -std=c++17 -Os -fno-builtin \
+		-fno-exceptions -fno-rtti -fno-threadsafe-statics -ffunction-sections -fdata-sections \
+		-fstack-usage $(TFLITE_CPPFLAGS) -c $< -o $(Build)/tflite_quant_full.o
+	ld.lld -r --gc-sections --undefined=psc_tflite_quantize --undefined=psc_tflite_requantize \
+		$(Build)/tflite_quant_full.o -o $@
+
+$(TJPGD_DIR)/src/tjpgd.c $(TJPGD_DIR)/src/tjpgd.h:
+	@echo "TJpgDec missing: run git submodule update --init --recursive" >&2
+	@exit 1
+
+$(TJPGD_BUILD)/.ready: $(TJPGD_DIR)/src/tjpgd.c $(TJPGD_DIR)/src/tjpgd.h $(JPEG_DIR)/tjpgdcnf.h
+	mkdir -p $(TJPGD_BUILD)
+	ln -sf "$$(realpath --relative-to=$(TJPGD_BUILD) $(TJPGD_DIR)/src/tjpgd.c)" $(TJPGD_BUILD)/tjpgd.c
+	ln -sf "$$(realpath --relative-to=$(TJPGD_BUILD) $(TJPGD_DIR)/src/tjpgd.h)" $(TJPGD_BUILD)/tjpgd.h
+	ln -sf "$$(realpath --relative-to=$(TJPGD_BUILD) $(JPEG_DIR)/tjpgdcnf.h)" $(TJPGD_BUILD)/tjpgdcnf.h
+	touch $@
+
+$(TJPGD_BUILD)/tjpgd.c $(TJPGD_BUILD)/tjpgd.h $(TJPGD_BUILD)/tjpgdcnf.h: $(TJPGD_BUILD)/.ready
+
 SRCS_USER := \
 	$(Src)/shell.c \
 	$(Src)/user.c \
-	$(Src)/fat32.c
+	$(Src)/fat32.c \
+	$(TFLITE_DIR)/tflite_file.c $(TFLITE_DIR)/tflite_platform.c \
+	$(JPEG_SRCS)
+
+SIM_USER ?= full
+ifeq ($(SIM_USER),minimal)
+  USER_SRCS = $(Src)/sim_shell.c
+  USER_DEPS = $(Src)/sim_shell.c
+  USER_LIBS =
+  USER_OBJCOPY_FLAGS =
+else ifeq ($(SIM_USER),full)
+  USER_SRCS = $(SRCS_USER)
+  USER_DEPS = $(SRCS_USER) $(MICROPY_LIB) $(JPEG_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/user.ld $(Src)/user.h $(Src)/syscall.h
+  USER_LIBS = $(TFLITE_OBJ) $(MICROPY_LIB) $(LIBM) $(LIBC)
+  USER_OBJCOPY_FLAGS = --set-section-flags .bss=alloc,contents
+else
+  $(error SIM_USER=$(SIM_USER) is invalid (use: full | minimal))
+endif
 
 SRCS_KERNEL := \
 	$(Src)/kernel.c \
+	$(Src)/kernel_process.c \
+	$(Src)/kernel_trap.c \
+	$(Src)/kernel_syscall.c \
 	$(Src)/common.c \
 	$(Src)/dma.c \
 	$(Src)/synap_api.c \
 	$(Src)/sdcard_api.c \
 	$(Src)/timer_api.c \
+	$(Src)/timer_measure.c \
 	$(Src)/mic_api.c \
 	$(Src)/lcd_api.c \
 	$(Src)/led_api.c \
 	$(Src)/fft_api.c \
 	$(Src)/mem_test.c \
-	$(Src)/speech_recognition_api.c
+	$(Src)/speech_recognition_api.c \
+	$(Src)/multitask_test.c
 
 SRCS_MBIOS := $(Src)/psc_mbios.S
 
@@ -298,6 +384,7 @@ LIBM := $(PICOLIBC_BASE)/libm.a
 LIBC := $(PICOLIBC_BASE)/libc.a
 
 MICROPY_DEPS := \
+	$(TFLITE_DIR)/tflite_api.h $(TFLITE_DIR)/tflite_inspect.h \
 	$(MICROPY_DIR)/modpsc.c \
 	$(MICROPY_DIR)/mphalport.c \
 	$(MICROPY_DIR)/mphalport.h \
@@ -311,33 +398,30 @@ $(MICROPY_LIB): $(MICROPY_DEPS)
 # ------------------------------------------------------------
 $(USER_ELF): \
 	$(Build) \
-	$(SRCS_USER) \
-	$(Build)/divmodsi3.o \
-	$(MICROPY_LIB)
+	$(USER_DEPS) \
+	$(Build)/divmodsi3.o
 
-	$(CC) $(CFLAGS) $(DUSERBASE) $(DEFUSERBASE) \
+	$(CC) $(CFLAGS) $(JPEG_CPPFLAGS) $(DUSERBASE) $(DEFUSERBASE) \
 		$(LDFLAGS_USER) \
 		-o $@ \
-		$(SRCS_USER) \
+		$(USER_SRCS) \
 		$(Build)/divmodsi3.o \
-		$(MICROPY_LIB) \
-		$(LIBM) \
-		$(LIBC) \
+		$(USER_LIBS) \
 		$(BUILTINS_LIB)
 
 $(USER_BIN): $(USER_ELF)
 	$(OBJCOPY) \
-		--set-section-flags .bss=alloc,contents \
+		$(USER_OBJCOPY_FLAGS) \
 		-O binary \
 		$< $@
-	@echo "[USER] PSC-OS shell + MicroPython -> $(USER_BIN)"
+	@echo "[USER] SIM_USER=$(SIM_USER) -> $(USER_BIN)"
 
 # ------------------------------------------------------------
 # Common USER output
 # ------------------------------------------------------------
 $(USER_MEM): $(USER_BIN) | $(Build)
 	hexdump -v -e '1/4 "%08x\n"' $(USER_BIN) > $(USER_MEM)
-	@echo "[USER] shell + MicroPython -> $(USER_MEM)"
+	@echo "[USER] SIM_USER=$(SIM_USER) -> $(USER_MEM)"
 
 # ========================
 # Kernel linker selection
@@ -370,19 +454,20 @@ endif
 $(KERNEL_ELF): \
 	$(Build) \
 	$(SRCS_KERNEL) \
+	$(wildcard $(Src)/*.h) $(Src)/kernel_fpga.ld \
 	$(USER_BIN) \
-	$(Build)/divmodsi3.o
+	$(Build)/divmodsi3.o $(KERNEL_BUILTINS) Makefile
 
 	@USER_SIZE=$$(stat -c%s $(USER_BIN)); \
 	echo "[USER] external image PA=$(USER_BASE_VAL) size=$$USER_SIZE"; \
-	$(CC) $(CFLAGS) $(KCPPFLAGS) $(DUSERBASE) \
+	$(CC) $(KERNEL_CFLAGS) $(KCPPFLAGS) $(DUSERBASE) \
 		-Wl,-T$(KERNEL_LD) \
 		$(LDFLAGS_KERNEL) \
 		-Wl,--defsym,_binary_shell_bin_start=$(USER_BASE_VAL) \
 		-Wl,--defsym,_binary_shell_bin_end=$(USER_BASE_VAL)+$$USER_SIZE \
 		-o $@ \
 		$(SRCS_KERNEL) \
-		$(Build)/divmodsi3.o
+		$(Build)/divmodsi3.o $(KERNEL_BUILTINS)
 
 kernel_mem: $(KERNEL_ELF)
 	$(OBJCOPY) \

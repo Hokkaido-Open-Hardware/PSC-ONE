@@ -12,6 +12,8 @@ typedef uint32_t size_t;
 typedef uint32_t uintptr_t;
 typedef uint32_t paddr_t;
 typedef uint32_t vaddr_t;
+typedef signed char int8_t;
+typedef signed int  int32_t;
 
 #define true  1
 #define false 0

@@ -309,7 +309,7 @@ module Decorder (
 
     assign is_nop = (opcode == 32'h0000_0013);
 
-    // パイプライン対象外となるM拡張命令
+    // （MULDIV除外テスト時に）パイプライン対象外となるM拡張命令
     wire is_mul_div_w =
         is_mul    |
         is_mulh   |
@@ -321,10 +321,20 @@ module Decorder (
         is_remu;
         //is_nop;
 
-    // 通常のR-typeとI-Typeだけパイプライン対象
+    // Pipeline execution instructions
+    //
+    // R-Type     : ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND
+    //              MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU (M lane)
+    // I-Type ALU : ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI
+    // Load       : LB, LH, LW, LBU, LHU
+    // Store      : SB, SH, SW
+    //
+    // LUI/AUIPC also retain their existing integer-ALU issue path in v2.
+    // Other control/system instructions use the existing serialized ROB path.
+    // pipeline_type classifies the groups above; v2 has no separate legacy
+    // instruction execution pipeline.
     wire pipeline_type_w =
-        (is_R_type_w || is_op_imm_w) &&
-        !is_mul_div_w;
+        is_R_type_w || is_op_imm_w || is_load_w || is_store_w;
 
     // =============================================================================
     // 構造体へまとめた次段デコード結果
@@ -369,19 +379,19 @@ module Decorder (
                                     raise_illegal_instruction_alu;
     end
 
-    // =============================================================================
-    // パイプラインレジスタ
-    // =============================================================================
-    always @(posedge clock or negedge reset_n) begin
-        if(!reset_n) begin
+    // Register the full decode result before rename.  This separates the
+    // Fetch FIFO read mux and opcode decode from the RAT lookup/rename path.
+    // decode_done remains asserted until the requester drops decode_enb, so
+    // the FIFO head is consumed exactly once.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
             decoder_ctrl <= '0;
             decode_done  <= 1'b0;
-        end else if (decode_enb) begin
+        end else if (!decode_enb) begin
+            decode_done <= 1'b0;
+        end else if (!decode_done) begin
             decoder_ctrl <= decoder_ctrl_next;
             decode_done  <= 1'b1;
-        end else begin
-            // decode_doneだけ1クロックのパルスにし、ほかの結果は保持する。
-            decode_done  <= 1'b0;
         end
     end
 

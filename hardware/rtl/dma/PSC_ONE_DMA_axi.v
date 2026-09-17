@@ -125,8 +125,9 @@ module PSC_ONE_DMA_axi #(
 
                     if (dma_start) begin
                         word_count <= 32'd0;
-                        dma_busy   <= 1'b1;
-                        st <= ST_AR;
+                        // A zero-length request completes without AXI traffic.
+                        dma_busy   <= (DMA_WORDS != 0);
+                        st <= (DMA_WORDS == 0) ? ST_DONE : ST_AR;
                     end
                 end
 

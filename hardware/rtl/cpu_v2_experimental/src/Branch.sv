@@ -1,180 +1,95 @@
 // NISHIHARU
-
 import PSC_Types::*;
 
-module Branch (
+// Pipeline MEM controller; branch/jump decisions remain in PSC_InstructionUnit.
+module Branch #(
+    parameter logic [31:0] UART_MMIO_ADDR = 32'hF004_00F0
+)(
     input  logic        clock,
     input  logic        reset_n,
-    input  logic        branch_enb,
-    input  logic [31:0] in_vaddr,
-    input  logic [31:0] r_data1,
-    input  logic [31:0] r_data2,
-
-    // Decoder control
+    input  logic        cpu_stop,
+    input  logic        valid,
     input  dec_ctrl_t   decoder_ctrl,
-
-    // MMU
+    input  logic [31:0] in_vaddr,
+    input  logic [31:0] r_data2,
+    input  logic        mode_sv32,
     output logic        mmu_valid,
-    output logic [31:0] vaddr,
     input  logic        mmu_ready,
+    input  logic        access_fault,
     input  logic [31:0] d_paddr,
-
-    // Memory
-    output logic [31:0] data_mem_read_address,
+    output logic [31:0] data_mem_address,
+    output logic [31:0] data_mem_write_data,
     output logic        data_mem_read_valid,
+    output logic        data_mem_write_valid,
     input  logic        data_mem_req_ready,
     input  logic        data_mem_read_ready,
-
-    // Branch result
-    output logic        pc_sel2,
-
-    // Completion
-    output logic        busy,
-    output logic        branch_done
+    input  logic        data_mem_write_ready,
+    output logic [8:0]  uart,
+    output logic        pending,
+    output logic        done,
+    output logic        misaligned_fault
 );
+    // The ROB head is v2's MEM record and holds address, rs2, funct3 and PC
+    // until completion. Younger ALU work may proceed in the other ROB slot.
+    logic mmu_started;
+    logic translated;
+    logic [31:0] translated_address;
+    logic misaligned_address;
 
-    typedef enum logic [3:0] {
-        IDLE, BRANCH_MMU, BRANCH_MMU_W,
-        BRANCH_ACCESS, BRANCH_WAIT,
-        BRANCH_DONE
-    } state_t;
+    // Check alignment before translation; register faults to let older instructions commit.
+    assign misaligned_address =
+        (((decoder_ctrl.funct3 == 3'b001) ||
+          (decoder_ctrl.is_load && decoder_ctrl.funct3 == 3'b101)) && in_vaddr[0]) ||
+        ((decoder_ctrl.funct3 == 3'b010) && (|in_vaddr[1:0]));
+    assign done               = pending && (decoder_ctrl.is_store
+                             ? data_mem_write_ready : data_mem_read_ready);
 
-    state_t state;
-
-    function automatic logic branch_exec (
-        input logic [2:0]  branch_op,
-        input logic [31:0] data1,
-        input logic [31:0] data2,
-        input logic [1:0]  pc_sel
-    );
-        unique case (pc_sel)
-            // PC + 4
-            2'b00: begin
-                branch_exec = 1'b0;
-            end
-            // Conditional branch
-            2'b01: begin
-                unique case (branch_op)
-                    3'b000: begin
-                        // BEQ
-                        branch_exec = (data1 == data2);
-                    end
-                    3'b001: begin
-                        // BNE
-                        branch_exec = (data1 != data2);
-                    end
-                    3'b100: begin
-                        // BLT: signed comparison
-                        branch_exec = (
-                            $signed(data1) < $signed(data2)
-                        );
-                    end
-                    3'b101: begin
-                        // BGE: signed comparison
-                        branch_exec = (
-                            $signed(data1) >= $signed(data2)
-                        );
-                    end
-                    3'b110: begin
-                        // BLTU: unsigned comparison
-                        branch_exec = (data1 < data2);
-                    end
-                    3'b111: begin
-                        // BGEU: unsigned comparison
-                        branch_exec = (data1 >= data2);
-                    end
-                    default: begin
-                        // Illegal branch operation
-                        branch_exec = 1'b0;
-                    end
-                endcase
-            end
-            // JAL / JALR
-            2'b10: begin
-                branch_exec = 1'b1;
-            end
-
-            default: begin
-                branch_exec = 1'b0;
-            end
-        endcase
-    endfunction
-
+    // Pulse one cache request after req_ready, then hold pending until its response.
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            state                 <= IDLE;
-            pc_sel2               <= 1'b0;
-            mmu_valid             <= 1'b0;
-            vaddr                 <= 32'd0;
-            data_mem_read_valid   <= 1'b0;
-            data_mem_read_address <= 32'd0;
-            busy                  <= 1'b0;
-            branch_done           <= 1'b0;
+            pending              <= 1'b0;
+            mmu_started          <= 1'b0;
+            translated           <= 1'b0;
+            translated_address   <= 32'd0;
+            mmu_valid            <= 1'b0;
+            data_mem_read_valid  <= 1'b0;
+            data_mem_write_valid <= 1'b0;
+            data_mem_address     <= 32'd0;
+            data_mem_write_data  <= 32'd0;
+            uart                 <= 9'd0;
+            misaligned_fault     <= 1'b0;
         end else begin
-            // Default pulse outputs
-            mmu_valid           <= 1'b0;
-            data_mem_read_valid <= 1'b0;
-            branch_done         <= 1'b0;
-
-            unique case (state)
-                IDLE: begin
-                    busy <= 1'b0;
-                    pc_sel2 <= branch_exec(
-                        decoder_ctrl.funct3,
-                        r_data1,
-                        r_data2,
-                        decoder_ctrl.pc_sel
-                    );
-                    if (branch_enb && !busy) begin
-                        busy <= 1'b1;
-                        if (decoder_ctrl.is_load) begin
-                            state <= BRANCH_MMU;
-                        end else begin
-                            state <= BRANCH_DONE;
-                        end
+            mmu_valid            <= 1'b0;
+            data_mem_read_valid  <= 1'b0;
+            data_mem_write_valid <= 1'b0;
+            uart                 <= 9'd0;
+            misaligned_fault     <= 1'b0;
+            if (cpu_stop || (access_fault || misaligned_fault) || done) begin
+                pending     <= 1'b0;
+                mmu_started <= 1'b0;
+                translated  <= 1'b0;
+            end else if (valid && !pending) begin
+                if (misaligned_address) begin
+                    misaligned_fault     <= 1'b1;
+                end else if (mode_sv32 && !translated) begin
+                    if (!mmu_started) begin
+                        mmu_valid          <= 1'b1;
+                        mmu_started        <= 1'b1;
                     end
-                end
-
-                BRANCH_MMU: begin
-                    mmu_valid <= 1'b1;
-                    vaddr     <= in_vaddr;
-                    state     <= BRANCH_MMU_W;
-                end
-
-                BRANCH_MMU_W: begin
                     if (mmu_ready) begin
-                        data_mem_read_address <= d_paddr;
-                        state                 <= BRANCH_ACCESS;
+                        translated_address <= d_paddr;
+                        translated         <= 1'b1;
                     end
+                end else if (data_mem_req_ready) begin
+                    pending              <= 1'b1;
+                    data_mem_read_valid  <= decoder_ctrl.is_load;
+                    data_mem_write_valid <= decoder_ctrl.is_store;
+                    data_mem_address     <= mode_sv32 ? translated_address : in_vaddr;
+                    data_mem_write_data  <= r_data2;
+                    if (decoder_ctrl.is_store && (in_vaddr == UART_MMIO_ADDR))
+                        uart               <= {1'b1, r_data2[7:0]};
                 end
-
-                BRANCH_ACCESS: begin
-                    if (data_mem_req_ready) begin
-                        data_mem_read_valid <= 1'b1;
-                        state               <= BRANCH_WAIT;
-                    end
-                end
-
-                BRANCH_WAIT: begin
-                    if (data_mem_read_ready) begin
-                        state <= BRANCH_DONE;
-                    end
-
-                end
-
-                BRANCH_DONE: begin
-                    branch_done <= 1'b1;
-                    state       <= IDLE;
-                end
-
-                default: begin
-                    state                 <= IDLE;
-                    mmu_valid             <= 1'b0;
-                    data_mem_read_valid   <= 1'b0;
-                    data_mem_read_address <= 32'd0;
-                    branch_done           <= 1'b0;
-                end
-            endcase
+            end
         end
     end
 
