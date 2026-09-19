@@ -20,9 +20,9 @@ MODE = verilator
 # ============================================================
 ifeq ($(MODE),verilator)
 SIM          		= verilator
-SDRAM_MODEL  		= ../rtl/SDRAM_model/w9825g6kh_verilator.v
-GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v
-SDCARD_MODEL 		= ../rtl/SDCARD_model/sdcard_spi_model.v
+SDRAM_MODEL  		= ../rtl/model/SDRAM_model/w9825g6kh_verilator.v
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram_verilator.v
+SDCARD_MODEL 		= ../rtl/model/SDCARD_model/sdcard_spi_model.v
 TOP_COMPILE_ARGS 	= -DTOP_SIM
 
 ifeq ($(SIM_FAST),1)
@@ -43,9 +43,9 @@ endif
 
 ifeq ($(MODE),icarus)
 SIM          		= icarus
-SDRAM_MODEL    		= ./SDRAM_model/w9825g6kh.v 	# ← Icarus 用 Micron モデルに修正
-GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram.v 
-SDCARD_MODEL		= ../rtl/SDCARD_model/sdcard_spi_model.v 
+SDRAM_MODEL    		= ../rtl/model/SDRAM_model/w9825g6kh.v 	# ← Icarus 用 Micron モデルに修正
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram.v 
+SDCARD_MODEL		= ../rtl/model/SDCARD_model/sdcard_spi_model.v 
 EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
 TOP_COMPILE_ARGS 	= -DTOP_SIM
 VCD_COMPILE_ARGS 	= -DDUMP_VCD
@@ -63,15 +63,19 @@ endif
 TOP          = PSC_RV32IS_Chip_sim
 PSCONE_TOP   = PSC_ONE_Chip_sim
 
-CPU_SRC_DIR  = ../rtl/cpu/src
-TOP_SRC_DIR  = ../rtl/top
-CACHE_DIR    = ../rtl/cache/src
+CPU_SRC_DIR  = ../rtl/soc/cpu/src
+TOP_SRC_DIR  = ../rtl/tang20k/top
+CACHE_DIR    = ../rtl/soc/cache/src
+SOC_TOP_SRC_DIR  = ../rtl/soc/soc_top
 
 PSCONE_SIM_TOP_FILE = \
 	$(TOP_SRC_DIR)/PSC_ONE_Chip_sim.v \
 
 PSCONE_TOP_FILE = \
 	$(TOP_SRC_DIR)/PSC_ONE_Chip.v
+
+PSCONE_SOC_TOP_FILE = \
+	$(SOC_TOP_SRC_DIR)/PSC_ONE_SOC.v
 
 # RV32_core
 CPU_CORE_FILES = \
@@ -92,7 +96,7 @@ CPU_CORE_FILES = \
 	$(CPU_SRC_DIR)/Csr.v \
 	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
 
-CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
+CPU_V1_SRC_DIR  = ../rtl/soc/cpu_v1/src
 
 # RV32_core
 CPU_V1_CORE_FILES = \
@@ -117,7 +121,7 @@ CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/Csr.sv \
 	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
 
-CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+CPU_V2_SRC_DIR  = ../rtl/soc/cpu_v2_experimental/src
 
 # RV32_core(V2)
 CPU_V2_CORE_FILES = \
@@ -141,9 +145,9 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/Csr.sv \
 	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
 
-MMIO_DIR	= ../rtl/mmio/MMIO
-UART_DIR	= ../rtl/mmio/UART
-LED_DIR		= ../rtl/mmio/LED
+MMIO_DIR	= ../rtl/soc/mmio/MMIO
+UART_DIR	= ../rtl/soc/mmio/UART
+LED_DIR		= ../rtl/soc/mmio/LED
 
 # ============================================================
 # CPUコアの切り替え（v1 / legacy）
@@ -173,14 +177,14 @@ CPU_FILES = \
 	$(CACHE_DIR)/dm_cache_tag.v \
 	$(TOP_SRC_DIR)/Delay_N.v
 
-AXI_DIR			= ../rtl/axi
-SDRAM_CNT_DIR	= ../rtl/sdram_controller
-BOOT_SRC_DIR	= ../rtl/boot
-DMA_SRC_DIR		= ../rtl/dma
+AXI_DIR			= ../rtl/soc/axi
+SDRAM_CNT_DIR	= ../rtl/tang20k/sdram_controller
+BOOT_SRC_DIR	= ../rtl/soc/boot
+DMA_SRC_DIR		= ../rtl/soc/dma
 
 SDRAM_32bit_AXI_FILES = \
 	$(AXI_DIR)/sdram_32bit_to_256bit_axi_bridge.v \
-	$(AXI_DIR)/sdram_axi_controller.v \
+	$(SDRAM_CNT_DIR)/sdram_axi_controller.v \
 	$(SDRAM_CNT_DIR)/sdram_controller.sv \
 	$(GW2AR_SDRAM_MODEL)
 
@@ -195,8 +199,8 @@ PSC_ONE_DMA_FILE =  $(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
 # デフォルトはNPU_V1
 NPU_VERSION ?= legacy
 
-NPU_LEGACY_DIR = ../rtl/npu/src
-NPU_V1_DIR     = ../rtl/npu_v1/src
+NPU_LEGACY_DIR = ../rtl/soc/npu/src
+NPU_V1_DIR     = ../rtl/soc/npu_v1/src
 
 # NPU V1: 4 MUL -> 4 fixed WB lanes -> 16 ACC bank
 NPU_V1_FILES = \
@@ -225,7 +229,7 @@ else
 $(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 または legacy を指定してください)
 endif
 
-MMIO_BASE_DIR	= ../rtl/mmio
+MMIO_BASE_DIR	= ../rtl/soc/mmio
 
 # LCD
 PSCONELCD_FILE = \
@@ -240,7 +244,7 @@ SD_READER_FILE = \
 	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard_SPI.sv 
 
 # PSC Phase Flow Engine
-FPE_DIR  = ../rtl/pfe/src
+FPE_DIR  = ../rtl/soc/pfe/src
 FPE_FILE = \
 	$(FPE_DIR)/PSC_PFE.v
 
@@ -251,12 +255,13 @@ TIMER_FILE = $(MMIO_BASE_DIR)/TIMER/PSC_RV32IS_TIMER.v
 I2S_RX_FILE = \
 	$(MMIO_BASE_DIR)/I2S_RX/PSC_I2SRX.sv \
 
-I2S_MIC_MODEL = ../rtl/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v 
+I2S_MIC_MODEL = ../rtl/model/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v 
 
-LCD_ILI9488_MODEL = ../rtl/LCD_model/PSC_LCD_ILI9488_MODEL.v 
+LCD_ILI9488_MODEL = ../rtl/model/LCD_model/PSC_LCD_ILI9488_MODEL.v 
 
 INPUT_32bit_FILE = \
-	$(PSCONE_SIM_TOP_FILE) $(PSCONE_TOP_FILE) $(CPU_FILES) $(SDRAM_32bit_AXI_FILES) \
+	$(PSCONE_SIM_TOP_FILE) $(PSCONE_TOP_FILE) $(PSCONE_SOC_TOP_FILE) \
+	$(CPU_FILES) $(SDRAM_32bit_AXI_FILES) \
 	$(PSC_ONE_BOOT_FILE) $(PSC_ONE_DMA_FILE) \
 	$(SA_FILE) $(PSCONELCD_FILE) $(SD_READER_FILE) $(TIMER_FILE) \
 	$(I2S_RX_FILE) $(I2S_MIC_MODEL) $(LCD_ILI9488_MODEL) \

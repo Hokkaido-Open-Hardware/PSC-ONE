@@ -16,7 +16,7 @@ SIM  := $(MODE)
 # ------------------------------------------------------------
 ifeq ($(MODE),verilator)
 SIM          		= verilator
-GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram_verilator.v
 TOP_COMPILE_ARGS 	= -DSDRAM_CNT_SIM -DCOCOTB_SIM
 EXTRA_ARGS = \
 	-O3 --trace --trace-fst \
@@ -27,7 +27,7 @@ endif
 
 ifeq ($(MODE),icarus)
 SIM          		= icarus
-GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram.v
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram.v
 
 EXTRA_ARGS =
 TOP_COMPILE_ARGS 	= -DSDRAM_CNT_SIM -DCOCOTB_SIM 
@@ -52,9 +52,9 @@ COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
 #  ソース一覧
 # ============================================================
 SRC_SIMTOP = \
-	../rtl/sdram_controller/sim_sdram_controller.v
+	../rtl/tang20k/sdram_controller/sim_sdram_controller.v
 SRC_SDRAM_CNT = \
-	../rtl/sdram_controller/sdram_controller.sv \
+	../rtl/tang20k/sdram_controller/sdram_controller.sv \
 
 SIM_SRC = $(SRC_SIMTOP) $(SRC_SDRAM_CNT) $(GW2AR_SDRAM_MODEL)
 	

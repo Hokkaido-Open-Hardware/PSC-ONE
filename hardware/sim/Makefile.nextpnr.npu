@@ -34,7 +34,7 @@ FREQ   ?= 81
 # NPU_V1 FILES
 #--------------------------------------------------
 
-NPU_SRC_DIR := ../rtl/npu_v1/src
+NPU_SRC_DIR := ../rtl/soc/npu_v1/src
 
 NPU_DATAPATH_FILES := \
 	$(NPU_SRC_DIR)/PSC_NPU_MACScheduler.sv \
@@ -51,7 +51,7 @@ NPU_V1_RTL_FILES := \
 # NPU legacy FILES
 #--------------------------------------------------
 
-LEGACY_SRC_DIR := ../rtl/npu/src
+LEGACY_SRC_DIR := ../rtl/soc/npu/src
 
 # Preserve the standalone legacy PE and 2x2 tests, including atomic commit.
 PE_FILE = $(LEGACY_SRC_DIR)/PSC_NPU_PE_INT.sv \
@@ -69,7 +69,7 @@ NPU_RTL_FILES		= $(NPU_CTRL_FILE) $(VERILOG_FILE_SA_4x4)
 # NPU timing wrapper and source files
 # ------------------------------------------------------------
 
-TIMING_DIR  := ../rtl/timing
+TIMING_DIR  := ../rtl/tang20k/timing
 
 # PSC_NPU_Timing.sv is expected in the same directory as this Makefile.
 TIMING_WRAPPER := $(TIMING_DIR)/PSC_NPU_TimingTop.sv

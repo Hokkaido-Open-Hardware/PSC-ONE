@@ -44,8 +44,8 @@ COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
 # ============================================================
 #  ソース一覧
 # ============================================================
-SDCARD_MODEL = ../rtl/SDCARD_model/sdcard_spi_model.v 
-MMIO_DIR = ../rtl/mmio/PSC_SDCARD
+SDCARD_MODEL = ../rtl/model/SDCARD_model/sdcard_spi_model.v
+MMIO_DIR = ../rtl/soc/mmio/PSC_SDCARD
 
 SRC_SD = \
 	$(MMIO_DIR)/src/sim_PSC_SDCard.v \

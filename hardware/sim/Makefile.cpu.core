@@ -49,9 +49,9 @@ endif
 
 CPU_TOP 	 = PSC_RV32_core
 
-CPU_SRC_DIR  	= ../rtl/cpu/src
-CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
-CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+CPU_SRC_DIR  	= ../rtl/soc/cpu/src
+CPU_V1_SRC_DIR  = ../rtl/soc/cpu_v1/src
+CPU_V2_SRC_DIR  = ../rtl/soc/cpu_v2_experimental/src
 
 # RV32_core
 CPU_CORE_FILES = \

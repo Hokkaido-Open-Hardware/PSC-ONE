@@ -45,7 +45,7 @@ endif
 # ============================================================
 
 MMU_TOP 	 = MMU
-MMU_SRC_DIR  = ../rtl/cpu_v1/src
+MMU_SRC_DIR  = ../rtl/soc/cpu_v1/src
 
 MMU_FILES = \
 	$(MMU_SRC_DIR)/MMU.sv

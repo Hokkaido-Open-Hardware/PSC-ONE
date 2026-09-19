@@ -36,16 +36,20 @@ TOP := PSC_ONE_Chip
 # Top
 # ============================================================
 
-TOP_SRC_DIR := ../rtl/top
+TOP_SRC_DIR := ../rtl/tang20k/top
+SOC_TOP_SRC_DIR := ../rtl/soc/soc_top
 
 CHIP_TOP_FILE := \
 	$(TOP_SRC_DIR)/PSC_ONE_Chip.v
+
+SOC_TOP_FILE := \
+	$(SOC_TOP_SRC_DIR)/PSC_ONE_SOC.v
 
 # ============================================================
 # CPU
 # ============================================================
 
-CPU_SRC_DIR := ../rtl/cpu/src
+CPU_SRC_DIR := ../rtl/soc/cpu/src
 
 CPU_CORE_FILES = \
 	$(CPU_SRC_DIR)/PSC_ONE_RV32_core.v \
@@ -65,7 +69,7 @@ CPU_CORE_FILES = \
 	$(CPU_SRC_DIR)/Csr.v \
 	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
 
-CPU_V1_SRC_DIR := ../rtl/cpu_v1/src
+CPU_V1_SRC_DIR := ../rtl/soc/cpu_v1/src
 
 CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32_core.v \
@@ -89,7 +93,7 @@ CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/Csr.sv \
 	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
 
-CPU_V2_SRC_DIR := ../rtl/cpu_v2_experimental/src
+CPU_V2_SRC_DIR := ../rtl/soc/cpu_v2_experimental/src
 
 CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32_core.v \
@@ -131,10 +135,10 @@ endif
 # CPU peripheral / cache
 # ============================================================
 
-CACHE_DIR := ../rtl/cache/src
-MMIO_DIR  := ../rtl/mmio/MMIO
-UART_DIR  := ../rtl/mmio/UART
-LED_DIR   := ../rtl/mmio/LED
+CACHE_DIR := ../rtl/soc/cache/src
+MMIO_DIR  := ../rtl/soc/mmio/MMIO
+UART_DIR  := ../rtl/soc/mmio/UART
+LED_DIR   := ../rtl/soc/mmio/LED
 
 CPU_FILES = \
 	$(SELECTED_CPU_CORE_FILES) \
@@ -151,14 +155,14 @@ CPU_FILES = \
 # AXI / SDRAM / Boot / DMA
 # ============================================================
 
-AXI_DIR       := ../rtl/axi
-SDRAM_CNT_DIR := ../rtl/sdram_controller
-BOOT_SRC_DIR  := ../rtl/boot
-DMA_SRC_DIR   := ../rtl/dma
+AXI_DIR       := ../rtl/soc/axi
+SDRAM_CNT_DIR := ../rtl/tang20k/sdram_controller
+BOOT_SRC_DIR  := ../rtl/soc/boot
+DMA_SRC_DIR   := ../rtl/soc/dma
 
 MEMORY_FILES = \
 	$(AXI_DIR)/sdram_32bit_to_256bit_axi_bridge.v \
-	$(AXI_DIR)/sdram_axi_controller.v \
+	$(SDRAM_CNT_DIR)/sdram_axi_controller.v \
 	$(SDRAM_CNT_DIR)/sdram_controller.sv \
 	$(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v \
 	$(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
@@ -169,8 +173,8 @@ MEMORY_FILES = \
 
 NPU_VERSION ?= v1
 
-NPU_LEGACY_DIR := ../rtl/npu/src
-NPU_V1_DIR     := ../rtl/npu_v1/src
+NPU_LEGACY_DIR := ../rtl/soc/npu/src
+NPU_V1_DIR     := ../rtl/soc/npu_v1/src
 
 NPU_V1_FILES = \
 	$(NPU_V1_DIR)/PSC_NPU_Controller.v \
@@ -199,7 +203,7 @@ endif
 # MMIO peripherals
 # ============================================================
 
-MMIO_BASE_DIR := ../rtl/mmio
+MMIO_BASE_DIR := ../rtl/soc/mmio
 
 LCD_FILES = \
 	$(MMIO_BASE_DIR)/LCD/PSC_ONE_LCD.v \
@@ -218,7 +222,7 @@ I2S_FILES = \
 	$(MMIO_BASE_DIR)/I2S_RX/PSC_I2SRX.sv
 
 FPE_FILES = \
-	../rtl/pfe/src/PSC_PFE.v
+	../rtl/soc/pfe/src/PSC_PFE.v
 
 # ============================================================
 # Full chip source list
@@ -226,6 +230,7 @@ FPE_FILES = \
 
 CHIP_FILES = \
 	$(CHIP_TOP_FILE) \
+	$(SOC_TOP_FILE) \
 	$(CPU_FILES) \
 	$(MEMORY_FILES) \
 	$(NPU_FILES) \
@@ -241,7 +246,7 @@ CHIP_FILES = \
 #   make -f Makefile.nextpnr.chip timing CHIP_CST=../path/to/file.cst
 # ============================================================
 
-CHIP_CST ?= ../rtl/timing/PSC_ONE_tang20k_cst.cst
+CHIP_CST ?= ../rtl/tang20k/timing/PSC_ONE_tang20k_cst.cst
 
 # ============================================================
 # Build files

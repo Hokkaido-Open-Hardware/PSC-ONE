@@ -44,7 +44,7 @@ COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
 # ============================================================
 #  ソース一覧
 # ============================================================
-FPE_DIR  = ../rtl/pfe/src
+FPE_DIR  = ../rtl/soc/pfe/src
 PFE_FILE = PSC_PFE.v
 
 SRC_FPE = \

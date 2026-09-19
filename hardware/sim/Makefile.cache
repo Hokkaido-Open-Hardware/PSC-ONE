@@ -16,14 +16,14 @@ SIM  := $(MODE)
 # ------------------------------------------------------------
 ifeq ($(MODE),verilator)
 # verilator
-GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram_verilator.v
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram_verilator.v
 
 EXTRA_ARGS = \
 	--trace --trace-fst --Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
 	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
 else ifeq ($(MODE),icarus)
 # icarus
-GW2AR_SDRAM_MODEL 	= ../rtl/SDRAM_model/GW2AR_sdram.v 
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram.v
 
 EXTRA_ARGS  =
 VCD_COMPILE_ARGS = -DDUMP_VCD
@@ -48,17 +48,17 @@ COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
 #  ソース一覧
 # ============================================================
 SRC_SIMTOP = \
-	../rtl/cache/src/sim_cache_dma_controller.v
+	../rtl/soc/cache/src/sim_cache_dma_controller.v
 SRC_CASHE = \
-	../rtl/cache/src/cache_dma_controller.sv \
-	../rtl/cache/src/cache_dma_controller_io.sv \
-	../rtl/cache/src/dm_cache_data.v \
-	../rtl/cache/src/dm_cache_tag.v
+	../rtl/soc/cache/src/cache_dma_controller.sv \
+	../rtl/soc/cache/src/cache_dma_controller_io.sv \
+	../rtl/soc/cache/src/dm_cache_data.v \
+	../rtl/soc/cache/src/dm_cache_tag.v
 SRC_BRIDGE = \
-	../rtl/axi/sdram_32bit_to_256bit_axi_bridge.v
+	../rtl/soc/axi/sdram_32bit_to_256bit_axi_bridge.v
 SRC_AXI_SDRAM_CNT = \
-	../rtl/axi/sdram_axi_controller.v \
-	../rtl/sdram_controller/sdram_controller.sv
+	../rtl/tang20k/sdram_controller/sdram_axi_controller.v \
+	../rtl/tang20k/sdram_controller/sdram_controller.sv
 
 SIM_SRC = $(SRC_SIMTOP) $(SRC_CASHE) $(SRC_BRIDGE) $(SRC_AXI_SDRAM_CNT) $(GW2AR_SDRAM_MODEL)
 	
@@ -104,6 +104,6 @@ simulate_ICACHE:
 
 # Python test
 cache_regression:
-	python ../rtl/cache/tests/run_cache_regression.py
-	python ../rtl/cache/tests/run_cache_io_regression.py
+	python ../rtl/soc/cache/tests/run_cache_regression.py
+	python ../rtl/soc/cache/tests/run_cache_io_regression.py
 

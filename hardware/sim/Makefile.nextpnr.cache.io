@@ -35,8 +35,8 @@ FREQ   ?= 81
 # Cache DMA Controller IO source
 # ------------------------------------------------------------
 
-TIMING_DIR  := ../rtl/timing
-CACHE_SRC_DIR := ../rtl/cache/src
+TIMING_DIR  := ../rtl/tang20k/timing
+CACHE_SRC_DIR := ../rtl/soc/cache/src
 
 CACHE_FILES := \
 	$(CACHE_SRC_DIR)/cache_dma_controller_io.sv \

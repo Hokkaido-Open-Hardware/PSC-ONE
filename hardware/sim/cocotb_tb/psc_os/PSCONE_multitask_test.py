@@ -76,12 +76,12 @@ async def two_busy_processes_are_preempted_by_1ms_timer_irq(dut):
 
     for cycle in range(RUN_CYCLES):
         await RisingEdge(dut.clock)
-        irq = resolved(dut.u_chip.irq_tx)
+        irq = resolved(dut.u_chip.u_soc.irq_tx)
         if irq == 1 and previous_irq == 0:
             irq_rise_cycles.append(cycle)
         previous_irq = irq
-        if resolved(dut.u_chip.u_uart.w_tx_wr) == 1:
-            ch = resolved(dut.u_chip.u_uart.cpu_wdata) & 0xFF
+        if resolved(dut.u_chip.u_soc.u_uart.w_tx_wr) == 1:
+            ch = resolved(dut.u_chip.u_soc.u_uart.cpu_wdata) & 0xFF
             if 0x20 <= ch <= 0x7E or ch in (0x0A, 0x0D):
                 seen += chr(ch)
                 if "DUMMY_TIMER_DONE" in seen:
@@ -96,7 +96,7 @@ async def two_busy_processes_are_preempted_by_1ms_timer_irq(dut):
             break
 
     if markers != expected:
-        core = dut.u_chip.u_rv32_core_axi.u_core
+        core = dut.u_chip.u_soc.u_rv32_core_axi.u_core
         csr = core.u_csr
         debug = {
             "boot_done": resolved(dut.u_chip.Boot_rom_done),

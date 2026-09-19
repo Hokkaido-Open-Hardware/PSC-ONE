@@ -49,9 +49,9 @@ endif
 
 CPU_TOP 	 = PSC_RV32_core
 
-CPU_SRC_DIR  	= ../rtl/cpu/src
-CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
-CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+CPU_SRC_DIR  	= ../rtl/soc/cpu/src
+CPU_V1_SRC_DIR  = ../rtl/soc/cpu_v1/src
+CPU_V2_SRC_DIR  = ../rtl/soc/cpu_v2_experimental/src
 
 # RV32_core
 CPU_CORE_FILES = \
@@ -72,7 +72,7 @@ CPU_CORE_FILES = \
 	$(CPU_SRC_DIR)/Csr.v \
 	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
 
-CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
+CPU_V1_SRC_DIR  = ../rtl/soc/cpu_v1/src
 
 # RV32_core
 CPU_V1_CORE_FILES = \
@@ -97,7 +97,7 @@ CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/Csr.sv \
 	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
 
-CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+CPU_V2_SRC_DIR  = ../rtl/soc/cpu_v2_experimental/src
 
 # RV32_core(V2)
 CPU_V2_CORE_FILES = \

@@ -31,7 +31,7 @@ DEVICE ?= GW2AR-LV18QN88C8/I7
 FAMILY ?= GW2A-18C
 FREQ   ?= 81
 
-CPU_SRC_DIR := ../rtl/cpu/src
+CPU_SRC_DIR := ../rtl/soc/cpu/src
 
 # RV32_core
 CPU_CORE_FILES = \
@@ -51,7 +51,7 @@ CPU_CORE_FILES = \
 	$(CPU_SRC_DIR)/Csr.v \
 	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
 
-CPU_V1_SRC_DIR  = ../rtl/cpu_v1/src
+CPU_V1_SRC_DIR  = ../rtl/soc/cpu_v1/src
 
 # RV32_core(V1)
 CPU_V1_CORE_FILES = \
@@ -75,7 +75,7 @@ CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/Csr.sv \
 	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
 
-CPU_V2_SRC_DIR  = ../rtl/cpu_v2_experimental/src
+CPU_V2_SRC_DIR  = ../rtl/soc/cpu_v2_experimental/src
 
 # RV32_core(V2)
 CPU_V2_CORE_FILES = \
@@ -113,7 +113,7 @@ else
 $(error CPU_VERSION=$(CPU_VERSION) is invalid. Use v1 / v2 / legacy)
 endif
 
-TIMING_DIR     := ../rtl/timing
+TIMING_DIR     := ../rtl/tang20k/timing
 TIMING_WRAPPER := $(TIMING_DIR)/PSC_CPU_TimingTop.sv
 TIMING_CST     := $(TIMING_DIR)/PSC_CPU_TimingTop.cst
 

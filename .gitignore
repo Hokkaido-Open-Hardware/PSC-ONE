@@ -30,13 +30,10 @@ parallel_run/
 *.dump
 
 # yosys
-hardware/sim/build_nextpnr_v1/
-hardware/sim/build_nextpnr_v2/
-hardware/sim/build_nextpnr_legacy/
-hardware/sim/build_nextpnr_npu/
-hardware/sim/build_nextpnr_cache_io/
-hardware/sim/build_nextpnr_cache/
 hardware/sim/log/test_result_*.log
+
+# nextpnr / synthesis generated files
+**/build_nextpnr*/
 
 # codex
 hardware/sim/tests/

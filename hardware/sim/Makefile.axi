@@ -3,8 +3,10 @@
 # ============================================================
 
 #make -f Makefile.axi simulate_32bit_to_128bit_axi_bridge MODE=icarus
+#make -f Makefile.axi simulate_32bit_to_256bit_axi_bridge MODE=icarus
 #or
 #make -f Makefile.axi simulate_32bit_to_128bit_axi_bridge MODE=verilator
+#make -f Makefile.axi simulate_32bit_to_256bit_axi_bridge MODE=verilator
 
 # ============================================================
 #  SIMULATOR 切り替え (MODE=icarus / verilator)
@@ -18,16 +20,16 @@ SIM  := $(MODE)
 # ------------------------------------------------------------
 ifeq ($(MODE),verilator)
 # verilator
-SDRAM_MODEL = ../SDRAM_model/w9825g6kh_verilator.v
-GW2AR_SDRAM_MODEL 	= ../SDRAM_model/GW2AR_sdram_verilator.v
+SDRAM_MODEL = ../rtl/model/SDRAM_model/w9825g6kh_verilator.v
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram_verilator.v
 
 EXTRA_ARGS = \
 	--trace --trace-fst --Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
 	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
 else ifeq ($(MODE),icarus)
 # icarus
-SDRAM_MODEL 		= ../SDRAM_model/w9825g6kh.v
-GW2AR_SDRAM_MODEL 	= ../SDRAM_model/GW2AR_sdram.v
+SDRAM_MODEL 		= ../rtl/model/SDRAM_model/w9825g6kh.v
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram.v
 
 EXTRA_ARGS  =
 else
@@ -51,7 +53,8 @@ COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
 #  ソース一覧
 # ============================================================
 SRC_BRIDGE = \
-	../rtl/axi/sdram_32bit_to_128bit_axi_bridge.v
+	../rtl/soc/axi/sdram_32bit_to_128bit_axi_bridge.v \
+	../rtl/soc/axi/sdram_32bit_to_256bit_axi_bridge.v
 
 # ============================================================
 #  Cocotb simulation targets

@@ -16,8 +16,8 @@ DEVICE ?= GW2AR-LV18QN88C8/I7
 FAMILY ?= GW2A-18C
 FREQ   ?= 81
 
-CACHE_SRC_DIR := ../rtl/cache/src
-TIMING_DIR  := ../rtl/timing
+CACHE_SRC_DIR := ../rtl/soc/cache/src
+TIMING_DIR  := ../rtl/tang20k/timing
 
 CACHE_FILES := \
 	$(CACHE_SRC_DIR)/cache_dma_controller.sv \

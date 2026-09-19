@@ -71,7 +71,7 @@ COCOTB_MAKEFILE := $(shell cocotb-config --makefiles)/Makefile.sim
 # NPU_V1 FILES
 #--------------------------------------------------
 
-NPU_SRC_DIR := ../rtl/npu_v1/src
+NPU_SRC_DIR := ../rtl/soc/npu_v1/src
 
 NPU_DATAPATH_FILES := \
 	$(NPU_SRC_DIR)/PSC_NPU_MACScheduler.sv \
@@ -88,7 +88,7 @@ NPU_V1_RTL_FILES := \
 # NPU legacy FILES
 #--------------------------------------------------
 
-LEGACY_SRC_DIR := ../rtl/npu/src
+LEGACY_SRC_DIR := ../rtl/soc/npu/src
 
 # Preserve the standalone legacy PE and 2x2 tests, including atomic commit.
 PE_FILE = $(LEGACY_SRC_DIR)/PSC_NPU_PE_INT.sv \
@@ -96,8 +96,9 @@ PE_FILE = $(LEGACY_SRC_DIR)/PSC_NPU_PE_INT.sv \
           $(LEGACY_SRC_DIR)/PSC_NPU_PE_SimTop.v
 
 VERILOG_FILE_SA_2x2 = $(LEGACY_SRC_DIR)/PSC_NPU_SystolicArray2x2.v $(PE_FILE)
-VERILOG_FILE_SA_4x4 = $(LEGACY_SRC_DIR)/PSC_NPU_SystolicArray4x4.v $(NPU_DATAPATH_FILES)
-NPU_CTRL_FILE 	    = $(LEGACY_SRC_DIR)/PSC_NPU_Controller.v
+VERILOG_FILE_SA_4x4 = $(LEGACY_SRC_DIR)/PSC_NPU_SystolicArray4x4.v $(PE_FILE)
+NPU_CTRL_FILE 	    = $(LEGACY_SRC_DIR)/PSC_NPU_Controller.v \
+	                  $(LEGACY_SRC_DIR)/PSC_NPU_ReadController.v
 
 NPU_RTL_FILES		= $(NPU_CTRL_FILE) $(VERILOG_FILE_SA_4x4)
 
@@ -202,9 +203,9 @@ simulate_SA_multicycle_Ctrl:
 
 YOSYS ?= yosys
 
-YOSYS_OUT_DIR := ../rtl/npu/yosys_out
+YOSYS_OUT_DIR := ../rtl/soc/npu/yosys_out
 
-YOSYS_TOP_SAT_2x2 := SystolicArray2x2
+YOSYS_TOP_SAT_2x2 := PSC_NPU_SystolicArray2x2
 YOSYS_LOG_SAT_2x2 := $(YOSYS_OUT_DIR)/sa_2x2.log
 YOSYS_JSON_SAT_2x2 := $(YOSYS_OUT_DIR)/sa_2x2.json
 
@@ -216,7 +217,7 @@ yosys_SA_2x2:
 	@echo "========================================"
 	@mkdir -p $(YOSYS_OUT_DIR)
 	$(YOSYS) -l $(YOSYS_LOG_SAT_2x2) -p " \
-		read_verilog -sv $(VERILOG_FILE_SA); \
+		read_verilog -sv $(VERILOG_FILE_SA_2x2); \
 		hierarchy -check -top $(YOSYS_TOP_SAT_2x2); \
 		proc; \
 		opt; \
@@ -237,6 +238,6 @@ yosys_clean:
 .PHONY: validate_streaming
 validate_streaming:
 	python3 cocotb_tb/npu/run_streaming_validation.py \
-	    --src $(abspath $(NPU_SRC_DIR)) \
+	    --src $(abspath $(if $(filter legacy,$(NPU_VERSION)),$(LEGACY_SRC_DIR),$(NPU_SRC_DIR))) \
 	    --build $(abspath $(SIM_BUILD))/validate_streaming \
 	    $(if $(filter legacy,$(NPU_VERSION)),--baseline)

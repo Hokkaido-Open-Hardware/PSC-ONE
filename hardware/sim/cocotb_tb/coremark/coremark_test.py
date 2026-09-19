@@ -15,9 +15,9 @@ from cocotb_tb.psc_os.PSCONE_os_test import uart_serial_decoder
 async def observe_timer(dut, windows):
     """Independent check of the target timer against RTL simulated time."""
     while True:
-        await RisingEdge(dut.u_chip.u_timer.running)
+        await RisingEdge(dut.u_chip.u_soc.u_timer.running)
         start = int(get_sim_time(unit='ns'))
-        await FallingEdge(dut.u_chip.u_timer.running)
+        await FallingEdge(dut.u_chip.u_soc.u_timer.running)
         windows.append(int(get_sim_time(unit='ns')) - start)
 
 
@@ -47,7 +47,7 @@ async def coremark(dut):
             while queue:
                 stream.write(chr(queue.popleft()))
             stream.flush()
-            if int(dut.u_chip.u_mmap_io.PIO_out_reg.value) == 0xEE01:
+            if int(dut.u_chip.u_soc.u_mmap_io.PIO_out_reg.value) == 0xEE01:
                 complete = True
                 break
             if elapsed and elapsed % 10000000 == 0:

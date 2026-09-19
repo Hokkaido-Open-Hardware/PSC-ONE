@@ -44,8 +44,8 @@ COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
 # ============================================================
 #  ソース一覧
 # ============================================================
-LCD_ILI9488_MODEL = ../rtl/LCD_model/PSC_LCD_ILI9488_MODEL.v 
-MMIO_DIR = ../rtl/mmio
+LCD_ILI9488_MODEL = ../rtl/model/LCD_model/PSC_LCD_ILI9488_MODEL.v
+MMIO_DIR = ../rtl/soc/mmio
 
 SRC_LCD = \
 	$(MMIO_DIR)/LCD/sim_PSC_ONE_LCD.v \

@@ -311,7 +311,7 @@ async def RV32IS_chip_test1(dut):
     if not os.path.exists(PROGRAM_FILE):
         dut._log.info(f"[FAIL] PROGRAM_FILE not found: {PROGRAM_FILE}")
 
-    rom_write_num = dut.u_chip.u_bt_rom.ROM_WORD.value
+    rom_write_num = dut.u_chip.u_soc.u_bt_rom.ROM_WORD.value
     dut._log.info(f"PSC_ONE_Boot_axi ROM_WORD : {rom_write_num}")
 
     # uart
@@ -377,13 +377,13 @@ async def RV32IS_chip_test1(dut):
     #dump_sdram_mem(dut, "GW2AR", 0x0020_1400, 84)
     #dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
     #dump_page_table(dut, 0x024)
-    #satp_val = int(dut.u_chip.u_rv32_core_axi.u_core.u_csr.csr_satp.value)
+    #satp_val = int(dut.u_chip.u_soc.u_rv32_core_axi.u_core.u_csr.csr_satp.value)
 
     while waited < timeout_cycles:
         await RisingEdge(dut.clock)
 
-        page_fault_i = dut.u_chip.u_rv32_core_axi.u_core.i_pf.value
-        page_fault_d = dut.u_chip.u_rv32_core_axi.u_core.d_pf.value
+        page_fault_i = dut.u_chip.u_soc.u_rv32_core_axi.u_core.i_pf.value
+        page_fault_d = dut.u_chip.u_soc.u_rv32_core_axi.u_core.d_pf.value
 
         # PageFaultでbreak
         if page_fault_i or page_fault_d:
@@ -396,7 +396,7 @@ async def RV32IS_chip_test1(dut):
             dump_sdram_mem(dut, "GW2AR", 0x0027_E000, 1024)
 
             # 正しい page table の物理アドレスを取得
-            satp_val = int(dut.u_chip.u_rv32_core_axi.u_core.u_csr.csr_satp.value)
+            satp_val = int(dut.u_chip.u_soc.u_rv32_core_axi.u_core.u_csr.csr_satp.value)
             ppn = satp_val & 0b11_1111_1111_1111_1111_1111    # 22bit and
             root_pt = ppn << 12
 
@@ -405,8 +405,8 @@ async def RV32IS_chip_test1(dut):
             break
 
         # PIO
-        pio_val = safe_peek(dut.u_chip.u_mmap_io.PIO_out_reg, 0)
-        if dut.u_chip.u_mmap_io.cpu_wready.value == 1:    # cpu_wvalid=1より1clk遅れだがOK
+        pio_val = safe_peek(dut.u_chip.u_soc.u_mmap_io.PIO_out_reg, 0)
+        if dut.u_chip.u_soc.u_mmap_io.cpu_wready.value == 1:    # cpu_wvalid=1より1clk遅れだがOK
             dut._log.info(f"PIO data at cycle {waited} = {pio_val:08x}")
 
         if col_mismatch_Assert == 1:
@@ -470,8 +470,8 @@ async def RV32IS_chip_test1(dut):
 
         # ↓デバッグログ
         if ((waited % 10000000) == 0):
-            pc_val  = safe_peek(dut.u_chip.u_rv32_core_axi.u_core.pc, 0)
-            adr_val = safe_peek(dut.u_chip.u_rv32_core_axi.program_mem_read_address, 0)
+            pc_val  = safe_peek(dut.u_chip.u_soc.u_rv32_core_axi.u_core.pc, 0)
+            adr_val = safe_peek(dut.u_chip.u_soc.u_rv32_core_axi.program_mem_read_address, 0)
             uart_dbg = (
                 f"0x{last_uart_byte:02x}"
                 if last_uart_byte is not None

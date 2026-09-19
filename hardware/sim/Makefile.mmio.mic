@@ -44,8 +44,8 @@ COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
 # ============================================================
 #  ソース一覧
 # ============================================================
-I2S_MIC_MODEL = ../rtl/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v 
-MMIO_DIR = ../rtl/mmio
+I2S_MIC_MODEL = ../rtl/model/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v
+MMIO_DIR = ../rtl/soc/mmio
 
 SRC_MIC = \
 	$(MMIO_DIR)/I2S_RX/sim_PSC_I2SRX.sv \

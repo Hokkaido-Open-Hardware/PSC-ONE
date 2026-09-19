@@ -25,7 +25,7 @@ def regression(args):
     makefile = subprocess.check_output(['cocotb-config','--makefiles'], env=env,
                                       text=True).strip()+'/Makefile.sim'
     src = args.src
-    legacy = src if args.baseline else SIM.parent/'rtl/npu/src'
+    legacy = src if args.baseline else SIM.parent/'rtl/soc/npu/src'
     pe = [legacy/n for n in ['PSC_NPU_PE_INT.sv','PSC_NPU_PE_Mult.sv','PSC_NPU_PE_SimTop.v']]
     sa = [src/'PSC_NPU_SystolicArray4x4.v']
     if not args.baseline:
@@ -74,7 +74,7 @@ def regression(args):
 
 
 def timing(args):
-    wrapper = args.src.parent.parent/'timing/PSC_NPU_TimingTop.sv'
+    wrapper = SIM.parent/'rtl/tang20k/timing/PSC_NPU_TimingTop.sv'
     cst = wrapper.with_suffix('.cst')
     datapath = ['PSC_NPU_PE_INT.sv','PSC_NPU_PE_Mult.sv'] if args.baseline else [
         'PSC_NPU_MACScheduler.sv','PSC_NPU_Mul4.sv','PSC_NPU_AccBank.sv']
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     parser.add_argument('--timing',action='store_true')
     parser.add_argument('--case')
     args=parser.parse_args()
-    default_src = SIM.parent/'rtl'/('npu' if args.baseline else 'npu_v1')/'src'
+    default_src = SIM.parent/'rtl/soc'/('npu' if args.baseline else 'npu_v1')/'src'
     args.src=(args.src or default_src).resolve();args.build=args.build.resolve()
     args.build.mkdir(parents=True,exist_ok=True)
     timing(args) if args.timing else regression(args)

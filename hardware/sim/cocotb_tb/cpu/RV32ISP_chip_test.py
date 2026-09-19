@@ -190,13 +190,13 @@ async def RV32IS_chip_test1(dut):
     if not os.path.exists(PROGRAM_FILE):
         dut._log.info(f"[FAIL] PROGRAM_FILE not found: {PROGRAM_FILE}")
 
-    rom_write_num = dut.u_chip.u_bt_rom.ROM_WORD.value.to_unsigned()
+    rom_write_num = dut.u_chip.u_soc.u_bt_rom.ROM_WORD.value.to_unsigned()
     dut._log.info(f"PSC_RV32IS_Boot_axi ROM_WORD : {rom_write_num}")
 
     shared_monitor = None
     if os.getenv("CHECK_SHARED_BRIDGE") == "1":
         from cocotb_tb.axi.shared_monitor import SharedMonitor
-        shared_monitor = SharedMonitor(dut.u_chip.u_rv32_core_axi)
+        shared_monitor = SharedMonitor(dut.u_chip.u_soc.u_rv32_core_axi)
         cocotb.start_soon(shared_monitor.run())
 
     # ---- clock, rst ----
@@ -234,8 +234,8 @@ async def RV32IS_chip_test1(dut):
     while waited < timeout_cycles:
         await RisingEdge(dut.clock)
 
-        page_fault_i = dut.u_chip.u_rv32_core_axi.u_core.i_pf.value
-        page_fault_d = dut.u_chip.u_rv32_core_axi.u_core.d_pf.value
+        page_fault_i = dut.u_chip.u_soc.u_rv32_core_axi.u_core.i_pf.value
+        page_fault_d = dut.u_chip.u_soc.u_rv32_core_axi.u_core.d_pf.value
 
         # PageFaultでbreak
         if page_fault_i or page_fault_d:
@@ -248,12 +248,12 @@ async def RV32IS_chip_test1(dut):
             #break
 
         # PIO32 = 0xEE01を検出
-        pio_val = safe_peek(dut.u_chip.u_mmap_io.PIO_out_reg, 0)
+        pio_val = safe_peek(dut.u_chip.u_soc.u_mmap_io.PIO_out_reg, 0)
         if pio_val == 0xEE01:
             dut._log.info(f"PIO matched 0xEE01 at cycle {waited}")
             found = True
             break
-        elif dut.u_chip.u_mmap_io.cpu_wready.value == 1:    # cpu_wvalid=1より1clk遅れだがOK
+        elif dut.u_chip.u_soc.u_mmap_io.cpu_wready.value == 1:    # cpu_wvalid=1より1clk遅れだがOK
             dut._log.info(f"PIO data at cycle {waited} = {pio_val:08x}")
 
         # waited counter
@@ -300,7 +300,7 @@ async def RV32IS_chip_test1(dut):
     # ---------- PIO read ----------
     pio_word = None
     try:
-        pio_word = int(dut.u_chip.u_mmap_io.PIO_out_reg.value)
+        pio_word = int(dut.u_chip.u_soc.u_mmap_io.PIO_out_reg.value)
         pio_word &= 0xFFFFFFFF
     except Exception as e:
         dut._log.warning(f"[WARN] pio skipped: {e}")
