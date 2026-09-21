@@ -33,7 +33,7 @@ module PSC_Register #(
         end
     end
 
-    // Combinational read ports let the v2 issue stage consume the current
+    // Combinational read ports let the issue stage consume the current
     // FIFO head without adding a register-read bubble.  A same-cycle commit
     // dependency is interlocked in PSC_InstructionUnit; keeping that bypass
     // out of the register file prevents commit write data from feeding the
