@@ -1,0 +1,32 @@
+{
+  "relative_to": "archived Horner source",
+  "changed": [
+    "README.md",
+    "src/PSC_NPU_AccBank.sv",
+    "src/PSC_NPU_Controller.v",
+    "src/PSC_NPU_MACScheduler.sv",
+    "src/PSC_NPU_PotLanes.sv",
+    "src/PSC_NPU_SystolicArray4x4.v",
+    "tests/CoreTop.sv",
+    "tests/bank_test.py",
+    "tests/core_test.py",
+    "tests/pot_lanes_test.py",
+    "tests/run.py",
+    "tests/synthesis.py"
+  ],
+  "new_source": [
+    "src/PSC_NPU_AccReadMux.sv",
+    "src/PSC_NPU_ShiftAdd2.sv",
+    "tests/acc_read_test.py",
+    "tests/shared8_report.py",
+    "tests/shiftadd_test.py",
+    "tests/DatapathTiming.sv"
+  ],
+  "new_artifacts": [
+    "results/horner_baseline_source.tar.gz",
+    "results/horner_baseline_manifest.json",
+    "results/shared8/"
+  ],
+  "deleted": [],
+  "fresh_model_vectors_match_test_vectors": true
+}

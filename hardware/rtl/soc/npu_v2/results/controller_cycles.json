@@ -1,0 +1,178 @@
+{
+  "v1": [
+    {
+      "x": 4,
+      "y": 4,
+      "signed": 0,
+      "delay": 1,
+      "cycles": 214
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "signed": 1,
+      "delay": 1,
+      "cycles": 214
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "signed": 1,
+      "delay": 1,
+      "cycles": 394
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "signed": 0,
+      "delay": 5,
+      "cycles": 1280
+    },
+    {
+      "x": 12,
+      "y": 20,
+      "signed": 0,
+      "delay": 5,
+      "cycles": 18624
+    },
+    {
+      "x": 20,
+      "y": 12,
+      "signed": 1,
+      "delay": 5,
+      "cycles": 10509
+    }
+  ],
+  "v2_4": [
+    {
+      "x": 4,
+      "y": 4,
+      "signed": 0,
+      "delay": 1,
+      "cycles": 262
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "signed": 1,
+      "delay": 1,
+      "cycles": 262
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "signed": 1,
+      "delay": 1,
+      "cycles": 490
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "signed": 0,
+      "delay": 5,
+      "cycles": 1470
+    },
+    {
+      "x": 12,
+      "y": 20,
+      "signed": 0,
+      "delay": 5,
+      "cycles": 22189
+    },
+    {
+      "x": 20,
+      "y": 12,
+      "signed": 1,
+      "delay": 5,
+      "cycles": 12669
+    }
+  ],
+  "v2_8": [
+    {
+      "x": 4,
+      "y": 4,
+      "signed": 0,
+      "delay": 1,
+      "cycles": 214
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "signed": 1,
+      "delay": 1,
+      "cycles": 214
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "signed": 1,
+      "delay": 1,
+      "cycles": 394
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "signed": 0,
+      "delay": 5,
+      "cycles": 1280
+    },
+    {
+      "x": 12,
+      "y": 20,
+      "signed": 0,
+      "delay": 5,
+      "cycles": 18624
+    },
+    {
+      "x": 20,
+      "y": 12,
+      "signed": 1,
+      "delay": 5,
+      "cycles": 10509
+    }
+  ],
+  "v2_16": [
+    {
+      "x": 4,
+      "y": 4,
+      "signed": 0,
+      "delay": 1,
+      "cycles": 190
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "signed": 1,
+      "delay": 1,
+      "cycles": 190
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "signed": 1,
+      "delay": 1,
+      "cycles": 346
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "signed": 0,
+      "delay": 5,
+      "cycles": 1181
+    },
+    {
+      "x": 12,
+      "y": 20,
+      "signed": 0,
+      "delay": 5,
+      "cycles": 16794
+    },
+    {
+      "x": 20,
+      "y": 12,
+      "signed": 1,
+      "delay": 5,
+      "cycles": 9429
+    }
+  ]
+}

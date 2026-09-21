@@ -155,13 +155,18 @@ NPU_SRC_DIR := ../rtl/soc/npu_v1/src
 SE_YOSYS_INPUT := $(addprefix $(NPU_SRC_DIR)/,\
 	PSC_NPU_Controller.v PSC_NPU_ReadController.v PSC_NPU_SystolicArray4x4.v \
 	PSC_NPU_MACScheduler.sv PSC_NPU_Mul4.sv PSC_NPU_AccBank.sv)
+else ifeq ($(NPU_VERSION),v2)
+NPU_SRC_DIR := ../rtl/soc/npu_v2/src
+SE_YOSYS_INPUT := $(addprefix $(NPU_SRC_DIR)/,\
+	PSC_NPU_Controller.v PSC_NPU_ReadController.v PSC_NPU_SystolicArray4x4.v \
+	PSC_NPU_MACScheduler.sv PSC_NPU_PotLanes.sv PSC_NPU_AccBank.sv)
 else ifeq ($(NPU_VERSION),legacy)
 NPU_SRC_DIR := ../rtl/soc/npu/src
 SE_YOSYS_INPUT := $(addprefix $(NPU_SRC_DIR)/,\
 	PSC_NPU_Controller.v PSC_NPU_ReadController.v PSC_NPU_SystolicArray4x4.v \
 	PSC_NPU_PE_INT.sv PSC_NPU_PE_Mult.sv)
 else
-$(error NPU_VERSION=$(NPU_VERSION) is invalid. Use v1 / legacy)
+$(error NPU_VERSION=$(NPU_VERSION) is invalid. Use v1 / v2 / legacy)
 endif
 
 SE_YOSYS_TOP := PSC_NPU_Controller

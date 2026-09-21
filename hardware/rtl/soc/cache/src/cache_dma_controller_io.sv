@@ -6,6 +6,7 @@
 //   - 単一 PIO アドレスはキャッシュ迂回で即応答
 //   - FPGA向け：BRAMはリセットせず、起動時に S_INIT で全ライン invalid 化
 //   - byte書き込み対応
+//   - 2-line REG read cache: registered requests respond on the second clock
 // ===================================================================
 `timescale 1ns/1ps
 module cache_dma_controller_io #(
@@ -126,6 +127,7 @@ module cache_dma_controller_io #(
         S_IDLE                  = 5'd1,
         S_CASHE_START           = 5'd2,
         S_LOOKUP_ISSUE          = 5'd4,
+        S_LOOKUP_READ           = 5'd3,
         S_COMPARE               = 5'd6,
         S_WRITEBACK             = 5'd7,
         S_ALLOC_WAIT            = 5'd8,
@@ -152,6 +154,13 @@ module cache_dma_controller_io #(
     // ---------------- 内部レジスタ ----------------
     logic [4:0]                 state;
 
+    // Only two recent lines are duplicated in FFs; the backing tag/data RAMs
+    // remain unchanged. Dirty ownership stays exclusively in the backing cache.
+    logic [CACHE_DATA_WIDTH-1:0] line_cache_data [0:1];
+    logic [ADDR_WIDTH-OFFSET_BITS-1:0] line_cache_addr [0:1];
+    logic [1:0]                 line_cache_valid;
+    logic                       line_cache_lru; // victim when both entries are valid
+
     // 初期化スイープ
     logic  [INDEX_WIDTH_BA-1:0] init_idx;
 
@@ -174,13 +183,13 @@ module cache_dma_controller_io #(
     logic                       cpu_cache_wb_latch;
 
     // アドレス
-    wire [ADDR_WIDTH-1:0]     cpu_byte_raddr =  cpu_raddr[31:0];  
-    wire [ADDR_WIDTH-1:0]     cpu_word_raddr =  cpu_raddr[31:2];   // cpu_add[1:0]を削除
-    wire [ADDR_WIDTH-1:0]     cpu_byte_waddr =  cpu_waddr[31:0];  
-    wire [ADDR_WIDTH-1:0]     cpu_word_waddr =  cpu_waddr[31:2];   // cpu_add[1:0]を削除
+    wire [ADDR_WIDTH-1:0] cpu_byte_raddr = cpu_raddr[31:0];
+    wire [ADDR_WIDTH-1:0] cpu_word_raddr = cpu_raddr[31:2];   // cpu_add[1:0]を削除
+    wire [ADDR_WIDTH-1:0] cpu_byte_waddr = cpu_waddr[31:0];
+    wire [ADDR_WIDTH-1:0] cpu_word_waddr = cpu_waddr[31:2];   // cpu_add[1:0]を削除
 
-    wire [ADDR_WIDTH-1:0]     sa_byte_addr  =  sa_addr[31:0];  
-    wire [ADDR_WIDTH-1:0]     sa_word_addr  =  sa_addr[31:2];   // cpu_add[1:0]を削除
+    wire [ADDR_WIDTH-1:0] sa_byte_addr = sa_addr[31:0];
+    wire [ADDR_WIDTH-1:0] sa_word_addr = sa_addr[31:2];   // cpu_add[1:0]を削除
 
     // ルックアップ（次拍でBRAM出力）
     logic  [INDEX_WIDTH_BA-1:0] cur_index_r;      // RAM アドレス
@@ -192,9 +201,9 @@ module cache_dma_controller_io #(
     wire [TAG_ENTRY_WIDTH-1:0]      tag_read;
 
     // アンパック
-    wire [TAG_WIDTH-1:0]          tag_read_tag   = tag_read[TAG_ENTRY_WIDTH-1:2];
-    wire                          tag_read_valid = tag_read[1];
-    wire                          tag_read_dirty = tag_read[0];
+    wire [TAG_WIDTH-1:0] tag_read_tag = tag_read[TAG_ENTRY_WIDTH-1:2];
+    wire tag_read_valid = tag_read[1];
+    wire tag_read_dirty = tag_read[0];
 
     // Data RAM I/F
     logic                           data_we;
@@ -298,23 +307,62 @@ module cache_dma_controller_io #(
         end
     endfunction
 
+    // Arbitration feeds only the request registers. Slots preserve simultaneous
+    // and busy-time requests; an idle port can enter the registers directly.
+    wire select_mmu = mmu_req_slot_valid || mmu_valid;
+    wire select_sa = !select_mmu && (sa_req_slot_valid || sa_valid);
+    wire request_pending = select_mmu || select_sa || cpu_req_slot_valid ||
+        cpu_rvalid || cpu_wvalid;
+    wire [ADDR_WIDTH-1:0] selected_cpu_addr = cpu_req_slot_valid
+        ? cpu_byte_addr_slot : cpu_wvalid ? cpu_waddr : cpu_raddr;
+    wire [ADDR_WIDTH-1:0] selected_addr = select_mmu
+        ? (mmu_req_slot_valid ? mmu_addr_slot : mmu_addr)
+        : select_sa ? (sa_req_slot_valid ? sa_byte_addr_slot : sa_addr)
+        : selected_cpu_addr;
+    wire selected_write = !select_mmu && (select_sa
+        ? (sa_req_slot_valid ? sa_rw_latch : sa_rw)
+        : (cpu_req_slot_valid ? cpu_rw_latch : cpu_rw));
+    wire [CPU_DATA_WIDTH-1:0] selected_wdata = select_sa
+        ? (sa_req_slot_valid ? sa_data_latch : sa_data)
+        : (cpu_req_slot_valid ? cpu_data_latch : cpu_data);
+    wire [2:0] selected_write_sel = select_sa ? 3'b010
+        : cpu_req_slot_valid ? cpu_write_sel_latch : cpu_write_sel;
+
+    wire line_cache_maintenance = cpu_cache_clear || cpu_cache_wb ||
+        cpu_cache_clear_latch || cpu_cache_wb_latch || (state == S_INIT) ||
+        (state >= S_CACHE_WB_START);
+    wire req_mmio = !req_from_mmu && !req_from_sa && mmio_hit(req_addr_b);
+    wire [1:0] line_cache_match = {
+        line_cache_valid[1] && (line_cache_addr[1] == req_addr_b[ADDR_WIDTH-1:OFFSET_BITS]),
+        line_cache_valid[0] && (line_cache_addr[0] == req_addr_b[ADDR_WIDTH-1:OFFSET_BITS])
+    };
+    wire line_cache_hit = (state == S_CASHE_START) &&
+        !req_is_write && !req_mmio && !line_cache_maintenance && (|line_cache_match);
+    // Select a word from each line first, then mux only CPU_DATA_WIDTH bits.
+    wire [CPU_DATA_WIDTH-1:0] line_cache_word = line_cache_match[0]
+        ? pick_word(line_cache_data[0], req_word_sel_r)
+        : pick_word(line_cache_data[1], req_word_sel_r);
+
     // Response enables are disjoint by state. Keep the tag comparison out
     // of the nested write/miss/arbitration mux tree feeding output FF enables.
-    wire read_hit                               = (state == S_COMPARE) && !req_is_write &&
-                                                lookup_valid && (lookup_tag == cur_tag_r);
-    wire read_fill                              = (state == S_ALLOC_WAIT) && mem_ready && !req_is_write;
-    wire read_response                          = read_hit || read_fill;
-    wire cpu_read_response                      = read_response && !req_from_mmu && !req_from_sa;
-    wire mmio_response                          = (state == S_MMIO_WAIT) && mmio_ready;
-    wire protected_response                     = (state == S_CASHE_START) &&
-                                                !mmu_req_slot_valid && !sa_req_slot_valid && cpu_req_slot_valid &&
-                                                PROTECT_MODE && cpu_rw_latch && (cpu_byte_addr_slot < PROTECT_ADDR);
-    wire [CPU_DATA_WIDTH-1:0] response_word     = (state == S_ALLOC_WAIT)
-                                                ? pick_word(mem_data_in, req_word_sel_r)
-                                                : pick_word(data_read, req_word_sel_r);
+    wire read_hit           = (state == S_COMPARE) && !req_is_write &&
+        lookup_valid && (lookup_tag == cur_tag_r);
+    wire read_fill          = (state == S_ALLOC_WAIT) && mem_ready && !req_is_write;
+    wire read_response      = line_cache_hit || read_hit || read_fill;
+    wire cpu_read_response  = read_response && !req_from_mmu && !req_from_sa;
+    wire mmio_response      = (state == S_MMIO_WAIT) && mmio_ready;
+    wire protected_response = (state == S_CASHE_START) &&
+        !req_from_mmu && !req_from_sa &&
+        PROTECT_MODE && req_is_write && (req_addr_b < PROTECT_ADDR);
+    // State-disjoint data sources form one shared word mux. Output enables
+    // depend only on the registered owner and the matching response condition.
+    wire [CPU_DATA_WIDTH-1:0] response_word =
+        ({CPU_DATA_WIDTH{state == S_CASHE_START}} & line_cache_word) |
+        ({CPU_DATA_WIDTH{state == S_COMPARE}} & pick_word(data_read, req_word_sel_r)) |
+        ({CPU_DATA_WIDTH{state == S_ALLOC_WAIT}} & pick_word(mem_data_in, req_word_sel_r));
     wire [CPU_DATA_WIDTH-1:0] cpu_response_data =
-                                                ({CPU_DATA_WIDTH{(state == S_COMPARE) || (state == S_ALLOC_WAIT)}} & response_word) |
-                                                ({CPU_DATA_WIDTH{state == S_MMIO_WAIT}} & mmio_rdata);
+        ({CPU_DATA_WIDTH{!protected_response}} & response_word) |
+        ({CPU_DATA_WIDTH{state == S_MMIO_WAIT}} & mmio_rdata);
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
@@ -333,15 +381,15 @@ module cache_dma_controller_io #(
 
     // Memory request registers have a common, flat enable. In particular,
     // the eviction line does not need the priority mux for every FSM branch.
-    wire cache_match                          = lookup_valid && (lookup_tag == cur_tag_r);
-    wire dirty_victim                         = lookup_valid && lookup_dirty;
-    wire miss_request                         = (state == S_COMPARE) && !cache_match &&
+    wire cache_match        = lookup_valid && (lookup_tag == cur_tag_r);
+    wire dirty_victim       = lookup_valid && lookup_dirty;
+    wire miss_request       = (state == S_COMPARE) && !cache_match &&
         !(req_is_write && PROTECT_MODE && (req_addr_b < PROTECT_ADDR)) && mem_req_ready;
-    wire eviction_request                     = miss_request && dirty_victim;
-    wire post_alloc_request                   = (state == S_POST_WBALLOC) && mem_req_ready;
-    wire sweep_request                        = (state == S_CACHE_WB_WRITE_REQ) && mem_req_ready;
-    wire writeback_request                    = eviction_request || sweep_request;
-    wire memory_request                       = miss_request || post_alloc_request || sweep_request;
+    wire eviction_request   = miss_request && dirty_victim;
+    wire post_alloc_request = (state == S_POST_WBALLOC) && mem_req_ready;
+    wire sweep_request      = (state == S_CACHE_WB_WRITE_REQ) && mem_req_ready;
+    wire writeback_request  = eviction_request || sweep_request;
+    wire memory_request     = miss_request || post_alloc_request || sweep_request;
     wire [ADDR_WIDTH-1:0] memory_request_addr = writeback_request
         ? wb_addr_ba_f(tag_read_tag, cur_index_r) : alloc_addr_ba_f(req_addr_b);
 
@@ -367,6 +415,53 @@ module cache_dma_controller_io #(
     // conditions to line-wide FF enables. The merge datapath itself is unchanged.
     wire cache_write_hit = (state == S_COMPARE) && req_is_write && cache_match;
     wire cache_fill      = (state == S_ALLOC_WAIT) && mem_ready;
+
+    // Refresh an existing copy first, otherwise use an invalid entry, then
+    // LRU. Never install the same line in both entries.
+    wire [1:0] line_cache_fill_match = {
+        line_cache_valid[1] && (line_cache_addr[1] == req_addr_b[ADDR_WIDTH-1:OFFSET_BITS]),
+        line_cache_valid[0] && (line_cache_addr[0] == req_addr_b[ADDR_WIDTH-1:OFFSET_BITS])
+    };
+    wire line_cache_fill_slot = line_cache_fill_match[0] ? 1'b0 :
+        line_cache_fill_match[1] ? 1'b1 : !line_cache_valid[0] ? 1'b0 :
+        !line_cache_valid[1] ? 1'b1 : line_cache_lru;
+
+    // Stores and maintenance conservatively invalidate both entries. A
+    // backing-cache replacement invalidates only copies of its index, so a
+    // fill at another index can keep the other REG line. External DMA still
+    // uses the existing WB/clear software protocol. Maintenance wins over fill.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            line_cache_valid <= 2'b00;
+            line_cache_lru <= 1'b0;
+        end else if (line_cache_maintenance || cache_write_hit ||
+                     (cache_fill && req_is_write)) begin
+            line_cache_valid <= 2'b00;
+            line_cache_lru <= 1'b0;
+        end else if (miss_request) begin
+            if (line_cache_addr[0][INDEX_WIDTH_BA-1:0] == cur_index_r)
+                line_cache_valid[0] <= 1'b0;
+            if (line_cache_addr[1][INDEX_WIDTH_BA-1:0] == cur_index_r)
+                line_cache_valid[1] <= 1'b0;
+        end else if (read_hit || read_fill) begin
+            line_cache_valid[line_cache_fill_slot] <= 1'b1;
+            line_cache_lru <= !line_cache_fill_slot;
+        end else if (line_cache_hit)
+            line_cache_lru <= line_cache_match[0];
+    end
+    // Exactly two FF lines with individual enables and no line-wide reset.
+    genvar reg_line;
+    generate
+        for (reg_line = 0; reg_line < 2; reg_line = reg_line + 1) begin : g_reg_line
+            always_ff @(posedge clock) begin
+                if ((read_hit || read_fill) && (line_cache_fill_slot == reg_line)) begin
+                    line_cache_data[reg_line] <= read_fill ? mem_data_in : data_read;
+                    line_cache_addr[reg_line] <= req_addr_b[ADDR_WIDTH-1:OFFSET_BITS];
+                end
+            end
+        end
+    endgenerate
+
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             data_write <= {CACHE_DATA_WIDTH{1'b0}};
@@ -377,19 +472,13 @@ module cache_dma_controller_io #(
         end
     end
 
-    // Present the arbitrated index to tag RAM in the request-selection
-    // cycle. Its synchronous result can then be captured in LOOKUP_ISSUE,
-    // without adding a cycle to the hit path. Data RAM keeps its old address
-    // schedule; only the small tag result needs an extra timing boundary.
-    wire [INDEX_WIDTH_BA-1:0] selected_tag_index = mmu_req_slot_valid
-        ? mmu_addr_slot[TAGLSB-1:OFFSET_BITS] : sa_req_slot_valid
-        ? sa_byte_addr_slot[TAGLSB-1:OFFSET_BITS] : cpu_byte_addr_slot[TAGLSB-1:OFFSET_BITS];
-    wire [INDEX_WIDTH_BA-1:0] tag_index          = (state == S_CASHE_START)
-        ? selected_tag_index : cur_index_r;
+    // Both RAMs see only cur_index_r. It changes for a demand lookup only
+    // after a registered REG-cache miss; REG hits leave RAM addresses held.
+    // READ waits for the synchronous RAM, ISSUE captures its small tag result.
     logic [TAG_ENTRY_WIDTH-1:0] lookup_tag_r;
-    wire [TAG_WIDTH-1:0] lookup_tag              = lookup_tag_r[TAG_ENTRY_WIDTH-1:2];
-    wire                 lookup_valid            = lookup_tag_r[1];
-    wire                 lookup_dirty            = lookup_tag_r[0];
+    wire [TAG_WIDTH-1:0] lookup_tag = lookup_tag_r[TAG_ENTRY_WIDTH-1:2];
+    wire lookup_valid = lookup_tag_r[1];
+    wire lookup_dirty = lookup_tag_r[0];
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n)
             lookup_tag_r <= {TAG_ENTRY_WIDTH{1'b0}};
@@ -535,99 +624,57 @@ module cache_dma_controller_io #(
                 // ---------------- IDLE ----------------
                 // state = 1
                 S_IDLE: begin
-                    if (cpu_req_slot_valid | sa_req_slot_valid | mmu_req_slot_valid) begin
+                    if (request_pending) begin
+                        req_from_mmu    <= select_mmu;
+                        req_from_sa     <= select_sa;
+                        req_is_write    <= selected_write;
+                        req_addr_b      <= selected_addr;
+                        req_addr_w      <= selected_addr >> 2;
+                        req_word_sel_r  <= selected_addr[OFFSET_BITS-1:2];
+                        req_wdata       <= selected_wdata;
+                        req_write_sel_r <= selected_write_sel;
+                        byte_sel        <= selected_addr[1:0];
+                        half_sel        <= selected_addr[1];
+                        cur_tag_r       <= selected_addr[TAGMSB:TAGLSB];
+                        if (select_mmu) mmu_req_slot_valid <= 1'b0;
+                        else if (select_sa) sa_req_slot_valid <= 1'b0;
+                        else cpu_req_slot_valid <= 1'b0;
                         state <= S_CASHE_START;
-                    end else begin
-                        if (cpu_cache_clear_latch) begin
-                            state       <= S_INIT;
-                            cpu_cache_clear_latch <= 1'b0;
-                        end
-                        else if (cpu_cache_wb_latch) begin
-                            state       <= S_CACHE_WB_START;
-                            cpu_cache_wb_latch <= 1'b0;
-                        end
+                    end else if (cpu_cache_clear_latch) begin
+                        state <= S_INIT;
+                        cpu_cache_clear_latch <= 1'b0;
+                    end else if (cpu_cache_wb_latch) begin
+                        state <= S_CACHE_WB_START;
+                        cpu_cache_wb_latch <= 1'b0;
                     end
                 end
 
-                // ---------------- S_CASHE_START (旧: S_IDLE) ----------------
-                // state = 2
+                // Registered request lookup: accepting edge = clock 1,
+                // REG data and ready are registered here at clock 2.
                 S_CASHE_START: begin
-                    // cpu_validよりmmu_valid優先.
-                    if (mmu_req_slot_valid) begin
-                        // ===== MMU READ ONLY =====
-                        req_from_mmu    <= 1'b1;
-                        req_from_sa     <= 1'b0;
-                        req_is_write    <= 1'b0;
-                        req_addr_b      <= mmu_addr_slot;
-                        req_addr_w      <= mmu_addr_slot[31:2];
-                        req_word_sel_r  <= mmu_addr_slot[OFFSET_BITS-1:2];
-                        mmu_req_slot_valid <= 1'b0;    // _valid をクリア
-
-                        // MMIO は MMU では使わない（即ミス扱い or 無視）
-                        cur_index_r <= mmu_addr_slot[TAGLSB-1:OFFSET_BITS];
-                        cur_tag_r   <= mmu_addr_slot[TAGMSB:TAGLSB];
-                        state       <= S_LOOKUP_ISSUE;
-
-                    // cpu_validよりsa_valid優先.
-                    end else if (sa_req_slot_valid) begin
-                        req_from_mmu    <= 1'b0;
-                        req_from_sa     <= 1'b1;
-                        req_is_write    <= sa_rw_latch;
-                        req_addr_w      <= sa_word_addr_slot;
-                        req_addr_b      <= sa_byte_addr_slot;
-                        req_wdata       <= sa_data_latch;
-                        req_write_sel_r <= sa_write_sel_latch;
-                        byte_sel        <= sa_byte_addr_slot[1:0];
-                        half_sel        <= sa_byte_addr_slot[1];
-                        req_word_sel_r  <= sa_word_addr_slot[WORD_BITS-1:0];
-                        // MMIO は SA では使わない（即ミス扱い or 無視）
-                        cur_index_r     <= sa_byte_addr_slot[TAGLSB-1:OFFSET_BITS];
-                        cur_tag_r       <= sa_byte_addr_slot[TAGMSB:TAGLSB];
-                        state           <= S_LOOKUP_ISSUE;
-
-                    end else if (cpu_req_slot_valid) begin
-                        // 要求ラッチ
-                        req_from_mmu    <= 1'b0;
-                        req_from_sa     <= 1'b0;
-                        req_is_write    <= cpu_rw_latch;
-                        req_addr_w      <= cpu_word_addr_slot;
-                        req_addr_b      <= cpu_byte_addr_slot;
-                        req_wdata       <= cpu_data_latch;
-                        req_write_sel_r <= cpu_write_sel_latch;
-                        byte_sel        <= cpu_byte_addr_slot[1:0];
-                        half_sel        <= cpu_byte_addr_slot[1];
-                        req_word_sel_r  <= cpu_word_addr_slot[WORD_BITS-1:0];
-                        cpu_req_slot_valid <= 1'b0;    // _valid をクリア
-
-                        // ---------- PROTECT MODE: 書き込み禁止 ----------
-                        if (PROTECT_MODE && cpu_rw_latch && (cpu_byte_addr_slot < PROTECT_ADDR)) begin
-                            cpu_ready    <= 1'b1;
-                            state        <= S_IDLE;
-                        end
-
-                        // ---------- PIO：MMIO ----------
-                        else if (mmio_hit(cpu_byte_addr_slot)) begin
-                            if(cpu_rw_latch) begin
-                                mmio_valid  <= 1'b1;
-                                mmio_rw     <= 1'b1;
-                                mmio_addr   <= cpu_byte_addr_slot;
-                                mmio_wdata  <= cpu_data_latch;
-                                state       <= S_MMIO_WAIT;
-                            end else begin
-                                mmio_valid  <= 1'b1;
-                                mmio_rw     <= 1'b0;
-                                mmio_addr   <= cpu_byte_addr_slot;
-                                state       <= S_MMIO_WAIT;
-                            end
-                        end
-
-                        // ---------- キャッシュルックアップ ----------
-                        else begin
-                            cur_index_r <= cpu_byte_addr_slot[TAGLSB-1:OFFSET_BITS];
-                            cur_tag_r   <= cpu_byte_addr_slot[TAGMSB:TAGLSB];
-                            state       <= S_LOOKUP_ISSUE;
-                        end
+                    if (line_cache_hit) begin
+                        if (req_from_mmu) mmu_ready <= 1'b1;
+                        else if (req_from_sa) sa_ready <= 1'b1;
+                        else cpu_ready <= 1'b1;
+                        cache_hit_pulse <= 1'b1;
+                        state <= S_IDLE;
+                    end else if (protected_response) begin
+                        cpu_ready <= 1'b1;
+                        state <= S_IDLE;
+                    end else if (req_mmio) begin
+                        mmio_valid <= 1'b1;
+                        mmio_rw <= req_is_write;
+                        mmio_addr <= req_addr_b;
+                        mmio_wdata <= req_wdata;
+                        state <= S_MMIO_WAIT;
+                    end else begin
+                        cur_index_r <= req_addr_b[TAGLSB-1:OFFSET_BITS];
+                        state <= S_LOOKUP_READ;
                     end
+                end
+
+                S_LOOKUP_READ: begin
+                    state <= S_LOOKUP_ISSUE;
                 end
 
                 // ---------------- MMIO WAIT ----------------
@@ -827,7 +874,7 @@ module cache_dma_controller_io #(
     ) u_tag (
         .clk       (clock),
         .we        (tag_we),
-        .index     (tag_index),
+        .index     (cur_index_r),
         .tag_write (tag_write),
         .tag_read  (tag_read)
     );

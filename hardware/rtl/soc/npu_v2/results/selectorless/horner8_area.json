@@ -1,0 +1,90 @@
+{
+  "device": "GW2AR-LV18QN88C8/I7",
+  "family": "GW2A-18C",
+  "target_MHz": 81,
+  "yosys": "Yosys 0.68+136 (git sha1 c30457480, Release, GNU /usr/bin/c++ 15.2.0)",
+  "nextpnr": "\"nextpnr-himbaechel\" -- Next Generation Place and Route (Version nextpnr-0.11.1-18-gdec04b3b)",
+  "serial_terms": 0,
+  "wrapper_sha256": "034dd6ad9359f37990c7cd859f7291638c21e05c680f0960c5c45d8104ca0fb8",
+  "variants": {
+    "v2_4": {
+      "cells": {
+        "DFFC": 37,
+        "LUT1": 57,
+        "ALU": 865,
+        "LUT3": 375,
+        "DFFCE": 1625,
+        "LUT2": 957,
+        "LUT4": 874,
+        "MUX2_LUT5": 115,
+        "DFFP": 18,
+        "OBUF": 1,
+        "$scopeinfo": 6,
+        "GND": 1,
+        "VCC": 1,
+        "IBUF": 2,
+        "MULT9X9": 3,
+        "DFFPE": 3,
+        "MUX2_LUT6": 4
+      },
+      "LUT": 2263,
+      "FF": 1683,
+      "MUX": 119,
+      "ALU": 865,
+      "MULT9X9": 3,
+      "MULT18X18": 0,
+      "source_sha256": {
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_AccBank.sv": "548b9b7877c70c6beb0233dd95d6e894039fb35049dc0f565a9e68c72d2e3809",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v": "8aa8894792d7ce2f846f3c3fbd3daeb10d1cc7be3ca65ea2c91dcb7b0637763c",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_MACScheduler.sv": "2bad1dde4b5c598f79fc88187a3d74f3a3b54f4b79d4011cce6d266dc1c53cb5",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv": "ec96151b032bcd450132bd76a5456d774adfc777fc9810a98538b326b1565df3",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ReadController.v": "55acb12f03ba289f7ec41caa823fecdb2eba2195f22e6aed594caee839c63852",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_SystolicArray4x4.v": "2479148d40954e071a97bd256357c774d29f89ee388ab7a53024af1cc4137721"
+      },
+      "arithmetic": {
+        "cells": {
+          "LUT3": 104,
+          "ALU": 100,
+          "LUT2": 16,
+          "MUX2_LUT5": 72,
+          "LUT4": 253,
+          "DFFCE": 327,
+          "IBUF": 267,
+          "LUT1": 9,
+          "GND": 1,
+          "VCC": 1,
+          "OBUF": 148,
+          "DFFC": 1
+        },
+        "LUT": 382,
+        "FF": 328,
+        "MUX": 72,
+        "ALU": 100,
+        "MULT9X9": 0,
+        "MULT18X18": 0
+      },
+      "arithmetic_generic_cells": {
+        "$add": 4,
+        "$adffe": 9,
+        "$reduce_and": 1,
+        "$logic_not": 5,
+        "$eq": 9,
+        "$logic_and": 21,
+        "$logic_or": 4,
+        "$ne": 4,
+        "$reduce_bool": 4,
+        "$neg": 4,
+        "$adff": 1,
+        "$shiftx": 8,
+        "$mux": 20
+      },
+      "selector_audit": "PASS: no activation shift/pmux, only <=4 context operand selection",
+      "full_hierarchy_selector_audit": {
+        "status": "PASS",
+        "cells_checked": 89,
+        "scope": "flattened lane and scheduler; Controller/read/ACC/output selection preserved from baseline"
+      },
+      "pnr": []
+    }
+  }
+}

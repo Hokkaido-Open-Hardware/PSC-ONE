@@ -1,0 +1,160 @@
+{
+  "new_v2": {
+    "PASS": 8,
+    "FAIL": 0,
+    "SKIP": 0,
+    "tests": [
+      {
+        "name": "every_acc_id_and_out_of_range",
+        "classname": "acc_read_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/acc_read_test.py",
+        "lineno": "6",
+        "time": "0.061051368713378906",
+        "sim_time_ns": "3200.0",
+        "ratio_time": "52414.87729821766"
+      },
+      {
+        "name": "wrapping_clear_priority_lane_ownership",
+        "classname": "bank_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/bank_test.py",
+        "lineno": "6",
+        "time": "0.23314309120178223",
+        "sim_time_ns": "20020.0",
+        "ratio_time": "85870.01183180229"
+      },
+      {
+        "name": "matrix_cycles_and_transactions",
+        "classname": "controller_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/controller_test.py",
+        "lineno": "12",
+        "time": "1.5639023780822754",
+        "sim_time_ns": "281680.0",
+        "ratio_time": "180113.54413656445"
+      },
+      {
+        "name": "phases_accumulator_reset_snapshot_back_to_back",
+        "classname": "core_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/core_test.py",
+        "lineno": "13",
+        "time": "0.2266848087310791",
+        "sim_time_ns": "21900.0",
+        "ratio_time": "96609.9145442976"
+      },
+      {
+        "name": "actual_tflite_all_channels",
+        "classname": "core_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/core_test.py",
+        "lineno": "59",
+        "time": "3.2376720905303955",
+        "sim_time_ns": "419220.0",
+        "ratio_time": "129481.92042861368"
+      },
+      {
+        "name": "exhaustive_shared_even_odd_complete_products",
+        "classname": "pot_lanes_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/pot_lanes_test.py",
+        "lineno": "5",
+        "time": "2.560157299041748",
+        "sim_time_ns": "250910.0",
+        "ratio_time": "98005.6967960188"
+      },
+      {
+        "name": "full_tflite_fc1_fc2_all_samples",
+        "classname": "model_controller_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/model_controller_test.py",
+        "lineno": "13",
+        "time": "53.84061336517334",
+        "sim_time_ns": "8659120.0",
+        "ratio_time": "160828.77699162933"
+      },
+      {
+        "name": "exhaustive_independent_shiftadd",
+        "classname": "shiftadd_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/shiftadd_test.py",
+        "lineno": "5",
+        "time": "1.9731924533843994",
+        "sim_time_ns": "131072.0",
+        "ratio_time": "66426.36392369465"
+      }
+    ]
+  },
+  "v1": {
+    "PASS": 5,
+    "FAIL": 0,
+    "SKIP": 0,
+    "tests": [
+      {
+        "name": "independent_acc_scoreboard",
+        "classname": "cocotb_tb.npu.streaming_bank_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/cocotb_tb/npu/streaming_bank_test.py",
+        "lineno": "7",
+        "time": "0.11568212509155273",
+        "sim_time_ns": "18000.0",
+        "ratio_time": "155598.80133386643"
+      },
+      {
+        "name": "matrix_cycles_and_transactions",
+        "classname": "cocotb_tb.npu.streaming_controller_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/cocotb_tb/npu/streaming_controller_test.py",
+        "lineno": "11",
+        "time": "1.5325336456298828",
+        "sim_time_ns": "312730.0",
+        "ratio_time": "204060.77275482303"
+      },
+      {
+        "name": "exhaustive_signed_unsigned",
+        "classname": "cocotb_tb.npu.streaming_mul_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/cocotb_tb/npu/streaming_mul_test.py",
+        "lineno": "5",
+        "time": "2.8034656047821045",
+        "sim_time_ns": "409640.0",
+        "ratio_time": "146119.14599602827"
+      },
+      {
+        "name": "snapshot_drain_and_streaming",
+        "classname": "cocotb_tb.npu.streaming_acc_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/cocotb_tb/npu/streaming_acc_test.py",
+        "lineno": "15",
+        "time": "0.44438982009887695",
+        "sim_time_ns": "30800.0",
+        "ratio_time": "69308.51834802829"
+      },
+      {
+        "name": "padded_2x2_and_k_accumulation",
+        "classname": "cocotb_tb.npu.streaming_acc_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/cocotb_tb/npu/streaming_acc_test.py",
+        "lineno": "88",
+        "time": "0.03128409385681152",
+        "sim_time_ns": "8075.999999999996",
+        "ratio_time": "258150.35707807785"
+      }
+    ]
+  },
+  "batch_measurement": {
+    "PASS": 2,
+    "FAIL": 0,
+    "SKIP": 0,
+    "tests": [
+      {
+        "name": "phases_accumulator_reset_snapshot_back_to_back",
+        "classname": "core_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/core_test.py",
+        "lineno": "13",
+        "time": "0.22209906578063965",
+        "sim_time_ns": "21900.0",
+        "ratio_time": "98604.6470885652"
+      },
+      {
+        "name": "actual_tflite_all_channels",
+        "classname": "core_test",
+        "file": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/core_test.py",
+        "lineno": "79",
+        "time": "3.143739700317383",
+        "sim_time_ns": "419220.0",
+        "ratio_time": "133350.73509988017"
+      }
+    ]
+  },
+  "preserved_baseline_result_files": 41,
+  "verilator": "exit 0; three pre-existing Controller width warnings"
+}

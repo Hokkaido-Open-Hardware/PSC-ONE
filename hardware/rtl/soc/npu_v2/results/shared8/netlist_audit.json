@@ -1,0 +1,934 @@
+{
+  "packed_read": {
+    "status": "PASS",
+    "shiftx_cells": 0,
+    "variable_shift_cells": 0
+  },
+  "block": {
+    "status": "PASS",
+    "generic_cells": {
+      "$add": 1,
+      "$logic_not": 3,
+      "$logic_and": 1,
+      "$neg": 2,
+      "$pmux": 2,
+      "$eq": 14,
+      "$mux": 3
+    },
+    "shift_selection": "two 16-bit 8-choice fixed-candidate muxes per block",
+    "no_variable_shift": true,
+    "no_state_or_accumulator": true
+  },
+  "physical_shiftadd_instances": 8,
+  "hierarchical_muxes": {
+    "$paramod$307663d54ccd312905f02689dff12188c7776671\\PSC_NPU_ReadController": [
+      {
+        "type": "$pmux",
+        "width": 2,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 2,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 2,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 2,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 3,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 3,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 3,
+        "select_width": 5
+      },
+      {
+        "type": "$mux",
+        "width": 3,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 3,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 3,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      }
+    ],
+    "$paramod$35b960564bfeb2f69dde1a821302e63f94ecfeef\\PSC_NPU_Controller": [
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 7
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 7
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 6,
+        "select_width": 16
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 5
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 5
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 6,
+        "select_width": 5
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 6,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 8,
+        "select_width": 4
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 8,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 8,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 2
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      }
+    ],
+    "$paramod\\PSC_NPU_AccBank\\LANES=s32'00000000000000000000000000001000": [
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      }
+    ],
+    "$paramod\\PSC_NPU_MACScheduler\\LANES=s32'00000000000000000000000000001000": [
+      {
+        "type": "$mux",
+        "width": 1,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 1,
+        "select_width": 2
+      },
+      {
+        "type": "$pmux",
+        "width": 3,
+        "select_width": 5
+      },
+      {
+        "type": "$mux",
+        "width": 3,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 3,
+        "select_width": 0
+      }
+    ],
+    "$paramod\\PSC_NPU_PotLanes\\LANES=s32'00000000000000000000000000001000": [
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 8,
+        "select_width": 0
+      }
+    ],
+    "$paramod\\PSC_NPU_SystolicArray4x4\\LANES=s32'00000000000000000000000000001000": [
+      {
+        "type": "$mux",
+        "width": 128,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 128,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 128,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 128,
+        "select_width": 0
+      }
+    ],
+    "PSC_NPU_AccReadMux": [
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 4
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 4
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 4
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 4
+      },
+      {
+        "type": "$mux",
+        "width": 32,
+        "select_width": 0
+      },
+      {
+        "type": "$pmux",
+        "width": 32,
+        "select_width": 4
+      }
+    ],
+    "PSC_NPU_ShiftAdd2": [
+      {
+        "type": "$pmux",
+        "width": 16,
+        "select_width": 8
+      },
+      {
+        "type": "$pmux",
+        "width": 16,
+        "select_width": 8
+      },
+      {
+        "type": "$mux",
+        "width": 16,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 16,
+        "select_width": 0
+      },
+      {
+        "type": "$mux",
+        "width": 17,
+        "select_width": 0
+      }
+    ],
+    "PSC_NPU_Timing": []
+  },
+  "product_cones": {
+    "scope": "union of combinational D-input cones of all 136 product FFs; stop at other FFs",
+    "stage": "Yosys mapped, before nextpnr packing",
+    "product_FF": 136,
+    "cells": {
+      "LUT1": 4005,
+      "MUX2_LUT5": 2831,
+      "MUX2_LUT7": 548,
+      "LUT2": 1149,
+      "LUT4": 1019,
+      "LUT3": 439,
+      "MUX2_LUT6": 1299,
+      "ALU": 384,
+      "MUX2_LUT8": 134,
+      "VCC": 1,
+      "GND": 1
+    },
+    "LUT": 6612,
+    "MUX": 4812,
+    "ALU": 384
+  },
+  "critical_endpoint_sources": {
+    "v1": [
+      {
+        "seed": 1,
+        "start": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_Controller.v:315.5-549.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68",
+        "end": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_Controller.v:315.5-549.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68"
+      },
+      {
+        "seed": 2,
+        "start": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_Controller.v:315.5-549.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68",
+        "end": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_Controller.v:315.5-549.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68"
+      },
+      {
+        "seed": 3,
+        "start": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_Controller.v:315.5-549.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68",
+        "end": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_Controller.v:315.5-549.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68"
+      }
+    ],
+    "shared8": [
+      {
+        "seed": 1,
+        "start": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_AccBank.sv:19.9-26.12|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68",
+        "end": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:316.5-550.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68"
+      },
+      {
+        "seed": 2,
+        "start": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:316.5-550.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68",
+        "end": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:316.5-550.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68"
+      },
+      {
+        "seed": 3,
+        "start": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_AccBank.sv:19.9-26.12|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68",
+        "end": "/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:316.5-550.8|/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:115.8-115.68"
+      }
+    ]
+  }
+}

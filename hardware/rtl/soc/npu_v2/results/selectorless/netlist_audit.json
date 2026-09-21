@@ -1,0 +1,93 @@
+{
+  "old_selector": {
+    "generic_cells": {
+      "$add": 3,
+      "$adffe": 10,
+      "$logic_not": 8,
+      "$logic_and": 4,
+      "$neg": 4,
+      "$adff": 1,
+      "$pmux": 4,
+      "$eq": 28,
+      "$shiftx": 8,
+      "$mux": 12
+    },
+    "adders": [
+      {
+        "A": 32,
+        "B": 32,
+        "Y": 32
+      },
+      {
+        "A": 32,
+        "B": 32,
+        "Y": 32
+      },
+      {
+        "A": 32,
+        "B": 32,
+        "Y": 32
+      }
+    ],
+    "parallel_muxes": [
+      {
+        "WIDTH": 16,
+        "S_WIDTH": 8
+      },
+      {
+        "WIDTH": 16,
+        "S_WIDTH": 8
+      },
+      {
+        "WIDTH": 16,
+        "S_WIDTH": 8
+      },
+      {
+        "WIDTH": 16,
+        "S_WIDTH": 8
+      }
+    ],
+    "netlist_sha256": "3582fc7bf5ea071b69756750f9fa6b28ac11b9ecf9e6809b4cc6ec6268c26d6f"
+  },
+  "new_horner": {
+    "generic_cells": {
+      "$add": 4,
+      "$adffe": 9,
+      "$reduce_and": 1,
+      "$logic_not": 5,
+      "$eq": 9,
+      "$logic_and": 21,
+      "$logic_or": 4,
+      "$ne": 4,
+      "$reduce_bool": 4,
+      "$neg": 4,
+      "$adff": 1,
+      "$shiftx": 8,
+      "$mux": 20
+    },
+    "adders": [
+      {
+        "A": 17,
+        "B": 17,
+        "Y": 17
+      },
+      {
+        "A": 17,
+        "B": 17,
+        "Y": 17
+      },
+      {
+        "A": 17,
+        "B": 17,
+        "Y": 17
+      },
+      {
+        "A": 17,
+        "B": 17,
+        "Y": 17
+      }
+    ],
+    "parallel_muxes": [],
+    "netlist_sha256": "9cfcf0f798e4dc32f3d9e5c10d90efe5cdd6884e6ef5ef74b4dea9e8229a97a2"
+  }
+}

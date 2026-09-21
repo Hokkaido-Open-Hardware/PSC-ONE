@@ -1,0 +1,137 @@
+Info: Critical path report for clock 'clock_IBUF_I_O' (posedge -> posedge):
+Info:       type curr  total name
+Info:   clk-to-q  0.23  0.23 Source operand_b_DFFCE_Q_15.Q
+Info:    routing  1.68  1.91 Net operand_b[49] (8,39) -> (8,39)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_ALU_SUM_I1_LUT4_F.I2
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/DatapathTiming.sv:11.54-11.63
+Info:      logic  0.46  2.37 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_ALU_SUM_I1_LUT4_F.F
+Info:    routing  0.88  3.25 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_ALU_SUM_I1[0] (8,39) -> (5,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_ALU_SUM.I1
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.57  3.82 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_ALU_SUM.COUT
+Info:    routing  0.00  3.82 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_ALU_SUM_COUT (5,43) -> (5,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_ALU_SUM_COUT_ALU_CIN.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  3.85 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_ALU_SUM_COUT_ALU_CIN.COUT
+Info:    routing  0.00  3.85 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_ALU_SUM_COUT_ALU_CIN_COUT (5,43) -> (5,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  3.89 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_I1_ALU_SUM.COUT
+Info:    routing  0.00  3.89 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_I1_ALU_SUM_COUT (5,43) -> (5,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_9_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  3.92 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_9_I1_ALU_SUM.COUT
+Info:    routing  0.00  3.92 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_9_I1_ALU_SUM_COUT (5,43) -> (5,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_7_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  3.96 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_7_I1_ALU_SUM.COUT
+Info:    routing  0.00  3.96 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_7_I1_ALU_SUM_COUT (5,43) -> (6,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_10_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  3.99 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_10_I1_ALU_SUM.COUT
+Info:    routing  0.00  3.99 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_10_I1_ALU_SUM_COUT (6,43) -> (6,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_8_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.03 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_8_I1_ALU_SUM.COUT
+Info:    routing  0.00  4.03 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_8_I1_ALU_SUM_COUT (6,43) -> (6,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_6_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.06 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_6_I1_ALU_SUM.COUT
+Info:    routing  0.00  4.06 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_6_I1_ALU_SUM_COUT (6,43) -> (6,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_3_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.10 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_3_I1_ALU_SUM.COUT
+Info:    routing  0.00  4.10 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_3_I1_ALU_SUM_COUT (6,43) -> (6,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_12_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.13 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_12_I1_ALU_SUM.COUT
+Info:    routing  0.00  4.13 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_12_I1_ALU_SUM_COUT (6,43) -> (6,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_4_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.17 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_4_I1_ALU_SUM.COUT
+Info:    routing  0.00  4.17 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_4_I1_ALU_SUM_COUT (6,43) -> (7,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_11_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.20 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_11_I1_ALU_SUM.COUT
+Info:    routing  0.00  4.20 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_11_I1_ALU_SUM_COUT (7,43) -> (7,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_2_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.24 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_2_I1_ALU_SUM.COUT
+Info:    routing  0.00  4.24 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_2_I1_ALU_SUM_COUT (7,43) -> (7,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_5_I1_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.27 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_5_I1_ALU_SUM.COUT
+Info:    routing  0.00  4.27 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT2_F_5_I1_ALU_SUM_COUT (7,43) -> (7,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F_1_I3_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.31 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F_1_I3_ALU_SUM.COUT
+Info:    routing  0.00  4.31 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F_1_I3_ALU_SUM_COUT (7,43) -> (7,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F_2_I3_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  4.34 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F_2_I3_ALU_SUM.COUT
+Info:    routing  0.00  4.34 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F_2_I3_ALU_SUM_COUT (7,43) -> (7,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F_I3_ALU_SUM.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ShiftAdd2.sv:34.22-34.59
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.47  4.81 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F_I3_ALU_SUM.SUM
+Info:    routing  0.40  5.21 Net GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F_I3[3] (7,43) -> (8,43)
+Info:                          Sink GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F.I3
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.37  5.58 Source GEN_BLOCK[6].GEN_SHIFTADD.u_shiftadd.product_LUT4_F.F
+Info:    routing  0.00  5.58 Net GEN_BLOCK[6].product[16] (8,43) -> (8,43)
+Info:                          Sink results_DFFC_Q_17.D
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/DatapathTiming.sv:33.21-33.28
+Info:      setup  0.04  5.62 Source results_DFFC_Q_17.D
+Info: 2.66 ns logic, 2.96 ns routing
+

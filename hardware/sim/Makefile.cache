@@ -3,6 +3,39 @@
 # ============================================================
 
 #make -f Makefile.cache simulate_CACHE 
+#make -f Makefile.cache simulate_CACHE TEST=1
+
+# ============================================================
+#  D-Cache test selection
+#
+#  TEST=1 : cache_data_hit_test
+#  TEST=2 : cache_data_test
+#  TEST=3 : cache_program_test
+#  TEST=4 : cache_data_wb_test
+#  TEST=5 : cache_data_clear_test
+#  TEST=6 : cache_data_byte_test
+#
+#  TEST未指定 : 全テスト実行
+# ============================================================
+
+TEST ?=
+
+# Cocotb filters match module-qualified names; anchor only the function suffix.
+ifeq ($(TEST),1)
+DCACHE_TEST_FILTER := cache_data_hit_test$$
+else ifeq ($(TEST),2)
+DCACHE_TEST_FILTER := cache_data_test$$
+else ifeq ($(TEST),3)
+DCACHE_TEST_FILTER := cache_program_test$$
+else ifeq ($(TEST),4)
+DCACHE_TEST_FILTER := cache_data_wb_test$$
+else ifeq ($(TEST),5)
+DCACHE_TEST_FILTER := cache_data_clear_test$$
+else ifeq ($(TEST),6)
+DCACHE_TEST_FILTER := cache_data_byte_test$$
+else
+DCACHE_TEST_FILTER :=
+endif
 
 # ============================================================
 #  SIMULATOR 切り替え (MODE=icarus / verilator)
@@ -74,10 +107,13 @@ simulate_CACHE: simulate_IDCACHE simulate_ICACHE
 # cache test
 simulate_IDCACHE:
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_DM_CACHE test)"
+	@echo "[SIM] TEST=$(TEST)"
+	@echo "[SIM] FILTER=$(DCACHE_TEST_FILTER)"
 	@echo EXTRA_ARGS=$(EXTRA_ARGS)
 	@mkdir -p ./wave
 	SIM_BUILD="$(CACHE_BUILD_ROOT)/dcache" COCOTB_RESULTS_FILE="$(CACHE_BUILD_ROOT)/dcache-results.xml" \
 	COCOTB_TEST_MODULES=cocotb_tb.cache.dm_cache_test \
+	COCOTB_TEST_FILTER="$(DCACHE_TEST_FILTER)" \
 	TOPLEVEL=sim_cache_dma_controller TOPLEVEL_LANG=verilog \
 	SIM=$(SIM) \
 	VERILOG_SOURCES="$(SIM_SRC)" \
@@ -106,4 +142,3 @@ simulate_ICACHE:
 cache_regression:
 	python ../rtl/soc/cache/tests/run_cache_regression.py
 	python ../rtl/soc/cache/tests/run_cache_io_regression.py
-

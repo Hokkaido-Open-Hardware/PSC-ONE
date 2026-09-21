@@ -84,6 +84,17 @@ NPU_V1_RTL_FILES := \
 	$(NPU_SRC_DIR)/PSC_NPU_SystolicArray4x4.v \
 	$(NPU_DATAPATH_FILES)
 
+NPU_V2_DIR := ../rtl/soc/npu_v2/src
+
+# NPU V2: selector 8 lanes, two signed power-of-two terms per weight byte.
+NPU_V2_FILES = \
+	$(NPU_V2_DIR)/PSC_NPU_Controller.v \
+	$(NPU_V2_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_V2_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_V2_DIR)/PSC_NPU_MACScheduler.sv \
+	$(NPU_V2_DIR)/PSC_NPU_PotLanes.sv \
+	$(NPU_V2_DIR)/PSC_NPU_AccBank.sv
+
 #--------------------------------------------------
 # NPU legacy FILES
 #--------------------------------------------------
@@ -103,17 +114,19 @@ NPU_CTRL_FILE 	    = $(LEGACY_SRC_DIR)/PSC_NPU_Controller.v \
 NPU_RTL_FILES		= $(NPU_CTRL_FILE) $(VERILOG_FILE_SA_4x4)
 
 # ============================================================
-# NPUコアの切り替え（v1 / legacy）
+# NPUコアの切り替え（v1 / v2 / legacy）
 # ============================================================
 # デフォルトはV1
 NPU_VERSION ?= v1
 
 ifeq ($(NPU_VERSION),v1)
 VERILOG_FILE_CTRL = $(NPU_V1_RTL_FILES)
+else ifeq ($(NPU_VERSION),v2)
+VERILOG_FILE_CTRL = $(NPU_V2_FILES)
 else ifeq ($(NPU_VERSION),legacy)
 VERILOG_FILE_CTRL = $(NPU_RTL_FILES)
 else
-$(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 または legacy を指定してください)
+$(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 / v2 / legacy を指定してください)
 endif
 
 #--------------------------------------------------
@@ -125,9 +138,28 @@ COCOTB_FILE_SA 			= int8_SA_test
 COCOTB_FILE_SA_4x4		= int8_SA_4x4_test
 COCOTB_FILE_PE 			= int8_PE_test
 
+COCOTB_CTRL_MODULE = cocotb_tb.npu.$(COCOTB_FILE_SA_Ctrl)
+COCOTB_SA4_MODULE = cocotb_tb.npu.$(COCOTB_FILE_SA_4x4)
+SA4_TOP = PSC_NPU_SystolicArray4x4
+SA4_FILES = $(VERILOG_FILE_SA_4x4)
+
 COCOTB_CFG       := $(shell which cocotb-config)
 COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
-SIM_BUILD        ?= sim_build
+SIM_BUILD        ?= $(if $(filter v2,$(NPU_VERSION)),sim_build/npu_v2,sim_build)
+
+# v2 weight bytes are PoT codes, so use its matching arithmetic scoreboards.
+NPU_V2_BASE := $(abspath $(NPU_V2_DIR)/..)
+NPU_V2_MODEL_BUILD = $(abspath $(SIM_BUILD))/model_reference
+PYTHON ?= python3
+ifeq ($(NPU_VERSION),v2)
+COCOTB_CTRL_MODULE = controller_test
+COCOTB_SA4_MODULE = core_test
+SA4_TOP = CoreTop
+SA4_FILES = $(NPU_V2_FILES) $(NPU_V2_BASE)/tests/CoreTop.sv
+export PYTHONPATH := $(NPU_V2_BASE)/tests:$(NPU_V2_BASE)/reference:$(CURDIR):$(PYTHONPATH)
+export LANES := 8
+export MODEL_VECTORS = $(NPU_V2_MODEL_BUILD)/rtl_vectors.json
+endif
 
 #--------------------------------------------------
 # Targets
@@ -140,12 +172,14 @@ simulate_all: simulate_PE simulate_SA_2x2 simulate_SA_4x4 simulate_SA_Ctrl simul
 # Output Stationary.
 simulate_SA_Ctrl: 
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
+	@mkdir -p $(abspath $(SIM_BUILD))/simulate_SA_Ctrl
+	NPU_CYCLE_RESULTS="$(abspath $(SIM_BUILD))/simulate_SA_Ctrl/cycles.json" \
 	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_CTRL=1" \
 	$(MAKE) -f $(COCOTB_MAKEFILE) \
 	    SIM=$(SIM) \
 	    SIM_BUILD=$(SIM_BUILD)/$@ \
 	    COCOTB_RESULTS_FILE=$(abspath $(SIM_BUILD))/$@/results.xml \
-	    COCOTB_TEST_MODULES=cocotb_tb.npu.$(COCOTB_FILE_SA_Ctrl) \
+	    COCOTB_TEST_MODULES=$(COCOTB_CTRL_MODULE) \
 	    TOPLEVEL=PSC_NPU_Controller \
 	    TOPLEVEL_LANG=verilog \
 	    VERILOG_SOURCES="$(VERILOG_FILE_CTRL)"
@@ -171,10 +205,10 @@ simulate_SA_4x4:
 	    SIM=$(SIM) \
 	    SIM_BUILD=$(SIM_BUILD)/$@ \
 	    COCOTB_RESULTS_FILE=$(abspath $(SIM_BUILD))/$@/results.xml \
-	    COCOTB_TEST_MODULES=cocotb_tb.npu.$(COCOTB_FILE_SA_4x4) \
-	    TOPLEVEL=PSC_NPU_SystolicArray4x4 \
+	    COCOTB_TEST_MODULES=$(COCOTB_SA4_MODULE) \
+	    TOPLEVEL=$(SA4_TOP) \
 	    TOPLEVEL_LANG=verilog \
-	    VERILOG_SOURCES="$(VERILOG_FILE_SA_4x4)"
+	    VERILOG_SOURCES="$(SA4_FILES)"
 
 simulate_PE:
 	$(SIM_ARG_NAME)="$(SIM_ARGS) -DDUMP_VCD_PE=1" \
@@ -236,8 +270,25 @@ yosys_clean:
 
 # Isolated old/new regressions plus streaming, snapshot and cycle scoreboards.
 .PHONY: validate_streaming
+ifeq ($(NPU_VERSION),v2)
+# Like the original validate_streaming runner, this full suite uses Icarus.
+# Direct simulate_SA_Ctrl / simulate_SA_4x4 targets honor MODE.
+.PHONY: npu_v2_model_reference
+npu_v2_model_reference:
+	$(PYTHON) $(NPU_V2_BASE)/reference/evaluate_model.py \
+	    --build $(NPU_V2_MODEL_BUILD) \
+	    --output $(NPU_V2_MODEL_BUILD)/results
+
+simulate_SA_4x4: npu_v2_model_reference
+
+validate_streaming: npu_v2_model_reference
+	$(PYTHON) $(NPU_V2_BASE)/tests/run.py \
+	    --build $(abspath $(SIM_BUILD))/validate_streaming \
+	    --vectors $(NPU_V2_MODEL_BUILD)/rtl_vectors.json --lanes 8
+else
 validate_streaming:
 	python3 cocotb_tb/npu/run_streaming_validation.py \
 	    --src $(abspath $(if $(filter legacy,$(NPU_VERSION)),$(LEGACY_SRC_DIR),$(NPU_SRC_DIR))) \
 	    --build $(abspath $(SIM_BUILD))/validate_streaming \
 	    $(if $(filter legacy,$(NPU_VERSION)),--baseline)
+endif

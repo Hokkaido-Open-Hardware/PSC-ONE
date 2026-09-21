@@ -1,6 +1,6 @@
 import cocotb
 import random
-from cocotb.triggers import Timer, RisingEdge, ReadOnly, ReadWrite
+from cocotb.triggers import Timer, RisingEdge, FallingEdge, ReadOnly, ReadWrite
 
 CLK_NS = 10
 
@@ -260,13 +260,14 @@ async def cpu_data_read(dut, addr, mode="CPU", timeout=1000):
     # ------------------------------------------------
     # 読み出し完了待ち
     # ------------------------------------------------
+    # Observe the accepting edge too: a REG hit can already have responded.
     for _ in range(timeout):
-        await RisingEdge(dut.clock)
         await ReadOnly()
 
         if int(read_ready.value) == 1:
             data = int(read_data.value)
             break
+        await RisingEdge(dut.clock)
     else:
         raise AssertionError(
             f"{mode} read_ready timeout addr=0x{addr:08x}"
@@ -333,7 +334,6 @@ async def cpu_data_byte_read(dut, addr, timeout=1000):
     dut.data_mem_read_valid.value = 0
 
     for _ in range(timeout):
-        await RisingEdge(dut.clock)
         await ReadOnly()
 
         if int(dut.data_mem_read_ready.value) == 1:
@@ -350,6 +350,7 @@ async def cpu_data_byte_read(dut, addr, timeout=1000):
 
             data = int(selected_byte)
             break
+        await RisingEdge(dut.clock)
     else:
         raise AssertionError(
             f"data_mem_read_ready timeout addr=0x{addr:08x}"
@@ -420,7 +421,122 @@ async def cpu_monitor_count(dut, mon):
             mon.data_cache_miss_count += 1
 
 # ------------------------------------------------
-# TEST 1: data dm cache test.
+# TEST 1: data cache hit / 2-Line REG cache latency test.
+# ------------------------------------------------
+@cocotb.test()
+async def cache_data_hit_test(dut):
+    dut._log.info("==== PSC_ONE data cache hit test start ====")
+    cocotb.start_soon(gen_clock(dut))
+    await reset_dut(dut)
+    await sdram_init_fin_wait(dut)
+
+    base_addr = 0x0018_0000
+    line_bytes = 32
+    words = [0xA500_0000 ^ (index * 0x0101_0101) for index in range(24)]
+    for index, data in enumerate(words):
+        await cpu_data_write(dut, base_addr + index * 4, data)
+    await data_cache_wb_start(dut)
+    await data_cache_clear_start(dut)
+
+    reg_response_clocks = []
+
+    async def check_read(addr, mode, expected_path):
+        if mode == "CPU":
+            req_ready = dut.data_mem_req_ready
+            read_valid = dut.data_mem_read_valid
+            read_address = dut.data_mem_read_address
+            read_ready = dut.data_mem_read_ready
+            read_data = dut.data_mem_read_data
+        else:
+            req_ready = dut.sa_req_ready
+            read_valid = dut.sa_mem_read_valid
+            read_address = dut.sa_mem_read_address
+            read_ready = dut.sa_mem_read_ready
+            read_data = dut.sa_mem_read_data
+
+        for _ in range(1000):
+            await FallingEdge(dut.clock)
+            if int(req_ready.value):
+                break
+        else:
+            raise AssertionError(f"{mode} hit-test request timeout")
+
+        read_address.value = addr
+        read_valid.value = 1
+        # Count the accepting rising edge as clock 1. An idle REG hit must
+        # produce both ready and correct data within clocks 1..2.
+        hits = misses = memory_requests = 0
+        for response_clocks in range(1, 1001):
+            await RisingEdge(dut.clock)
+            await ReadOnly()
+            hits += int(dut.data_cache_hit_pulse.value)
+            misses += int(dut.data_cache_miss_pulse.value)
+            memory_requests += int(dut.d_mem_valid256.value)
+            responded = int(read_ready.value)
+            if responded:
+                actual = int(read_data.value)
+            await FallingEdge(dut.clock)
+            read_valid.value = 0
+            if responded:
+                break
+        else:
+            raise AssertionError(f"{mode} hit-test response timeout addr=0x{addr:08x}")
+
+        context = f"{mode} {expected_path} addr=0x{addr:08x} response={response_clocks}clk (acceptance=1)"
+        expected = words[(addr - base_addr) // 4]
+        assert actual == expected, f"{context}: got=0x{actual:08x}, expected=0x{expected:08x}"
+        if expected_path == "miss":
+            assert (hits, misses, memory_requests) == (0, 1, 1), context
+        else:
+            assert (hits, misses, memory_requests) == (1, 0, 0), context
+            if expected_path == "REG hit":
+                assert 1 <= response_clocks <= 2, f"REG hit must respond within 2 clocks: {context}"
+                reg_response_clocks.append(response_clocks)
+            else:
+                assert response_clocks > 1, f"Expected backing-cache lookup: {context}"
+
+        await RisingEdge(dut.clock)
+        await ReadOnly()
+        assert not int(read_ready.value), f"Duplicate response: {context}"
+        assert not int(dut.data_cache_hit_pulse.value), f"Duplicate hit: {context}"
+        assert not int(dut.data_cache_miss_pulse.value), f"Unexpected miss: {context}"
+        assert not int(dut.d_mem_valid256.value), f"Unexpected memory request: {context}"
+        await FallingEdge(dut.clock)
+        if expected_path != "REG hit":
+            dut._log.info(context)
+
+    # A cold fill must seed the REG cache for all eight words and both ports.
+    await check_read(base_addr, "CPU", "miss")
+    for mode in ("CPU", "SA"):
+        for index in range(8):
+            await check_read(base_addr + index * 4, mode, "REG hit")
+
+    # Fill a second index, then alternate all words of both lines on both
+    # ports. Every access must respond within two clocks including acceptance.
+    await check_read(base_addr + line_bytes, "SA", "miss")
+    await check_read(base_addr + line_bytes + 28, "CPU", "REG hit")
+    for mode in ("CPU", "SA"):
+        for index in range(8):
+            await check_read(base_addr + index * 4, mode, "REG hit")
+            await check_read(base_addr + line_bytes + index * 4, mode, "REG hit")
+
+    # Touch A, then fill C: LRU must evict B from REG while A survives.
+    # B remains in backing RAM and must repopulate REG on its next read.
+    await check_read(base_addr, "CPU", "REG hit")
+    await check_read(base_addr + 2 * line_bytes, "SA", "miss")
+    await check_read(base_addr + 28, "CPU", "REG hit")
+    await check_read(base_addr + 2 * line_bytes + 28, "SA", "REG hit")
+    await check_read(base_addr + line_bytes, "CPU", "RAM hit")
+    await check_read(base_addr + line_bytes + 4, "SA", "REG hit")
+    await check_read(base_addr + 2 * line_bytes + 4, "CPU", "REG hit")
+
+    dut._log.info(
+        "==== PASS cache hit test: REG hits=%d, response=%d..%dclk (acceptance=1, expected=1..2) ====",
+        len(reg_response_clocks), min(reg_response_clocks), max(reg_response_clocks)
+    )
+
+# ------------------------------------------------
+# TEST 2: data dm cache test.
 # ------------------------------------------------
 @cocotb.test()
 async def cache_data_test(dut):
@@ -477,7 +593,7 @@ async def cache_data_test(dut):
     dut._log.info("==== PASS test ====")
 
 # ------------------------------------------------
-# TEST 2: program dm cache test.
+# TEST 3: program dm cache test.
 # ------------------------------------------------
 @cocotb.test()
 async def cache_program_test(dut):
@@ -534,7 +650,7 @@ async def cache_program_test(dut):
     dut._log.info("==== PASS test ====")
 
 # ------------------------------------------------
-# TEST 3: data cache write back test.
+# TEST 4: data cache write back test.
 # ------------------------------------------------
 @cocotb.test()
 async def cache_data_wb_test(dut):
@@ -611,7 +727,7 @@ async def cache_data_wb_test(dut):
     dut._log.info("==== PASS test ====")
 
 # ------------------------------------------------
-# TEST 4: data cache clear back test.
+# TEST 5: data cache clear back test.
 # ------------------------------------------------
 @cocotb.test()
 async def cache_data_clear_test(dut):
@@ -682,7 +798,7 @@ async def cache_data_clear_test(dut):
 
 
 # ------------------------------------------------
-# TEST 5: data dm cache test. (byte)
+# TEST 6: data dm cache test. (byte)
 # ------------------------------------------------
 @cocotb.test()
 async def cache_data_byte_test(dut):
@@ -738,7 +854,7 @@ async def cache_data_byte_test(dut):
     dut._log.info("==== PASS test ====")
 
 # ------------------------------------------------
-# TEST 6: data dm cache test. (sa port)
+# TEST 7: data dm cache test. (sa port)
 # ------------------------------------------------
 @cocotb.test()
 async def cache_data_sa_test(dut):
@@ -875,7 +991,6 @@ async def cpu_sa_same_clock_cpu_write_sa_read(
     # CPU Write / SA Read の双方が完了するまで待つ
     # ------------------------------------------------------------
     for _ in range(timeout):
-        await RisingEdge(dut.clock)
         await ReadOnly()
 
         if int(dut.data_mem_write_ready.value) == 1:
@@ -887,6 +1002,7 @@ async def cpu_sa_same_clock_cpu_write_sa_read(
 
         if cpu_write_done and sa_read_done:
             break
+        await RisingEdge(dut.clock)
     else:
         raise AssertionError(
             "same-clock CPU Write + SA Read timeout "
@@ -972,7 +1088,6 @@ async def cpu_sa_same_clock_sa_write_cpu_read(
     # SA Write / CPU Read の双方が完了するまで待つ
     # ------------------------------------------------------------
     for _ in range(timeout):
-        await RisingEdge(dut.clock)
         await ReadOnly()
 
         if int(dut.sa_mem_write_ready.value) == 1:
@@ -984,6 +1099,7 @@ async def cpu_sa_same_clock_sa_write_cpu_read(
 
         if sa_write_done and cpu_read_done:
             break
+        await RisingEdge(dut.clock)
     else:
         raise AssertionError(
             "same-clock SA Write + CPU Read timeout "
@@ -1003,7 +1119,7 @@ async def cpu_sa_same_clock_sa_write_cpu_read(
     return cpu_read_data
 
 # ------------------------------------------------
-# TEST 7:
+# TEST 8:
 # CPU Write + SA Read / SA Write + CPU Read
 # same clock request test
 # ------------------------------------------------
@@ -1115,7 +1231,7 @@ async def cache_cpu_sa_same_clock_write_read_test(dut):
     )
 
 # ------------------------------------------------
-# TEST 8:
+# TEST 9:
 # Write Miss時に同一16Bラインの未更新ワードが保持されることを確認
 # ------------------------------------------------
 @cocotb.test()

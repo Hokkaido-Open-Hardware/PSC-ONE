@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
-// Standalone transaction/latency regression. Runs unchanged against original
-// and optimized DUTs. Two cache lines make exhaustive conflict/WB tests fast.
+// Standalone transaction/latency regression, including the 2-line REG cache.
+// Two backing-cache lines make exhaustive conflict/WB tests fast.
 module cache_io_regression;
     reg clock = 0; always #5 clock = ~clock;
     reg reset_n = 0;
@@ -133,6 +133,10 @@ module cache_io_regression;
             tick(); start_cycle=cycle; // first rising edge sampling valid
             @(negedge clock);
             cpu_rvalid=0; cpu_wvalid=0; sa_valid=0; mmu_valid=0;
+            // Poison live buses after acceptance: all lookup/response fields
+            // must come from the request registers, including REG hits.
+            cpu_raddr=~addr; cpu_waddr=~addr; sa_addr=~addr; mmu_addr=~addr;
+            cpu_data=~data; sa_data=~data;
             n=0;
             while (!(port_id==0 ? cpu_ready : port_id==1 ? sa_ready : mmu_ready)) begin
                 tick(); n=n+1;
@@ -172,6 +176,35 @@ module cache_io_regression;
             tick(); tick(); idle();
         end
     endtask
+    // Every word and port must use the short path without a RAM lookup or
+    // external request. Also check that exactly one response/hit is emitted.
+    task reg_read(input integer port_id, input [31:0] addr);
+        integer before_reads, before_writes, before_index;
+        begin
+            before_reads=reads; before_writes=writes; before_index=dut.cur_index_r;
+            transact(port_id,0,addr,2,0,"");
+            // latency is elapsed cycles after the accepting edge, hence 0
+            // or 1 means a response within the allowed one or two request clocks.
+            if(latency<0 || latency>1 || !cache_hit_pulse || cache_miss_pulse ||
+               reads!=before_reads || writes!=before_writes || dut.cur_index_r!=before_index)
+                $fatal(1,"REG hit protocol/latency addr=%h port=%0d latency=%0d",addr,port_id,latency);
+            $display("REG_LATENCY port=%0d clocks=%0d",port_id,latency+1);
+            tick();
+            if(cpu_ready || sa_ready || mmu_ready || cache_hit_pulse)
+                $fatal(1,"duplicate REG response");
+        end
+    endtask
+    always @(posedge clock) begin
+        if(reset_n && dut.line_cache_valid == 2'b11 &&
+           dut.line_cache_addr[0] == dut.line_cache_addr[1])
+            $fatal(1,"duplicate REG entries for the same line");
+        if(reset_n && dut.line_cache_hit) begin
+            if(dut.u_tag.index !== dut.cur_index_r || dut.u_data.index !== dut.cur_index_r || dut.tag_we || dut.data_we || mem_valid || mmio_valid)
+                $fatal(1,"REG hit accessed backing cache/memory");
+            if(dut.req_is_write || dut.line_cache_maintenance)
+                $fatal(1,"REG hit bypassed store/maintenance");
+        end
+    end
     integer i,j,k,old_reads,old_writes,seen;
     reg [31:0] rng=32'h195ac742, a, d;
     initial begin
@@ -184,6 +217,39 @@ module cache_io_regression;
             $fatal(1,"reset output mismatch");
         @(negedge clock); reset_n=1; mem_req_ready=1;
         transact(0,0,'h1000,2,0,"CPU_read_clean_miss");
+        for(j=0;j<3;j=j+1)
+            for(k=0;k<8;k=k+1) reg_read(j,'h1000+4*k);
+        // Both backing indices must coexist in REG and hit within two clocks of the sampling
+        // edge for all words and ports, even when alternating lines.
+        transact(0,0,'h1020,2,0,"");
+        for(j=0;j<3;j=j+1)
+            for(k=0;k<8;k=k+1) begin
+                reg_read(j,'h1000+4*k);
+                reg_read(j,'h1020+4*k);
+            end
+        // A conflicting backing-cache fill must invalidate A's REG copy,
+        // but leave B available in REG. Reading A again must access memory.
+        old_reads=reads;
+        transact(0,0,'h1040,2,0,"REG_backing_index_conflict");
+        if(reads!=old_reads+1) $fatal(1,"conflict did not fill from memory");
+        reg_read(0,'h1020);
+        old_reads=reads;
+        transact(0,0,'h1000,2,0,"REG_after_backing_eviction");
+        if(reads!=old_reads+1) $fatal(1,"evicted line survived in REG");
+        reg_read(0,'h1020);
+        reg_read(0,'h1000);
+        // A store invalidates both copies. Read hits on both backing lines
+        // must repopulate the REG entries without external memory traffic.
+        transact(0,1,'h1004,2,expected['h1004/4],"");
+        if(dut.line_cache_valid) $fatal(1,"store did not invalidate both REG lines");
+        transact(0,0,'h1020,2,0,"");
+        old_reads=reads;
+        transact(0,0,'h1000,2,0,"CPU_backing_read_hit");
+        if(latency!=4 || reads!=old_reads) $fatal(1,"backing hit did not use RAM");
+        reg_read(0,'h101c);
+        // Restore the original cold/hot sequence below after the added checks.
+        clear_cache();
+        transact(0,0,'h1000,2,0,"");
         transact(0,0,'h1000,2,0,"CPU_read_hit");
         transact(0,1,'h1004,2,32'h12345678,"CPU_write_hit");
         transact(0,0,'h1040,2,0,"CPU_read_dirty_miss");
@@ -279,6 +345,106 @@ module cache_io_regression;
             begin repeat(30) tick(); @(negedge clock); mem_req_ready=1; end
             writeback("WB_stalled_sweep");
         join
+        // A warm CPU read competing with an SA write must see the store.
+        transact(0,0,'h6000,2,0,"");
+        reg_read(0,'h6000);
+        idle();
+        cpu_rvalid=1; cpu_rw=0; cpu_raddr='h6000;
+        sa_valid=1; sa_rw=1; sa_addr='h6000; sa_data=32'h55aa1234;
+        tick(); @(negedge clock); cpu_rvalid=0; sa_valid=0;
+        seen=0; k=0;
+        while(seen<2) begin
+            tick(); k=k+1;
+            if(k>1000) $fatal(1,"SA store arbitration timeout");
+            if(sa_ready) begin
+                if(seen!=0 || dut.line_cache_valid) $fatal(1,"SA store did not invalidate REG line");
+                expected['h6000/4]=32'h55aa1234; seen=1;
+            end
+            if(cpu_ready) begin
+                if(seen!=1 || cpu_data_out!==expected['h6000/4])
+                    $fatal(1,"CPU returned stale data after competing SA store");
+                seen=2;
+            end
+        end
+        reg_read(2,'h6000);
+        // WB drops even a valid REG copy. External DMA then changes RAM;
+        // the existing WB-before-DMA / clear-after-DMA protocol must work.
+        writeback("WB_REG_line");
+        if(dut.line_cache_valid) $fatal(1,"WB did not invalidate REG line");
+        transact(0,0,'h6000,2,0,"");
+        reg_read(1,'h6000);
+        memory['h6000/32][31:0]=32'hda7a1234;
+        expected['h6000/4]=32'hda7a1234;
+        clear_cache();
+        old_reads=reads;
+        transact(0,0,'h6000,2,0,"CPU_after_DMA_clear");
+        if(reads!=old_reads+1) $fatal(1,"DMA clear returned stale REG line");
+        reg_read(0,'h6000);
+
+        // A clear requested during a fill must prevent revalidating the REG
+        // copy, then invalidate the backing cache before the next access.
+        response_delay=10;
+        fork
+            begin
+                wait(pending>0);
+                @(negedge clock); cpu_cache_clear=1;
+                tick(); @(negedge clock); cpu_cache_clear=0;
+            end
+            transact(0,0,'h6080,2,0,"clear_during_fill");
+        join
+        if(dut.line_cache_valid) $fatal(1,"fill revalidated during pending clear");
+        tick(); idle();
+        old_reads=reads;
+        transact(0,0,'h6080,2,0,"");
+        if(reads!=old_reads+1) $fatal(1,"busy clear did not invalidate backing line");
+        reg_read(0,'h6080);
+        response_delay=3;
+
+        // SA can cache this line, but a CPU MMIO address in the same line
+        // must still go to the device rather than return the REG word.
+        transact(1,0,32'h10000000,2,0,"");
+        reg_read(1,32'h10000000);
+        old_reads=mmios;
+        transact(0,0,32'h10000001,2,0,"MMIO_with_REG_line_match");
+        if(returned!==32'hcafe1234 || mmios!=old_reads+1 || cache_hit_pulse)
+            $fatal(1,"REG cache bypassed MMIO");
+
+        // All three live ports hit a warm line. Only the highest-priority
+        // MMU read responds within two clocks; the other two requests must stay
+        // queued and return once each in SA > CPU order.
+        transact(0,0,'h6000,2,0,"");
+        idle();
+        cpu_rvalid=1; cpu_rw=0; cpu_raddr='h6004;
+        sa_valid=1; sa_rw=0; sa_addr='h6008;
+        mmu_valid=1; mmu_addr='h600c;
+        tick();
+        @(negedge clock); cpu_rvalid=0; sa_valid=0; mmu_valid=0;
+        if(!mmu_ready) tick();
+        if(!mmu_ready || cpu_ready || sa_ready || mmu_data_out!==expected['h600c/4] ||
+           !cache_hit_pulse || !dut.cpu_req_slot_valid || !dut.sa_req_slot_valid ||
+           dut.mmu_req_slot_valid)
+            $fatal(1,"registered-hit MMU arbitration lost a request");
+        @(negedge clock); cpu_rvalid=0; sa_valid=0; mmu_valid=0;
+        seen=1; k=0;
+        while(seen<3) begin
+            tick(); k=k+1;
+            if(k>1000) $fatal(1,"registered-hit arbitration timeout");
+            if(mmu_ready) $fatal(1,"registered-hit MMU request was replayed");
+            if(sa_ready) begin
+                if(seen!=1 || sa_data_out!==expected['h6008/4])
+                    $fatal(1,"registered-hit pending SA request mismatch");
+                seen=2;
+            end
+            if(cpu_ready) begin
+                if(seen!=2 || cpu_data_out!==expected['h6004/4])
+                    $fatal(1,"registered-hit pending CPU request mismatch");
+                seen=3;
+            end
+        end
+        tick();
+        if(cpu_ready || sa_ready || mmu_ready || cache_hit_pulse)
+            $fatal(1,"registered-hit arbitration duplicated a response");
+
         // Reset after populated/dirty-cache activity invalidates all lines.
         @(negedge clock); reset_n=0; tick();
         if(cpu_ready || sa_ready || mmu_ready || mem_valid || mmio_valid ||

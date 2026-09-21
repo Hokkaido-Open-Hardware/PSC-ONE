@@ -47,6 +47,17 @@ NPU_V1_RTL_FILES := \
 	$(NPU_SRC_DIR)/PSC_NPU_SystolicArray4x4.v \
 	$(NPU_DATAPATH_FILES)
 
+NPU_V2_DIR := ../rtl/soc/npu_v2/src
+
+# NPU V2: selector 8 lanes, two signed power-of-two terms per weight byte.
+NPU_V2_FILES = \
+	$(NPU_V2_DIR)/PSC_NPU_Controller.v \
+	$(NPU_V2_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_V2_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_V2_DIR)/PSC_NPU_MACScheduler.sv \
+	$(NPU_V2_DIR)/PSC_NPU_PotLanes.sv \
+	$(NPU_V2_DIR)/PSC_NPU_AccBank.sv
+
 #--------------------------------------------------
 # NPU legacy FILES
 #--------------------------------------------------
@@ -77,17 +88,19 @@ TIMING_CST     := $(TIMING_DIR)/PSC_NPU_TimingTop.cst
 
 
 # ============================================================
-# NPUコアの切り替え（v1 / legacy）
+# NPUコアの切り替え（v1 / v2 / legacy）
 # ============================================================
 # デフォルトはV1
 NPU_VERSION ?= v1
 
 ifeq ($(NPU_VERSION),v1)
 NPU_FILES := $(TIMING_WRAPPER) $(NPU_V1_RTL_FILES)
+else ifeq ($(NPU_VERSION),v2)
+NPU_FILES := $(TIMING_WRAPPER) $(NPU_V2_FILES)
 else ifeq ($(NPU_VERSION),legacy)
 NPU_FILES := $(TIMING_WRAPPER) $(NPU_RTL_FILES)
 else
-$(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 または legacy を指定してください)
+$(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 / v2 / legacy を指定してください)
 endif
 
 TOP := PSC_NPU_Timing

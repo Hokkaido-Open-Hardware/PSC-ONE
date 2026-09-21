@@ -1,0 +1,6 @@
+{
+  "AccBank_unchanged": true,
+  "ReadController_unchanged": true,
+  "Controller_logic_unchanged_except_compile_time_parameter": true,
+  "weight_encoding_unchanged": true
+}

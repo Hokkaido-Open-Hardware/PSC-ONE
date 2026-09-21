@@ -1,0 +1,28 @@
+Info: Critical path report for clock 'u_npu.clock' (posedge -> posedge):
+Info:       type curr  total name
+Info:   clk-to-q  0.23  0.23 Source sa_state_reset_LUT4_I1_F_LUT4_I3_F_LUT3_I2_F_DFFCE_CE_Q_DFFCE_Q_1.Q
+Info:    routing  0.64  0.87 Net done_DFFC_Q_D_LUT4_F_I3[1] (10,22) -> (7,20)
+Info:                          Sink done_DFFC_Q_D_LUT4_F_I3_LUT4_I3_F_LUT2_F_I0_LUT4_I3_F_LUT4_F.I1
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.57  1.44 Source done_DFFC_Q_D_LUT4_F_I3_LUT4_I3_F_LUT2_F_I0_LUT4_I3_F_LUT4_F.F
+Info:    routing  0.40  1.85 Net BASE_ADDR_B_ALU_I0_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_I1_LUT3_F_I1_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_SUM[1] (7,20) -> (8,19)
+Info:                          Sink BASE_ADDR_B_ALU_I0_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_I1_LUT3_F_I1_LUT4_I0_F_LUT3_I2_F_MUX2_LUT5_O_I1_LUT4_F.I2
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.46  2.31 Source BASE_ADDR_B_ALU_I0_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_I1_LUT3_F_I1_LUT4_I0_F_LUT3_I2_F_MUX2_LUT5_O_I1_LUT4_F.F
+Info:    routing  0.00  2.31 Net BASE_ADDR_B_ALU_I0_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_I1_LUT3_F_I1_LUT4_I0_F_LUT3_I2_F_MUX2_LUT5_O_I1 (8,19) -> (8,19)
+Info:                          Sink BASE_ADDR_B_ALU_I0_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_I1_LUT3_F_I1_LUT4_I0_F_LUT3_I2_F_MUX2_LUT5_O.I1
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:151.13-151.15
+Info:      logic  0.27  2.58 Source BASE_ADDR_B_ALU_I0_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_I1_LUT3_F_I1_LUT4_I0_F_LUT3_I2_F_MUX2_LUT5_O.O
+Info:    routing  0.78  3.36 Net BASE_ADDR_B_ALU_I0_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_I1_LUT3_F_I1_LUT4_I0_F_LUT3_I2_F[4] (8,19) -> (5,17)
+Info:                          Sink u_npu.i_idx_DFFCE_Q_CE_MUX2_LUT5_O.S0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.10  3.46 Source u_npu.i_idx_DFFCE_Q_CE_MUX2_LUT5_O.O
+Info:    routing  1.17  4.64 Net u_npu.i_idx_DFFCE_Q_CE (5,17) -> (1,23)
+Info:                          Sink u_npu.i_idx_DFFCE_Q_3.CE
+Info:      setup  0.04  4.67 Source u_npu.i_idx_DFFCE_Q_3.CE
+Info: 1.67 ns logic, 3.00 ns routing
+

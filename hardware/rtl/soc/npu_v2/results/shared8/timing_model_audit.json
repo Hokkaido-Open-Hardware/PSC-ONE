@@ -1,0 +1,9 @@
+{
+  "nextpnr_commit": "dec04b3b",
+  "finding": "Gowin create_timing_info defines no MULT9X9 timing variant; unknown cell timing is TMG_IGNORE. Raw mul4 wrapper Fmax is stimulus-to-CE, not multiplier Fmax.",
+  "effect": "Do not interpret mul4 871 MHz as usable DSP frequency. Full-NPU Fmax also excludes address/arithmetic DSP internal arcs.",
+  "source_files": {
+    "/home/haruhiko/nextpnr/himbaechel/uarch/gowin/gowin_arch_gen.py": "d93a58e7cc35bc89e0ab242395133ed55cf3d27189b40343422b8e10452a38b4",
+    "/home/haruhiko/nextpnr/himbaechel/arch.cc": "14d326ea2850c35cf73c4fd0154d3b6f3078d81273d9f47bfb7e8d6cb73eb42c"
+  }
+}

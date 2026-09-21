@@ -1,0 +1,10 @@
+Info: Critical path report for clock 'clock_IBUF_I_O' (posedge -> posedge):
+Info:       type curr  total name
+Info:   clk-to-q  0.23  0.23 Source stimulus_DFFC_Q_64.Q
+Info:    routing  0.88  1.11 Net stimulus[1] (2,17) -> (3,22)
+Info:                          Sink operand_a_DFFCE_Q_4.CE
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/tests/DatapathTiming.sv:14.5-28.8
+Info:      setup  0.04  1.15 Source operand_a_DFFCE_Q_4.CE
+Info: 0.27 ns logic, 0.88 ns routing
+

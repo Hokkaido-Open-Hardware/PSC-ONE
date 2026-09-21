@@ -1,0 +1,30 @@
+Info: Critical path report for clock 'u_npu.clock' (posedge -> posedge):
+Info:       type curr  total name
+Info:   clk-to-q  0.23  0.23 Source u_npu.u_sa.u_acc_read.value_LUT4_F_7_I3_LUT4_F_I3_LUT4_F_I1_ALU_I1_SUM_LUT2_I0_F_LUT2_F_24_I0_ALU_SUM_I1_LUT4_I1_F_DFFCE_Q_2.Q
+Info:    routing  0.64  0.87 Net u_npu.u_sa.u_acc_read.value_LUT3_F_1_I2_LUT4_F_1_I3_LUT4_F_1_I1[3] (13,11) -> (9,11)
+Info:                          Sink u_npu.u_sa.u_acc_read.value_LUT4_F_I3_LUT4_F_2_I3_LUT4_F_I3_LUT4_F_1.I3
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.37  1.24 Source u_npu.u_sa.u_acc_read.value_LUT4_F_I3_LUT4_F_2_I3_LUT4_F_I3_LUT4_F_1.F
+Info:    routing  1.24  2.48 Net u_npu.u_sa.u_acc_read.value_LUT4_F_I3_LUT4_F_2_I3_LUT4_F_I3[3] (9,11) -> (14,14)
+Info:                          Sink u_npu.u_sa.u_acc_read.value_LUT4_F_I3_LUT4_F_2_I3_LUT4_F.I3
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.37  2.86 Source u_npu.u_sa.u_acc_read.value_LUT4_F_I3_LUT4_F_2_I3_LUT4_F.F
+Info:    routing  0.98  3.83 Net u_npu.u_sa.u_acc_read.value_LUT4_F_I3_LUT4_F_2_I3[3] (14,14) -> (3,12)
+Info:                          Sink u_npu.u_sa.u_acc_read.value_LUT4_F_I3_LUT4_F_2.I3
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.37  4.20 Source u_npu.u_sa.u_acc_read.value_LUT4_F_I3_LUT4_F_2.F
+Info:    routing  0.62  4.82 Net u_npu.u_sa.u_acc_read.value_LUT4_F_I3[3] (3,12) -> (3,8)
+Info:                          Sink u_npu.u_sa.u_acc_read.value_LUT4_F.I3
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.37  5.19 Source u_npu.u_sa.u_acc_read.value_LUT4_F.F
+Info:    routing  0.00  5.19 Net u_npu.ps_acc_out[3] (3,8) -> (3,8)
+Info:                          Sink c_write_wdata_DFFCE_Q_28.D
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_AccReadMux.sv:9.23-9.28
+Info:      setup  0.04  5.22 Source c_write_wdata_DFFCE_Q_28.D
+Info: 1.75 ns logic, 3.48 ns routing
+

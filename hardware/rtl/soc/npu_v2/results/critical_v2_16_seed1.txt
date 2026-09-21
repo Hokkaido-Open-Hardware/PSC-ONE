@@ -1,0 +1,102 @@
+Info: Critical path report for clock 'u_npu.clock' (posedge -> posedge):
+Info:       type curr  total name
+Info:   clk-to-q  0.23  0.23 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_I1_LUT4_F_I1_DFFCE_Q_2.Q
+Info:    routing  2.18  2.41 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_I1_LUT4_F_I1[3] (9,33) -> (8,16)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT5_O_S0_MUX2_LUT6_O_1_I1_MUX2_LUT5_O_I0_LUT4_F_I0_LUT4_I0_4_F_MUX2_LUT5_I1_O_MUX2_LUT6_I0_O_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O.S0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.10  2.52 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT5_O_S0_MUX2_LUT6_O_1_I1_MUX2_LUT5_O_I0_LUT4_F_I0_LUT4_I0_4_F_MUX2_LUT5_I1_O_MUX2_LUT6_I0_O_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O.O
+Info:    routing  0.00  2.52 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT5_O_S0_MUX2_LUT6_O_1_I1_MUX2_LUT5_O_I0_LUT4_F_I0_LUT4_I0_4_F_MUX2_LUT5_I1_O_MUX2_LUT6_I0_O_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0 (8,16) -> (8,16)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT5_O_S0_MUX2_LUT6_O_1_I1_MUX2_LUT5_O_I0_LUT4_F_I0_LUT4_I0_4_F_MUX2_LUT5_I1_O_MUX2_LUT6_I0_O_MUX2_LUT8_O_I0_MUX2_LUT7_O.I0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:170.42-170.67
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:163.9-163.11
+Info:      logic  0.27  2.79 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT5_O_S0_MUX2_LUT6_O_1_I1_MUX2_LUT5_O_I0_LUT4_F_I0_LUT4_I0_4_F_MUX2_LUT5_I1_O_MUX2_LUT6_I0_O_MUX2_LUT8_O_I0_MUX2_LUT7_O.O
+Info:    routing  0.00  2.79 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT5_O_S0_MUX2_LUT6_O_1_I1_MUX2_LUT5_O_I0_LUT4_F_I0_LUT4_I0_4_F_MUX2_LUT5_I1_O_MUX2_LUT6_I0_O_MUX2_LUT8_O_I0 (8,16) -> (7,16)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT5_O_S0_MUX2_LUT6_O_1_I1_MUX2_LUT5_O_I0_LUT4_F_I0_LUT4_I0_4_F_MUX2_LUT5_I1_O_MUX2_LUT6_I0_O_MUX2_LUT8_O.I0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:169.9-169.11
+Info:      logic  0.27  3.05 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT5_O_S0_MUX2_LUT6_O_1_I1_MUX2_LUT5_O_I0_LUT4_F_I0_LUT4_I0_4_F_MUX2_LUT5_I1_O_MUX2_LUT6_I0_O_MUX2_LUT8_O.O
+Info:    routing  0.95  4.00 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT5_O_S0_MUX2_LUT6_O_1_I1_MUX2_LUT5_O_I0_LUT4_F_I0_LUT4_I0_4_F_MUX2_LUT5_I1_O_MUX2_LUT6_I0_O[2] (7,16) -> (9,21)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O_I0_MUX2_LUT5_O_I0_LUT4_F.I2
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.46  4.46 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O_I0_MUX2_LUT5_O_I0_LUT4_F.F
+Info:    routing  0.00  4.46 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O_I0_MUX2_LUT5_O_I0 (9,21) -> (9,21)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O_I0_MUX2_LUT5_O.I0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:170.42-170.67
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:164.41-164.66
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:158.41-158.66
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:151.9-151.11
+Info:      logic  0.27  4.73 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O_I0_MUX2_LUT5_O.O
+Info:    routing  0.00  4.73 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O_I0 (9,21) -> (9,21)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O.I0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:170.42-170.67
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:164.41-164.66
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:157.9-157.11
+Info:      logic  0.27  5.00 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0_MUX2_LUT6_O.O
+Info:    routing  0.00  5.00 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O_I0 (9,21) -> (9,21)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O.I0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:170.42-170.67
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:163.9-163.11
+Info:      logic  0.27  5.27 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0_MUX2_LUT7_O.O
+Info:    routing  0.00  5.27 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O_I0 (9,21) -> (8,21)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O.I0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:169.9-169.11
+Info:      logic  0.27  5.54 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM_MUX2_LUT8_O.O
+Info:    routing  0.64  6.18 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_SUM[2] (8,21) -> (11,22)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.I1
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.57  6.75 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.COUT
+Info:    routing  0.00  6.75 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN (11,22) -> (11,22)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:54.69-54.77
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  6.78 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.COUT
+Info:    routing  0.00  6.78 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN (11,22) -> (11,22)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:54.69-54.77
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  6.82 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.COUT
+Info:    routing  0.00  6.82 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN (11,22) -> (11,22)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:54.69-54.77
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  6.85 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.COUT
+Info:    routing  0.00  6.85 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN (11,22) -> (12,22)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:54.69-54.77
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.04  6.89 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT.COUT
+Info:    routing  0.00  6.89 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_CIN (12,22) -> (12,22)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT.CIN
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:54.69-54.77
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/arith_map.v:57.7-63.5
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_sim.v:1033.25-1033.29
+Info:      logic  0.47  7.36 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT.SUM
+Info:    routing  0.74  8.10 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_SUM[3] (12,22) -> (13,32)
+Info:                          Sink u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_6.I3
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.37  8.47 Source u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_6.F
+Info:    routing  0.00  8.47 Net u_npu.u_sa.u_pot.GEN_LANE[2].term_data[12] (13,32) -> (13,32)
+Info:                          Sink u_npu.u_sa.ps_acc_out_LUT4_F_17_I3_LUT4_F_1_I3_ALU_I1_SUM_LUT2_I0_F_LUT2_F_14_I0_ALU_SUM_I1_LUT4_I3_F_LUT4_F_I3_LUT4_F_1_I1_ALU_I1_1_SUM_LUT2_I0_F_LUT2_F_29_I0_ALU_SUM_I0_DFFCE_Q.D
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:54.21-54.30
+Info:      setup  0.04  8.50 Source u_npu.u_sa.ps_acc_out_LUT4_F_17_I3_LUT4_F_1_I3_ALU_I1_SUM_LUT2_I0_F_LUT2_F_14_I0_ALU_SUM_I1_LUT4_I3_F_LUT4_F_I3_LUT4_F_1_I1_ALU_I1_1_SUM_LUT2_I0_F_LUT2_F_29_I0_ALU_SUM_I0_DFFCE_Q.D
+Info: 3.99 ns logic, 4.51 ns routing
+

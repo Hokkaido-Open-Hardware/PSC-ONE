@@ -1,0 +1,43 @@
+%Warning-WIDTHTRUNC: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_MACScheduler.sv:28:22: Operator VAR 'LAST_GROUP' expects 2 bits on the Initial value, but Initial value's SUB generates 32 bits.
+                                                                                      : ... note: In instance 'PSC_NPU_Controller.u_sa.u_scheduler'
+   28 |     localparam [1:0] LAST_GROUP = (16/LANES)-1;
+      |                      ^~~~~~~~~~
+                     ... For warning description see https://verilator.org/warn/WIDTHTRUNC?v=5.050
+                     ... Use "/* verilator lint_off WIDTHTRUNC */" and lint_on around source to disable this message.
+%Warning-WIDTHTRUNC: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:60:9: Logical operator GENIF expects 1 bit on the If, but If's VARREF 'SERIAL_TERMS' generates 32 bits.
+                                                                                 : ... note: In instance 'PSC_NPU_Controller.u_sa.u_pot'
+   60 |         if (SERIAL_TERMS) begin : GEN_SERIAL
+      |         ^~
+%Warning-WIDTHTRUNC: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:21:44: Logical operator LOGNOT expects 1 bit on the LHS, but LHS's VARREF 'SERIAL_TERMS' generates 32 bits.
+                                                                                  : ... note: In instance 'PSC_NPU_Controller.u_sa.u_pot'
+   21 |     wire final_step = exponent == 3'd0 && (!SERIAL_TERMS || phase);
+      |                                            ^
+%Warning-WIDTHTRUNC: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:57:48: Logical operator LOGNOT expects 1 bit on the LHS, but LHS's VARREF 'SERIAL_TERMS' generates 32 bits.
+                                                                                  : ... note: In instance 'PSC_NPU_Controller.u_sa.u_pot'
+   57 |         wire first_step = exponent == 3'd7 && (!SERIAL_TERMS || !phase);
+      |                                                ^
+%Warning-WIDTHTRUNC: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_MACScheduler.sv:61:21: Logical operator IF expects 1 bit on the If, but If's VARREF 'SERIAL_TERMS' generates 32 bits.
+                                                                                      : ... note: In instance 'PSC_NPU_Controller.u_sa.u_scheduler'
+   61 |                     if (SERIAL_TERMS) phase <= ~phase;
+      |                     ^~
+%Warning-WIDTHTRUNC: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_MACScheduler.sv:62:25: Logical operator LOGNOT expects 1 bit on the LHS, but LHS's VARREF 'SERIAL_TERMS' generates 32 bits.
+                                                                                      : ... note: In instance 'PSC_NPU_Controller.u_sa.u_scheduler'
+   62 |                     if (!SERIAL_TERMS || phase) begin
+      |                         ^
+%Warning-WIDTHEXPAND: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:443:31: Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'row_s' generates 6 bits.
+                                                                                     : ... note: In instance 'PSC_NPU_Controller'
+  443 |                     if (row_s == (2*PE_N - 1)) begin
+      |                               ^~
+                      ... For warning description see https://verilator.org/warn/WIDTHEXPAND?v=5.050
+                      ... Use "/* verilator lint_off WIDTHEXPAND */" and lint_on around source to disable this message.
+%Warning-WIDTHEXPAND: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:473:35: Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'row_s' generates 6 bits.
+                                                                                     : ... note: In instance 'PSC_NPU_Controller'
+  473 |                         if (row_s == PE_N - 1) begin
+      |                                   ^~
+%Warning-WIDTHEXPAND: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:512:35: Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'row_s' generates 6 bits.
+                                                                                     : ... note: In instance 'PSC_NPU_Controller'
+  512 |                         if (row_s == PE_N*PE_N - 1) begin
+      |                                   ^~
+- V e r i l a t i o n   R e p o r t: Verilator 5.050 2026-07-01 rev v5.050-60-g3d2421f3b
+- Verilator: Built from 0.269 MB sources in 7 modules, into 0.172 MB in 3 C++ files needing 0.000 MB
+- Verilator: Walltime 0.035 s (elab=0.007, cvt=0.018, bld=0.000); cpu 0.035 s on 1 threads; allocated 25.090 MB

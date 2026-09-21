@@ -193,14 +193,15 @@ PSC_ONE_BOOT_FILE = $(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v
 PSC_ONE_DMA_FILE =  $(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
 
 # ============================================================
-# NPU implementation selection (v1 / legacy)
+# NPU implementation selection (v1 / v2 / legacy)
 # ============================================================
 
-# デフォルトはNPU_V1
+# デフォルトはlegacy
 NPU_VERSION ?= legacy
 
 NPU_LEGACY_DIR = ../rtl/soc/npu/src
 NPU_V1_DIR     = ../rtl/soc/npu_v1/src
+NPU_V2_DIR     = ../rtl/soc/npu_v2/src
 
 # NPU V1: 4 MUL -> 4 fixed WB lanes -> 16 ACC bank
 NPU_V1_FILES = \
@@ -210,6 +211,15 @@ NPU_V1_FILES = \
 	$(NPU_V1_DIR)/PSC_NPU_MACScheduler.sv \
 	$(NPU_V1_DIR)/PSC_NPU_Mul4.sv \
 	$(NPU_V1_DIR)/PSC_NPU_AccBank.sv
+
+# NPU V2: selector 8 lanes, two signed power-of-two terms per weight byte.
+NPU_V2_FILES = \
+	$(NPU_V2_DIR)/PSC_NPU_Controller.v \
+	$(NPU_V2_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_V2_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_V2_DIR)/PSC_NPU_MACScheduler.sv \
+	$(NPU_V2_DIR)/PSC_NPU_PotLanes.sv \
+	$(NPU_V2_DIR)/PSC_NPU_AccBank.sv
 
 # Legacy NPU
 NPU_LEGACY_FILES = \
@@ -222,11 +232,14 @@ NPU_LEGACY_FILES = \
 ifeq ($(NPU_VERSION),v1)
 SA_DIR  = $(NPU_V1_DIR)
 SA_FILE = $(NPU_V1_FILES)
+else ifeq ($(NPU_VERSION),v2)
+SA_DIR  = $(NPU_V2_DIR)
+SA_FILE = $(NPU_V2_FILES)
 else ifeq ($(NPU_VERSION),legacy)
 SA_DIR  = $(NPU_LEGACY_DIR)
 SA_FILE = $(NPU_LEGACY_FILES)
 else
-$(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 または legacy を指定してください)
+$(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 / v2 / legacy を指定してください)
 endif
 
 MMIO_BASE_DIR	= ../rtl/soc/mmio

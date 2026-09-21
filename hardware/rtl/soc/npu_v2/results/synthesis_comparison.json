@@ -1,0 +1,2197 @@
+{
+  "device": "GW2AR-LV18QN88C8/I7",
+  "family": "GW2A-18C",
+  "target_MHz": 81,
+  "yosys": "Yosys 0.68+136 (git sha1 c30457480, Release, GNU /usr/bin/c++ 15.2.0)",
+  "nextpnr": "\"nextpnr-himbaechel\" -- Next Generation Place and Route (Version nextpnr-0.11.1-18-gdec04b3b)",
+  "wrapper_sha256": "034dd6ad9359f37990c7cd859f7291638c21e05c680f0960c5c45d8104ca0fb8",
+  "variants": {
+    "v1": {
+      "cells": {
+        "DFFC": 37,
+        "LUT1": 125,
+        "ALU": 762,
+        "LUT3": 278,
+        "DFFCE": 1624,
+        "LUT2": 1045,
+        "LUT4": 697,
+        "MUX2_LUT5": 265,
+        "DFFP": 18,
+        "OBUF": 1,
+        "$scopeinfo": 6,
+        "GND": 1,
+        "VCC": 1,
+        "IBUF": 2,
+        "MULT9X9": 7
+      },
+      "LUT": 2145,
+      "FF": 1679,
+      "MUX": 265,
+      "ALU": 762,
+      "MULT9X9": 7,
+      "MULT18X18": 0,
+      "source_sha256": {
+        "PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_AccBank.sv": "c47fc8e7424c3d4964be45321c711e7ebafd0dadc7bfe904751e6a2ebd39bff4",
+        "PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_Controller.v": "82944b54ca8ae602d32dfda81ae6b484c9f15feba2a1f5882c7c8f2f1b9b568c",
+        "PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_MACScheduler.sv": "82f2c0d5976585ba5f5fc52fd0710dc99373b61f78c70aa227488834bc022b28",
+        "PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_Mul4.sv": "14048eefa0a50b2f3ddf2e0496302ed6b12d6e60da56a2257b8f6d92003e450c",
+        "PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_ReadController.v": "55acb12f03ba289f7ec41caa823fecdb2eba2195f22e6aed594caee839c63852",
+        "PSC-ONE/hardware/rtl/soc/npu_v1/src/PSC_NPU_SystolicArray4x4.v": "7dfba53dcd8c194f88d01b09290afad04869b13b5251186906e7d6c9d3621c44"
+      },
+      "arithmetic": {
+        "cells": {
+          "MUX2_LUT6": 80,
+          "MUX2_LUT5": 160,
+          "LUT4": 320,
+          "DFFCE": 326,
+          "IBUF": 263,
+          "LUT2": 4,
+          "MUX2_LUT7": 8,
+          "MULT9X9": 4,
+          "LUT1": 1,
+          "OBUF": 148,
+          "GND": 1,
+          "VCC": 1,
+          "DFFC": 1
+        },
+        "LUT": 325,
+        "FF": 327,
+        "MUX": 248,
+        "ALU": 0,
+        "MULT9X9": 4,
+        "MULT18X18": 0
+      },
+      "arithmetic_generic_cells": {
+        "$adffe": 7,
+        "$logic_and": 12,
+        "$mul": 4,
+        "$adff": 1,
+        "$shiftx": 8
+      },
+      "pnr": [
+        {
+          "seed": 1,
+          "fmax_MHz": 202.72,
+          "pass_81MHz": true,
+          "logic_ns": 1.67,
+          "routing_ns": 3.26,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 820
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1679
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 7
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 2769
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 7
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 265
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 0
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 0
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 0
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "sa_state_reset_LUT4_I1_F_LUT4_I3_F_LUT3_I2_F_DFFCE_CE_Q_DFFCE_Q_1",
+            "loc": [
+              2,
+              26
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "c_write_addr_DFFCE_Q_24",
+            "loc": [
+              6,
+              16
+            ],
+            "port": "CE"
+          }
+        },
+        {
+          "seed": 2,
+          "fmax_MHz": 214.13,
+          "pass_81MHz": true,
+          "logic_ns": 1.67,
+          "routing_ns": 3.0,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 820
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1679
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 7
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 2771
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 7
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 265
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 0
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 0
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 0
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "sa_state_reset_LUT4_I1_F_LUT4_I3_F_LUT3_I2_F_DFFCE_CE_Q_DFFCE_Q_1",
+            "loc": [
+              10,
+              22
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.i_idx_DFFCE_Q_3",
+            "loc": [
+              1,
+              23
+            ],
+            "port": "CE"
+          }
+        },
+        {
+          "seed": 3,
+          "fmax_MHz": 192.38,
+          "pass_81MHz": true,
+          "logic_ns": 1.76,
+          "routing_ns": 3.44,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 820
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1679
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 7
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 2769
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 7
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 265
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 0
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 0
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 0
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "sa_state_reset_LUT4_I1_F_LUT4_I3_F_LUT3_I2_F_DFFCE_CE_Q_DFFCE_Q_2",
+            "loc": [
+              18,
+              21
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.i_idx_DFFCE_Q_6",
+            "loc": [
+              3,
+              19
+            ],
+            "port": "CE"
+          }
+        }
+      ],
+      "median_fmax_MHz": 202.72,
+      "min_fmax_MHz": 192.38,
+      "max_fmax_MHz": 214.13
+    },
+    "v2_4": {
+      "cells": {
+        "DFFC": 37,
+        "LUT1": 746,
+        "ALU": 823,
+        "LUT3": 374,
+        "DFFCE": 1622,
+        "LUT2": 1062,
+        "LUT4": 723,
+        "MUX2_LUT5": 603,
+        "DFFP": 18,
+        "MUX2_LUT6": 163,
+        "OBUF": 1,
+        "$scopeinfo": 6,
+        "GND": 1,
+        "VCC": 1,
+        "IBUF": 2,
+        "MULT9X9": 3,
+        "MUX2_LUT7": 63,
+        "MUX2_LUT8": 12
+      },
+      "LUT": 2905,
+      "FF": 1677,
+      "MUX": 841,
+      "ALU": 823,
+      "MULT9X9": 3,
+      "MULT18X18": 0,
+      "source_sha256": {
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_AccBank.sv": "548b9b7877c70c6beb0233dd95d6e894039fb35049dc0f565a9e68c72d2e3809",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v": "fb6e9878094e1b5250039dddb87233b1e1efd99250b58f177c1c61c73c8daa9a",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_MACScheduler.sv": "db48a19218e8494dc3e3fbc6acfa225d754a479500d51b6a295329d78306cef5",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv": "0d9a4e85fd7b0b6b500ed901b4cccae3dbc6864ee548db2838f5a59244608b8f",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ReadController.v": "55acb12f03ba289f7ec41caa823fecdb2eba2195f22e6aed594caee839c63852",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_SystolicArray4x4.v": "62649f600557b0e4d54cd3c353f2fd4edf7d8cb1e3371a8ef7ff5a5235b7eb32"
+      },
+      "arithmetic": {
+        "cells": {
+          "DFFCE": 323,
+          "GND": 1,
+          "LUT2": 80,
+          "LUT4": 386,
+          "ALU": 62,
+          "LUT3": 96,
+          "MUX2_LUT5": 460,
+          "IBUF": 264,
+          "LUT1": 507,
+          "MUX2_LUT7": 77,
+          "MUX2_LUT6": 198,
+          "MUX2_LUT8": 14,
+          "VCC": 1,
+          "OBUF": 148,
+          "DFFC": 1
+        },
+        "LUT": 1069,
+        "FF": 324,
+        "MUX": 749,
+        "ALU": 62,
+        "MULT9X9": 0,
+        "MULT18X18": 0
+      },
+      "arithmetic_generic_cells": {
+        "$add": 3,
+        "$adffe": 10,
+        "$logic_not": 8,
+        "$logic_and": 4,
+        "$neg": 4,
+        "$adff": 1,
+        "$pmux": 4,
+        "$eq": 28,
+        "$shiftx": 8,
+        "$mux": 12
+      },
+      "pnr": [
+        {
+          "seed": 1,
+          "fmax_MHz": 129.43,
+          "pass_81MHz": true,
+          "logic_ns": 4.07,
+          "routing_ns": 3.66,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 886
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1677
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 3
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 3482
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 3
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 603
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 163
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 63
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 12
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_6_I2_ALU_I1_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_SUM_LUT4_F_I1_LUT4_I3_F_LUT4_F_I3_MUX2_LUT7_O_I0_MUX2_LUT6_O_I0_MUX2_LUT5_O_I1_LUT1_F_I0_LUT3_I1_F_LUT4_I1_F_MUX2_LUT5_I0_O_LUT4_F_1_I1_DFFCE_Q_1",
+            "loc": [
+              11,
+              2
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.u_sa.ps_acc_out_MUX2_LUT5_O_30_S0_LUT4_F_I3_LUT4_F_I3_ALU_I1_SUM_LUT2_I0_F_LUT2_F_27_I0_ALU_SUM_I0_DFFCE_Q",
+            "loc": [
+              7,
+              6
+            ],
+            "port": "D"
+          }
+        },
+        {
+          "seed": 2,
+          "fmax_MHz": 129.85,
+          "pass_81MHz": true,
+          "logic_ns": 3.59,
+          "routing_ns": 4.11,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 886
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1677
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 3
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 3480
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 3
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 603
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 163
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 63
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 12
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_6_I2_ALU_I1_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_SUM_LUT4_F_I1_LUT4_F_1_I1_DFFCE_Q",
+            "loc": [
+              13,
+              23
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.u_sa.ps_acc_out_MUX2_LUT5_O_30_S0_LUT4_F_I3_LUT4_F_I3_ALU_I1_SUM_LUT2_I0_F_LUT2_F_20_I0_ALU_SUM_I0_DFFCE_Q",
+            "loc": [
+              12,
+              15
+            ],
+            "port": "D"
+          }
+        },
+        {
+          "seed": 3,
+          "fmax_MHz": 117.76,
+          "pass_81MHz": true,
+          "logic_ns": 4.0,
+          "routing_ns": 4.49,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 886
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1677
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 3
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 3477
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 3
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 603
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 163
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 63
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 12
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "u_npu.u_sa.u_scheduler.state_DFFC_Q_1_D_LUT4_F_I1_DFFCE_Q",
+            "loc": [
+              8,
+              19
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.u_sa.ps_acc_out_MUX2_LUT5_O_30_S0_LUT4_F_I3_LUT4_F_I3_ALU_I1_SUM_LUT2_I0_F_LUT2_F_20_I0_ALU_SUM_I0_DFFCE_Q",
+            "loc": [
+              14,
+              13
+            ],
+            "port": "D"
+          }
+        }
+      ],
+      "median_fmax_MHz": 129.43,
+      "min_fmax_MHz": 117.76,
+      "max_fmax_MHz": 129.85,
+      "selector_audit": "PASS: one 16-bit 8-choice selector per lane, no data multiplier or variable shift"
+    },
+    "v2_8": {
+      "cells": {
+        "DFFC": 37,
+        "LUT1": 299,
+        "ALU": 884,
+        "LUT3": 488,
+        "DFFCE": 1685,
+        "LUT2": 1071,
+        "LUT4": 1068,
+        "MUX2_LUT5": 292,
+        "DFFP": 18,
+        "OBUF": 1,
+        "$scopeinfo": 6,
+        "GND": 1,
+        "VCC": 1,
+        "IBUF": 2,
+        "MULT9X9": 3,
+        "MUX2_LUT6": 42,
+        "MUX2_LUT7": 6
+      },
+      "LUT": 2926,
+      "FF": 1740,
+      "MUX": 340,
+      "ALU": 884,
+      "MULT9X9": 3,
+      "MULT18X18": 0,
+      "source_sha256": {
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_AccBank.sv": "548b9b7877c70c6beb0233dd95d6e894039fb35049dc0f565a9e68c72d2e3809",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v": "fb6e9878094e1b5250039dddb87233b1e1efd99250b58f177c1c61c73c8daa9a",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_MACScheduler.sv": "db48a19218e8494dc3e3fbc6acfa225d754a479500d51b6a295329d78306cef5",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv": "0d9a4e85fd7b0b6b500ed901b4cccae3dbc6864ee548db2838f5a59244608b8f",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ReadController.v": "55acb12f03ba289f7ec41caa823fecdb2eba2195f22e6aed594caee839c63852",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_SystolicArray4x4.v": "62649f600557b0e4d54cd3c353f2fd4edf7d8cb1e3371a8ef7ff5a5235b7eb32"
+      },
+      "arithmetic": {
+        "cells": {
+          "DFFCE": 386,
+          "GND": 1,
+          "LUT2": 131,
+          "LUT4": 506,
+          "ALU": 121,
+          "LUT3": 241,
+          "IBUF": 264,
+          "MUX2_LUT5": 241,
+          "MUX2_LUT6": 39,
+          "LUT1": 168,
+          "MUX2_LUT7": 3,
+          "VCC": 1,
+          "OBUF": 296,
+          "DFFC": 1
+        },
+        "LUT": 1046,
+        "FF": 387,
+        "MUX": 283,
+        "ALU": 121,
+        "MULT9X9": 0,
+        "MULT18X18": 0
+      },
+      "arithmetic_generic_cells": {
+        "$add": 7,
+        "$adffe": 18,
+        "$logic_not": 16,
+        "$logic_and": 8,
+        "$neg": 8,
+        "$adff": 1,
+        "$pmux": 8,
+        "$eq": 56,
+        "$shiftx": 16,
+        "$mux": 24
+      },
+      "pnr": [
+        {
+          "seed": 1,
+          "fmax_MHz": 131.49,
+          "pass_81MHz": true,
+          "logic_ns": 3.97,
+          "routing_ns": 3.63,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 952
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1740
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 3
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 3473
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 3
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 292
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 42
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 6
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 0
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "u_npu.u_sa.u_pot.GEN_LANE[1].term_data_LUT4_F_I3_ALU_I1_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_SUM_DFFCE_Q",
+            "loc": [
+              9,
+              20
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.u_sa.u_pot.GEN_LANE[6].term_data_DFFCE_D",
+            "loc": [
+              12,
+              13
+            ],
+            "port": "D"
+          }
+        },
+        {
+          "seed": 2,
+          "fmax_MHz": 133.28,
+          "pass_81MHz": true,
+          "logic_ns": 3.91,
+          "routing_ns": 3.59,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 952
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1740
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 3
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 3469
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 3
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 292
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 42
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 6
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 0
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "u_npu.u_sa.u_pot.GEN_LANE[1].term_data_LUT4_F_I3_ALU_I1_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_SUM_DFFCE_Q",
+            "loc": [
+              5,
+              8
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.u_sa.ps_acc_out_LUT3_F_23_I2_LUT4_F_1_I3_LUT4_F_I1_ALU_I1_SUM_LUT2_I1_F_LUT2_F_12_I0_ALU_SUM_I0_DFFCE_Q",
+            "loc": [
+              2,
+              19
+            ],
+            "port": "D"
+          }
+        },
+        {
+          "seed": 3,
+          "fmax_MHz": 126.55,
+          "pass_81MHz": true,
+          "logic_ns": 3.94,
+          "routing_ns": 3.96,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 952
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1740
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 3
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 3465
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 3
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 292
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 42
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 6
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 0
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "u_npu.u_sa.u_pot.GEN_LANE[1].term_data_LUT4_F_I3_ALU_I1_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_SUM_DFFCE_Q",
+            "loc": [
+              6,
+              15
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.u_sa.ps_acc_out_LUT3_F_17_I2_LUT4_F_1_I3_LUT4_F_1_I1_ALU_I1_SUM_LUT2_I0_F_LUT2_F_28_I0_ALU_SUM_I0_DFFCE_Q",
+            "loc": [
+              9,
+              24
+            ],
+            "port": "D"
+          }
+        }
+      ],
+      "median_fmax_MHz": 131.49,
+      "min_fmax_MHz": 126.55,
+      "max_fmax_MHz": 133.28,
+      "selector_audit": "PASS: one 16-bit 8-choice selector per lane, no data multiplier or variable shift"
+    },
+    "v2_16": {
+      "cells": {
+        "DFFC": 37,
+        "LUT1": 3628,
+        "ALU": 1002,
+        "LUT3": 1201,
+        "DFFCE": 1812,
+        "LUT2": 1433,
+        "LUT4": 1673,
+        "MUX2_LUT5": 2711,
+        "DFFP": 18,
+        "OBUF": 1,
+        "$scopeinfo": 6,
+        "GND": 1,
+        "VCC": 1,
+        "IBUF": 2,
+        "MULT9X9": 3,
+        "MUX2_LUT6": 1209,
+        "MUX2_LUT7": 382,
+        "MUX2_LUT8": 144
+      },
+      "LUT": 7935,
+      "FF": 1867,
+      "MUX": 4446,
+      "ALU": 1002,
+      "MULT9X9": 3,
+      "MULT18X18": 0,
+      "source_sha256": {
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_AccBank.sv": "548b9b7877c70c6beb0233dd95d6e894039fb35049dc0f565a9e68c72d2e3809",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v": "fb6e9878094e1b5250039dddb87233b1e1efd99250b58f177c1c61c73c8daa9a",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_MACScheduler.sv": "db48a19218e8494dc3e3fbc6acfa225d754a479500d51b6a295329d78306cef5",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv": "0d9a4e85fd7b0b6b500ed901b4cccae3dbc6864ee548db2838f5a59244608b8f",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_ReadController.v": "55acb12f03ba289f7ec41caa823fecdb2eba2195f22e6aed594caee839c63852",
+        "PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_SystolicArray4x4.v": "62649f600557b0e4d54cd3c353f2fd4edf7d8cb1e3371a8ef7ff5a5235b7eb32"
+      },
+      "arithmetic": {
+        "cells": {
+          "DFFCE": 513,
+          "GND": 1,
+          "LUT2": 97,
+          "LUT4": 1347,
+          "LUT3": 620,
+          "ALU": 240,
+          "MUX2_LUT5": 1869,
+          "LUT1": 2620,
+          "MUX2_LUT6": 849,
+          "MUX2_LUT7": 213,
+          "MUX2_LUT8": 66,
+          "IBUF": 264,
+          "VCC": 1,
+          "OBUF": 592,
+          "DFFC": 1
+        },
+        "LUT": 4684,
+        "FF": 514,
+        "MUX": 2997,
+        "ALU": 240,
+        "MULT9X9": 0,
+        "MULT18X18": 0
+      },
+      "arithmetic_generic_cells": {
+        "$add": 15,
+        "$adffe": 33,
+        "$logic_not": 32,
+        "$logic_and": 16,
+        "$neg": 16,
+        "$adff": 1,
+        "$pmux": 16,
+        "$eq": 112,
+        "$shiftx": 32,
+        "$mux": 48
+      },
+      "pnr": [
+        {
+          "seed": 1,
+          "fmax_MHz": 117.65,
+          "pass_81MHz": true,
+          "logic_ns": 3.99,
+          "routing_ns": 4.51,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 1076
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1867
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 3
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 8504
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 3
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 2711
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 1209
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 382
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 144
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "u_npu.u_sa.u_pot.GEN_LANE[2].term_data_LUT4_F_11_I0_ALU_I1_CIN_ALU_COUT_I1_LUT4_F_I1_DFFCE_Q_2",
+            "loc": [
+              9,
+              33
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.u_sa.ps_acc_out_LUT4_F_17_I3_LUT4_F_1_I3_ALU_I1_SUM_LUT2_I0_F_LUT2_F_14_I0_ALU_SUM_I1_LUT4_I3_F_LUT4_F_I3_LUT4_F_1_I1_ALU_I1_1_SUM_LUT2_I0_F_LUT2_F_29_I0_ALU_SUM_I0_DFFCE_Q",
+            "loc": [
+              13,
+              32
+            ],
+            "port": "D"
+          }
+        },
+        {
+          "seed": 2,
+          "fmax_MHz": 120.77,
+          "pass_81MHz": true,
+          "logic_ns": 4.41,
+          "routing_ns": 3.87,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 1076
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1867
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 3
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 8499
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 3
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 2711
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 1209
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 382
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 144
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "u_npu.u_sa.u_pot.GEN_LANE[3].term_data_LUT4_F_11_I0_ALU_I1_SUM_DFFCE_Q",
+            "loc": [
+              34,
+              22
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.u_sa.ps_acc_out_LUT4_F_17_I3_LUT4_F_1_I3_ALU_I1_SUM_LUT2_I0_F_LUT2_F_14_I0_ALU_SUM_I1_LUT4_I3_F_LUT4_F_I3_LUT4_F_I1_ALU_I1_SUM_LUT2_I0_F_LUT2_F_26_I0_ALU_SUM_I0_DFFCE_Q",
+            "loc": [
+              21,
+              17
+            ],
+            "port": "D"
+          }
+        },
+        {
+          "seed": 3,
+          "fmax_MHz": 120.54,
+          "pass_81MHz": true,
+          "logic_ns": 3.57,
+          "routing_ns": 4.72,
+          "utilization": {
+            "ALU": {
+              "available": 15552,
+              "used": 1076
+            },
+            "ALU54D": {
+              "available": 24,
+              "used": 0
+            },
+            "BSRAM": {
+              "available": 46,
+              "used": 0
+            },
+            "BUFG": {
+              "available": 24,
+              "used": 1
+            },
+            "CLKDIV": {
+              "available": 8,
+              "used": 0
+            },
+            "CLKDIV2": {
+              "available": 16,
+              "used": 0
+            },
+            "DCS": {
+              "available": 8,
+              "used": 0
+            },
+            "DFF": {
+              "available": 15552,
+              "used": 1867
+            },
+            "DHCEN": {
+              "available": 24,
+              "used": 0
+            },
+            "DQCE": {
+              "available": 24,
+              "used": 0
+            },
+            "DUMMY_CELL": {
+              "available": 0,
+              "used": 3
+            },
+            "GND": {
+              "available": 1,
+              "used": 1
+            },
+            "GSR": {
+              "available": 1,
+              "used": 1
+            },
+            "IOB": {
+              "available": 384,
+              "used": 3
+            },
+            "IOLOGICI": {
+              "available": 384,
+              "used": 0
+            },
+            "IOLOGICO": {
+              "available": 384,
+              "used": 0
+            },
+            "LUT4": {
+              "available": 20736,
+              "used": 8502
+            },
+            "MULT18X18": {
+              "available": 48,
+              "used": 0
+            },
+            "MULT36X36": {
+              "available": 12,
+              "used": 0
+            },
+            "MULT9X9": {
+              "available": 96,
+              "used": 3
+            },
+            "MULTADDALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU18X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MULTALU36X18": {
+              "available": 24,
+              "used": 0
+            },
+            "MUX2_LUT5": {
+              "available": 10368,
+              "used": 2711
+            },
+            "MUX2_LUT6": {
+              "available": 5184,
+              "used": 1209
+            },
+            "MUX2_LUT7": {
+              "available": 2592,
+              "used": 382
+            },
+            "MUX2_LUT8": {
+              "available": 2592,
+              "used": 144
+            },
+            "OSC": {
+              "available": 1,
+              "used": 0
+            },
+            "PADD18": {
+              "available": 48,
+              "used": 0
+            },
+            "PADD9": {
+              "available": 96,
+              "used": 0
+            },
+            "RAM16SDP4": {
+              "available": 648,
+              "used": 0
+            },
+            "VCC": {
+              "available": 1,
+              "used": 1
+            },
+            "rPLL": {
+              "available": 2,
+              "used": 0
+            }
+          },
+          "critical_start": {
+            "cell": "u_npu.u_sa.u_pot.GEN_LANE[13].term_data_LUT4_F_3_I3_ALU_I1_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_COUT_ALU_CIN_SUM_DFFCE_Q",
+            "loc": [
+              20,
+              8
+            ],
+            "port": "Q"
+          },
+          "critical_end": {
+            "cell": "u_npu.u_sa.ps_acc_out_LUT4_F_17_I3_LUT4_F_1_I3_ALU_I1_SUM_LUT2_I0_F_LUT2_F_14_I0_ALU_SUM_I1_LUT4_I3_F_LUT4_F_I3_LUT4_F_I1_ALU_I1_COUT_ALU_CIN_I1_LUT4_I1_F_LUT4_I3_F_LUT4_F_I3_ALU_I1_SUM_LUT2_I0_F_LUT2_F_24_I0_ALU_SUM_I0_DFFCE_Q",
+            "loc": [
+              8,
+              24
+            ],
+            "port": "D"
+          }
+        }
+      ],
+      "median_fmax_MHz": 120.54,
+      "min_fmax_MHz": 117.65,
+      "max_fmax_MHz": 120.77,
+      "selector_audit": "PASS: one 16-bit 8-choice selector per lane, no data multiplier or variable shift"
+    }
+  }
+}

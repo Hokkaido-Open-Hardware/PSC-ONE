@@ -1,0 +1,27 @@
+%Warning-WIDTHTRUNC: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_PotLanes.sv:64:29: Operator ASSIGNDLY expects 4 bits on the Assign RHS, but Assign RHS's ADD generates 32 bits.
+                                                                                  : ... note: In instance 'PSC_NPU_Controller.u_sa.u_pot'
+   64 |                 destination <= group_index*LANES+lane;
+      |                             ^~
+                     ... For warning description see https://verilator.org/warn/WIDTHTRUNC?v=5.050
+                     ... Use "/* verilator lint_off WIDTHTRUNC */" and lint_on around source to disable this message.
+%Warning-WIDTHEXPAND: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_MACScheduler.sv:59:41: Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'group_index' generates 2 bits.
+                                                                                       : ... note: In instance 'PSC_NPU_Controller.u_sa.u_scheduler'
+   59 |                         if (group_index == (16/LANES)-1)
+      |                                         ^~
+                      ... For warning description see https://verilator.org/warn/WIDTHEXPAND?v=5.050
+                      ... Use "/* verilator lint_off WIDTHEXPAND */" and lint_on around source to disable this message.
+%Warning-WIDTHEXPAND: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:442:31: Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'row_s' generates 6 bits.
+                                                                                     : ... note: In instance 'PSC_NPU_Controller'
+  442 |                     if (row_s == (2*PE_N - 1)) begin
+      |                               ^~
+%Warning-WIDTHEXPAND: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:472:35: Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'row_s' generates 6 bits.
+                                                                                     : ... note: In instance 'PSC_NPU_Controller'
+  472 |                         if (row_s == PE_N - 1) begin
+      |                                   ^~
+%Warning-WIDTHEXPAND: PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_Controller.v:511:35: Operator EQ expects 32 bits on the LHS, but LHS's VARREF 'row_s' generates 6 bits.
+                                                                                     : ... note: In instance 'PSC_NPU_Controller'
+  511 |                         if (row_s == PE_N*PE_N - 1) begin
+      |                                   ^~
+- V e r i l a t i o n   R e p o r t: Verilator 5.050 2026-07-01 rev v5.050-60-g3d2421f3b
+- Verilator: Built from 0.263 MB sources in 7 modules, into 0.179 MB in 3 C++ files needing 0.000 MB
+- Verilator: Walltime 0.022 s (elab=0.004, cvt=0.012, bld=0.000); cpu 0.022 s on 1 threads; allocated 24.953 MB

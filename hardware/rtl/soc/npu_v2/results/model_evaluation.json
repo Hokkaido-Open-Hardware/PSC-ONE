@@ -1,0 +1,74 @@
+{
+  "model": "PSC-ONE/software/os/tests/tflite/build/tflite-model/phase3/MODEL.TFL",
+  "sha256": "cced9beaa289713f1eb6fe614df9e68d7147959bc5d0ed7c143003a7be70cd1e",
+  "samples": 262,
+  "channels_per_sample": 20,
+  "cpu_python_exact": true,
+  "existing_20ch_golden_exact": true,
+  "classification_definition": "argmax of FC2 output; first index wins ties; synthetic model, no ground truth labels",
+  "layers": [
+    {
+      "name": "FC1",
+      "weights": {
+        "count": 256,
+        "MAE": 0.0,
+        "RMSE": 0.0,
+        "maximum_error": 0,
+        "changed": 0
+      },
+      "output": {
+        "count": 4192,
+        "MAE": 0.0,
+        "RMSE": 0.0,
+        "maximum_error": 0,
+        "changed": 0
+      },
+      "accumulator": {
+        "count": 4192,
+        "MAE": 0.0,
+        "RMSE": 0.0,
+        "maximum_error": 0,
+        "changed": 0
+      }
+    },
+    {
+      "name": "FC2",
+      "weights": {
+        "count": 64,
+        "MAE": 0.0,
+        "RMSE": 0.0,
+        "maximum_error": 0,
+        "changed": 0
+      },
+      "output": {
+        "count": 1048,
+        "MAE": 0.0,
+        "RMSE": 0.0,
+        "maximum_error": 0,
+        "changed": 0
+      },
+      "accumulator": {
+        "count": 1048,
+        "MAE": 0.0,
+        "RMSE": 0.0,
+        "maximum_error": 0,
+        "changed": 0
+      }
+    }
+  ],
+  "classification_agreement": 262,
+  "demo_final_original": [
+    -36,
+    27,
+    18,
+    8
+  ],
+  "demo_final_pot": [
+    -36,
+    27,
+    18,
+    8
+  ],
+  "demo_class_original": 1,
+  "demo_class_pot": 1
+}

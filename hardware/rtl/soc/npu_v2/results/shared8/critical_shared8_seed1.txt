@@ -1,0 +1,30 @@
+Info: Critical path report for clock 'u_npu.clock' (posedge -> posedge):
+Info:       type curr  total name
+Info:   clk-to-q  0.23  0.23 Source u_npu.u_sa.u_acc_read.value_LUT4_F_7_I3_LUT4_F_I3_LUT4_F_I1_ALU_I1_SUM_LUT2_I0_F_LUT2_F_8_I0_ALU_SUM_I1_DFFCE_Q.Q
+Info:    routing  0.98  1.21 Net u_npu.u_sa.u_acc_read.value_LUT4_F_7_I3_LUT4_F_I3_LUT4_F_I1_ALU_I1_SUM_LUT2_I0_F_LUT2_F_8_I0_ALU_SUM_I1[0] (21,13) -> (27,16)
+Info:                          Sink u_npu.u_sa.u_acc_read.value_LUT4_F_7_I3_LUT4_F_I3_LUT4_F_I1_ALU_I1_SUM_LUT2_I0_F_LUT2_F_8_I0_ALU_SUM_I1_LUT4_I1.I0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.55  1.76 Source u_npu.u_sa.u_acc_read.value_LUT4_F_7_I3_LUT4_F_I3_LUT4_F_I1_ALU_I1_SUM_LUT2_I0_F_LUT2_F_8_I0_ALU_SUM_I1_LUT4_I1.F
+Info:    routing  0.40  2.16 Net u_npu.u_sa.u_acc_read.value_LUT4_F_7_I3_LUT4_F_I3_LUT4_F_I1_ALU_I1_SUM_LUT2_I0_F_LUT2_F_8_I0_ALU_SUM_I1_LUT4_I1_F[4] (27,16) -> (25,16)
+Info:                          Sink u_npu.u_sa.u_acc_read.value_LUT4_F_8_I3_LUT4_F_I3_MUX2_LUT5_O.S0
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.10  2.27 Source u_npu.u_sa.u_acc_read.value_LUT4_F_8_I3_LUT4_F_I3_MUX2_LUT5_O.O
+Info:    routing  0.88  3.14 Net u_npu.u_sa.u_acc_read.value_LUT4_F_8_I3_LUT4_F_I3[2] (25,16) -> (28,19)
+Info:                          Sink u_npu.u_sa.u_acc_read.value_LUT4_F_8_I3_LUT4_F.I2
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.46  3.61 Source u_npu.u_sa.u_acc_read.value_LUT4_F_8_I3_LUT4_F.F
+Info:    routing  0.40  4.01 Net u_npu.u_sa.u_acc_read.value_LUT4_F_8_I3[3] (28,19) -> (29,20)
+Info:                          Sink u_npu.u_sa.u_acc_read.value_LUT4_F_8.I3
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.37  4.38 Source u_npu.u_sa.u_acc_read.value_LUT4_F_8.F
+Info:    routing  0.00  4.38 Net u_npu.ps_acc_out[17] (29,20) -> (29,20)
+Info:                          Sink c_write_wdata_DFFCE_Q_14.D
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/rtl/soc/npu_v2/src/PSC_NPU_AccReadMux.sv:9.23-9.28
+Info:      setup  0.04  4.41 Source c_write_wdata_DFFCE_Q_14.D
+Info: 1.75 ns logic, 2.66 ns routing
+

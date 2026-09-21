@@ -1,0 +1,793 @@
+{
+  "datasets": {
+    "all_INT8": {
+      "weights": 256,
+      "encoded_term_count": {
+        "0": 1,
+        "1": 0,
+        "2": 255
+      },
+      "minimal_term_count": {
+        "0": 1,
+        "1": 15,
+        "2": 240
+      },
+      "raw_exponents": [
+        {
+          "exponent": 0,
+          "positive": 13,
+          "negative": 11
+        },
+        {
+          "exponent": 1,
+          "positive": 19,
+          "negative": 14
+        },
+        {
+          "exponent": 2,
+          "positive": 28,
+          "negative": 21
+        },
+        {
+          "exponent": 3,
+          "positive": 41,
+          "negative": 30
+        },
+        {
+          "exponent": 4,
+          "positive": 55,
+          "negative": 35
+        },
+        {
+          "exponent": 5,
+          "positive": 60,
+          "negative": 22
+        },
+        {
+          "exponent": 6,
+          "positive": 52,
+          "negative": 46
+        },
+        {
+          "exponent": 7,
+          "positive": 23,
+          "negative": 40
+        }
+      ],
+      "minimal_exponents": [
+        {
+          "exponent": 0,
+          "positive": 13,
+          "negative": 11
+        },
+        {
+          "exponent": 1,
+          "positive": 16,
+          "negative": 13
+        },
+        {
+          "exponent": 2,
+          "positive": 25,
+          "negative": 21
+        },
+        {
+          "exponent": 3,
+          "positive": 39,
+          "negative": 30
+        },
+        {
+          "exponent": 4,
+          "positive": 53,
+          "negative": 35
+        },
+        {
+          "exponent": 5,
+          "positive": 58,
+          "negative": 22
+        },
+        {
+          "exponent": 6,
+          "positive": 52,
+          "negative": 44
+        },
+        {
+          "exponent": 7,
+          "positive": 23,
+          "negative": 40
+        }
+      ],
+      "exponent_major_raw_terms": 510,
+      "exponent_major_minimal_terms": 495,
+      "zero_weight_rate": 0.00390625,
+      "serial_term_skip_rate": 0.87548828125,
+      "horner_coefficient_skip_rate": 0.75390625,
+      "horner_coefficients": {
+        "-2": 1,
+        "-1": 217,
+        "0": 1544,
+        "1": 281,
+        "2": 5
+      },
+      "reordering_changes_raw_term_count": false,
+      "ideal_sparse_issue_cycles": {
+        "4": 131,
+        "8": 68,
+        "16": 37
+      },
+      "ideal_sparse_caveat": "ignores destination conflicts, loading, scatter addresses, final reduction and empty exponent transitions",
+      "dense_issue_cycles": {
+        "4": {
+          "v1": 64,
+          "selector_v2": 128,
+          "horner8": 512,
+          "horner16": 1024
+        },
+        "8": {
+          "v1": 64,
+          "selector_v2": 64,
+          "horner8": 256,
+          "horner16": 512
+        },
+        "16": {
+          "v1": 64,
+          "selector_v2": 32,
+          "horner8": 128,
+          "horner16": 256
+        }
+      }
+    },
+    "unique_canonical": {
+      "weights": 88,
+      "encoded_term_count": {
+        "0": 1,
+        "1": 0,
+        "2": 87
+      },
+      "minimal_term_count": {
+        "0": 1,
+        "1": 15,
+        "2": 72
+      },
+      "raw_exponents": [
+        {
+          "exponent": 0,
+          "positive": 13,
+          "negative": 11
+        },
+        {
+          "exponent": 1,
+          "positive": 15,
+          "negative": 10
+        },
+        {
+          "exponent": 2,
+          "positive": 14,
+          "negative": 9
+        },
+        {
+          "exponent": 3,
+          "positive": 13,
+          "negative": 9
+        },
+        {
+          "exponent": 4,
+          "positive": 13,
+          "negative": 9
+        },
+        {
+          "exponent": 5,
+          "positive": 13,
+          "negative": 9
+        },
+        {
+          "exponent": 6,
+          "positive": 11,
+          "negative": 13
+        },
+        {
+          "exponent": 7,
+          "positive": 5,
+          "negative": 7
+        }
+      ],
+      "minimal_exponents": [
+        {
+          "exponent": 0,
+          "positive": 13,
+          "negative": 11
+        },
+        {
+          "exponent": 1,
+          "positive": 12,
+          "negative": 9
+        },
+        {
+          "exponent": 2,
+          "positive": 11,
+          "negative": 9
+        },
+        {
+          "exponent": 3,
+          "positive": 11,
+          "negative": 9
+        },
+        {
+          "exponent": 4,
+          "positive": 11,
+          "negative": 9
+        },
+        {
+          "exponent": 5,
+          "positive": 11,
+          "negative": 9
+        },
+        {
+          "exponent": 6,
+          "positive": 11,
+          "negative": 11
+        },
+        {
+          "exponent": 7,
+          "positive": 5,
+          "negative": 7
+        }
+      ],
+      "exponent_major_raw_terms": 174,
+      "exponent_major_minimal_terms": 159,
+      "zero_weight_rate": 0.011363636363636364,
+      "serial_term_skip_rate": 0.8764204545454546,
+      "horner_coefficient_skip_rate": 0.7613636363636364,
+      "horner_coefficients": {
+        "-2": 1,
+        "-1": 75,
+        "0": 536,
+        "1": 87,
+        "2": 5
+      },
+      "reordering_changes_raw_term_count": false,
+      "ideal_sparse_issue_cycles": {
+        "4": 46,
+        "8": 24,
+        "16": 15
+      },
+      "ideal_sparse_caveat": "ignores destination conflicts, loading, scatter addresses, final reduction and empty exponent transitions",
+      "dense_issue_cycles": {
+        "4": {
+          "v1": 22,
+          "selector_v2": 44,
+          "horner8": 176,
+          "horner16": 352
+        },
+        "8": {
+          "v1": 22,
+          "selector_v2": 22,
+          "horner8": 88,
+          "horner16": 176
+        },
+        "16": {
+          "v1": 22,
+          "selector_v2": 12,
+          "horner8": 48,
+          "horner16": 96
+        }
+      }
+    },
+    "FC1": {
+      "weights": 256,
+      "encoded_term_count": {
+        "0": 17,
+        "1": 0,
+        "2": 239
+      },
+      "minimal_term_count": {
+        "0": 17,
+        "1": 103,
+        "2": 136
+      },
+      "raw_exponents": [
+        {
+          "exponent": 0,
+          "positive": 85,
+          "negative": 51
+        },
+        {
+          "exponent": 1,
+          "positive": 119,
+          "negative": 34
+        },
+        {
+          "exponent": 2,
+          "positive": 69,
+          "negative": 51
+        },
+        {
+          "exponent": 3,
+          "positive": 17,
+          "negative": 52
+        },
+        {
+          "exponent": 4,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 5,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 6,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 7,
+          "positive": 0,
+          "negative": 0
+        }
+      ],
+      "minimal_exponents": [
+        {
+          "exponent": 0,
+          "positive": 85,
+          "negative": 51
+        },
+        {
+          "exponent": 1,
+          "positive": 68,
+          "negative": 17
+        },
+        {
+          "exponent": 2,
+          "positive": 51,
+          "negative": 52
+        },
+        {
+          "exponent": 3,
+          "positive": 17,
+          "negative": 34
+        },
+        {
+          "exponent": 4,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 5,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 6,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 7,
+          "positive": 0,
+          "negative": 0
+        }
+      ],
+      "exponent_major_raw_terms": 478,
+      "exponent_major_minimal_terms": 375,
+      "zero_weight_rate": 0.06640625,
+      "serial_term_skip_rate": 0.88330078125,
+      "horner_coefficient_skip_rate": 0.77490234375,
+      "horner_coefficients": {
+        "-2": 0,
+        "-1": 188,
+        "0": 1587,
+        "1": 256,
+        "2": 17
+      },
+      "reordering_changes_raw_term_count": false,
+      "ideal_sparse_issue_cycles": {
+        "4": 121,
+        "8": 61,
+        "16": 32
+      },
+      "ideal_sparse_caveat": "ignores destination conflicts, loading, scatter addresses, final reduction and empty exponent transitions",
+      "dense_issue_cycles": {
+        "4": {
+          "v1": 64,
+          "selector_v2": 128,
+          "horner8": 512,
+          "horner16": 1024
+        },
+        "8": {
+          "v1": 64,
+          "selector_v2": 64,
+          "horner8": 256,
+          "horner16": 512
+        },
+        "16": {
+          "v1": 64,
+          "selector_v2": 32,
+          "horner8": 128,
+          "horner16": 256
+        }
+      }
+    },
+    "FC2": {
+      "weights": 64,
+      "encoded_term_count": {
+        "0": 5,
+        "1": 0,
+        "2": 59
+      },
+      "minimal_term_count": {
+        "0": 5,
+        "1": 30,
+        "2": 29
+      },
+      "raw_exponents": [
+        {
+          "exponent": 0,
+          "positive": 19,
+          "negative": 10
+        },
+        {
+          "exponent": 1,
+          "positive": 35,
+          "negative": 10
+        },
+        {
+          "exponent": 2,
+          "positive": 20,
+          "negative": 14
+        },
+        {
+          "exponent": 3,
+          "positive": 0,
+          "negative": 10
+        },
+        {
+          "exponent": 4,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 5,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 6,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 7,
+          "positive": 0,
+          "negative": 0
+        }
+      ],
+      "minimal_exponents": [
+        {
+          "exponent": 0,
+          "positive": 19,
+          "negative": 10
+        },
+        {
+          "exponent": 1,
+          "positive": 20,
+          "negative": 5
+        },
+        {
+          "exponent": 2,
+          "positive": 15,
+          "negative": 14
+        },
+        {
+          "exponent": 3,
+          "positive": 0,
+          "negative": 5
+        },
+        {
+          "exponent": 4,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 5,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 6,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 7,
+          "positive": 0,
+          "negative": 0
+        }
+      ],
+      "exponent_major_raw_terms": 118,
+      "exponent_major_minimal_terms": 88,
+      "zero_weight_rate": 0.078125,
+      "serial_term_skip_rate": 0.884765625,
+      "horner_coefficient_skip_rate": 0.779296875,
+      "horner_coefficients": {
+        "-2": 0,
+        "-1": 44,
+        "0": 399,
+        "1": 64,
+        "2": 5
+      },
+      "reordering_changes_raw_term_count": false,
+      "ideal_sparse_issue_cycles": {
+        "4": 32,
+        "8": 17,
+        "16": 9
+      },
+      "ideal_sparse_caveat": "ignores destination conflicts, loading, scatter addresses, final reduction and empty exponent transitions",
+      "dense_issue_cycles": {
+        "4": {
+          "v1": 16,
+          "selector_v2": 32,
+          "horner8": 128,
+          "horner16": 256
+        },
+        "8": {
+          "v1": 16,
+          "selector_v2": 16,
+          "horner8": 64,
+          "horner16": 128
+        },
+        "16": {
+          "v1": 16,
+          "selector_v2": 8,
+          "horner8": 32,
+          "horner16": 64
+        }
+      }
+    },
+    "model_all": {
+      "weights": 320,
+      "encoded_term_count": {
+        "0": 22,
+        "1": 0,
+        "2": 298
+      },
+      "minimal_term_count": {
+        "0": 22,
+        "1": 133,
+        "2": 165
+      },
+      "raw_exponents": [
+        {
+          "exponent": 0,
+          "positive": 104,
+          "negative": 61
+        },
+        {
+          "exponent": 1,
+          "positive": 154,
+          "negative": 44
+        },
+        {
+          "exponent": 2,
+          "positive": 89,
+          "negative": 65
+        },
+        {
+          "exponent": 3,
+          "positive": 17,
+          "negative": 62
+        },
+        {
+          "exponent": 4,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 5,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 6,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 7,
+          "positive": 0,
+          "negative": 0
+        }
+      ],
+      "minimal_exponents": [
+        {
+          "exponent": 0,
+          "positive": 104,
+          "negative": 61
+        },
+        {
+          "exponent": 1,
+          "positive": 88,
+          "negative": 22
+        },
+        {
+          "exponent": 2,
+          "positive": 66,
+          "negative": 66
+        },
+        {
+          "exponent": 3,
+          "positive": 17,
+          "negative": 39
+        },
+        {
+          "exponent": 4,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 5,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 6,
+          "positive": 0,
+          "negative": 0
+        },
+        {
+          "exponent": 7,
+          "positive": 0,
+          "negative": 0
+        }
+      ],
+      "exponent_major_raw_terms": 596,
+      "exponent_major_minimal_terms": 463,
+      "zero_weight_rate": 0.06875,
+      "serial_term_skip_rate": 0.88359375,
+      "horner_coefficient_skip_rate": 0.77578125,
+      "horner_coefficients": {
+        "-2": 0,
+        "-1": 232,
+        "0": 1986,
+        "1": 320,
+        "2": 22
+      },
+      "reordering_changes_raw_term_count": false,
+      "ideal_sparse_issue_cycles": {
+        "4": 151,
+        "8": 76,
+        "16": 39
+      },
+      "ideal_sparse_caveat": "ignores destination conflicts, loading, scatter addresses, final reduction and empty exponent transitions",
+      "dense_issue_cycles": {
+        "4": {
+          "v1": 80,
+          "selector_v2": 160,
+          "horner8": 640,
+          "horner16": 1280
+        },
+        "8": {
+          "v1": 80,
+          "selector_v2": 80,
+          "horner8": 320,
+          "horner16": 640
+        },
+        "16": {
+          "v1": 80,
+          "selector_v2": 40,
+          "horner8": 160,
+          "horner16": 320
+        }
+      }
+    }
+  },
+  "python_exhaustive_comparisons": 262144,
+  "status": "PASS",
+  "encoding": {
+    "unchanged_code_bits_per_weight": 8,
+    "minimal_terms_with_separate_valid_bits": 10,
+    "ternary_planes_bits_per_weight": 16,
+    "raw_two_term_signed_planes_bits_per_weight": 24,
+    "sparse_term_bits_for_FC1": 9,
+    "sparse_term_note": "exponent implicit in bucket; sign 1 + input index 4 + output index 4; exclude bucket pointers/counts",
+    "ternary_note": "16 bits assumes normalized coefficients -1/0/+1; raw equal-exponent terms can need +/-2 (3 bits/exponent)"
+  },
+  "architectures": {
+    "exponent_banks": {
+      "extra_ACC_bits_per_16_outputs": 4096,
+      "notes": "8 banks; fixed shifts on separate outputs require wide reduction/add network"
+    },
+    "fixed_shift_writeback": {
+      "notes": "parallel exponent-specific adders need wide output selection; serialized fixed 1-bit shifts take extra cycles"
+    },
+    "horner16": {
+      "lane_product_bits": 17,
+      "lane_adders": [
+        17,
+        9
+      ],
+      "cycles_per_group": 16,
+      "notes": "one term at a time: +/-x/skip; 17-bit feedback hold/double mux and 4-bit term mux"
+    },
+    "horner8": {
+      "lane_product_bits": 17,
+      "lane_adders": [
+        17,
+        9
+      ],
+      "cycles_per_group": 8,
+      "notes": "merge equal-exponent terms; contribution 0,+/-x,+/-2x. Always fixed feedback doubling; at most one 2:1 magnitude mux"
+    },
+    "global_horner_ACC": {
+      "notes": "would double previous K-tile sums too. Requires reordering Controller/read path over the entire reduction or extra saved ACC bank; avoid interface/dataflow changes"
+    }
+  },
+  "batch_cycles": {
+    "4": {
+      "v1": {
+        "issue": 4,
+        "start_to_done": 8,
+        "start_interval": 9
+      },
+      "selector_v2": {
+        "issue": 8,
+        "start_to_done": 12,
+        "start_interval": 13
+      },
+      "horner8": {
+        "issue": 32,
+        "start_to_done": 36,
+        "start_interval": 37
+      },
+      "horner16": {
+        "issue": 64,
+        "start_to_done": 68,
+        "start_interval": 69
+      }
+    },
+    "8": {
+      "v1": {
+        "issue": 4,
+        "start_to_done": 8,
+        "start_interval": 9
+      },
+      "selector_v2": {
+        "issue": 4,
+        "start_to_done": 8,
+        "start_interval": 9
+      },
+      "horner8": {
+        "issue": 16,
+        "start_to_done": 20,
+        "start_interval": 21
+      },
+      "horner16": {
+        "issue": 32,
+        "start_to_done": 36,
+        "start_interval": 37
+      }
+    },
+    "16": {
+      "v1": {
+        "issue": 4,
+        "start_to_done": 8,
+        "start_interval": 9
+      },
+      "selector_v2": {
+        "issue": 2,
+        "start_to_done": 6,
+        "start_interval": 7
+      },
+      "horner8": {
+        "issue": 8,
+        "start_to_done": 12,
+        "start_interval": 13
+      },
+      "horner16": {
+        "issue": 16,
+        "start_to_done": 20,
+        "start_interval": 21
+      }
+    }
+  }
+}

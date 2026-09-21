@@ -1,0 +1,23 @@
+Info: Critical path report for clock 'u_npu.clock' (posedge -> posedge):
+Info:       type curr  total name
+Info:   clk-to-q  0.23  0.23 Source sa_state_reset_LUT4_I1_F_LUT4_I3_F_LUT3_I2_F_DFFCE_CE_Q_DFFCE_Q_1.Q
+Info:    routing  0.91  1.14 Net done_DFFC_Q_D_LUT4_F_I3[1] (2,26) -> (6,20)
+Info:                          Sink done_DFFC_Q_D_LUT4_F_I3_LUT4_I3_F_LUT2_F_I0_LUT4_I3_F_LUT4_F.I1
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.57  1.71 Source done_DFFC_Q_D_LUT4_F_I3_LUT4_I3_F_LUT2_F_I0_LUT4_I3_F_LUT4_F.F
+Info:    routing  0.88  2.59 Net BASE_ADDR_B_ALU_I0_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_CIN_ALU_COUT_I1_LUT3_F_I1_ALU_I1_CIN_ALU_COUT_CIN_ALU_COUT_SUM[1] (6,20) -> (12,19)
+Info:                          Sink c_write_ready_LUT4_I0.I1
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:130.20-130.21
+Info:      logic  0.57  3.16 Source c_write_ready_LUT4_I0.F
+Info:    routing  0.00  3.16 Net c_write_ready_LUT4_I0_F (12,19) -> (12,19)
+Info:                          Sink c_write_ready_LUT4_I0_F_MUX2_LUT5_I1.I1
+Info:                          Defined in:
+Info:                               /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim/yosys/build/share/gowin/cells_map.v:151.13-151.15
+Info:      logic  0.27  3.43 Source c_write_ready_LUT4_I0_F_MUX2_LUT5_I1.O
+Info:    routing  1.47  4.90 Net c_write_ready_LUT4_I0_F_MUX2_LUT5_I1_O (12,19) -> (6,16)
+Info:                          Sink c_write_addr_DFFCE_Q_24.CE
+Info:      setup  0.04  4.93 Source c_write_addr_DFFCE_Q_24.CE
+Info: 1.67 ns logic, 3.26 ns routing
+
