@@ -297,7 +297,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	timer_irq_test1:RV32ISP_chip_test:./mem/timer_irq_test1.mem:0x00000321 \
+	cv_pulp_test1:RV32ISP_chip_test:./mem/cv_pulp_test1.mem:0x600D600D \
 
 # ============================================================
 # 複数テスト定義
@@ -309,6 +309,7 @@ PSCONE_SINGLE_TEST = \
 PSCONE_BASIC_TESTS = \
 	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
 	add_test2:RV32ISP_chip_test:./mem/add_test2.mem:0x00000000 \
+	cv_pulp_test1:RV32ISP_chip_test:./mem/cv_pulp_test1.mem:0x600D600D \
 	timer_irq_test1:RV32ISP_chip_test:./mem/timer_irq_test1.mem:0x00000321 \
 	timer_irq_test2:RV32ISP_chip_test:./mem/timer_irq_test2.mem:0x00000322 \
 	forwarding_test1:RV32ISP_chip_test:./mem/forwarding_test1.mem:0x00000011 \

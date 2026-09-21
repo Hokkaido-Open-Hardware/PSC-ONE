@@ -43,6 +43,10 @@ module Decorder (
     localparam [6:0] FENCE         = 7'b0001111;
     localparam [6:0] MULDIV        = 7'b0110011; // (未使用なら無視)
 
+    // Only the register/register unsigned halfword form is implemented.
+    wire is_cv_dotup_h = (opcode & 32'hfe00_707f) == 32'h8000_007b;
+    wire illegal_pulp = (op == 7'h7b) && !is_cv_dotup_h;
+
     // ---- SYSTEM / CSR detection ----
     wire        is_sfence_vma_w =
                             is_system &&
@@ -206,6 +210,7 @@ module Decorder (
     wire raise_illegal_instruction_alu = 0;
 
     assign alucon_w =
+                    is_cv_dotup_h ? ALU_CV_DOTUP_H :
                     is_mul    ? 5'b1_1000 :
                     is_mulh   ? 5'b1_1001 :
                     is_mulhsu ? 5'b1_1010 :
@@ -229,7 +234,7 @@ module Decorder (
 
     // ---- オペランドセレクタ / メモリアクセス ----
     assign op1sel_w = ((op == SBFORMAT) || (op == UFORMAT_AUIPC) || (op == UJFORMAT)) ? 1'b1 : 1'b0;
-    assign op2sel_w = ((op == RFORMAT) || (op == MULDIV)) ? 1'b0 : 1'b1;
+    assign op2sel_w = ((op == RFORMAT) || (op == MULDIV) || is_cv_dotup_h) ? 1'b0 : 1'b1;
 
     // メモリアクセス（CSRはメモリに行かない）
     assign mem_rw_w = (op == SFORMAT) ? 1'b1 : 1'b0;
@@ -244,6 +249,7 @@ module Decorder (
     // ---- レジスタ書き込み許可信号 ----
     // CSR時は rd!=x0 のときのみ書く（rd==x0 なら破棄）
     wire rf_wen_noncsr =
+        is_cv_dotup_h ||
         ((op == RFORMAT) && ({opcode[31], opcode[29:25]} == 6'b000000)) ||
         ((op == MULDIV)  && (opcode[31:25] == 7'b000001)) ||
         ((op == IFORMAT_ALU) &&
@@ -280,6 +286,7 @@ module Decorder (
 
     // rs1を実際に使用する命令
     wire use_rs1_w =
+            is_cv_dotup_h ||
             (op == RFORMAT)       || // R-type、M拡張
             (op == IFORMAT_ALU)   || // ADDIなど
             (op == IFORMAT_LOAD)  || // LOADアドレス
@@ -293,13 +300,14 @@ module Decorder (
 
     // rs2を実際に使用する命令
     wire use_rs2_w =
+            is_cv_dotup_h ||
             (op == RFORMAT)      || // R-type、M拡張
             (op == SFORMAT)      || // STOREデータ
             (op == SBFORMAT)     || // BRANCH比較
             is_sfence_vma_w;
 
     // パイプライン処理 R-type判定
-    wire is_R_type_w = (op == RFORMAT);
+    wire is_R_type_w = (op == RFORMAT) || is_cv_dotup_h;
 
     // パイプライン処理 IMM判定
     wire is_op_imm_w = (op == IFORMAT_ALU);
@@ -378,7 +386,7 @@ module Decorder (
         decoder_ctrl_next.raise_illegal_instruction =
                                     raise_illegal_instruction_sw |
                                     raise_illegal_instruction_mw |
-                                    raise_illegal_instruction_alu;
+                                    raise_illegal_instruction_alu | illegal_pulp;
     end
 
     // The v2 issue stage consumes the FIFO head directly.  Keep decode

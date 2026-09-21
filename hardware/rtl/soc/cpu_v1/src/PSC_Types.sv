@@ -1,5 +1,8 @@
 package PSC_Types;
 
+    // Private ALU control; instruction encoding is checked in Decorder.
+    localparam logic [4:0] ALU_CV_DOTUP_H = 5'b0_1000;
+
     // ============================================================
     // CSR wire
     // ============================================================

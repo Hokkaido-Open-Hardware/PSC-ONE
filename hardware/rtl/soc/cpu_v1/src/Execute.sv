@@ -51,7 +51,8 @@ module Execute #(
     assign is_div_op = ENABLE_DIV &&
                        (decoder_ctrl.alucon[4:2] == 3'b111);
     assign is_mul_op = ENABLE_MUL &&
-                       (decoder_ctrl.alucon[4:2] == 3'b110);
+                       ((decoder_ctrl.alucon[4:2] == 3'b110) ||
+                        (decoder_ctrl.alucon == ALU_CV_DOTUP_H));
     assign div_signed = (decoder_ctrl.alucon == 5'b1_1100) ||
                         (decoder_ctrl.alucon == 5'b1_1110);
     assign div_start = execute_enb && (state == IDLE) && is_div_op;
@@ -75,6 +76,7 @@ module Execute #(
         .reset_n (reset_n),
         .start   (mul_start),
         .alucon  (decoder_ctrl.alucon[1:0]),
+        .dotup_h (decoder_ctrl.alucon == ALU_CV_DOTUP_H),
         .data_1  (operand_1),
         .data_2  (operand_2),
         .busy    (mul_busy),

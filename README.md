@@ -217,37 +217,31 @@ PSC_RV32_V1 is designed to provide a relatively simple FPGA-oriented RISC-V impl
 
 # CPU (PSC_RV32_V2)
 
-## Experimental Dual-Issue / Out-of-Order Architecture
+## Experimental Pipelined Architecture
 
 <img src="docs/images/PSC_RV32_V2.jpg" width="800">
 
-`PSC_RV32_V2` is an experimental CPU architecture derived from `PSC_RV32_V1`.
+`PSC_RV32_V2` is an experimental RISC-V CPU architecture developed alongside `PSC_RV32_V1`.
 
-While V1 uses a state-controlled execution model in which instruction processing is largely serialized, V2 explores overlapping instruction execution, dual instruction slots, register renaming, and limited out-of-order execution.
+V2 uses a multi-stage pipelined architecture that allows multiple instructions to progress through the processor concurrently. Instruction processing is separated into functional stages such as Fetch, Decode, Execute, Branch, Memory, CSR, and Write Back.
 
-The primary goal of V2 is not to build a large superscalar processor, but to investigate how much instruction-level parallelism can be introduced into a small FPGA-oriented RISC-V CPU with relatively simple hardware.
+The architecture is designed primarily to investigate pipeline organization, dependency handling, and FPGA implementation trade-offs within PSC-ONE rather than to implement a large superscalar or fully out-of-order processor.
 
-The current development focuses on allowing Fetch, Decode, Execute, and Commit operations to overlap instead of waiting for each instruction to complete the entire execution sequence.
+Pipeline control and forwarding are used to resolve register dependencies where possible. When dependencies or variable-latency operations cannot be resolved immediately, the affected stages are stalled or bubbles are inserted.  
 
-### Architecture Goals
+### Architecture Features
 
-The V2 architecture explores:
+* Multi-stage pipelined instruction execution
+* Overlapped Fetch / Decode / Execute / Memory / Write Back
+* Pipeline forwarding and dependency detection
+* Pipeline stalls and bubbles
+* Pipelined LOAD and STORE processing
+* Branch and CSR processing
+* Variable-latency MUL / DIV / REM execution
+* Exception handling
+* FPGA-oriented pipeline organization
 
-* Dual instruction slots
-* Overlapped Fetch / Decode / Execute / Commit
-* Limited out-of-order execution
-* In-order retirement
-* Register renaming
-* Register dependency detection
-* RAW / WAR / WAW hazard handling
-* Independent execution of instructions without dependencies
-* Variable-latency execution units such as MUL / DIV / REM
-* Forwarding between pipeline stages
-* Pipeline stalls and bubbles when dependencies cannot be resolved
-
-A particularly important target is hiding the latency of long-running operations.
-
-For example, when a DIV or REM instruction is waiting for completion, an independent arithmetic instruction may be allowed to execute first. Architectural state is still committed in program order so that externally visible CPU behavior remains consistent with sequential RISC-V execution.
+PSC_RV32_V2 serves as an experimental platform for evaluating how different pipeline structures affect performance, FPGA resource usage, timing, and implementation complexity. The results are also used to guide improvements to the main PSC_RV32 CPU architecture.  
 
 ### FPGA-Oriented Design
 

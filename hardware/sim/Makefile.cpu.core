@@ -153,6 +153,7 @@ RV32ISP_SINGLE_TEST = \
 RV32ISP_BASIC_TEST = \
 	add_test1:RV32ISP_core_test:./mem/add_test1.mem:0xff00ff0b \
 	add_test2:RV32ISP_core_test:./mem/add_test2.mem:0x00000000 \
+	cv_pulp_test1:RV32ISP_core_test:./mem/cv_pulp_test1.mem:0x600D600D \
 	forwarding_timing_test1:RV32ISP_core_test:./mem/forwarding_timing_test1.mem:0x00008000 \
 	sbwrite_test1:RV32ISP_core_test:./mem/sbwrite_test1.mem:0xE500000F \
 	jal_test1:RV32ISP_core_test:./mem/jal_test1.mem:0x12345678 \
