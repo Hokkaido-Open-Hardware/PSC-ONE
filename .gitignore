@@ -36,7 +36,7 @@ hardware/sim/log/test_result_*.log
 **/build_nextpnr*/
 
 # codex
-hardware/sim/tests/
+**/tests/
 
 # Vosk models
 vosk-model*/
