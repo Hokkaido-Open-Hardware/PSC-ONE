@@ -92,7 +92,15 @@
     "tensorflow/lite/kernels/internal/types.h": "85c38453b3a3b7f96d6becbec18228558e1e70da0230c6f809afe3f76f25eac4",
     "tensorflow/lite/kernels/internal/common.cc": "30bf4ec89cc0564dd2f6537ecb67a181ccc972103be65266d6a24a26ad21a1da",
     "tensorflow/lite/kernels/internal/optimized/neon_check.h": "b093a98868485ec76d9047d73a2ee66382d9e62ffe9606da1ddfc651969808c3",
-    "tensorflow/lite/kernels/internal/reference/integer_ops/fully_connected.h": "88beede059cee0eba102c5a108c0750b33fe823af25393053e618dd29781abd6"
+    "tensorflow/lite/kernels/internal/reference/integer_ops/fully_connected.h": "88beede059cee0eba102c5a108c0750b33fe823af25393053e618dd29781abd6",
+    "psc/host_test.cc": "c2852a734bf86b6ec413a12fd69a1a1a5aabc248d51f238e27b355da8668966e",
+    "psc/pulp_fc.h": "28dccf9749c3e38079ce3a38d312c361fff83d7cab43f009d152c939e4a13bdb",
+    "psc/run_host.py": "1b50fdc3bb5924f03efbbf6c40fe74431ca92c1755f31a2376fcb3a1cdba72e6",
+    "psc/runtime-integration.patch": "193f14eb1208fb525febe1ed6a696c036a5d680ae9e6dbdd9ee08bcd26846560",
+    "psc/run_target.py": "c062bc64c8e4bac6cbd9223371b1bad80d4ccaf88bd607e183a5919f35795bb3",
+    "psc/target_cocotb.py": "e13cd329e5abbd69a7766c67a709dae94a436cc47ee3caf27f071712845271a4",
+    "psc/target_test.cc": "2a9af28f50d321e7c7d5d84a5ce38f1e048b89aa972a0ccc94fbd8920507314f",
+    "psc/validation.json": "9a1ca23cb7e2e6d348800cbf15c546a43758aa434267aa5ae821512277f2e63c"
   },
   "gemmlowp": {
     "commit": "719139ce755a0f31cbf1c37f7f98adcc7fc9f425",
@@ -102,6 +110,19 @@
       "fixedpoint/**",
       "internal/detect_platform.h",
       "LICENSE"
+    ]
+  },
+  "psc_local": {
+    "description": "PSC-owned backend and validation assets; not upstream vendor files",
+    "files": [
+      "psc/host_test.cc",
+      "psc/pulp_fc.h",
+      "psc/run_host.py",
+      "psc/run_target.py",
+      "psc/runtime-integration.patch",
+      "psc/target_cocotb.py",
+      "psc/target_test.cc",
+      "psc/validation.json"
     ]
   }
 }

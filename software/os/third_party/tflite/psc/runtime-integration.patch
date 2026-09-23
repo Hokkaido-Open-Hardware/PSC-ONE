@@ -1,0 +1,50 @@
+--- a/PSC-ONE/software/os/src/tflite/tflite_api.h
++++ b/PSC-ONE/software/os/src/tflite/tflite_api.h
+@@ -2,7 +2,7 @@
+ #define PSC_TFLITE_API_H
+ #include "tflite_inspect.h"
+ #define PSC_TFLITE_ARENA_CAPACITY 4096u
+-enum psc_tflite_fc_backend { PSC_TFLITE_FC_CPU=0, PSC_TFLITE_FC_SYNAP=1 };
++enum psc_tflite_fc_backend { PSC_TFLITE_FC_CPU=0, PSC_TFLITE_FC_SYNAP=1, PSC_TFLITE_FC_PULP=2 };
+ enum { PSC_TFLITE_ERR_SYNAP=-206, PSC_TFLITE_ERR_SYNAP_TIMEOUT=-207,
+        PSC_TFLITE_ERR_SYNAP_ARGUMENT=-208, PSC_TFLITE_ERR_SYNAP_BUSY=-209 };
+ #ifdef __cplusplus
+@@ -21,7 +21,7 @@
+ int psc_tflite_invoke(void);
+ size_t psc_tflite_arena_used(void);
+ /* Default CPU and tile=4 after load/prepare/reset. Switching invalidates only
+-   output, preserving the prepared model and input. No implicit fallback. */
++   output, preserving the prepared model and input. PULP falls back to CPU when unavailable; Synap errors never fall back. */
+ int psc_tflite_set_fc_backend(enum psc_tflite_fc_backend backend);
+ int psc_tflite_set_synap_tile_size(unsigned size); /* 4,8,12,16 */
+ typedef struct {
+--- a/PSC-ONE/software/os/src/tflite/tflite_runtime.cc
++++ b/PSC-ONE/software/os/src/tflite/tflite_runtime.cc
+@@ -3,6 +3,7 @@
+ #include "tflite_synap.h"
+ #include "schema_generated.h"
+ #include <limits.h>
++#include "psc/pulp_fc.h"
+ 
+ namespace {
+ struct FC {
+@@ -120,7 +121,7 @@
+ extern "C" size_t psc_tflite_arena_used(void) { return rt.used; }
+ extern "C" int psc_tflite_set_fc_backend(psc_tflite_fc_backend backend) {
+     if(rt.invoking) return PSC_TFLITE_ERR_BUSY;
+-    if(backend!=PSC_TFLITE_FC_CPU && backend!=PSC_TFLITE_FC_SYNAP) return PSC_TFLITE_ERR_UNSUPPORTED;
++    if(backend!=PSC_TFLITE_FC_CPU && backend!=PSC_TFLITE_FC_SYNAP && backend!=PSC_TFLITE_FC_PULP) return PSC_TFLITE_ERR_UNSUPPORTED;
+     rt.backend=backend;rt.output_valid=false;return 0;
+ }
+ extern "C" int psc_tflite_set_synap_tile_size(unsigned tile) {
+@@ -150,6 +151,10 @@
+                     if(layer) layer(user,i,0);
+                     rt.profile.valid=0;rt.invoking=false;return rc;
+                 }
++            } else if(rt.backend==PSC_TFLITE_FC_PULP &&
++                      psc_tflite_pulp::try_dot(f.x,f.w+first*f.k,f.k,0,true,&dots[0])) {
++                // prepare/inspect validated INT8, symmetric weights and shape.
++                // Share the original row-sum correction and postprocessing below.
+             } else {
+                 // Phase 3 CPU reference dot is retained, including INT32 accumulation.
+                 dots[0]=0;

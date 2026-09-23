@@ -1,0 +1,484 @@
+{
+  "clock_mhz": 100,
+  "cpu": "v1",
+  "npu": "legacy",
+  "platform": "bare metal, original sa_run_checked driver; no OS syscall",
+  "cache": "same ELF/data; warm each backend immediately before every timed invoke",
+  "best": [
+    {
+      "sample": 3,
+      "mode": 0,
+      "tile": 4,
+      "invoke_us": 401,
+      "fc1_us": 287,
+      "fc2_us": 89
+    },
+    {
+      "sample": 0,
+      "mode": 1,
+      "tile": 4,
+      "invoke_us": 257,
+      "fc1_us": 185,
+      "fc2_us": 47
+    },
+    {
+      "sample": 3,
+      "mode": 2,
+      "tile": 4,
+      "invoke_us": 1107,
+      "fc1_us": 828,
+      "fc2_us": 249
+    },
+    {
+      "sample": 0,
+      "mode": 3,
+      "tile": 8,
+      "invoke_us": 1039,
+      "fc1_us": 684,
+      "fc2_us": 324
+    },
+    {
+      "sample": 0,
+      "mode": 4,
+      "tile": 12,
+      "invoke_us": 2063,
+      "fc1_us": 1364,
+      "fc2_us": 668
+    },
+    {
+      "sample": 3,
+      "mode": 5,
+      "tile": 16,
+      "invoke_us": 1416,
+      "fc1_us": 759,
+      "fc2_us": 627
+    }
+  ],
+  "samples": [
+    {
+      "sample": 0,
+      "mode": 0,
+      "tile": 4,
+      "invoke_us": 402,
+      "fc1_us": 287,
+      "fc2_us": 89
+    },
+    {
+      "sample": 0,
+      "mode": 1,
+      "tile": 4,
+      "invoke_us": 257,
+      "fc1_us": 185,
+      "fc2_us": 47
+    },
+    {
+      "sample": 0,
+      "mode": 2,
+      "tile": 4,
+      "invoke_us": 1108,
+      "fc1_us": 831,
+      "fc2_us": 250
+    },
+    {
+      "sample": 0,
+      "mode": 3,
+      "tile": 8,
+      "invoke_us": 1039,
+      "fc1_us": 684,
+      "fc2_us": 324
+    },
+    {
+      "sample": 0,
+      "mode": 4,
+      "tile": 12,
+      "invoke_us": 2063,
+      "fc1_us": 1364,
+      "fc2_us": 668
+    },
+    {
+      "sample": 0,
+      "mode": 5,
+      "tile": 16,
+      "invoke_us": 1417,
+      "fc1_us": 760,
+      "fc2_us": 627
+    },
+    {
+      "sample": 1,
+      "mode": 1,
+      "tile": 4,
+      "invoke_us": 257,
+      "fc1_us": 186,
+      "fc2_us": 47
+    },
+    {
+      "sample": 1,
+      "mode": 2,
+      "tile": 4,
+      "invoke_us": 1109,
+      "fc1_us": 830,
+      "fc2_us": 250
+    },
+    {
+      "sample": 1,
+      "mode": 3,
+      "tile": 8,
+      "invoke_us": 1040,
+      "fc1_us": 684,
+      "fc2_us": 324
+    },
+    {
+      "sample": 1,
+      "mode": 4,
+      "tile": 12,
+      "invoke_us": 2063,
+      "fc1_us": 1364,
+      "fc2_us": 667
+    },
+    {
+      "sample": 1,
+      "mode": 5,
+      "tile": 16,
+      "invoke_us": 1417,
+      "fc1_us": 760,
+      "fc2_us": 626
+    },
+    {
+      "sample": 1,
+      "mode": 0,
+      "tile": 4,
+      "invoke_us": 402,
+      "fc1_us": 286,
+      "fc2_us": 89
+    },
+    {
+      "sample": 2,
+      "mode": 2,
+      "tile": 4,
+      "invoke_us": 1109,
+      "fc1_us": 830,
+      "fc2_us": 250
+    },
+    {
+      "sample": 2,
+      "mode": 3,
+      "tile": 8,
+      "invoke_us": 1040,
+      "fc1_us": 684,
+      "fc2_us": 324
+    },
+    {
+      "sample": 2,
+      "mode": 4,
+      "tile": 12,
+      "invoke_us": 2063,
+      "fc1_us": 1364,
+      "fc2_us": 667
+    },
+    {
+      "sample": 2,
+      "mode": 5,
+      "tile": 16,
+      "invoke_us": 1417,
+      "fc1_us": 760,
+      "fc2_us": 626
+    },
+    {
+      "sample": 2,
+      "mode": 0,
+      "tile": 4,
+      "invoke_us": 402,
+      "fc1_us": 286,
+      "fc2_us": 89
+    },
+    {
+      "sample": 2,
+      "mode": 1,
+      "tile": 4,
+      "invoke_us": 258,
+      "fc1_us": 185,
+      "fc2_us": 46
+    },
+    {
+      "sample": 3,
+      "mode": 3,
+      "tile": 8,
+      "invoke_us": 1040,
+      "fc1_us": 684,
+      "fc2_us": 324
+    },
+    {
+      "sample": 3,
+      "mode": 4,
+      "tile": 12,
+      "invoke_us": 2063,
+      "fc1_us": 1364,
+      "fc2_us": 667
+    },
+    {
+      "sample": 3,
+      "mode": 5,
+      "tile": 16,
+      "invoke_us": 1416,
+      "fc1_us": 759,
+      "fc2_us": 627
+    },
+    {
+      "sample": 3,
+      "mode": 0,
+      "tile": 4,
+      "invoke_us": 401,
+      "fc1_us": 287,
+      "fc2_us": 89
+    },
+    {
+      "sample": 3,
+      "mode": 1,
+      "tile": 4,
+      "invoke_us": 257,
+      "fc1_us": 185,
+      "fc2_us": 47
+    },
+    {
+      "sample": 3,
+      "mode": 2,
+      "tile": 4,
+      "invoke_us": 1107,
+      "fc1_us": 828,
+      "fc2_us": 249
+    },
+    {
+      "sample": 4,
+      "mode": 4,
+      "tile": 12,
+      "invoke_us": 2065,
+      "fc1_us": 1365,
+      "fc2_us": 668
+    },
+    {
+      "sample": 4,
+      "mode": 5,
+      "tile": 16,
+      "invoke_us": 1417,
+      "fc1_us": 760,
+      "fc2_us": 627
+    },
+    {
+      "sample": 4,
+      "mode": 0,
+      "tile": 4,
+      "invoke_us": 401,
+      "fc1_us": 287,
+      "fc2_us": 89
+    },
+    {
+      "sample": 4,
+      "mode": 1,
+      "tile": 4,
+      "invoke_us": 257,
+      "fc1_us": 185,
+      "fc2_us": 47
+    },
+    {
+      "sample": 4,
+      "mode": 2,
+      "tile": 4,
+      "invoke_us": 1107,
+      "fc1_us": 828,
+      "fc2_us": 250
+    },
+    {
+      "sample": 4,
+      "mode": 3,
+      "tile": 8,
+      "invoke_us": 1039,
+      "fc1_us": 683,
+      "fc2_us": 324
+    }
+  ],
+  "rows": [
+    [
+      1529,
+      1517,
+      1380,
+      156,
+      127
+    ],
+    [
+      921,
+      915,
+      797,
+      83,
+      83
+    ],
+    [
+      -497,
+      -497,
+      -596,
+      -92,
+      -17
+    ],
+    [
+      -2440,
+      -2434,
+      -2514,
+      -331,
+      -17
+    ],
+    [
+      -1503,
+      -1491,
+      -1552,
+      -211,
+      -17
+    ],
+    [
+      -896,
+      -878,
+      -920,
+      -132,
+      -17
+    ],
+    [
+      2516,
+      2495,
+      2472,
+      292,
+      127
+    ],
+    [
+      2508,
+      2493,
+      2489,
+      294,
+      127
+    ],
+    [
+      1405,
+      1396,
+      1411,
+      160,
+      127
+    ],
+    [
+      -448,
+      -451,
+      -417,
+      -69,
+      -17
+    ],
+    [
+      -2421,
+      -2418,
+      -2365,
+      -313,
+      -17
+    ],
+    [
+      -2444,
+      -2435,
+      -2363,
+      -312,
+      -17
+    ],
+    [
+      -1357,
+      -1342,
+      -1251,
+      -173,
+      -17
+    ],
+    [
+      585,
+      606,
+      716,
+      73,
+      73
+    ],
+    [
+      2542,
+      2524,
+      2653,
+      315,
+      127
+    ],
+    [
+      1529,
+      1517,
+      1665,
+      191,
+      127
+    ],
+    [
+      -594,
+      -594,
+      -695,
+      -36,
+      -36
+    ],
+    [
+      221,
+      340,
+      322,
+      27,
+      27
+    ],
+    [
+      87,
+      104,
+      169,
+      18,
+      18
+    ],
+    [
+      -47,
+      -132,
+      16,
+      8,
+      8
+    ]
+  ],
+  "output": [
+    -36,
+    27,
+    18,
+    8
+  ],
+  "bit_exact": true,
+  "date": "2026-09-22",
+  "integration": "Applied to repository tflite_api.h and tflite_runtime.cc with explicit user permission; all runners compile repository sources directly",
+  "source_revision": "3d381d4a1a0b42c11cb3a12044095545c4038123",
+  "host": {
+    "disabled": "PASS",
+    "emulated": "PASS",
+    "invokes_per_build": 1950,
+    "five_stage_channel_comparisons_per_build": 31200,
+    "protected_boundary_simd_dots": 3048,
+    "baseline_phase3": "47 cases, 712 channels, 65560 quantizer comparisons PASS",
+    "baseline_phase4": "288 invokes, 2880 channels PASS",
+    "allocation_wrappers": "malloc/calloc/realloc/new/new[] forbidden during invoke; PASS",
+    "sanitizers": "ASan, UBSan, LSan PASS"
+  },
+  "encoding": {
+    "invoke(void (*)(void*, unsigned int, unsigned int, int, int, signed char), void (*)(void*, unsigned int, unsigned int, int, int, int, int, signed char), void (*)(void*, unsigned int, int), void*)": 2,
+    "audit_scalar": 0,
+    "audit_pulp": 2
+  },
+  "disabled_rv32": "ELF built; no dotsp or sdotsp encodings; no allocators linked",
+  "artifacts_sha256": {
+    "pulp_fc.elf": "fdcd62c77a1a0af48c8318a69aa881b99aad69f551eea4f1282d3932b1d6734d",
+    "pulp_fc.bin": "77d2aed7a969043749cf5e5974a9d2bcbc0688eae6291408620d7a5da44129dd"
+  },
+  "model_sha256": "cced9beaa289713f1eb6fe614df9e68d7147959bc5d0ed7c143003a7be70cd1e",
+  "compiler": "Ubuntu clang version 21.1.8 (6ubuntu1)",
+  "before_integration_runtime_sha256": {
+    "tflite_api.h": "fb031d8e3653464db44004e8b9549cee05837bbb660f631ad644721ac671103a",
+    "tflite_runtime.cc": "a68515433487f2160ac8b3846e6e7b943fab046b1e2931ab289c79a768ee31fe",
+    "tflite_synap.cc": "986069815acc54f5f6444dd57183987608904b53de926d75b58e8024c1a0c77e"
+  },
+  "runtime_sources_sha256": {
+    "tflite_api.h": "f70e124b641ba28035ea5e6569b151fe5a8c4cfbe084a8d2d942592e7950bb4e",
+    "tflite_runtime.cc": "ec876265fc78c36abbc79f4b2f3373e5199724b31409c4e69ac175be6cb1578e",
+    "tflite_synap.cc": "986069815acc54f5f6444dd57183987608904b53de926d75b58e8024c1a0c77e"
+  }
+}

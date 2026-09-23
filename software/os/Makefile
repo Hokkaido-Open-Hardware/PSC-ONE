@@ -20,6 +20,9 @@ OBJDUMP := riscv64-unknown-elf-objdump
 # ========================
 # sim / fpga_mem / sbi / psc
 MODE ?= sim
+# Match hardware/sim's CPU selector; command-line selections propagate through
+# recursive make. This selects software capabilities, not a different ISA ABI.
+CPU_VERSION ?= v1
 
 ifneq ($(filter $(MODE),sim fpga_mem),)
   BOOT_FLOW     := direct
@@ -147,18 +150,41 @@ JPEG_CPPFLAGS := -I$(Src) -I$(TJPGD_BUILD) -I../micropython/ports/psc/libc
 CXX := clang++
 TFLITE_DIR := $(Src)/tflite
 TFLITE_VENDOR := third_party/tflite
+TFLITE_CV_DOTSP_B := 0
+ifeq ($(CPU_VERSION),v1)
+ifneq ($(filter $(MODE),sim fpga_mem psc),)
+TFLITE_CV_DOTSP_B := 1
+endif
+endif
+# The run target uses generic QEMU virt in sim/SBI modes, not the PSC CPU.
+ifeq ($(RUN_QEMU),1)
+ifneq ($(filter run,$(MAKECMDGOALS)),)
+TFLITE_CV_DOTSP_B := 0
+endif
+endif
 TFLITE_CXX_ROOT ?= /usr/include/newlib/c++/$(shell $(GCC_PREFIX)-gcc -dumpversion)
 TFLITE_CPPFLAGS := -I$(TFLITE_DIR) -I$(TFLITE_VENDOR) \
 	-I$(TFLITE_VENDOR)/flatbuffers/include -I$(TFLITE_VENDOR)/gemmlowp \
 	-isystem $(TFLITE_CXX_ROOT) \
 	-isystem $(TFLITE_CXX_ROOT)/riscv64-unknown-elf/rv32im/ilp32 \
 	-isystem /usr/lib/picolibc/riscv64-unknown-elf/include \
-	-DFLATBUFFERS_LOCALE_INDEPENDENT=0 -DTFLITE_SINGLE_ROUNDING=0 -DNDEBUG
+	-DFLATBUFFERS_LOCALE_INDEPENDENT=0 -DTFLITE_SINGLE_ROUNDING=0 -DNDEBUG \
+	-DPSC_HAS_CV_DOTSP_B=$(TFLITE_CV_DOTSP_B)
 TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/sa_transfer.h \
+	$(TFLITE_VENDOR)/psc/pulp_fc.h $(Build)/tflite_cpu_config \
 	$(shell rg --files $(TFLITE_VENDOR)/tensorflow $(TFLITE_VENDOR)/gemmlowp) \
 	$(TFLITE_VENDOR)/schema_generated.h \
 	$(wildcard $(TFLITE_VENDOR)/flatbuffers/include/flatbuffers/*.h)
 TFLITE_OBJ := $(Build)/tflite_inspect.o $(Build)/tflite_runtime.o $(Build)/tflite_synap.o $(Build)/tflite_quant.o
+
+# Rebuild when switching CPU/mode in the same Build directory. Preserve the
+# stamp's mtime for unchanged flags so ordinary incremental builds stay cheap.
+.PHONY: tflite_config_check
+tflite_config_check:
+
+$(Build)/tflite_cpu_config: tflite_config_check | $(Build)
+	@printf '%s\n' '$(TFLITE_CPPFLAGS)' | cmp -s - $@ || \
+		printf '%s\n' '$(TFLITE_CPPFLAGS)' > $@
 
 .PHONY: tflite_vendor_check
 tflite_vendor_check:

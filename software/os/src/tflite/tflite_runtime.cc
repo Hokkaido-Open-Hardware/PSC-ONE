@@ -3,6 +3,7 @@
 #include "tflite_synap.h"
 #include "schema_generated.h"
 #include <limits.h>
+#include "psc/pulp_fc.h"
 
 namespace {
 struct FC {
@@ -120,7 +121,7 @@ extern "C" const int8_t *psc_tflite_get_output(size_t *bytes) {
 extern "C" size_t psc_tflite_arena_used(void) { return rt.used; }
 extern "C" int psc_tflite_set_fc_backend(psc_tflite_fc_backend backend) {
     if(rt.invoking) return PSC_TFLITE_ERR_BUSY;
-    if(backend!=PSC_TFLITE_FC_CPU && backend!=PSC_TFLITE_FC_SYNAP) return PSC_TFLITE_ERR_UNSUPPORTED;
+    if(backend!=PSC_TFLITE_FC_CPU && backend!=PSC_TFLITE_FC_SYNAP && backend!=PSC_TFLITE_FC_PULP) return PSC_TFLITE_ERR_UNSUPPORTED;
     rt.backend=backend;rt.output_valid=false;return 0;
 }
 extern "C" int psc_tflite_set_synap_tile_size(unsigned tile) {
@@ -150,6 +151,10 @@ static int invoke(psc_tflite_trace_fn trace,psc_tflite_trace_ex_fn detail,psc_tf
                     if(layer) layer(user,i,0);
                     rt.profile.valid=0;rt.invoking=false;return rc;
                 }
+            } else if(rt.backend==PSC_TFLITE_FC_PULP &&
+                      psc_tflite_pulp::try_dot(f.x,f.w+first*f.k,f.k,0,true,&dots[0])) {
+                // prepare/inspect validated INT8, symmetric weights and shape.
+                // Share the original row-sum correction and postprocessing below.
             } else {
                 // Phase 3 CPU reference dot is retained, including INT32 accumulation.
                 dots[0]=0;

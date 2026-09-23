@@ -2,7 +2,7 @@
 #define PSC_TFLITE_API_H
 #include "tflite_inspect.h"
 #define PSC_TFLITE_ARENA_CAPACITY 4096u
-enum psc_tflite_fc_backend { PSC_TFLITE_FC_CPU=0, PSC_TFLITE_FC_SYNAP=1 };
+enum psc_tflite_fc_backend { PSC_TFLITE_FC_CPU=0, PSC_TFLITE_FC_SYNAP=1, PSC_TFLITE_FC_PULP=2 };
 enum { PSC_TFLITE_ERR_SYNAP=-206, PSC_TFLITE_ERR_SYNAP_TIMEOUT=-207,
        PSC_TFLITE_ERR_SYNAP_ARGUMENT=-208, PSC_TFLITE_ERR_SYNAP_BUSY=-209 };
 #ifdef __cplusplus
@@ -21,7 +21,7 @@ const int8_t *psc_tflite_get_output(size_t *bytes);
 int psc_tflite_invoke(void);
 size_t psc_tflite_arena_used(void);
 /* Default CPU and tile=4 after load/prepare/reset. Switching invalidates only
-   output, preserving the prepared model and input. No implicit fallback. */
+   output, preserving the prepared model and input. PULP falls back to CPU when unavailable; Synap errors never fall back. */
 int psc_tflite_set_fc_backend(enum psc_tflite_fc_backend backend);
 int psc_tflite_set_synap_tile_size(unsigned size); /* 4,8,12,16 */
 typedef struct {
