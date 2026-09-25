@@ -192,6 +192,8 @@ Arithmetic, branch, LOAD, and STORE operations are integrated into the pipelined
 
 The core implements **RV32I** together with CSR and fence instructions, integer multiplication, and division/remainder operations.
 
+The core also implements selected PULP SIMD instructions. See [PULP SIMD instructions](docs/cpu_pulp.md) for details.
+
 PSC_RV32_V1 supports **Machine, Supervisor, and User privilege modes** and **Sv32 virtual memory translation**. Instruction and data accesses use separate cache paths connected to the PSC-ONE memory subsystem.
 
 <img src="docs/images/PSC_RV32_V1.jpg" width="800">
