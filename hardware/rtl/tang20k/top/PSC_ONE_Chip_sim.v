@@ -48,7 +48,8 @@ module PSC_ONE_Chip_sim #(
         $dumpvars(1, u_chip.u_led);
         $dumpvars(1, u_chip.u_dma);
         $dumpvars(1, u_chip.u_timer);
-        `else
+        `endif
+        `ifdef DUMP_FST
         $display("COCOTB_SIM TOP verilator FST ENABLE");
         $dumpfile("./wave/PSC_ONE_Chip_test.fst");
         $dumpvars(1, u_chip);

@@ -4,11 +4,40 @@
 #   - レベル待ち + タイムアウト
 #   - ユーティリティ関数で見通し改善
 # =========================================================
+# 対話実行 (リポジトリの仮想環境を有効にしてから):
+#   cd PSC-ONE/hardware/sim
+#   PSC_UART_INTERACTIVE=1 PSC_UART_AUTO_PROMPT=0 \
+#     make -f Makefile.pscos simulate_PSCOS CPU_VERSION=v1 SIM_FAST=1
+# 最初の PSC_OS> 検出後、端末に help + Enter を入力する。
+# [UART RX] の送信ログと log_uart/log_*.log のコマンド一覧/次の PSC_OS> を確認する。
+# RUN_CYCLES で実行時間を延長可能。終了は Ctrl-C。
+# PSC_UART_INTERACTIVE: 既定は stdin が端末なら有効。パイプ入力には明示的に 1。
+# PSC_UART_AUTO_PROMPT: 既定は対話時 0、それ以外 1。1 で従来の PROMPT_TEXT を送る。
+# 両環境変数とも 1/true/yes/on で有効、0/false/no/off で無効。
+# PSC_UART_KEY_INTERVAL_MS: 文字ごとの追加待ち時間 [シミュレーション ms]。
+# 既定は 0.1 (100 us)。従来は 2。0 で追加待ちなし (OS の取りこぼしに注意)。
 import os
+import select
+import sys
+import threading
 import cocotb
 from collections import deque
+from queue import Empty, Queue
 from cocotb.handle import SimHandleBase
-from cocotb.triggers import Timer, RisingEdge, FallingEdge
+from cocotb.triggers import Event, Timer, RisingEdge, FallingEdge
+
+
+def stdin_is_terminal():
+    try:
+        return sys.stdin is not None and sys.stdin.isatty()
+    except (OSError, ValueError):
+        return False
+
+
+def env_flag(name, default):
+    return os.getenv(name, "1" if default else "0").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
 
 # ========= 設定 =========
 Assert = 1
@@ -29,10 +58,15 @@ UART_BIT_NS = int(os.getenv("UART_BIT_NS", "40"))
 #PROMPT_TEXT = "primes\r"
 #PROMPT_TEXT = "help\r"
 PROMPT_TEXT = "exit\r"
+UART_INTERACTIVE = env_flag("PSC_UART_INTERACTIVE", stdin_is_terminal())
+UART_AUTO_PROMPT = env_flag("PSC_UART_AUTO_PROMPT", not UART_INTERACTIVE)
+UART_KEY_INTERVAL_MS = float(os.getenv("PSC_UART_KEY_INTERVAL_MS", "0.1"))
+if not 0 <= UART_KEY_INTERVAL_MS < float("inf"):
+    raise ValueError("PSC_UART_KEY_INTERVAL_MS must be finite and >= 0")
 #RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "1000_0000"))   # lcd test
-RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "5000_0000"))
-SDRAM_INIT_TIMEOUT = int(os.getenv("SDRAM_INIT_TIMEOUT", "500000"))  # cycles
-BOOT_ROM_TIMEOUT   = int(os.getenv("BOOT_ROM_TIMEOUT", "50000000"))  # cycles
+RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "3_0000_0000"))
+SDRAM_INIT_TIMEOUT = int(os.getenv("SDRAM_INIT_TIMEOUT", "50_0000"))  # cycles
+BOOT_ROM_TIMEOUT   = int(os.getenv("BOOT_ROM_TIMEOUT", "5000_0000"))  # cycles
 # ======================
 val_str = os.getenv("EXPECTED_RESULT")
 if not val_str or val_str.strip() == "":
@@ -248,7 +282,7 @@ async def uart_serial_decoder(tx, rx_queue):
 
         rx_queue.append(value)
 
-async def uart_serial_send(dut, rx, text: str, key_interval_ms: int = 10):
+async def uart_serial_send(dut, rx, text: str, key_interval_ms: float = UART_KEY_INTERVAL_MS):
     """
     PC側から UART RX へ文字列を送信する。
 
@@ -298,9 +332,87 @@ async def uart_serial_send(dut, rx, text: str, key_interval_ms: int = 10):
         if key_interval_ms > 0:
             await Timer(key_interval_ms, unit="ms")
 
+def uart_stdin_reader(stream, send_queue, stop):
+    """OS スレッドで行入力を受ける。DUT/cocotb API には触れない。"""
+    pending = bytearray()
+    previous_cr = False
+    try:
+        if stream is None:
+            raise ValueError("stdin is unavailable")
+        fd = stream.fileno()
+        encoding = stream.encoding or "utf-8"
+        while not stop.is_set():
+            # select + os.read なら、未入力でも終了要求を確認でき、Python の
+            # buffered stdin のロックを保持したまま終了することもない。
+            readable, _, _ = select.select([fd], [], [], 0.1)
+            if not readable:
+                continue
+            chunk = os.read(fd, 4096)
+            if not chunk:
+                if pending:
+                    send_queue.put(("stdin", pending.decode(encoding, errors="replace") + "\r"))
+                send_queue.put(("notice", "stdin EOF; terminal input stopped."))
+                return
+            for byte in chunk:
+                # LF / CRLF / CR をコマンド終端の CR 1 個に正規化する。
+                if byte == 10 and previous_cr:
+                    previous_cr = False
+                    continue
+                previous_cr = byte == 13
+                if byte in (10, 13):
+                    send_queue.put(("stdin", pending.decode(encoding, errors="replace") + "\r"))
+                    pending.clear()
+                else:
+                    pending.append(byte)
+    except (OSError, ValueError, AttributeError, TypeError) as exc:
+        send_queue.put(("notice", f"stdin unavailable; terminal input stopped: {exc}"))
+
+
+async def uart_send_worker(dut, send_queue, prompt_ready):
+    """自動送信も端末入力も、唯一の送信タスクから順番に送る。"""
+    await prompt_ready.wait()
+    while True:
+        try:
+            source, text = send_queue.get_nowait()
+        except Empty:
+            # Queue.get() や OS の待機でシミュレータをブロックしない。
+            await Timer(UART_BIT_NS * 10, unit="ns")
+            continue
+        if source == "notice":
+            dut._log.info(f"[UART stdin] {text}")
+        else:
+            dut._log.info(f"[UART RX] Queued {source}: {text!r}")
+            await uart_serial_send(dut, dut.uart_rx, text, key_interval_ms=UART_KEY_INTERVAL_MS)
+
+
 # ---------- メインテスト ---------------
 @cocotb.test()
 async def RV32IS_chip_test1(dut):
+    send_queue = Queue()
+    prompt_ready = Event()
+    stop_stdin = threading.Event()
+    sender = cocotb.start_soon(uart_send_worker(dut, send_queue, prompt_ready))
+    dut._log.info(
+        f"[CONF] PSC_UART_INTERACTIVE={int(UART_INTERACTIVE)}, "
+        f"PSC_UART_AUTO_PROMPT={int(UART_AUTO_PROMPT)}, "
+        f"PSC_UART_KEY_INTERVAL_MS={UART_KEY_INTERVAL_MS}"
+    )
+    try:
+        if UART_INTERACTIVE:
+            threading.Thread(
+                target=uart_stdin_reader,
+                args=(sys.stdin, send_queue, stop_stdin),
+                name="psc-os-stdin",
+                daemon=True,
+            ).start()
+            dut._log.info("[UART stdin] Enter commands followed by Enter; waiting for PSC_OS>.")
+        await run_psc_os_test(dut, send_queue, prompt_ready)
+    finally:
+        stop_stdin.set()
+        sender.cancel()
+
+
+async def run_psc_os_test(dut, send_queue, prompt_ready):
     dut._log.info("==============================================================")
     dut._log.info("Start PSC-ONE PSC_OS test")
     dut._log.info("Boot from ROM")
@@ -364,7 +476,7 @@ async def RV32IS_chip_test1(dut):
     # "PSC_OS> " がUARTに出力されたら、そのXX万クロック後に停止する。
     prompt_target = "PSC_OS>"
     prompt_index = 0
-    primes_run_count = 0
+    prompt_count = 0
     prompt_detected_cycle = None
     stop_after_prompt_cycles = 1000000
 
@@ -452,18 +564,14 @@ async def RV32IS_chip_test1(dut):
                     prompt_detected_cycle = waited
                     prompt_index = 0
 
-                    primes_run_count += 1
+                    prompt_count += 1
                     dut._log.info(
                         f'[PSC-OS] Prompt "PSC_OS>" detected. '
-                        f'Start primes run #{primes_run_count}.'
+                        f'Prompt #{prompt_count}.'
                     )
-
-                    await uart_serial_send(
-                        dut,
-                        dut.uart_rx,
-                        PROMPT_TEXT,
-                        key_interval_ms=2.0
-                    )
+                    if UART_AUTO_PROMPT:
+                        send_queue.put(("auto", PROMPT_TEXT))
+                    prompt_ready.set()
             else:
                 # 現在文字が先頭 'P' なら、次の候補として1文字目を保持
                 prompt_index = 1 if ch == ord(prompt_target[0]) else 0
@@ -493,7 +601,7 @@ async def RV32IS_chip_test1(dut):
 
     # ---- Stop & settle ----
     dut._log.info(
-        f"Stress test stopped after {primes_run_count} primes runs."
+        f"PSC-OS test stopped after {prompt_count} prompts."
     )
     await ncycles(dut.clock, 100000)
     dut._log.info("Uart tx-rx wait.")

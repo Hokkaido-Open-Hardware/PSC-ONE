@@ -153,7 +153,7 @@ __attribute__((used)) void kernel_main(void) {
     s_printf("NPU TEST\n");
     s_call_sa_api(4, true, true);
 #endif
-#if 1
+#if 0
     s_printf("Draw PSC Logo\n");
     lcd_draw_boot_logo();
 #endif

@@ -8,7 +8,7 @@
 //#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
 
 // JPEG LCD表示なしの場合のオプション
-//#define PSC_OS_DEBUG_WITHOUT_JPEGLCD
+#define PSC_OS_DEBUG_WITHOUT_JPEGLCD
 
 extern int psc_micropython_run(void);
 

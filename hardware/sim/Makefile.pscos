@@ -14,6 +14,9 @@
 # 通常テスト
 #make -f Makefile.pscos simulate_PSCOS
 
+# FST Dump
+#make -f Makefile.pscos simulate_PSCOS DUMP_FST=1
+
 # ============================================================
 #  MODE で一括切り替え（verilator / icarus）
 # ============================================================
@@ -46,6 +49,10 @@ EXTRA_ARGS = \
 	--Wno-MULTIDRIVEN
 endif
 
+endif
+
+ifeq ($(DUMP_FST),1)
+VCD_COMPILE_ARGS 	= -DDUMP_FST
 endif
 
 ifeq ($(MODE),icarus)
@@ -322,7 +329,7 @@ endif
 
 MODE = verilator
 
-VDEF = -DFST_UART_MODE -DOS_SIM -DDUMP_FST_FILE
+VDEF = -DFST_UART_MODE -DOS_SIM
 
 simulate_PSCOS: 
 	$(MAKE) clean
@@ -433,7 +440,7 @@ simulate_PSCOS_MULTITASK_LOG:
 MODE = verilator
 
 # define FPGA_BOOT_LOADER_MODE
-SD_VDEF = -DFST_UART_MODE -DOS_SIM -DDUMP_FST_FILE -DFPGA_BOOT_LOADER_MODE
+SD_VDEF = -DFST_UART_MODE -DOS_SIM -DFPGA_BOOT_LOADER_MODE
 
 simulate_SD_PSCOS: 
 	$(MAKE) clean
