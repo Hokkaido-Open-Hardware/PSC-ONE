@@ -98,23 +98,13 @@ module PSC_NPU_Controller #(
         end
     endfunction
 
-    // Address of C[i_idx*4][j_idx*4].  This is evaluated only once per
-    // completed output tile, not once per PE result.
-    function automatic [31:0] matrix_tile_base_C;
-        reg [7:0]  global_row_base;
-        reg [7:0]  global_col_base;
-        reg [31:0] element_idx;
-        begin
-            global_row_base = i_idx << 2;
-            global_col_base = j_idx << 2;
-
-            element_idx =
-                matrix_row_elements(global_row_base, matrix_size_y)
-                + {24'd0, global_col_base};
-
-            matrix_tile_base_C = BASE_ADDR_C + (element_idx << 2);
-        end
-    endfunction
+    // Preserve the original 8-bit tile-coordinate truncation. Snapshot all
+    // terms at the old address-update event, then separate MULT / ADD / ADD.
+    wire [7:0] global_row_base = i_idx << 2;
+    wire [7:0] global_col_base = j_idx << 2;
+    reg [31:0] c_row_elements_q, c_element_idx_q, c_base_q;
+    reg [7:0] c_col_q;
+    reg [31:0] c_row_delta_q;
 
     // C is uint32_t, therefore one matrix row occupies matrix_size_y * 4
     // bytes.  After writing column 3 of a 4-wide tile, advance from
@@ -315,6 +305,9 @@ module PSC_NPU_Controller #(
 
         S_OUTPUT_MEMORY         = 6'd20,
         S_OUTPUT_MEMORY_W       = 6'd21,
+        S_C_ADDR_COLUMN         = 6'd22,
+        S_C_ADDR_BASE           = 6'd23,
+        S_C_ADDR_ROW            = 6'd24,
         S_DONE                  = 6'd31;
 
     reg [5:0] state;
@@ -344,6 +337,11 @@ module PSC_NPU_Controller #(
             c_write_valid     <= 1'b0;
             c_write_addr      <= 32'd0;
             c_write_wdata     <= 32'd0;
+            c_row_elements_q  <= 32'd0;
+            c_element_idx_q   <= 32'd0;
+            c_base_q          <= 32'd0;
+            c_col_q           <= 8'd0;
+            c_row_delta_q     <= 32'd0;
 
             busy              <= 1'b0;
             done              <= 1'b0;
@@ -487,8 +485,11 @@ module PSC_NPU_Controller #(
                                 // All K tiles for this C tile are complete.
                                 // Preload the first write address here so
                                 // row_s is not on the c_write_addr timing path.
-                                c_write_addr <= matrix_tile_base_C();
-                                state <= S_OUTPUT_MEMORY;
+                                c_row_elements_q <= matrix_row_elements(
+                                    global_row_base, matrix_size_y);
+                                c_col_q <= global_col_base;
+                                c_base_q <= BASE_ADDR_C;
+                                state <= S_C_ADDR_COLUMN;
                             end else begin
                                 // Keep ps_acc and process the next K tile.
                                 k_idx <= k_idx + 8'd1;
@@ -504,6 +505,21 @@ module PSC_NPU_Controller #(
                 //--------------------------------------------
                 // Write the completed C[i_idx][j_idx] 4x4 tile.
                 //--------------------------------------------
+                S_C_ADDR_COLUMN: begin
+                    c_element_idx_q <= c_row_elements_q + {24'd0, c_col_q};
+                    state <= S_C_ADDR_BASE;
+                end
+
+                S_C_ADDR_BASE: begin
+                    c_write_addr <= c_base_q + (c_element_idx_q << 2);
+                    state <= S_OUTPUT_MEMORY;
+                end
+
+                S_C_ADDR_ROW: begin
+                    c_write_addr <= c_write_addr + c_row_delta_q;
+                    state <= S_OUTPUT_MEMORY;
+                end
+
                 S_OUTPUT_MEMORY: begin
                     if (sa_req_ready) begin
                         c_write_valid <= 1'b1;
@@ -535,13 +551,15 @@ module PSC_NPU_Controller #(
                             // Advance within the 4x4 output tile.
                             // Columns 0..2 are contiguous uint32_t words.
                             // After column 3, jump to the next matrix row.
-                            if (row_s[1:0] == 2'd3)
-                                c_write_addr <= c_write_addr + c_next_row_delta;
-                            else
+                            if (row_s[1:0] == 2'd3) begin
+                                c_row_delta_q <= c_next_row_delta;
+                                state <= S_C_ADDR_ROW;
+                            end else begin
                                 c_write_addr <= c_write_addr + 32'd4;
+                                state <= S_OUTPUT_MEMORY;
+                            end
 
                             row_s <= row_s + 6'd1;
-                            state <= S_OUTPUT_MEMORY;
                         end
                     end
                 end

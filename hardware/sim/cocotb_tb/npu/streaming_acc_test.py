@@ -15,6 +15,8 @@ def pack(values, width=8):
 @cocotb.test()
 async def snapshot_drain_and_streaming(dut):
     baseline = bool(int(os.getenv('NPU_BASELINE','0')))
+    # Legacy PE keeps its atomic commit, with two added multiplier stages.
+    completion_phase = 10 if baseline else 8
     rng = random.Random(0x4acc)
     a,b,acc = [0]*16,[0]*16,[0]*16
     products = [0]*16
@@ -56,7 +58,7 @@ async def snapshot_drain_and_streaming(dut):
                     acc[dest] = (acc[dest]+products[dest]) & 0xffffffff
             elif not baseline:
                 assert int(dut.wb_valid.value) == 0
-            if phase == 8:
+            if phase == completion_phase:
                 if baseline:
                     acc = [(x+y)&0xffffffff for x,y in zip(acc,products)]
                 phase,done = 0,1
@@ -123,5 +125,6 @@ async def padded_2x2_and_k_accumulation(dut):
             for index in range(16):
                 dut.ps_select.value = index; await Timer(1,unit='ns')
                 assert int(dut.ps_acc_out.value) == expected[index], (mode,batch,index)
-    assert set(timings) == {8}
-    Path(os.environ['NPU_CYCLE_RESULTS']).write_text(json.dumps({'mac_start_to_done':8,'batches':len(timings)})+'\n')
+    latency = 10 if int(os.getenv('NPU_BASELINE','0')) else 8
+    assert set(timings) == {latency}
+    Path(os.environ['NPU_CYCLE_RESULTS']).write_text(json.dumps({'mac_start_to_done':latency,'batches':len(timings)})+'\n')

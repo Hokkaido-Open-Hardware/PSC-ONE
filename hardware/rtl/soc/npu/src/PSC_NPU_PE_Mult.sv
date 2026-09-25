@@ -113,6 +113,13 @@ module PSC_NPU_PE_Mult #(
 
     logic [PARALLEL_NUM-1:0] mul_lane_valid;
 
+    // Keep selection, multiplication and result distribution in separate
+    // cycles. Carry the destination and valid mask alongside each group.
+    logic [PARALLEL_NUM*DW-1:0] mul_A_q, mul_B_q;
+    logic [PARALLEL_NUM*MW-1:0] product_q;
+    logic [PARALLEL_NUM-1:0] operand_valid_q, product_valid_q;
+    logic [GROUP_W-1:0] operand_group_q, product_group_q;
+
     // ========================================================
     // Fixed lane selection
     // ========================================================
@@ -152,7 +159,8 @@ module PSC_NPU_PE_Mult #(
     // ========================================================
     // Physical multipliers
     //
-    // PARALLEL_NUM=2なら乗算演算子は2個だけ生成される。
+    // Each physical lane has signed/unsigned expressions. Their sharing
+    // and DSP mapping are determined by synthesis.
     // ========================================================
 
     genvar g;
@@ -169,12 +177,12 @@ module PSC_NPU_PE_Mult #(
             logic signed [MW-1:0] signed_mul_result;
             logic        [MW-1:0] unsigned_mul_result;
 
-            assign signed_mul_a = $signed(mul_A_bus[g*DW +: DW]);
-            assign signed_mul_b = $signed(mul_B_bus[g*DW +: DW]);
+            assign signed_mul_a = $signed(mul_A_q[g*DW +: DW]);
+            assign signed_mul_b = $signed(mul_B_q[g*DW +: DW]);
 
             assign signed_mul_result = signed_mul_a * signed_mul_b;
             assign unsigned_mul_result =
-                mul_A_bus[g*DW +: DW] * mul_B_bus[g*DW +: DW];
+                mul_A_q[g*DW +: DW] * mul_B_q[g*DW +: DW];
 
             assign mul_result_bus[g*MW +: MW] =
                 signed_mode_latch
@@ -198,6 +206,13 @@ module PSC_NPU_PE_Mult #(
             signed_mode_latch   <= 1'b0;
             data_out_ready      <= {N{1'b0}};
             result_C       <= {(N*SW){1'b0}};
+            mul_A_q        <= '0;
+            mul_B_q        <= '0;
+            product_q      <= '0;
+            operand_valid_q <= '0;
+            product_valid_q <= '0;
+            operand_group_q <= '0;
+            product_group_q <= '0;
 
             for (
                 seq_i = 0;
@@ -211,6 +226,30 @@ module PSC_NPU_PE_Mult #(
         end else begin
             // readyは常に1クロックパルス
             data_out_ready <= {N{1'b0}};
+
+            mul_A_q         <= mul_A_bus;
+            mul_B_q         <= mul_B_bus;
+            operand_group_q <= group_index;
+            operand_valid_q <= mul_lane_valid;
+            product_q       <= mul_result_bus;
+            product_group_q <= operand_group_q;
+            product_valid_q <= operand_valid_q;
+
+            // Drain in WAIT_CLEAR as well: the final two groups may still
+            // be in flight after the last group has been issued.
+            for (seq_i = 0; seq_i < N; seq_i = seq_i + 1) begin
+                if ((product_group_q == seq_i / PARALLEL_NUM) &&
+                    product_valid_q[seq_i % PARALLEL_NUM]) begin
+                    if (signed_mode_latch)
+                        result_C[seq_i*SW +: SW] <=
+                            {{(SW-MW){product_q[(seq_i % PARALLEL_NUM)*MW + MW-1]}},
+                              product_q[(seq_i % PARALLEL_NUM)*MW +: MW]};
+                    else
+                        result_C[seq_i*SW +: SW] <=
+                            {{(SW-MW){1'b0}}, product_q[(seq_i % PARALLEL_NUM)*MW +: MW]};
+                    data_out_ready[seq_i] <= 1'b1;
+                end
+            end
 
             case (state)
 
@@ -251,27 +290,6 @@ module PSC_NPU_PE_Mult #(
                 // =============================================
 
                 STATE_ACTIVE: begin
-                    // Decode the destination group once per fixed lane.
-                    // Constant slices avoid a variable write into the entire
-                    // result bus (and its wide feedback mux).
-                    for (seq_i = 0; seq_i < N; seq_i = seq_i + 1) begin
-                        if ((group_index == seq_i / PARALLEL_NUM) &&
-                            mul_lane_valid[seq_i % PARALLEL_NUM]) begin
-                            if (signed_mode_latch) begin
-                                result_C[seq_i*SW +: SW]
-                                    <= {{(SW-MW){mul_result_bus[
-                                        (seq_i % PARALLEL_NUM)*MW + MW-1]}},
-                                        mul_result_bus[
-                                        (seq_i % PARALLEL_NUM)*MW +: MW]};
-                            end else begin
-                                result_C[seq_i*SW +: SW]
-                                    <= {{(SW-MW){1'b0}}, mul_result_bus[
-                                        (seq_i % PARALLEL_NUM)*MW +: MW]};
-                            end
-                            data_out_ready[seq_i] <= 1'b1;
-                        end
-                    end
-
                     // 最終グループを処理した
                     if (group_index == GROUPS - 1) begin
                         group_index <= {GROUP_W{1'b0}};
@@ -296,7 +314,8 @@ module PSC_NPU_PE_Mult #(
                 // =============================================
 
                 STATE_WAIT_CLEAR: begin
-                    if (!(|data_in_valid)) begin
+                    if (!(|data_in_valid) && !(|operand_valid_q) &&
+                        !(|product_valid_q)) begin
                         state <= STATE_IDLE;
                     end
                 end

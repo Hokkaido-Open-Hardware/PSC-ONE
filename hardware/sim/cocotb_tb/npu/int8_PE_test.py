@@ -559,7 +559,8 @@ async def test_pe_cycle_contract(dut):
     """Check atomic accumulation and input capture, including busy-time changes.
 
     Model the public contract: start, two cycles to operand capture, fixed
-    groups of multiplications, then an atomic accumulator commit. In
+    groups of multiplications, two pipeline drain cycles, then an atomic
+    accumulator commit. In
     particular, input shifts/clear and mode changes during a batch must
     not alter already captured operands or expose partially updated sums.
     """
@@ -618,7 +619,7 @@ async def test_pe_cycle_contract(dut):
                     product = signed(x, dw) * signed(y, dw) if mode else x * y
                     product &= (1 << pw) - 1
                     pending.append(signed(product, pw) if pe_signed else product)
-            if phase == groups + 4:
+            if phase == groups + 6:
                 acc = [(x + y) & mask for x, y in zip(acc, pending)]
                 phase, done = 0, 1
                 completed += 1

@@ -746,7 +746,11 @@ async def test_systolic_array_driver_64x64(dut):
     dut.start.value = 0
 
     # 32x32実測のおよそ8倍を見込み、余裕を持たせる。
-    timeout = 1_500_000
+    # Retain the previous bound plus the added pipeline latency: at most
+    # eight MAC batches per K tile (+2 each), and address setup/row steps
+    # (+2 + 3) per output tile. Do not relax the result/write checks.
+    tiles = MATRIX_N // 4
+    timeout = 1_500_000 + tiles**3 * 8 * 2 + tiles**2 * 5
 
     for cycle in range(timeout):
         if int(dut.done.value) == 1:
