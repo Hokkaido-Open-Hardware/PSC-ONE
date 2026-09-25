@@ -25,8 +25,8 @@ extern "C" void run()
 {
     bool all_ok = true;
 
-    alignas(4) uint8_t A[4][4];
-    alignas(4) uint8_t B[4][4];
+    alignas(4) uint8_t A[4][4] = {};
+    alignas(4) uint8_t B[4][4] = {};
     alignas(4) uint32_t Csa_mem[4][4];
 
     // --------------------------------------------------------

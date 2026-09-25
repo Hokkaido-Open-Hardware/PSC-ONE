@@ -195,6 +195,7 @@ __attribute__((used)) void kernel_main(void) {
         "| CMD   : fat32_touch\n"
         "| CMD   : speech\n"
         "| CMD   : microPython\n"
+        "| CMD   : run (.ELF)\n"
         "| microPython exit: Ctl+D.\n"
         "| SBI quit : Ctl+A C. q.\n"
         "+--------------------------------------------------+\n",

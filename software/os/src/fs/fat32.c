@@ -201,9 +201,169 @@ int fat32_mount(void)
     return 0;
 }
 
+/* Kept outside the SD buffer so names can cross sectors and clusters. */
+typedef struct {
+    uint16_t name[260]; /* 20 entries, 13 UTF-16 code units each */
+    unsigned slots, next;
+    uint8_t checksum;
+} fat32_lfn_t;
+
+static void fat32_lfn_entry(fat32_lfn_t *lfn, const uint8_t *e)
+{
+    static const uint8_t offsets[13] = {
+        1, 3, 5, 7, 9, 14, 16, 18, 20, 22, 24, 28, 30
+    };
+    unsigned order = e[0] & 0x1f;
+    if ((e[0] & 0xa0) || order == 0 || order > 20 ||
+        e[12] != 0 || e[26] != 0 || e[27] != 0) {
+        lfn->slots = 0;
+        return;
+    }
+    if (e[0] & 0x40) {
+        lfn->slots = order * 13;
+        lfn->next = order;
+        lfn->checksum = e[13];
+    }
+    if (!lfn->slots || lfn->next != order || lfn->checksum != e[13]) {
+        lfn->slots = 0;
+        return;
+    }
+    for (unsigned i = 0; i < 13; ++i) {
+        unsigned p = offsets[i];
+        lfn->name[(order - 1) * 13 + i] =
+            (uint16_t)e[p] | ((uint16_t)e[p + 1] << 8);
+    }
+    --lfn->next;
+}
+
+/* Validate before printing anything; corrupt names fall back to 8.3. */
+static unsigned fat32_lfn_length(const fat32_lfn_t *lfn, const uint8_t *e)
+{
+    if (!lfn->slots || lfn->next || (e[11] & 0x08))
+        return 0;
+    uint8_t checksum = 0;
+    for (unsigned i = 0; i < 11; ++i)
+        checksum = ((checksum & 1) << 7) + (checksum >> 1) + e[i];
+    if (checksum != lfn->checksum)
+        return 0;
+    unsigned length = 0;
+    while (length < lfn->slots && lfn->name[length] != 0) {
+        if (lfn->name[length] == 0xffff)
+            return 0;
+        ++length;
+    }
+    if (!length || length > 255 || length <= lfn->slots - 13)
+        return 0;
+    for (unsigned i = length + 1; i < lfn->slots; ++i)
+        if (lfn->name[i] != 0xffff)
+            return 0;
+    return length;
+}
+
+/* Console column widths for common combining, CJK and emoji characters.
+ * Ambiguous-width characters are treated as one column.
+ */
+static unsigned fat32_name_columns(uint32_t ch)
+{
+    if ((ch >= 0x0300 && ch <= 0x036f) ||
+        (ch >= 0xfe00 && ch <= 0xfe0f))
+        return 0;
+    if ((ch >= 0x1100 && ch <= 0x115f) ||
+        (ch >= 0x2e80 && ch <= 0xa4cf && ch != 0x303f) ||
+        (ch >= 0xac00 && ch <= 0xd7a3) ||
+        (ch >= 0xf900 && ch <= 0xfaff) ||
+        (ch >= 0xfe10 && ch <= 0xfe19) ||
+        (ch >= 0xfe30 && ch <= 0xfe6f) ||
+        (ch >= 0xff01 && ch <= 0xff60) ||
+        (ch >= 0xffe0 && ch <= 0xffe6) ||
+        (ch >= 0x1f300 && ch <= 0x1faff) ||
+        (ch >= 0x20000 && ch <= 0x3fffd))
+        return 2;
+    return 1;
+}
+
+static unsigned fat32_lfn_print(const fat32_lfn_t *lfn, unsigned length)
+{
+    unsigned columns = 0, total = 0;
+    /* Measure first so only overflowing names reserve room for "...". */
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        for (unsigned i = 0; i < length; ++i) {
+            uint32_t ch = lfn->name[i];
+            if (ch >= 0xd800 && ch <= 0xdbff && i + 1 < length &&
+                lfn->name[i + 1] >= 0xdc00 && lfn->name[i + 1] <= 0xdfff) {
+                ch = 0x10000 + ((ch - 0xd800) << 10) +
+                     (lfn->name[++i] - 0xdc00);
+            } else if (ch >= 0xd800 && ch <= 0xdfff) {
+                ch = 0xfffd;
+            }
+            unsigned width = fat32_name_columns(ch);
+            if (pass == 0) {
+                total += width;
+                continue;
+            }
+            if (total > 28 && columns + width > 25)
+                break;
+            columns += width;
+            if (ch < 0x80) {
+                putchar(ch);
+            } else {
+                if (ch < 0x800) {
+                    putchar(0xc0 | (ch >> 6));
+                } else {
+                    if (ch < 0x10000) {
+                        putchar(0xe0 | (ch >> 12));
+                    } else {
+                        putchar(0xf0 | (ch >> 18));
+                        putchar(0x80 | ((ch >> 12) & 0x3f));
+                    }
+                    putchar(0x80 | ((ch >> 6) & 0x3f));
+                }
+                putchar(0x80 | (ch & 0x3f));
+            }
+        }
+    }
+    if (total > 28) {
+        printf("...");
+        columns += 3;
+    }
+    return columns;
+}
+
+/* Both short names and LFNs finish at the same details column. */
+static void fat32_name_print(const uint8_t *e, const fat32_lfn_t *lfn,
+                             unsigned length)
+{
+    unsigned columns = 0;
+    if (length) {
+        columns = fat32_lfn_print(lfn, length);
+    } else {
+        for (int j = 0; j < 8; ++j) {
+            if (e[j] != ' ') {
+                putchar(e[j]);
+                ++columns;
+            }
+        }
+        if (e[8] != ' ') {
+            putchar('.');
+            ++columns;
+            for (int j = 8; j < 11; ++j) {
+                if (e[j] != ' ') {
+                    putchar(e[j]);
+                    ++columns;
+                }
+            }
+        }
+    }
+    /* 28 columns plus two spaces, including the space before attr below. */
+    for (; columns < 29; ++columns)
+        putchar(' ');
+}
+
 void fat32_ls(void)
 {
     uint8_t *buf = fat32_buf;
+    fat32_lfn_t lfn;
+    lfn.slots = 0;
 
     if (fat32_mount())
         return;
@@ -228,24 +388,19 @@ void fat32_ls(void)
                 if (e[0] == 0x00)
                     return;
 
-                if (e[0] == 0xE5)
+                if (e[0] == 0xE5) {
+                    lfn.slots = 0;
                     continue;
-
-                if (e[11] == 0x0F)
-                    continue;
-
-                for (int j = 0; j < 8; j++) {
-                    if (e[j] != ' ')
-                        putchar(e[j]);
                 }
 
-                if (e[8] != ' ') {
-                    putchar('.');
-                    for (int j = 8; j < 11; j++) {
-                        if (e[j] != ' ')
-                            putchar(e[j]);
-                    }
+                if (e[11] == 0x0F) {
+                    fat32_lfn_entry(&lfn, e);
+                    continue;
                 }
+
+                unsigned length = fat32_lfn_length(&lfn, e);
+                fat32_name_print(e, &lfn, length);
+                lfn.slots = 0;
 
                 printf(" attr=%x", (uint32_t)e[11]);
 

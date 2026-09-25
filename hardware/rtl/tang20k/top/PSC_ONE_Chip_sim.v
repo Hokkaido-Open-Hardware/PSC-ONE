@@ -42,19 +42,12 @@ module PSC_ONE_Chip_sim #(
         `ifdef DUMP_VCD
         $display("COCOTB_SIM TOP DUMP_VCD ENABLE");
         $dumpfile("./wave/PSC_ONE_Chip_test.vcd");
-        $dumpvars(1, u_chip);
-        $dumpvars(1, u_chip.u_lcd);
-        $dumpvars(1, u_chip.u_i2s_if);
-        $dumpvars(1, u_chip.u_led);
-        $dumpvars(1, u_chip.u_dma);
-        $dumpvars(1, u_chip.u_timer);
+        $dumpvars(0, u_chip);
         `endif
         `ifdef DUMP_FST
         $display("COCOTB_SIM TOP verilator FST ENABLE");
         $dumpfile("./wave/PSC_ONE_Chip_test.fst");
         $dumpvars(1, u_chip);
-        $dumpvars(1, u_chip.u_lcd);
-        $dumpvars(1, u_chip.u_i2s_if);
         `endif
     end
     `endif

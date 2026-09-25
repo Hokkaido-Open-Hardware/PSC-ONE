@@ -247,55 +247,55 @@ module Csr (
     end
 
     // ---------------- read mux ----------------
-    function [31:0] csr_read_mux(input [11:0] a);
-        begin
-            case (a)
-                // Supervisor
-                12'h100: csr_read_mux = (csr_sstatus & SSTATUS_MASK); // sstatus
-                12'h104: csr_read_mux = (csr_sie     & SIRQ_MASK);    // sie
-                12'h105: csr_read_mux = csr_stvec;                    // stvec
-                12'h140: csr_read_mux = csr_sscratch;
-                12'h141: csr_read_mux = csr_sepc;
-                12'h142: csr_read_mux = csr_scause;
-                12'h143: csr_read_mux = csr_stval;
-                12'h144: csr_read_mux = sip_view(csr_mip);            // sip(view)
-                12'h180: csr_read_mux = csr_satp;
-                // Machine
-                12'h300: csr_read_mux = csr_mstatus;
-                12'h301: csr_read_mux = csr_misa;
-                12'h302: csr_read_mux = csr_medeleg;
-                12'h304: csr_read_mux = (csr_mie & MIRQ_MASK);
-                12'h305: csr_read_mux = csr_mtvec;
-                12'h340: csr_read_mux = csr_mscratch;
-                12'h341: csr_read_mux = csr_mepc;
-                12'h342: csr_read_mux = csr_mcause;
-                12'h344: csr_read_mux = (csr_mip & MIRQ_MASK);
-                // DMA
-                12'h7F0: csr_read_mux = csr_DMA_STATUS;
-                // SynapEngine
-                12'h7C8: csr_read_mux = csr_SA_STATUS;
-                // CPU Monitor
-                12'hBC4: csr_read_mux = in_CPU_MON_CYCLE;
+    // Keep the CSR registers in the combinational sensitivity set.  A
+    // continuous assignment calling a function with only csr_addr as an
+    // argument can retain a stale value in Icarus when the CSR changes.
+    reg [31:0] oldv;
+    always @(*) begin
+        case (csr_addr)
+            // Supervisor
+            12'h100: oldv = (csr_sstatus & SSTATUS_MASK); // sstatus
+            12'h104: oldv = (csr_sie     & SIRQ_MASK);    // sie
+            12'h105: oldv = csr_stvec;                    // stvec
+            12'h140: oldv = csr_sscratch;
+            12'h141: oldv = csr_sepc;
+            12'h142: oldv = csr_scause;
+            12'h143: oldv = csr_stval;
+            12'h144: oldv = sip_view(csr_mip);            // sip(view)
+            12'h180: oldv = csr_satp;
+            // Machine
+            12'h300: oldv = csr_mstatus;
+            12'h301: oldv = csr_misa;
+            12'h302: oldv = csr_medeleg;
+            12'h304: oldv = (csr_mie & MIRQ_MASK);
+            12'h305: oldv = csr_mtvec;
+            12'h340: oldv = csr_mscratch;
+            12'h341: oldv = csr_mepc;
+            12'h342: oldv = csr_mcause;
+            12'h344: oldv = (csr_mip & MIRQ_MASK);
+            // DMA
+            12'h7F0: oldv = csr_DMA_STATUS;
+            // SynapEngine
+            12'h7C8: oldv = csr_SA_STATUS;
+            // CPU Monitor
+            12'hBC4: oldv = in_CPU_MON_CYCLE;
 
-                default: csr_read_mux = 32'b0;
-            endcase
-        end
-    endfunction
+            default: oldv = 32'b0;
+        endcase
+    end
 
     // ---------------- main ----------------
-    //reg [31:0] oldv, newv;
-    wire [31:0] oldv, newv;
+    wire [31:0] newv;
 
     always @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             csr_rdata <= 32'd0;
         end else begin
             if (csr_wr & csr_enb)
-                csr_rdata <= csr_read_mux(csr_addr);
+                csr_rdata <= oldv;
         end
     end
 
-    assign  oldv = csr_read_mux(csr_addr);
     assign  newv = csr_apply(csr_cmd, side_effect_none_rs, oldv, csr_wr_val);
 
     always @(posedge clock or negedge reset_n) begin
