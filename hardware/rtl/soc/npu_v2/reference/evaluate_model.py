@@ -51,10 +51,10 @@ def main():
     a=p.parse_args(); a.build=a.build.resolve(); a.build.mkdir(parents=True,exist_ok=True);a.output.mkdir(parents=True,exist_ok=True)
     v=OS/'third_party/tflite'
     cmd=['g++','-std=c++17','-O2','-DTFLITE_SINGLE_ROUNDING=0']
-    cmd += ['-I'+str(d) for d in [OS/'src/tflite',v,v/'flatbuffers/include',v/'gemmlowp']]
-    cmd += [str(BASE/'reference/model_probe.cc')]+[str(OS/f) for f in ['src/tflite/tflite_inspect.cc','src/tflite/tflite_runtime.cc','src/tflite/tflite_quant.cc','src/tflite/tflite_synap.cc','tests/tflite/synap_mock.cc']]
+    cmd += ['-I'+str(d) for d in [OS/'src/api/tflite',v,v/'flatbuffers/include',v/'gemmlowp']]
+    cmd += [str(BASE/'reference/model_probe.cc')]+[str(OS/f) for f in ['src/api/tflite/tflite_inspect.cc','src/api/tflite/tflite_runtime.cc','src/api/tflite/tflite_quant.cc','src/api/tflite/tflite_synap.cc','tests/tflite/synap_mock.cc']]
     subprocess.run(cmd+['-o',str(a.build/'model_probe')],check=True)
-    header=(OS/'src/tflite/tflite_demo.h').read_text()
+    header=(OS/'src/api/tflite/tflite_demo.h').read_text()
     demo=[int(x) for x in re.search(r'demo_input\[16\] = \{([^}]+)',header)[1].split(',') if x.strip()]
     rng=random.Random(20260919)
     inputs=[demo]+[[v]*16 for v in [-128,-1,0,1,127]]+[[rng.randrange(-128,128) for _ in range(16)] for _ in range(256)]

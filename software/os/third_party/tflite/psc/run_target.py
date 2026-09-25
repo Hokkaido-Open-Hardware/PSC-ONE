@@ -22,7 +22,7 @@ def main():
     a = p.parse_args()
     build = a.build.resolve();build.mkdir(parents=True, exist_ok=True)
     os.environ['CCACHE_DIR']=str(build/'ccache')
-    dst = OS / 'src/tflite'
+    dst = OS / 'src/api/tflite'
     model = a.model.read_bytes()
     (build / 'model_bytes.h').write_text('alignas(16) static const unsigned char model_bytes[]={' +
                                         ','.join(str(x) for x in model) + '};\n')
@@ -32,7 +32,7 @@ def main():
     flags = [*arch, '-Os', '-g', '-fno-builtin', '-fno-stack-protector',
              '-ffunction-sections', '-fdata-sections', '-DNDEBUG']
     includes = []
-    for path in (dst, OS / 'src/tflite', VENDOR, VENDOR / 'flatbuffers/include',
+    for path in (dst, OS / 'src/api/tflite', VENDOR, VENDOR / 'flatbuffers/include',
                  VENDOR / 'gemmlowp', build):
         includes += ['-I' + str(path)]
     version = subprocess.check_output(['riscv64-unknown-elf-gcc', '-dumpversion'], text=True).strip()
@@ -41,7 +41,7 @@ def main():
                  Path('/usr/lib/picolibc/riscv64-unknown-elf/include')):
         includes += ['-isystem', str(path)]
     objects = []
-    for src in [dst / 'tflite_runtime.cc', HERE / 'target_test.cc'] + [OS / 'src/tflite' / name for name in
+    for src in [dst / 'tflite_runtime.cc', HERE / 'target_test.cc'] + [OS / 'src/api/tflite' / name for name in
                  ('tflite_inspect.cc', 'tflite_quant.cc', 'tflite_synap.cc')]:
         obj = build / (src.stem + '.o')
         subprocess.run(['clang++', *flags, *includes, '-std=c++17', '-fno-exceptions', '-fno-rtti',
@@ -49,7 +49,7 @@ def main():
                         '-DFLATBUFFERS_LOCALE_INDEPENDENT=0', f'-DPSC_HAS_CV_DOTSP_B={int(not a.disable_pulp)}',
                         '-include', str(dst / 'tflite_api.h'), '-c', str(src), '-o', str(obj)], check=True)
         objects.append(str(obj))
-    for src in (OS / 'src/synap_api.c', sim / 'cpp/sp_start.S'):
+    for src in (OS / 'src/api/synap_api.c', sim / 'cpp/sp_start.S'):
         obj = build / (src.stem + '.o')
         subprocess.run(['clang', *flags, '-c', str(src), '-o', str(obj)], check=True)
         objects.append(str(obj))

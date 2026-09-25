@@ -57,7 +57,7 @@ The original TFLM and FlatBuffers pins are unchanged. The manifest records the
 TFLM commit archive and gemmlowp commit archive URLs and SHA-256. Copy only the
 listed `tflite_micro.scope` files and gemmlowp scope, preserving upstream bytes.
 The target includes `common.cc` and `quantization_util.cc` through
-`src/tflite/tflite_quant.cc`; a partial link discards all functions except the
+`src/api/tflite/tflite_quant.cc`; a partial link discards all functions except the
 two helper entry points and their dependencies. `TFLITE_SINGLE_ROUNDING=0` is
 explicit on host and target. Upstream checks remain active; the target adapter
 maps their abort action to a trap rather than importing an OS abort function.
@@ -71,7 +71,7 @@ patch; all 56 upstream files remain byte-identical to the manifest.
 ## PSC INT8 PULP FC backend (2026-09-22)
 
 **Integration status:** `psc/pulp_fc.h` is connected to the production runtime
-through `src/tflite/tflite_api.h` and `src/tflite/tflite_runtime.cc`. These two
+through `src/api/tflite/tflite_api.h` and `src/api/tflite/tflite_runtime.cc`. These two
 files were changed with explicit user authorization to extend the original
 scope. `psc/runtime-integration.patch` is retained as a record of that already
 applied change; do not apply it again. The test runners now compile the actual
@@ -82,7 +82,7 @@ The C API can select PULP; CLI parsing and target build opt-in remain separate.
 
 The upstream `reference/integer_ops/fully_connected.h` is a host oracle, not the
 PSC target kernel. Target execution is the small, synchronous, non-reentrant
-runtime in `src/tflite/`, not a full TFLM interpreter. The existing enum is
+runtime in `src/api/tflite/`, not a full TFLM interpreter. The existing enum is
 `psc_tflite_fc_backend`: CPU=0, Synap=1. The patch preserves these values and
 adds `PSC_TFLITE_FC_PULP=2`; setter signature, reset behavior, busy protection,
 output invalidation, tile API, scalar code and Synap code are retained.
@@ -164,8 +164,8 @@ psc_tflite_set_synap_tile_size(8);             // only affects Synap
 
 Additional external integration, **not performed**:
 
-* `src/shell.c`: recognize `pulp` beside `cpu`/`npu`, update command help.
-* `src/tflite/tflite_file.c`: label PULP output and add it to `tflite_bench`'s
+* `src/shell/shell.c`: recognize `pulp` beside `cpu`/`npu`, update command help.
+* `src/api/tflite/tflite_file.c`: label PULP output and add it to `tflite_bench`'s
   CPU/NPU comparison. Existing `tflite_run` and `tflite_bench` are untouched.
 * `software/os/Makefile`: arrange the target capability define and add
   `third_party/tflite/psc/pulp_fc.h` to `TFLITE_HEADERS` for incremental rebuilds.

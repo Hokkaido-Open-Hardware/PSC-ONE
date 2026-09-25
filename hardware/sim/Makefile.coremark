@@ -95,7 +95,7 @@ endif
 
 CM_CFLAGS := $(filter -march=% -mabi=% -O% -g -ffreestanding -nostdlib -mstrict-align,$(CM_REF_CXXFLAGS)) \
 	-std=c11 -mno-relax -ffunction-sections -fdata-sections -Wall -Wextra
-CM_CPPFLAGS := -I$(PORT_DIR) -I$(COREMARK_DIR) -I$(OS_DIR) -I$(PORT_DIR)/os_include \
+CM_CPPFLAGS := -I$(PORT_DIR) -I$(COREMARK_DIR) -I$(OS_DIR)/kernel -I$(OS_DIR)/lib -I$(OS_DIR)/drivers -I$(PORT_DIR)/os_include \
 	-include $(PORT_DIR)/os_include/compat.h \
 	-DITERATIONS=$(ITERATIONS) -D$(COREMARK_RUN)_RUN=1 -DTOTAL_DATA_SIZE=2000
 CM_LDFLAGS := -Wl,-T,$(LINKER) -Wl,--gc-sections,--no-relax,--no-warn-rwx-segment \
@@ -104,7 +104,7 @@ CORE_SOURCES := core_list_join.c core_main.c core_matrix.c core_state.c core_uti
 PORT_SOURCES := core_portme.c runtime.c console.c
 OS_SOURCES := kernel.c common.c timer_api.c timer_measure.c kernel_trap.c
 OBJECTS := $(addprefix $(BUILD)/,$(CORE_SOURCES:.c=.o) $(PORT_SOURCES:.c=.o) $(OS_SOURCES:.c=.o))
-vpath %.c $(COREMARK_DIR) $(PORT_DIR) $(OS_DIR)
+vpath %.c $(COREMARK_DIR) $(PORT_DIR) $(OS_DIR)/kernel $(OS_DIR)/lib $(OS_DIR)/drivers
 
 # ============================================================
 # CoreMarkビルド

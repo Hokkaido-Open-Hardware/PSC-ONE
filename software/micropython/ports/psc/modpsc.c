@@ -7,7 +7,7 @@
 
 #include "mphalport.h"
 #include <string.h>
-#include "../../../os/src/tflite/tflite_api.h"
+#include "../../../os/src/api/tflite/tflite_api.h"
 
 
 /* ------------------------------------------------------------

@@ -65,6 +65,7 @@ module PSC_RV32_Fetch #(
     reg [3:0]  fetch_state, next_state;
 
     reg [31:0] fetch_pc, next_pc;
+    reg [31:0] fetch_paddr;
     reg        fetch_fifo_flush, next_flush;
     reg        flush_execute_done;
     reg        next_ready;
@@ -79,6 +80,7 @@ module PSC_RV32_Fetch #(
         if(!reset_n) begin
             fetch_state       <= IDLE;
             fetch_pc          <= 0;
+            fetch_paddr       <= 0;
             fetch_ready       <= 0;
             fetch_fifo_flush  <= 0;
             flush_execute_done <= 0;
@@ -90,6 +92,10 @@ module PSC_RV32_Fetch #(
             fetch_pc          <= next_pc;
             fetch_ready       <= next_ready;
             fetch_fifo_flush  <= next_flush;
+            // Keep the completed translation stable through memory backpressure.
+            // fetch_pc remains virtual for execution and FIFO bookkeeping.
+            if ((fetch_state == FETCH_MMU_W) && i_mmu_done)
+                fetch_paddr <= i_paddr;
             if (fetch_state == IDLE)
                 flush_execute_done <= 1'b0;
             else if (execute_ready &&
@@ -274,9 +280,7 @@ module PSC_RV32_Fetch #(
     wire        i_MMU_enb;
 
     // to memory
-    wire [31:0] mem_read_address_pvsel = i_paddr;   // MMU output addr.
-
-    assign program_mem_read_address = (program_mem_read_valid) ? mem_read_address_pvsel : 32'd0;
+    assign program_mem_read_address = program_mem_read_valid ? fetch_paddr : 32'd0;
     assign i_MMU_enb = (fetch_state==FETCH_MMU);
                             
     // =====================================

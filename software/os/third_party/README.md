@@ -27,7 +27,7 @@ implicitly by the OS Makefile.
 The decoder includes `"tjpgdcnf.h"` beside its header. Merely putting a PSC
 configuration earlier in `-I` would still select upstream's RGB565 settings.
 The Makefile therefore creates **relative symlinks in the ignored build
-folder** to upstream `tjpgd.c`/`.h` and PSC's `src/jpeg/tjpgdcnf.h`. The source
+folder** to upstream `tjpgd.c`/`.h` and PSC's `src/api/jpeg/tjpgdcnf.h`. The source
 bytes remain in the submodule; no vendor copy or patch is stored in PSC source.
 All adapters include the same build-folder header, keeping the JDEC ABI equal.
 

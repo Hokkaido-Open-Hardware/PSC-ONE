@@ -463,15 +463,25 @@ module PSC_RV32_core #(
 
     // trap save pc
     reg  [31:0] trap_pc_latch;
-    always @(posedge clock) begin
-        if (execute_ready) begin
+    reg         trap_pc_committed;
+    always @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
             trap_pc_latch <= 32'd0;
+            trap_pc_committed <= 1'b0;
+        end else if (cpu_stop || execute_ready) begin
+            trap_pc_latch <= 32'd0;
+            trap_pc_committed <= 1'b0;
         end else begin
-            if (trap) begin
+            // CSR trap entry changes priv_mode before execute_ready updates PC.
+            // Freeze the destination on that edge so a delegated U-mode ECALL
+            // cannot be reclassified as an S-mode ECALL and redirected to mtvec.
+            if (trap && !trap_pc_committed) begin
                 if (trap_deleg_to_s)
                     trap_pc_latch <= csr_stvec;
                 else
                     trap_pc_latch <= csr_mtvec;
+                if (csr_enb)
+                    trap_pc_committed <= 1'b1;
             end
         end
     end

@@ -95,9 +95,9 @@
     "tensorflow/lite/kernels/internal/reference/integer_ops/fully_connected.h": "88beede059cee0eba102c5a108c0750b33fe823af25393053e618dd29781abd6",
     "psc/host_test.cc": "c2852a734bf86b6ec413a12fd69a1a1a5aabc248d51f238e27b355da8668966e",
     "psc/pulp_fc.h": "28dccf9749c3e38079ce3a38d312c361fff83d7cab43f009d152c939e4a13bdb",
-    "psc/run_host.py": "1b50fdc3bb5924f03efbbf6c40fe74431ca92c1755f31a2376fcb3a1cdba72e6",
-    "psc/runtime-integration.patch": "193f14eb1208fb525febe1ed6a696c036a5d680ae9e6dbdd9ee08bcd26846560",
-    "psc/run_target.py": "c062bc64c8e4bac6cbd9223371b1bad80d4ccaf88bd607e183a5919f35795bb3",
+    "psc/run_host.py": "ae8f9fd59413df9ab0b4fa36ef4e33c6b63231f2b889e487ec5f3a29bd882e31",
+    "psc/runtime-integration.patch": "6b655046ce30e98021b7d6ce587eb8a2d9e649ba09e1fd04c013b859a8c37689",
+    "psc/run_target.py": "c4f0b5b45213287be001ad85802ab7b385e0791a838d4d49c79f597a7a9ce97e",
     "psc/target_cocotb.py": "e13cd329e5abbd69a7766c67a709dae94a436cc47ee3caf27f071712845271a4",
     "psc/target_test.cc": "2a9af28f50d321e7c7d5d84a5ce38f1e048b89aa972a0ccc94fbd8920507314f",
     "psc/validation.json": "9a1ca23cb7e2e6d348800cbf15c546a43758aa434267aa5ae821512277f2e63c"

@@ -83,6 +83,7 @@ module Fetch #(
                 IDLE: begin
                     if (fetch_enb) begin
                         vaddr            <= fetch_address;
+                        program_mem_read_address <= fetch_address; // Bare/M physical address
                         busy             <= 1'b1;
                         burst_count      <= 3'd0;
                         burst_start_word <= fetch_address[4:2];
@@ -96,13 +97,14 @@ module Fetch #(
                 MMU: begin
                     if (program_mem_req_ready) begin
                         mmu_valid                <= 1'b1;
-                        program_mem_read_address <= paddr;
                         state                    <= MMU_WAIT;
                     end
                 end
 
                 MMU_WAIT: begin
                     if (mmu_ready) begin
+                        // Latch the completed translation; keep vaddr for the PC.
+                        program_mem_read_address <= paddr;
                         burst_count      <= 3'd0;
                         burst_start_word <= paddr[4:2];
                         state            <= FETCH;
@@ -114,11 +116,10 @@ module Fetch #(
                         burst_count <= 3'd0;
                         if (BURST_MODE) begin
                             program_mem_read_valid   <= 1'b1;
-                            program_mem_read_address <= {vaddr[31:5], 5'b00000};
+                            program_mem_read_address <= {program_mem_read_address[31:5], 5'b00000};
                             state                    <= FETCH_WAIT;
                         end else begin
                             program_mem_read_valid   <= 1'b1;
-                            program_mem_read_address <= vaddr;
                             state                    <= FETCH_WAIT;
                         end
 

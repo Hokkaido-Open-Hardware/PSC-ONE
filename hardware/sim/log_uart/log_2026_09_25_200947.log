@@ -1,0 +1,4 @@
+[dbg] cycle=0, last_uart=--, pc=0x00000000, data_addr=0x00000000
+memset = OFF
+Draw PSC Logo
+IMG BOOT LOGO start.

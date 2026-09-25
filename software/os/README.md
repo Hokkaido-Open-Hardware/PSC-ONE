@@ -193,7 +193,7 @@ LCD TX FIFO/burst、MicroPython `psc.jpeg_view()`。現在はどれも未実装�
 
 ## JPEG landscape修正
 
-JPEGの寸法・MADCTLは`src/jpeg_display.h`に集約しています。
+JPEGの寸法・MADCTLは`src/api/jpeg_display.h`に集約しています。
 `JPEG_LCD_WIDTH=480`、`JPEG_LCD_HEIGHT=320`、`JPEG_LCD_MADCTL=0xE8`。
 以前の0x88からMX/MVを変更し、MY/BGRは維持しました。textの320×480定義と
 boot logoは変更していません。CASET=x、PASET=yのままで、画素のソフトウェア回転はありません。

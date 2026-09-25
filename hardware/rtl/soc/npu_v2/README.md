@@ -28,7 +28,7 @@ MACScheduler、Mul4、AccBank の6モジュール。4x4は論理配置であり�
   X/Yは非ゼロの4の倍数。ReadControllerは32bit read request/response、
   Controllerは32bit C write request/responseとbackpressureを扱う。
   Controllerのdoneはstate resetまで保持され、内部MACのdoneは1クロックpulse。
-- 公開APIは `software/os/src/synap_api.h` の `sa_run` / `sa_run_checked`。
+- 公開APIは `software/os/src/api/synap_api.h` の `sa_run` / `sa_run_checked`。
   MMIO controlは0x10005000、既定入力0x00020000、結果0x00030000。
   CSRはCTRL=0x7C0、MODE=0x7C4、STATUS=0x7C8、A/B/C=0x7D0/0x7D4/0x7D8。
   CSR/MMIOデコードはNPU Controllerの外側にある。

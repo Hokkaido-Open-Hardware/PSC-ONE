@@ -3,7 +3,7 @@
 
 #include "py/mphal.h"
 #include "mphalport.h"
-#include "../../../os/src/syscall.h"
+#include "../../../os/src/kernel/syscall.h"
 
 
 /* ------------------------------------------------------------

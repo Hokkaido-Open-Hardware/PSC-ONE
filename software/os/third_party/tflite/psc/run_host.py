@@ -19,16 +19,16 @@ def main():
     build.mkdir(parents=True, exist_ok=True)
     subprocess.run([sys.executable, str(OS / 'tests/tflite/generate_model.py'),
                     '--build', str(build / 'baseline')], check=True)
-    dst = OS / 'src/tflite'
+    dst = OS / 'src/api/tflite'
     flags = ['-std=c++17', '-O2', '-g', '-fno-omit-frame-pointer', '-fno-pie',
              '-fsanitize=address,undefined', '-fno-sanitize-recover=all',
              '-DTFLITE_SINGLE_ROUNDING=0', '-include', str(dst / 'tflite_api.h')]
-    for path in (dst, OS / 'src/tflite', VENDOR, VENDOR / 'flatbuffers/include',
+    for path in (dst, OS / 'src/api/tflite', VENDOR, VENDOR / 'flatbuffers/include',
                  VENDOR / 'gemmlowp', OS / 'tests/tflite', build / 'baseline'):
         flags += ['-I' + str(path)]
     cxx = os.environ.get('CXX', 'g++')
     common = []
-    for src in [OS / 'src/tflite' / name for name in
+    for src in [OS / 'src/api/tflite' / name for name in
                 ('tflite_inspect.cc', 'tflite_quant.cc', 'tflite_synap.cc')] + [OS / 'tests/tflite/synap_mock.cc']:
         obj = build / (src.stem + '.o')
         subprocess.run([cxx, *flags, '-c', str(src), '-o', str(obj)], check=True)

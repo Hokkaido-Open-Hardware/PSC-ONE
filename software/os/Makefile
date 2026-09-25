@@ -92,7 +92,7 @@ CFLAGS ?= \
 	-mstrict-align
 
 LDFLAGS_USER := \
-	-Wl,-T$(Src)/user.ld \
+	-Wl,-T$(Src)/shell/user.ld \
 	-Wl,-Map=$(Build)/shell.map \
 	-Wl,--no-relax
 
@@ -139,16 +139,16 @@ endif
 # MicroPython is linked as an embedded static library.
 TJPGD_DIR := third_party/tjpgd
 TJPGD_BUILD := $(Build)/tjpgd
-JPEG_DIR := $(Src)/jpeg
-JPEG_SRCS := $(Src)/fat32_stream.c $(JPEG_DIR)/jpeg_view.c \
+JPEG_DIR := $(Src)/api/jpeg
+JPEG_SRCS := $(Src)/fs/fat32_stream.c $(JPEG_DIR)/jpeg_view.c \
              $(JPEG_DIR)/jpeg_headers.c $(JPEG_DIR)/tjpgd_port.c $(TJPGD_BUILD)/tjpgd.c
-JPEG_HEADERS := $(wildcard $(JPEG_DIR)/*.h) $(Src)/fat32.h $(Src)/jpeg_display.h
+JPEG_HEADERS := $(wildcard $(JPEG_DIR)/*.h) $(Src)/fs/fat32.h $(Src)/api/jpeg_display.h
 JPEG_CPPFLAGS := -I$(Src) -I$(TJPGD_BUILD) -I../micropython/ports/psc/libc
 
 # Header-only official FlatBuffers reader, isolated from C-only user.h/libc.
 # No C++ runtime linkage: the inspection path uses neither heap nor exceptions.
 CXX := clang++
-TFLITE_DIR := $(Src)/tflite
+TFLITE_DIR := $(Src)/api/tflite
 TFLITE_VENDOR := third_party/tflite
 TFLITE_CV_DOTSP_B := 0
 ifeq ($(CPU_VERSION),v1)
@@ -170,7 +170,7 @@ TFLITE_CPPFLAGS := -I$(TFLITE_DIR) -I$(TFLITE_VENDOR) \
 	-isystem /usr/lib/picolibc/riscv64-unknown-elf/include \
 	-DFLATBUFFERS_LOCALE_INDEPENDENT=0 -DTFLITE_SINGLE_ROUNDING=0 -DNDEBUG \
 	-DPSC_HAS_CV_DOTSP_B=$(TFLITE_CV_DOTSP_B)
-TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/sa_transfer.h \
+TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/api/sa_transfer.h \
 	$(TFLITE_VENDOR)/psc/pulp_fc.h $(Build)/tflite_cpu_config \
 	$(shell rg --files $(TFLITE_VENDOR)/tensorflow $(TFLITE_VENDOR)/gemmlowp) \
 	$(TFLITE_VENDOR)/schema_generated.h \
@@ -220,21 +220,22 @@ $(TJPGD_BUILD)/.ready: $(TJPGD_DIR)/src/tjpgd.c $(TJPGD_DIR)/src/tjpgd.h $(JPEG_
 $(TJPGD_BUILD)/tjpgd.c $(TJPGD_BUILD)/tjpgd.h $(TJPGD_BUILD)/tjpgdcnf.h: $(TJPGD_BUILD)/.ready
 
 SRCS_USER := \
-	$(Src)/shell.c \
-	$(Src)/user.c \
-	$(Src)/fat32.c \
+	$(Src)/shell/shell.c \
+	$(Src)/api/user.c \
+	$(Src)/fs/fat32.c \
+	$(Src)/shell/elf_command.c $(Src)/kernel/elf_loader.c \
 	$(TFLITE_DIR)/tflite_file.c $(TFLITE_DIR)/tflite_platform.c \
 	$(JPEG_SRCS)
 
 SIM_USER ?= full
 ifeq ($(SIM_USER),minimal)
-  USER_SRCS = $(Src)/sim_shell.c
-  USER_DEPS = $(Src)/sim_shell.c
+  USER_SRCS = $(Src)/shell/sim_shell.c
+  USER_DEPS = $(Src)/shell/sim_shell.c
   USER_LIBS =
   USER_OBJCOPY_FLAGS =
 else ifeq ($(SIM_USER),full)
   USER_SRCS = $(SRCS_USER)
-  USER_DEPS = $(SRCS_USER) $(MICROPY_LIB) $(JPEG_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/user.ld $(Src)/user.h $(Src)/syscall.h
+  USER_DEPS = $(SRCS_USER) $(MICROPY_LIB) $(JPEG_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/shell/user.ld $(Src)/api/user.h $(Src)/kernel/syscall.h $(Src)/kernel/elf_loader.h $(Src)/kernel/user_memory.h
   USER_LIBS = $(TFLITE_OBJ) $(MICROPY_LIB) $(LIBM) $(LIBC)
   USER_OBJCOPY_FLAGS = --set-section-flags .bss=alloc,contents
 else
@@ -242,25 +243,26 @@ else
 endif
 
 SRCS_KERNEL := \
-	$(Src)/kernel.c \
-	$(Src)/kernel_process.c \
-	$(Src)/kernel_trap.c \
-	$(Src)/kernel_syscall.c \
-	$(Src)/common.c \
-	$(Src)/dma.c \
-	$(Src)/synap_api.c \
-	$(Src)/sdcard_api.c \
-	$(Src)/timer_api.c \
-	$(Src)/timer_measure.c \
-	$(Src)/mic_api.c \
-	$(Src)/lcd_api.c \
-	$(Src)/led_api.c \
-	$(Src)/fft_api.c \
-	$(Src)/mem_test.c \
-	$(Src)/speech_recognition_api.c \
-	$(Src)/multitask_test.c
+	$(Src)/kernel/kernel.c \
+	$(Src)/kernel/kernel_process.c \
+	$(Src)/kernel/kernel_trap.c \
+	$(Src)/kernel/kernel_syscall.c \
+	$(Src)/kernel/kernel_elf.c $(Src)/kernel/elf_loader.c \
+	$(Src)/lib/common.c \
+	$(Src)/drivers/dma.c \
+	$(Src)/api/synap_api.c \
+	$(Src)/drivers/sdcard_api.c \
+	$(Src)/drivers/timer_api.c \
+	$(Src)/drivers/timer_measure.c \
+	$(Src)/drivers/mic_api.c \
+	$(Src)/drivers/lcd_api.c \
+	$(Src)/drivers/led_api.c \
+	$(Src)/api/fft_api.c \
+	$(Src)/drivers/mem_test.c \
+	$(Src)/api/speech_recognition_api.c \
+	$(Src)/kernel/multitask_test.c
 
-SRCS_MBIOS := $(Src)/psc_mbios.S
+SRCS_MBIOS := $(Src)/boot/psc_mbios.S
 
 # ========================
 # File names
@@ -281,7 +283,7 @@ RISCV_ARCH   := -march=rv32im_zicsr_zifencei -mabi=ilp32
 # ========================
 # compiler helper objects
 # ========================
-$(Build)/mulsi3.o: $(Src)/mulsi3.c | $(Build)
+$(Build)/mulsi3.o: $(Src)/lib/mulsi3.c | $(Build)
 	$(RISCV_CLANG) \
 		$(RISCV_TARGET) \
 		$(RISCV_ARCH) \
@@ -290,7 +292,7 @@ $(Build)/mulsi3.o: $(Src)/mulsi3.c | $(Build)
 		-nostdlib \
 		-c $< -o $@
 
-$(Build)/divmodsi3.o: $(Src)/divmodsi3.c | $(Build)
+$(Build)/divmodsi3.o: $(Src)/lib/divmodsi3.c | $(Build)
 	$(RISCV_CLANG) \
 		$(RISCV_TARGET) \
 		$(RISCV_ARCH) \
@@ -312,9 +314,9 @@ else
   BIOS_FLAGS :=
 endif
 
-$(BOOT_ELF): $(Build) $(SRCS_MBIOS) $(Src)/bootrom.ld
+$(BOOT_ELF): $(Build) $(SRCS_MBIOS) $(Src)/boot/bootrom.ld
 	$(CC) $(CFLAGS) $(BIOS_FLAGS) \
-		-Wl,-T$(Src)/bootrom.ld \
+		-Wl,-T$(Src)/boot/bootrom.ld \
 		-o $@ \
 		$(SRCS_MBIOS) \
 		$(BUILTINS_LIB)
@@ -330,10 +332,10 @@ $(BOOT_MEM): $(BOOT_BIN)
 # Boot Loader
 # ========================
 SRCS_BOOT := \
-	$(Src)/bootloader_entry.S \
-	$(Src)/bootloader.c \
-	$(Src)/common.c \
-	$(Src)/sdcard_api.c
+	$(Src)/boot/bootloader_entry.S \
+	$(Src)/boot/bootloader.c \
+	$(Src)/lib/common.c \
+	$(Src)/drivers/sdcard_api.c
 
 BOOTLOADER_ELF := $(Build)/bootloader.elf
 BOOTLOADER_BIN := $(Build)/bootloader.bin
@@ -341,7 +343,7 @@ BOOTLOADER_MEM := $(Build)/bootloader.mem
 
 $(BOOTLOADER_ELF): $(Build) $(SRCS_BOOT)
 	$(CC) $(CFLAGS) \
-		-Wl,-T$(Src)/bootloader.ld \
+		-Wl,-T$(Src)/boot/bootloader.ld \
 		-Wl,-Map=$(Build)/bootloader.map \
 		-o $@ \
 		$(SRCS_BOOT) \
@@ -358,11 +360,11 @@ $(BOOTLOADER_MEM): $(BOOTLOADER_BIN)
 # Boot Loader FAT32 Ver.
 # ========================
 SRCS_BOOT_FAT32 := \
-	$(Src)/bootloader_entry.S \
-	$(Src)/bootloader_fat32.c \
-	$(Src)/common.c \
-	$(Src)/sdcard_api.c \
-	$(Src)/boot_fat32.c
+	$(Src)/boot/bootloader_entry.S \
+	$(Src)/boot/bootloader_fat32.c \
+	$(Src)/lib/common.c \
+	$(Src)/drivers/sdcard_api.c \
+	$(Src)/boot/boot_fat32.c
 
 BOOTLOADER_FAT32_ELF := $(Build)/bootloader_fat32.elf
 BOOTLOADER_FAT32_BIN := $(Build)/bootloader_fat32.bin
@@ -370,7 +372,7 @@ BOOTLOADER_FAT32_MEM := $(Build)/bootloader_fat32.mem
 
 $(BOOTLOADER_FAT32_ELF): $(Build) $(SRCS_BOOT_FAT32)
 	$(CC) $(CFLAGS) \
-		-Wl,-T$(Src)/bootloader.ld \
+		-Wl,-T$(Src)/boot/bootloader.ld \
 		-Wl,-Map=$(Build)/bootloader.map \
 		-o $@ \
 		$(SRCS_BOOT_FAT32) \
@@ -453,20 +455,20 @@ $(USER_MEM): $(USER_BIN) | $(Build)
 # Kernel linker selection
 # ========================
 ifeq ($(MODE),sim)
-$(KERNEL_ELF): KERNEL_LD := $(Src)/kernel_fpga.ld
-kernel_mem:    KERNEL_LD := $(Src)/kernel_fpga.ld
+$(KERNEL_ELF): KERNEL_LD := $(Src)/kernel/kernel_fpga.ld
+kernel_mem:    KERNEL_LD := $(Src)/kernel/kernel_fpga.ld
 
 else ifeq ($(MODE),fpga_mem)
-$(KERNEL_ELF): KERNEL_LD := $(Src)/kernel_fpga.ld
-kernel_mem:    KERNEL_LD := $(Src)/kernel_fpga.ld
+$(KERNEL_ELF): KERNEL_LD := $(Src)/kernel/kernel_fpga.ld
+kernel_mem:    KERNEL_LD := $(Src)/kernel/kernel_fpga.ld
 
 else ifeq ($(MODE),sbi)
-$(KERNEL_ELF): KERNEL_LD := $(Src)/kernel.ld
-kernel_mem:    KERNEL_LD := $(Src)/kernel.ld
+$(KERNEL_ELF): KERNEL_LD := $(Src)/kernel/kernel.ld
+kernel_mem:    KERNEL_LD := $(Src)/kernel/kernel.ld
 
 else ifeq ($(MODE),psc)
-$(KERNEL_ELF): KERNEL_LD := $(Src)/kernel_fpga.ld
-kernel_mem:    KERNEL_LD := $(Src)/kernel_fpga.ld
+$(KERNEL_ELF): KERNEL_LD := $(Src)/kernel/kernel_fpga.ld
+kernel_mem:    KERNEL_LD := $(Src)/kernel/kernel_fpga.ld
 endif
 
 # ========================
@@ -480,7 +482,7 @@ endif
 $(KERNEL_ELF): \
 	$(Build) \
 	$(SRCS_KERNEL) \
-	$(wildcard $(Src)/*.h) $(Src)/kernel_fpga.ld \
+	$(wildcard $(Src)/*/*.h) $(Src)/kernel/kernel_fpga.ld \
 	$(USER_BIN) \
 	$(Build)/divmodsi3.o $(KERNEL_BUILTINS) Makefile
 
@@ -543,6 +545,14 @@ fpga_fat32_boot:
 # ========================
 # Main Targets
 # ========================
+.PHONY: user_elf
+user_elf: $(Build)/HELLO.ELF
+
+$(Build)/HELLO.ELF: tests/elf/hello.c tests/elf/start.S tests/elf/user.ld $(Src)/kernel/syscall.h Makefile | $(Build)
+	$(CC) $(CFLAGS) -msmall-data-limit=0 -I$(Src) $(DEFUSERBASE) \
+		-Wl,-Ttests/elf/user.ld -Wl,--no-relax -Wl,-z,max-page-size=16 -Wl,-s \
+		tests/elf/start.S tests/elf/hello.c -o $@
+
 .PHONY: all
 
 all: $(KERNEL_ELF)

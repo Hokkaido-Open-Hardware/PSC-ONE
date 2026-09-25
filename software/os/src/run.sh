@@ -13,8 +13,8 @@ OBJCOPY=llvm-objcopy
 
 # 共通フラグ
 CFLAGS="-std=c11 -O2 -g3 -Wall -Wextra --target=riscv32-unknown-elf -fno-stack-protector -ffreestanding -nostdlib"
-LDFLAGS_USER="-Wl,-Tuser.ld -Wl,-Map=shell.map"
-LDFLAGS_KERN="-Wl,-Tkernel.ld -Wl,-Map=kernel.map"
+LDFLAGS_USER="-Wl,-Tshell/user.ld -Wl,-Map=shell.map"
+LDFLAGS_KERN="-Wl,-Tkernel/kernel.ld -Wl,-Map=kernel.map"
 
 # モード別設定（USER_BASE をモードで切替）
 KCPPFLAGS=""
@@ -50,7 +50,7 @@ rm -f shell.elf shell.bin shell.bin.o kernel.elf shell.map kernel.map
 # 1) シェル（ユーザ）をビルド
 # =========================
 $CC $CFLAGS $KCPPFLAGS $DUSERBASE $DEFUSERBASE $LDFLAGS_USER -o shell.elf \
-    shell.c user.c common.c
+    shell/shell.c api/user.c lib/common.c
 
 # ELF -> bin、bin -> .o（カーネルへ組込み用）
 $OBJCOPY --set-section-flags .bss=alloc,contents -O binary shell.elf shell.bin
@@ -60,7 +60,7 @@ $OBJCOPY -I binary -O elf32-littleriscv shell.bin shell.bin.o
 # 2) カーネルをビルド（SBI/MMIO 切替は KCPPFLAGS、USER_BASE 同期は DUSERBASE）
 # =========================
 $CC $CFLAGS $KCPPFLAGS $DUSERBASE $LDFLAGS_KERN -o kernel.elf \
-    kernel.c common.c shell.bin.o
+    kernel/kernel.c lib/common.c shell.bin.o
 
 # =========================
 # 3) 実行

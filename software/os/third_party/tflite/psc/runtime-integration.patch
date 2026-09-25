@@ -1,5 +1,5 @@
---- a/PSC-ONE/software/os/src/tflite/tflite_api.h
-+++ b/PSC-ONE/software/os/src/tflite/tflite_api.h
+--- a/PSC-ONE/software/os/src/api/tflite/tflite_api.h
++++ b/PSC-ONE/software/os/src/api/tflite/tflite_api.h
 @@ -2,7 +2,7 @@
  #define PSC_TFLITE_API_H
  #include "tflite_inspect.h"
@@ -18,8 +18,8 @@
  int psc_tflite_set_fc_backend(enum psc_tflite_fc_backend backend);
  int psc_tflite_set_synap_tile_size(unsigned size); /* 4,8,12,16 */
  typedef struct {
---- a/PSC-ONE/software/os/src/tflite/tflite_runtime.cc
-+++ b/PSC-ONE/software/os/src/tflite/tflite_runtime.cc
+--- a/PSC-ONE/software/os/src/api/tflite/tflite_runtime.cc
++++ b/PSC-ONE/software/os/src/api/tflite/tflite_runtime.cc
 @@ -3,6 +3,7 @@
  #include "tflite_synap.h"
  #include "schema_generated.h"
