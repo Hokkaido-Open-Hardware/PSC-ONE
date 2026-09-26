@@ -1,10 +1,19 @@
 # PSC-OS TFLite
 
+[PSC-ONE](../../../../../README.md) · [Documentation](../../../../../docs/README.md)
+
 Phase 4 selectable CPU/SynapEngine backends and measured comparison: [PHASE4.md](PHASE4.md).
 
 Historical Phase 3 CPU inference, API, tests and measurements: [PHASE3.md](PHASE3.md).
 
 The following records the Phase 0–2 inspector and its historical measurements.
+
+<!-- contents -->
+- [Shell usage](#shell-usage)
+- [Ownership and memory](#ownership-and-memory)
+- [Dependencies and build changes](#dependencies-and-build-changes)
+- [Reproducible checks](#reproducible-checks)
+<!-- /contents -->
 
 ## Shell usage
 

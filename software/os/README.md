@@ -1,4 +1,30 @@
-# PSC-OS JPEG表示（Phase 1）
+# PSC-OS
+
+[PSC-ONE](../../README.md) · [Documentation](../../docs/README.md)
+
+PSC-ONE向けのOS、シェル、デバイスAPI、ユーザーアプリケーションを収めています。
+
+- [ソフトウェア全体](../README.md)
+- [ELFアプリケーション](elf_apps/README.md)と[ローダの仕様・制限](tests/elf/README.md)
+- [TFLite API](src/api/tflite/README.md)
+- [MicroPython PSCポート](../micropython/ports/psc/README.md)
+- [FAT32回帰](tests/fat32/README.md)
+- [外部依存ライブラリ](third_party/README.md)
+
+以下はJPEG表示機能の実装・検証記録です。Phase 1時点の測定と、その後のlandscape修正を区別して記載します。
+
+<!-- contents -->
+- [JPEG表示（Phase 1）](#jpeg表示phase-1)
+- [ビルドと実機テスト](#ビルドと実機テスト)
+- [対応範囲](#対応範囲)
+- [実装構造](#実装構造)
+- [テスト画像・ホスト検証](#テスト画像ホスト検証)
+- [メモリ配置とサイズ（実装時のビルド）](#メモリ配置とサイズ実装時のビルド)
+- [検証範囲と次段階](#検証範囲と次段階)
+- [JPEG landscape修正](#jpeg-landscape修正)
+<!-- /contents -->
+
+## JPEG表示（Phase 1）
 
 `jpeg TEST.JPG`で、SDカードのBaseline JPEGを480×320横向きLCDの左上へ
 原寸表示します。JPEG全体やフルフレームバッファはRAMへ確保しません。

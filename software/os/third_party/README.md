@@ -1,4 +1,11 @@
-# TJpgDec dependency
+# PSC-OS dependencies
+
+[PSC-ONE](../../../README.md) · [Documentation](../../../docs/README.md)
+
+- JPEG: TJpgDec submodule, described below.
+- TFLite: [pinned dependencies and PSC backend](tflite/README.md).
+
+## TJpgDec dependency
 
 `third_party/tjpgd` is a Git submodule of
 [Bodmer/TJpg_Decoder](https://github.com/Bodmer/TJpg_Decoder), pinned to

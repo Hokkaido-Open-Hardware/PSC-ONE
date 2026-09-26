@@ -1,5 +1,7 @@
 # TFLite dependencies: vendor, not submodule
 
+[PSC-ONE](../../../../README.md) · [Documentation](../../../../docs/README.md)
+
 The upstream subtrees contain **vendored, unmodified upstream files**; `psc/`
 contains separately identified PSC-owned backend and validation code. This is not a
 Git submodule and does not add entries to `.gitmodules`. Normal builds are
@@ -19,6 +21,12 @@ The header tree contains builder/reflection/tool declarations too; these do not
 imply that their implementations or a FlatBuffers runtime library are linked.
 All three components have Apache-2.0 root licenses; see `LICENSE.tflm`,
 `flatbuffers/LICENSE` and `gemmlowp/LICENSE`. Upstream patches: none.
+
+<!-- contents -->
+- [Acquisition and exact verification](#acquisition-and-exact-verification)
+- [Phase 3 additions](#phase-3-additions)
+- [PSC INT8 PULP FC backend (2026-09-22)](#psc-int8-pulp-fc-backend-2026-09-22)
+<!-- /contents -->
 
 ## Acquisition and exact verification
 

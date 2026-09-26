@@ -1,6 +1,18 @@
 # PSC-ONE / RV32ISP CoreMark
 
+[PSC-ONE](../../../README.md) · [Documentation](../../../docs/README.md)
+
 測定条件、CPU別の結果、回帰確認は[測定レポート](RESULTS.md)に記録しています。
+
+<!-- contents -->
+- [取得と実行](#取得と実行)
+- [個別操作](#個別操作)
+- [ビルド設定](#ビルド設定)
+- [Consoleと時間計測](#consoleと時間計測)
+- [結果の読み方](#結果の読み方)
+- [再利用するsimulation環境](#再利用するsimulation環境)
+- [上流MD5検査について](#上流md5検査について)
+<!-- /contents -->
 
 ## 取得と実行
 

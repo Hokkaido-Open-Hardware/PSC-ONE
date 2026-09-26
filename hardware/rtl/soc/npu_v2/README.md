@@ -1,6 +1,8 @@
 # PSC-NPU v2: 2-Term Power-of-Two 評価
 
-> 現在のRTLは **旧v2：selector 8 lane（LANES=8）** に復元しています。保存済みselectorソースを使用し、2相で2項を処理します。実行手順は末尾の「selector 8 laneへの復元」を参照してください。Horner／Shared ShiftAddの記述・測定結果は過去の実験記録です。
+[PSC-ONE](../../../../README.md) · [Documentation](../../../../docs/README.md)
+
+> 現在のRTLは **旧v2：selector 8 lane（LANES=8）** に復元しています。保存済みselectorソースを使用し、2相で2項を処理します。実行手順は[「selector 8 laneへの復元」](#selector-8-laneへの復元)を参照してください。Horner／Shared ShiftAddの記述・測定結果は過去の実験記録です。
 
 
 Tang Nano 20K上で乗算器を2項のshift/addへ置き換える独立実験。
@@ -10,6 +12,21 @@ Makefileからの `NPU_VERSION=v2` 選択に対応した（末尾の手順を参
 測定結果: 演算用MULT9X9を4個削減したが、LUTが増えFmaxが低下した。
 8 laneで同一clock時のv1 throughputを回復できるものの、DSP不足がない用途で
 v1を置き換える優位性は確認できなかった。末尾にnextpnrの全比較を記載する。
+
+<!-- contents -->
+- [既存npu_v1の解析](#既存npu_v1の解析)
+- [変更対象・構造・リスク](#変更対象構造リスク)
+- [Weight codeと全探索](#weight-codeと全探索)
+- [TFLite CPU比較](#tflite-cpu比較)
+- [検証](#検証)
+- [再現手順（repository root）](#再現手順repository-root)
+- [成果物と残課題](#成果物と残課題)
+- [nextpnr測定結果](#nextpnr測定結果)
+- [追記：8:1 selector除去実験（4演算ブロックで比較）](#追記81-selector除去実験4演算ブロックで比較)
+- [追記：16 PE / Shared 2-Term ShiftAdd ×8 と固定スライス設計](#追記16-pe--shared-2-term-shiftadd-8-と固定スライス設計)
+- [selector 8 laneへの復元](#selector-8-laneへの復元)
+- [MakefileからのNPU_VERSION=v2選択](#makefileからのnpu_versionv2選択)
+<!-- /contents -->
 
 ## 既存npu_v1の解析
 

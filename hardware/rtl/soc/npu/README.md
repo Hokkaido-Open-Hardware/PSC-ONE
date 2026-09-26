@@ -1,4 +1,11 @@
-# PSC-ONE AI — PSC-NPU (SynapEngine)
+# PSC-NPU legacy (SynapEngine)
+
+[PSC-ONE](../../../../README.md) · [Documentation](../../../../docs/README.md)
+
+This directory documents the legacy configurable-multiplier implementation.
+See [NPU v1](../npu_v1/README.md) for the fixed four-lane MAC and
+[NPU v2](../npu_v2/README.md) for the shift/add experiment. Measurements below
+refer to this legacy implementation.
 
 PSC-ONE AI is a hardware accelerator for matrix multiplication (GEMM), based on an **Output-Stationary systolic array architecture**.
 
@@ -8,11 +15,41 @@ SynapEngine explores a virtualized Processing Element architecture in which PE c
 
 ---
 
+<!-- contents -->
+- [Architecture](#architecture)
+- [Overview](#overview)
+- [Current Architecture](#current-architecture)
+- [Key Features](#key-features)
+- [Output-Stationary Dataflow](#output-stationary-dataflow)
+- [Virtualized Processing Elements](#virtualized-processing-elements)
+- [External Arithmetic Units](#external-arithmetic-units)
+- [Configurable Multiplier Count](#configurable-multiplier-count)
+- [Operator-Independent PE Architecture](#operator-independent-pe-architecture)
+- [Execution of Larger Matrices](#execution-of-larger-matrices)
+- [Potential Topology Reconfiguration](#potential-topology-reconfiguration)
+- [Potential FIR Filter Application](#potential-fir-filter-application)
+- [Memory System Integration](#memory-system-integration)
+- [Programming Model](#programming-model)
+- [Systolic Array vs PicoRV32 — Yosys Analysis](#systolic-array-vs-picorv32--yosys-analysis)
+- [Verification](#verification)
+- [Execution Example](#execution-example)
+- [Directory Structure](#directory-structure)
+- [Current Status](#current-status)
+- [Future Work](#future-work)
+- [Design Philosophy](#design-philosophy)
+- [License](#license)
+- [Author](#author)
+<!-- /contents -->
+
 ## Architecture
 
 This diagram shows the integration of SynapEngine within the PSC-ONE system.
 
-<img src="../../../docs/images/PSC_NPU.jpg" width="800">
+<img src="../../../../docs/images/PSC_NPU.jpg" width="800" alt="PSC NPU">
+
+> Diagram note: “share a single multiplier” describes the shared-arithmetic
+> concept. The legacy multiplier count is configurable; NPU v1 uses four
+> physical multiplier lanes. The drawing is not an exact v1/v2 netlist.
 
 SynapEngine is connected directly to the PSC-ONE CPU and memory subsystem. Matrix addresses and accelerator control parameters are configured by the CPU, while matrix data is transferred through the shared memory and cache architecture.
 
@@ -404,6 +441,11 @@ Weight-Stationary mode is not currently implemented.
 
 ## Systolic Array vs PicoRV32 — Yosys Analysis
 
+
+PicoRV32 is an archived generic-cell result; its MUX count is corrected to 100
+from the saved log. FF-family counts are register cells, not individual bits.
+See the [CPU comparison and provenance](../../../../docs/cpu.md#psc_rv32-vs-picorv32-yosys-analysis).
+
 ### Resource Comparison
 
 | Metric         | SynapEngine (4×4) | PicoRV32 |
@@ -411,8 +453,8 @@ Weight-Stationary mode is not currently implemented.
 | Cells          |               555 |      515 |
 | Multipliers    |             **2** |    **0** |
 | Adders         |                25 |        8 |
-| Multiplexers   |               113 |      148 |
-| Registers (FF) |                88 |      105 |
+| Multiplexers   |               113 |      100 |
+| FF-family cells |                88 |      105 |
 | Control Logic  |          Moderate |     High |
 
 > Multiplexer counts include Yosys `$mux` cells only and exclude `$pmux` cells.

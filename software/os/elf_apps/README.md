@@ -1,5 +1,7 @@
 # PSC-OS ELF C++ applications
 
+[PSC-ONE](../../../README.md) · [Documentation](../../../docs/README.md)
+
 ```text
 elf_apps/
 ├── Makefile

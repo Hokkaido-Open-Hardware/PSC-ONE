@@ -1,4 +1,8 @@
-# cpu_v1 cv.dotup.h 実装・検証記録
+# cpu_v1 cv.dotup.h 初期実装・検証記録
+
+この記録はDOTSP.B追加前の履歴です。有効1命令／illegal 1,023などの値は
+当時の構成に対するものです。現行の2命令仕様は[日本語](cpu_pulp_JP.md)／
+[English](cpu_pulp.md)、再現手順は[SIMD回帰](../hardware/sim/tests/v1_cv_signed_byte/README.md)を参照してください。
 
 2026-09-21。仕様: [cpu_pulp.md](cpu_pulp.md)。対象は
 `hardware/rtl/soc/cpu_v1/src`。cpu_v2、分岐予測、キャッシュ、CSR、

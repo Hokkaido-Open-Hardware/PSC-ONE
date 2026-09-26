@@ -1,19 +1,45 @@
 # PSC_SDCard
 
+[PSC-ONE](../../../../../README.md) · [Documentation](../../../../../docs/README.md)
+
+[日本語](README.ja.md)
+
+Sources: [PSC_SDCard.sv](src/PSC_SDCard.sv) and [SPI engine](src/PSC_SDCard_SPI.sv).
+Set one control bit at a time. Bit 7 clears only the local error latch; it does
+not guarantee clearing the FSM's `state_error`. CRC is captured by RTL and
+checked in the [C example](cpp/sdcard_api.c).
+
+<!-- contents -->
+- [Overview](#overview)
+- [Features](#features)
+- [Example: SD Read Log](#example-sd-read-log)
+- [Memory Map (MMIO)](#memory-map-mmio)
+- [Control Register (SD_IF_CTRL)](#control-register-sd_if_ctrl)
+- [Usage Flow](#usage-flow)
+- [Internal Architecture](#internal-architecture)
+- [Initialization Sequence](#initialization-sequence)
+- [Read Sequence](#read-sequence)
+- [FIFO Behavior](#fifo-behavior)
+- [Busy Definition](#busy-definition)
+- [Limitations](#limitations)
+- [Future Improvements](#future-improvements)
+- [Implementation notes](#implementation-notes)
+<!-- /contents -->
+
 ## Overview
 
-PSC_SDCard is a hardware IP core that implements SD card (SPI mode) sector read functionality for FPGA-based systems.
+PSC_SDCard is a hardware IP core that implements SD card (SPI mode) single-sector read/write functionality for FPGA-based systems.
 
 It provides a simple MMIO-based interface for the CPU, while internally handling SD card initialization, command sequencing, data transfer, FIFO buffering, and SPI communication.
 
-From the CPU perspective, it behaves like a memory-mapped SD card reader.
+From the CPU perspective, it behaves like a memory-mapped SD card controller.
 
 ---
 
 ## Features
 
 - Full SD card initialization (SPI mode)
-- Single block read (CMD17)
+- Single-block read (CMD17) and write (CMD24)
 - 512-byte FIFO buffer
 - Memory-mapped interface (MMIO)
 - CRC reception (no validation yet)
@@ -26,7 +52,7 @@ From the CPU perspective, it behaves like a memory-mapped SD card reader.
 
 The following is an actual log captured from PSC_OS when reading a sector from the SD card.
 
-This demonstrates that PSC_SDReader successfully performs a full SD card read sequence, including CRC reception and FIFO-based data transfer.
+This demonstrates that PSC_SDCard successfully performs a full SD card read sequence, including CRC reception and FIFO-based data transfer.
 
 ```asm
 PSC_OS> sd_read 100
@@ -82,7 +108,7 @@ The output shows raw binary data stored in the SD card sector, corresponding to 
 
 | Address      | Name         | Description                    |
 |-------------|--------------|--------------------------------|
-| 0x10006000  | SD_IF_DATA   | FIFO read (1 byte per access) |
+| 0x10006000  | SD_IF_DATA   | Read FIFO pop / write FIFO push (1 byte) |
 | 0x10006004  | SD_IF_SECTOR | Sector (LBA) register         |
 | 0x10006008  | SD_IF_CTRL   | Control / Status register     |
 
@@ -98,14 +124,15 @@ Write (Control)
 | 1   | Start read (CMD17)   |
 | 2   | FIFO flush           |
 | 3   | Soft reset           |
-| 4   | Clear error          |
+| 4   | Start write (CMD24)   |
+| 7   | Clear local error latch |
 
 Read (Status)
 
 | Bit | Name        | Description                 |
 |-----|-------------|-----------------------------|
 | 1   | busy        | Operation in progress       |
-| 2   | read_ready  | Ready for new read command  |
+| 2   | sd_rw_ready  | FSM is in ST_READY  |
 | 3   | fifo_empty  | FIFO is empty               |
 | 4   | fifo_full   | FIFO is full                |
 | 5   | error       | Error occurred              |
@@ -116,39 +143,21 @@ Upper bytes contain CRC1 and CRC2 received from the SD card.
 
 ## Usage Flow
 
-1. Initialize SD Card
+1. Flush the read FIFO and initialize the card if needed.
+2. Wait for initialization with timeout and error handling.
+3. Write the LBA to `SD_IF_SECTOR`, then start CMD17 with control bit 1.
+4. Once data is available, read 512 bytes, checking FIFO empty before each read.
+5. Compare the received CRC with the software-computed value.
 
-```c
-*(volatile uint32_t*)0x10006008 = 0x01;
-```
-
-2. Set Sector (LBA)
-
-```c
-*(volatile uint32_t*)0x10006004 = lba;
-```
-
-3. Start Read
-
-```c
-*(volatile uint32_t*)0x10006008 = 0x02;
-```
-
-4. Read Data (512 bytes)
-
-```c
-for (int i = 0; i < 512; i++) {
-    uint8_t data = *(volatile uint32_t*)0x10006000;
-}
-```
-
----
+`busy` stays high while unread FIFO data remains; waiting only for busy=0 before
+reading would block. See the [C example](cpp/sdcard_api.c) for polling and delays.
+To write, fill DATA with 512 bytes, set the LBA, and start with control bit 4.
 
 ## Internal Architecture
 
 The module consists of three main components:
 
-- SPI Engine (PSC_SDReader_SPI)
+- SPI Engine (PSC_SDCard_SPI)
   Handles SPI timing and byte-level communication with the SD card. Supports both initialization (slow clock) and normal operation (fast clock).
 
 - FIFO Buffer
@@ -161,27 +170,27 @@ The module consists of three main components:
 
 ## Initialization Sequence
 
-RESET  
-→ 80 clock cycles (CS high)  
-→ CMD0  
-→ CMD8  
-→ CMD55  
-→ ACMD41 (loop until ready)  
-→ CMD58  
-→ READY  
+RESET\
+→ 80 clock cycles (CS high)\
+→ CMD0\
+→ CMD8\
+→ CMD55\
+→ ACMD41 (loop until ready)\
+→ CMD58\
+→ READY\
 
 ---
 
 ## Read Sequence
 
-READY  
-→ CMD17 (read single block)  
-→ WAIT_R1  
-→ WAIT_TOKEN (0xFE)  
-→ READ_DATA (512 bytes)  
-→ READ_CRC (2 bytes)  
-→ DONE  
-→ READY  
+READY\
+→ CMD17 (read single block)\
+→ WAIT_R1\
+→ WAIT_TOKEN (0xFE)\
+→ READ_DATA (512 bytes)\
+→ READ_CRC (2 bytes)\
+→ DONE\
+→ READY\
 
 ---
 
@@ -189,7 +198,7 @@ READY
 
 - Data is pushed from SPI into FIFO
 - CPU reads data via MMIO
-- FIFO depth is configurable (default: 512 bytes)
+- The validated sector-buffer configuration is 512 bytes; pointer widths are fixed in RTL.
 
 ---
 
@@ -208,7 +217,7 @@ The module is considered busy when the FSM is active or when unread data remains
 - SDHC only (LBA addressing assumed)
 - No CRC validation (only captured)
 - Single block read only (no CMD18)
-- Write operation not supported
+- Writes are restricted to LBA > `PROTECT_ADDRESS` (default `0x1000`).
 - FIFO full handling is minimal
 
 ---
@@ -217,14 +226,17 @@ The module is considered busy when the FSM is active or when unread data remains
 
 - CRC verification
 - Multi-block read (CMD18)
-- Write support (CMD24)
 - DMA integration
 - SDSC support
 
 ---
 
-## Summary
+## Implementation notes
 
-PSC_SDReader is a lightweight SD card interface IP that provides a simple CPU-side interface with fully hardware-managed SD protocol.
+PSC_SDCard is a lightweight SD card interface IP that provides a simple CPU-side interface with fully hardware-managed SD protocol.
 
 It is suitable for bare-metal OS, FPGA SoC designs, and custom storage subsystems.
+
+The RTL currently defines `fifo_full` as `fifo_count == FIFO_DEPTH + 1`.
+This differs from a conventional full-at-512 flag; validate its behavior before
+using it as a general fullness indication. This documentation update does not change RTL.

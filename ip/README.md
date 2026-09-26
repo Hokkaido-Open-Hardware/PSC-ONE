@@ -1,10 +1,12 @@
 <p align="center">
   <a href="https://github.com/QPSC-Design/PSC-ONE">
-    <img src="../docs/images/PSC-ONE_Logo.png" width="100%">
+    <img src="../docs/images/PSC-ONE_Logo.png" width="640" alt="PSC-ONE Logo">
   </a>
 </p>
 
 # Intellectual Property (IP)
+
+[PSC-ONE](../README.md) · [Documentation](../docs/README.md)
 
 This directory contains intellectual property related materials for the PSC-ONE project, including invention notes, prior art research, and patent draft documents.
 

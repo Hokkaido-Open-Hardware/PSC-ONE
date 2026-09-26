@@ -1,10 +1,24 @@
 <p align="center">
   <a href="https://github.com/QPSC-Design/PSC-ONE">
-    <img src="../docs/images/PSC-ONE_Logo.png" width="100%">
+    <img src="../docs/images/PSC-ONE_Logo.png" width="640" alt="PSC-ONE Logo">
   </a>
 </p>
 
 # PSC-ONE Software
+
+[Project](../README.md) · [Documentation](../docs/README.md) · [OS](../docs/psc_os.md) · [API](../docs/psc_os_api.md)
+
+| Task | Guide |
+| --- | --- |
+| PSC-OS build and JPEG display | [PSC-OS](os/README.md) |
+| ELF applications | [C++ applications](os/elf_apps/README.md), [loader and limitations](os/tests/elf/README.md) |
+| MicroPython | [PSC port and TFLite bindings](micropython/ports/psc/README.md) |
+| TFLite inference | [API and supported model profile](os/src/api/tflite/README.md) |
+| FAT32 regression | [Directory listing tests](os/tests/fat32/README.md) |
+| Dependencies | [JPEG and TFLite](os/third_party/README.md) |
+
+Commands in linked guides state their working directory. Repository-root
+commands use paths beginning with `PSC-ONE/`.
 
 This directory contains the software stack of **PSC-ONE**, a fully custom RISC-V SoC implemented on FPGA.
 
@@ -13,6 +27,20 @@ PSC-ONE includes an original operating system, **PSC-OS**, developed together wi
 The software stack does not depend on Linux, BSD, an existing RTOS, or an external kernel framework.
 
 ---
+
+<!-- contents -->
+- [Overview](#overview)
+- [Software Architecture](#software-architecture)
+- [Key Features](#key-features)
+- [Boot Flow](#boot-flow)
+- [Verification](#verification)
+- [Directory Structure](#directory-structure)
+- [Current Status](#current-status)
+- [Future Work](#future-work)
+- [Open Source](#open-source)
+- [Status](#status)
+- [PSC-OS JPEG display](#psc-os-jpeg-display)
+<!-- /contents -->
 
 ## Overview
 
@@ -32,14 +60,18 @@ It includes:
 
 The figure below illustrates the conceptual PSC-ONE software architecture, including user programs, kernel services, device drivers, and the PSC-ONE hardware platform.
 
-<img src="docs/PSC_OS.jpg" width="800">
+<img src="../docs/images/PSC_OS.jpg" width="800" alt="PSC OS">
+
+> Diagram note: FAT32 is drawn inside the kernel, but the current shell/ELF path
+> links FAT32 into the user image and accesses SD hardware through system calls.
+> The image is retained as a conceptual overview, not a privilege-boundary map.
 
 > This diagram presents the conceptual architecture of PSC-OS and PSC-ONE.
 > Some modules shown in the diagram may represent planned or experimental extensions.
 
-PSC-OS currently provides limited multitasking support, allowing a user program and a kernel task to run concurrently through timer-interrupt-based task switching.
+PSC-OS includes cooperative switching and a timer-preemption implementation. The additional kernel task and preemption start in the normal boot path are currently disabled with `#if 0`; see the [OS guide](../docs/psc_os.md) for the active configuration.
 
-All major software components are developed specifically for PSC-ONE and are closely integrated with its custom hardware architecture.
+The kernel and platform integration are PSC-specific. MicroPython, TJpgDec and selected TFLite dependencies are reused upstream components; their provenance is documented separately.
 
 ---
 
@@ -69,7 +101,7 @@ The software stack is divided into three execution levels:
 
 ## Key Features
 
-### 1. Fully Custom Operating System
+### Fully Custom Operating System
 
 PSC-OS is implemented from scratch for the PSC-ONE platform.
 
@@ -94,7 +126,7 @@ This provides direct control over:
 
 ---
 
-### 2. RISC-V Privilege Architecture
+### RISC-V Privilege Architecture
 
 PSC-OS operates with the RISC-V Machine, Supervisor, and User privilege modes.
 
@@ -134,7 +166,7 @@ User programs access operating-system services through the system-call interface
 
 ---
 
-### 3. Sv32 Virtual Memory
+### Sv32 Virtual Memory
 
 PSC-OS supports Sv32 virtual memory on the custom PSC_RV32ISP CPU.
 
@@ -145,7 +177,7 @@ Current virtual-memory features include:
 - `SFENCE.VMA` support
 - Separate kernel and user memory regions
 - Page-permission handling
-- User-mode address-space protection
+- User-mode mappings (U/S enforcement is not implemented in the MMU)
 - Supervisor-mode kernel execution
 - User-program loading into dedicated memory
 
@@ -158,11 +190,11 @@ Kernel region : 0x0020_0000
 User region   : 0x0040_0000
 ```
 
-The MMU allows PSC-OS to execute user programs in a protected address space instead of running all software with unrestricted hardware access.
+The MMU translates user addresses and checks R/W/X. It does not enforce U/S or A/D bits; see the [MMU limitations](../docs/cpu_mmu.md#実装上の制限).
 
 ---
 
-### 4. Process and User-Program Execution
+### Process and User-Program Execution
 
 PSC-OS currently supports basic process execution.
 
@@ -180,52 +212,18 @@ The current process model is intentionally small and experimental, but it provid
 
 ---
 
-### 5. System Call Interface
+### System Call Interface
 
 User programs communicate with the PSC-OS kernel using `ECALL`.
 
-Current system-call services include:
-
-| Number | Service                         |
-| -----: | ------------------------------- |
-|      1 | Character output                |
-|      2 | Character input                 |
-|      3 | Character input with timeout    |
-|     10 | SynapEngine execution           |
-|     20 | I2S microphone read             |
-|     21 | I2S microphone write            |
-|     30 | SD-card sector read             |
-|     31 | SD-card write test              |
-|     32 | SD-card sector write            |
-|     33 | SD-card buffered read           |
-|     40 | Memory dump                     |
-|     50 | Switch input read               |
-|     51 | File read                       |
-|     52 | File write                      |
-|     60 | Speech recognition              |
-|     70 | Timer start                     |
-|     71 | Timer start in auto-reload mode |
-|     72 | Timer stop                      |
-|     73 | Get timer count                 |
-|     74 | Get timer status                |
-|     75 | Check whether timer is running  |
-|     76 | Wait in microseconds            |
-|     77 | Wait in milliseconds            |
-|     80 | LED write                       |
-|     81 | LED on                          |
-|     82 | LED off                         |
-|     83 | LED toggle                      |
-|     84 | Turn all LEDs on                |
-|     85 | Turn all LEDs off               |
-|     86 | Get LED state                   |
-|     90 | User-program exit               |
-|     91 | Integer output                  |
-
-The system-call interface allows user applications to use hardware and filesystem services without directly accessing privileged kernel resources.
+The syscall number is passed in `a3`, with arguments in `a0`–`a2` and,
+for some services, `a4`–`a6`. See the [API reference](../docs/psc_os_api.md)
+for implemented calls, return values and the restricted foreground-ELF subset.
+Constants 51/52 and 90/91 exist in the header but have no dispatch handlers.
 
 ---
 
-### 6. MicroPython Support
+### MicroPython Support
 
 PSC-ONE supports **MicroPython** running as a user-mode application on the custom PSC_RV32ISP CPU.
 
@@ -242,7 +240,7 @@ MicroPython v1.29.0-preview
 
 ---
 
-### 7. Command Shell
+### Command Shell
 
 PSC-OS includes an interactive command shell.
 
@@ -277,7 +275,7 @@ The shell communicates through the PSC-ONE UART console.
 
 ---
 
-### 8. FAT32 Filesystem
+### FAT32 Filesystem
 
 PSC-OS includes native FAT32 filesystem support.
 
@@ -299,7 +297,7 @@ The filesystem is implemented directly for PSC-OS and does not use an external F
 
 ---
 
-### 9. SD-Card Support
+### SD-Card Support
 
 PSC-OS controls the PSC-ONE SPI-mode SD-card controller.
 
@@ -318,7 +316,7 @@ The SD card acts as both boot storage and a general-purpose filesystem device.
 
 ---
 
-### 10. Hardware-Accelerator Support
+### Hardware-Accelerator Support
 
 PSC-OS provides software interfaces for custom PSC-ONE accelerators.
 
@@ -349,19 +347,13 @@ The current SynapEngine configuration uses:
 
 #### PFE QUBO Engine
 
-PSC-OS also supports the experimental PFE QUBO accelerator.
-
-Software operations include:
-
-- QUBO coefficient setup
-- Binary-variable setup
-- Hardware execution
-- Energy-result readback
-- Accelerator-status access
+The [PFE RTL](../hardware/rtl/soc/pfe/README.md) implements an experimental
+QUBO engine. The current PSC-OS syscall dispatcher and `psc` module do not
+expose a PFE service; OS integration remains future work.
 
 ---
 
-### 10. I2S Audio Support
+### I2S Audio Support
 
 PSC-OS supports audio capture through the PSC-ONE I2S receiver.
 
@@ -378,7 +370,7 @@ The audio path is intended for future speech-recognition and DSP applications.
 
 ---
 
-### 11. Display and Peripheral Support
+### Display and Peripheral Support
 
 PSC-OS provides low-level access to PSC-ONE peripherals, including:
 
@@ -389,13 +381,13 @@ PSC-OS provides low-level access to PSC-ONE peripherals, including:
 - Switch inputs
 - Timers
 - SynapEngine
-- PFE QUBO engine
+- PFE QUBO engine (planned OS integration)
 
 Peripheral interfaces use memory-mapped registers provided by the PSC-ONE hardware.
 
 ---
 
-### 12. Hardware/Software Co-Design
+### Hardware/Software Co-Design
 
 PSC-OS is developed together with the PSC-ONE CPU and SoC hardware.
 
@@ -462,7 +454,7 @@ Current verification methods include:
 - Kernel boot tests
 - User-program execution tests
 - SynapEngine result comparison
-- PFE accelerator tests
+- PFE hardware tests (separate from OS API support)
 - FPGA hardware execution
 
 This full-stack verification approach allows the CPU, kernel, peripherals, and accelerators to be tested as one integrated system.
@@ -501,7 +493,7 @@ The current PSC-OS implementation supports:
 - LCD output
 - I2S microphone capture
 - SynapEngine matrix acceleration
-- PFE QUBO acceleration
+- Experimental PFE hardware; OS API integration is pending
 - Full FPGA execution
 - Full SoC simulation
 

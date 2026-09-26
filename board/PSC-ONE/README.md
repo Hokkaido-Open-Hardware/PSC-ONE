@@ -1,8 +1,17 @@
 # PSC-ONE Design
 
-The current PSC-ONE prototype hardware.  
-  
-<img src="../../docs/images/PSC-ONE_board.jpg" width="600">
+[PSC-ONE](../../README.md) · [Documentation](../../docs/README.md)
+
+The current PSC-ONE prototype hardware.\
+
+<img src="../../docs/images/PSC-ONE_board.jpg" width="600" alt="PSC-ONE board">
+
+<!-- contents -->
+- [Purpose](#purpose)
+- [Features](#features)
+- [Getting Started](#getting-started)
+- [License](#license)
+<!-- /contents -->
 
 ## Purpose
 
@@ -18,7 +27,7 @@ It also serves as a demonstration platform for various embedded applications, in
 - Sensor integration
 - Real-time embedded systems
 
-<img src="mechanical/PSC-ONE.3D_final.jpg" width="800">
+<img src="mechanical/PSC-ONE.3D_final.jpg" width="800" alt="PSC-ONE.3D final">
 
 ## Features
 
@@ -46,24 +55,21 @@ After successful programming, connect:
 
 ### Prepare the SD Card
 
-Write the PSC-OS images to the SD card.
+Match the SD layout to the bootloader in the FPGA image. Two flows exist:
 
-Current default layout:
+| Bootloader | SD layout |
+| --- | --- |
+| [FAT32 loader](../../software/os/src/boot/bootloader_fat32.c) | `KERNEL.MEM` and `USER.MEM` in the FAT32 root |
+| [Legacy raw-image writer](../../hardware/bootloader/Makefile) | `kernel.img` at sector 100, `user.img` at sector 300 |
 
-| Image      | Start Sector |
-| ---------- | ------------ |
-| kernel.img | 100          |
-| user.img   | 200          |
+The raw-image writer currently hard-codes `/dev/sdc`; it does not accept a
+`/dev/sdX` placeholder or automatically select a card. Inspect the actual device
+and the selected bootloader before using that writer. The historical log below
+belongs to the earlier raw-sector flow and is not a current layout specification.
 
-Example:
-
-```bash
-cd ~/PSC-ONE/hardware/bootloader
-make bootloader
-make write_img_to_sd_card
-```
-
-Replace `/dev/sdX` with the actual SD card device.
+Build the FAT32 bootloader from the repository root with the OS Makefile's
+`fpga_fat32_boot` target (see that [Makefile](../../software/os/Makefile) for
+available build targets and outputs).
 
 ### Boot PSC-OS
 
@@ -77,7 +83,10 @@ The bootloader loads:
 2. `user.img` from the SD card into SDRAM
 3. Transfers control to PSC-OS
 
-Expected boot log:
+Historical boot log (June 2026; addresses and image sizes are build-dependent):
+
+<details>
+<summary>Show the full recorded boot log</summary>
 
 ```text
 boot start
@@ -1696,7 +1705,9 @@ PSC_OS>
 
 ```
 
-The system is now ready for interactive use through the UART console.
+</details>
+
+The `PSC_OS>` prompt indicates that this recorded run reached the shell.
 
 
 ## License

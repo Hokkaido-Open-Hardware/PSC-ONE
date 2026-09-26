@@ -1,12 +1,14 @@
 # cache_dma_controller_io 単体検証
 
+[PSC-ONE](../../../../../README.md) · [Documentation](../../../../../docs/README.md)
+
 Icarus Verilogで、外部メモリ／MMIOモデルと参照メモリを使って検証します。
 既存のcocotbテストやTimingTopは変更しません。
 
 ```bash
-python3 PSC-ONE/hardware/rtl/cache/tests/run_cache_io_regression.py
+python3 PSC-ONE/hardware/rtl/soc/cache/tests/run_cache_io_regression.py
 # 変更前のRTLに対しても同じテストを実行可能
-python3 PSC-ONE/hardware/rtl/cache/tests/run_cache_io_regression.py \
+python3 PSC-ONE/hardware/rtl/soc/cache/tests/run_cache_io_regression.py \
   --rtl /path/to/before.sv --build /tmp/cache-before
 ```
 

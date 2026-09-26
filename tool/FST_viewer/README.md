@@ -1,6 +1,20 @@
 # PSC_RV32 Trace Studio
 
+[PSC-ONE](../../README.md) · [Documentation](../../docs/README.md)
+
 実際のFST/VCDを命令・CPU構造単位で表示するPython＋ブラウザGUIです。RTLは変更しません。
+
+<!-- contents -->
+- [CPU対応](#cpu対応)
+- [必要環境・起動](#必要環境起動)
+- [FST生成](#fst生成)
+- [GUI操作](#gui操作)
+- [CPUごとの構造・信号](#cpuごとの構造信号)
+- [レジスタ表示の取得元](#レジスタ表示の取得元)
+- [対応命令](#対応命令)
+- [検証](#検証)
+- [制限事項](#制限事項)
+<!-- /contents -->
 
 ## CPU対応
 
@@ -19,7 +33,7 @@
 - JavaScript / Canvas対応ブラウザ。VCD直接入力ならfst2vcd不要
 
 ```bash
-cd /home/haruhiko/Program/PSC_RV32I/PSC-ONE/tool/FST_viewer
+cd PSC-ONE/tool/FST_viewer
 python3 fst_viewer.py
 python3 fst_viewer.py validation/legacy.fst
 python3 fst_viewer.py validation/v1.fst
@@ -41,7 +55,7 @@ python3 fst_viewer.py trace.fst --summary
 ## FST生成
 
 ```bash
-cd /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim
+cd PSC-ONE/hardware/sim
 make -f Makefile.cpu simulate_PSC_ONE_TESTS TEST_PROGRAM_LIST=single CPU_VERSION=legacy
 make -f Makefile.cpu simulate_PSC_ONE_TESTS TEST_PROGRAM_LIST=single CPU_VERSION=v1
 make -f Makefile.cpu simulate_PSC_ONE_TESTS TEST_PROGRAM_LIST=single CPU_VERSION=v2
@@ -73,7 +87,7 @@ make -f Makefile.cpu simulate_PSC_ONE_TESTS TEST_PROGRAM_LIST=single CPU_VERSION
 
 ### legacy
 
-参照RTL: `PSC-ONE/hardware/rtl/cpu/src/` の `PSC_RV32_Execute.v`、`Execute.v`、`Decorder.v`、`Branch.v`、`MemoryStore.v` 等。
+参照RTL: `PSC-ONE/hardware/rtl/soc/cpu/src/` の `PSC_RV32_Execute.v`、`Execute.v`、`Decorder.v`、`Branch.v`、`MemoryStore.v` 等。
 
 検出anchor: `u_execute_state.execute_state`（4bit）。packed pipelineはありません。
 

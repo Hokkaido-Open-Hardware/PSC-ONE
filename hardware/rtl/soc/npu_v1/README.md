@@ -1,5 +1,7 @@
 # PSC-NPU v1: fixed four-lane streaming MAC
 
+[PSC-ONE](../../../../README.md) · [Documentation](../../../../docs/README.md)
+
 Production datapath:
 
 ```text
@@ -49,4 +51,4 @@ the original design. The same selection is used by Makefile.cpu and
 Makefile.pscos. `NPU_ASSERTIONS` enables simulation checks for lane/ID ownership,
 duplicate destinations and premature clear/done.
 
-See [implementation and measured results](../../../docs/npu_v1_streaming_results.md).
+See [implementation and measured results](../../../../docs/npu_v1_streaming_results.md).
