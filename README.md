@@ -171,7 +171,7 @@ This isolates the CPU core from SDRAM wait states, cache misses, and refill late
 CPU       CoreMark    CoreMark/MHz    Execution Time    CRC Validation
 -----------------------------------------------------------------------
 cpu_v1    80.879974   0.808800        12.364 s          PASS
-cpu_v2    39.987204   0.399872        12.504 s          PASS
+cpu_v2    53.287861   0.532879        18.766 s          PASS
 ```
 
 Recorded measurement conditions (historical results, not rerun for this documentation update):
@@ -285,30 +285,6 @@ multiplier lanes; see [its implementation](hardware/rtl/soc/npu_v1/README.md).
 
 - A **dataflow-oriented compute engine (Systolic Array)**
 - A **control-oriented general-purpose CPU (PicoRV32)**
-
-------------------------------------------------------------------------
-
-### PSC-ONE AI Goals
-
-This project is not intended to compete with commercial AI accelerators.
-
-Instead, the goal is to explore:
-
-- Dataflow-oriented accelerator design
-- Memory bandwidth optimization
-- Small-scale AI hardware prototyping
-- Hardware/software integration techniques
-- Experimental SoC architecture research
-
-------------------------------------------------------------------------
-
-### PSC-ONE AI Future Work
-
-- Manufacturing a demonstration FPGA board
-- Voice recognition demo using the AI accelerator
-- Robot control using PSC-ONE AI
-- Expansion of the systolic array architecture
-- DMA and memory subsystem improvements
 
 ------------------------------------------------------------------------
 

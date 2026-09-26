@@ -1,0 +1,16 @@
+PSC CoreMark: 100 MHz, MMIO timer, 1 tick = 1 ms
+2K performance run parameters for coremark.
+CoreMark Size    : 666
+Total ticks      : 18766
+Total time (secs): 18
+Iterations/Sec   : 55
+Iterations       : 1000
+Compiler version : GCC 14.2.0
+Compiler flags   : -march=rv32im_zicsr_zifencei -mabi=ilp32 -O2 -g -ffreestanding -nostdlib -mstrict-align -std=c11 -mno-relax -ffunction-sections -fdata-sections -Wall -Wextra -I/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim//coremark_psc -I/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim//coremark -I/home/haruhiko/Program/PSC_RV32I/PSC-ONE/software/os/src/kernel -I/home/haruhiko/Program/PSC_RV32I/PSC-ONE/software/os/src/lib -I/home/haruhiko/Program/PSC_RV32I/PSC-ONE/software/os/src/drivers -I/home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim//coremark_psc/os_include -include /home/haruhiko/Program/PSC_RV32I/PSC-ONE/hardware/sim//coremark_psc/os_include/compat.h -DITERATIONS=1000 -DPERFORMANCE_RUN=1 -DTOTAL_DATA_SIZE=2000
+Memory location  : STATIC in SDRAM; code in SDRAM; existing I/D caches
+seedcrc          : 0x0000e9f5
+[0]crclist       : 0x0000e714
+[0]crcmatrix     : 0x00001fd7
+[0]crcstate      : 0x00008e3a
+[0]crcfinal      : 0x0000d340
+Correct operation validated. See README.md for run and reporting rules.
