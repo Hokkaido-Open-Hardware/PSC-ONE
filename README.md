@@ -711,7 +711,7 @@ FST Viewer is intended to make PSC_RV32 CPU development and verification easier 
 - [x] Hardware Architecture
 - [ ] Software Architecture
 - [ ] Developer Guide
-- [ ] API Reference
+- [x] API Reference
 
 ### Future Goals
 

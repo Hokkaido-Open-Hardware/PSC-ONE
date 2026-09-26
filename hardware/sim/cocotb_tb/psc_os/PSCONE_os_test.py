@@ -21,6 +21,7 @@ import select
 import sys
 import threading
 import cocotb
+from cocotb.clock import Clock
 from collections import deque
 from queue import Empty, Queue
 from cocotb.handle import SimHandleBase
@@ -60,6 +61,12 @@ UART_BIT_NS = int(os.getenv("UART_BIT_NS", "40"))
 PROMPT_TEXT = "exit\r"
 UART_INTERACTIVE = env_flag("PSC_UART_INTERACTIVE", stdin_is_terminal())
 UART_AUTO_PROMPT = env_flag("PSC_UART_AUTO_PROMPT", not UART_INTERACTIVE)
+STOP_AFTER_BOOT = env_flag("PSC_OS_STOP_AFTER_BOOT", False)
+VERIFY_DMA = env_flag("PSC_OS_VERIFY_DMA", False)
+BOOT_MARKER = os.getenv("PSC_OS_BOOT_MARKER", "simulation shell start."
+                        if os.getenv("SIM_USER") == "minimal" else "PSC_OS>")
+if not BOOT_MARKER:
+    raise ValueError("PSC_OS_BOOT_MARKER must not be empty")
 UART_KEY_INTERVAL_MS = float(os.getenv("PSC_UART_KEY_INTERVAL_MS", "0.1"))
 if not 0 <= UART_KEY_INTERVAL_MS < float("inf"):
     raise ValueError("PSC_UART_KEY_INTERVAL_MS must be finite and >= 0")
@@ -132,6 +139,10 @@ def safe_peek(handle: SimHandleBase, default: int = 0) -> int:
 
 async def generate_clock(dut, period_ns=CLK_PERIOD_NS):
     """Free-running clock."""
+    if STOP_AFTER_BOOT:
+        # Same phase/period; let the simulator drive boot-validation clocks.
+        await Clock(dut.clock, period_ns, unit="ns", impl="gpi").start(start_high=False)
+        return
     while True:
         dut.clock.value = 0
         await Timer(period_ns // 2, unit="ns")
@@ -386,12 +397,32 @@ async def uart_send_worker(dut, send_queue, prompt_ready):
 
 
 # ---------- メインテスト ---------------
+async def verify_dma_copies(dut, stats):
+    """Check completed DMA transfers against SDRAM, independently of CPU caches."""
+    soc = dut.u_chip.u_soc
+    while True:
+        await RisingEdge(soc.dma_busy)
+        src = int(soc.csr_DMA_SRC.value)
+        dst = int(soc.csr_DMA_DST.value)
+        words = int(soc.csr_DMA_WORDS.value)
+        assert words > 0 and (src | dst) & 3 == 0
+        await RisingEdge(soc.dma_done)
+        for offset in range(0, words * 4, 4):
+            assert GW2AR_sdram_read32(dut, src + offset) == GW2AR_sdram_read32(dut, dst + offset), (
+                f"DMA copy mismatch: src=0x{src + offset:08x} dst=0x{dst + offset:08x}"
+            )
+        stats["transfers"] += 1
+        stats["bytes"] += words * 4
+
+
 @cocotb.test()
 async def RV32IS_chip_test1(dut):
     send_queue = Queue()
     prompt_ready = Event()
     stop_stdin = threading.Event()
     sender = cocotb.start_soon(uart_send_worker(dut, send_queue, prompt_ready))
+    dma_stats = {"transfers": 0, "bytes": 0}
+    dma_checker = cocotb.start_soon(verify_dma_copies(dut, dma_stats)) if VERIFY_DMA else None
     dut._log.info(
         f"[CONF] PSC_UART_INTERACTIVE={int(UART_INTERACTIVE)}, "
         f"PSC_UART_AUTO_PROMPT={int(UART_AUTO_PROMPT)}, "
@@ -407,9 +438,14 @@ async def RV32IS_chip_test1(dut):
             ).start()
             dut._log.info("[UART stdin] Enter commands followed by Enter; waiting for PSC_OS>.")
         await run_psc_os_test(dut, send_queue, prompt_ready)
+        if VERIFY_DMA:
+            assert dma_stats["transfers"] > 0, "No completed DMA copies observed"
+            dut._log.info(f"[DMA VERIFY] {dma_stats}")
     finally:
         stop_stdin.set()
         sender.cancel()
+        if dma_checker is not None:
+            dma_checker.cancel()
 
 
 async def run_psc_os_test(dut, send_queue, prompt_ready):
@@ -471,14 +507,25 @@ async def run_psc_os_test(dut, send_queue, prompt_ready):
     timeout_cycles = RUN_CYCLES
     waited = 0
     last_uart_byte = None
+    uart_line = ""
 
     # ---- PSC-OS prompt detection ----
     # "PSC_OS> " がUARTに出力されたら、そのXX万クロック後に停止する。
-    prompt_target = "PSC_OS>"
+    prompt_target = BOOT_MARKER
     prompt_index = 0
     prompt_count = 0
     prompt_detected_cycle = None
     stop_after_prompt_cycles = 1000000
+
+    # Resolve hierarchy once, rather than repeating VPI lookups every cycle.
+    clock = dut.clock
+    core = dut.u_chip.u_soc.u_rv32_core_axi.u_core
+    fault_i, fault_d = core.i_pf, core.d_pf
+    io = dut.u_chip.u_soc.u_mmap_io
+    pio_output, io_write_ready = io.PIO_out_reg, io.cpu_wready
+    if col_mismatch_Assert == 1:
+        sdram = dut.u_chip.u_4port_sdram_axi.u_sdram_controller
+        read_mismatch, write_mismatch = sdram.col_rmismatch, sdram.col_wmismatch
 
     #dump_sdram_mem(dut, "GW2AR", 0x0000_0000, 24)
     #dump_sdram_mem(dut, "GW2AR", 0x0010_0000, 24)
@@ -492,10 +539,10 @@ async def run_psc_os_test(dut, send_queue, prompt_ready):
     #satp_val = int(dut.u_chip.u_soc.u_rv32_core_axi.u_core.u_csr.csr_satp.value)
 
     while waited < timeout_cycles:
-        await RisingEdge(dut.clock)
+        await RisingEdge(clock)
 
-        page_fault_i = dut.u_chip.u_soc.u_rv32_core_axi.u_core.i_pf.value
-        page_fault_d = dut.u_chip.u_soc.u_rv32_core_axi.u_core.d_pf.value
+        page_fault_i = fault_i.value
+        page_fault_d = fault_d.value
 
         # PageFaultでbreak
         if page_fault_i or page_fault_d:
@@ -514,16 +561,16 @@ async def run_psc_os_test(dut, send_queue, prompt_ready):
 
             dut._log.info(f"SATP = 0x{satp_val:08x} → root PT = 0x{root_pt:08x}")
             dump_page_table(dut, root_pt)
-            break
+            raise AssertionError("Page fault during PSC-OS simulation")
 
         # PIO
-        pio_val = safe_peek(dut.u_chip.u_soc.u_mmap_io.PIO_out_reg, 0)
-        if dut.u_chip.u_soc.u_mmap_io.cpu_wready.value == 1:    # cpu_wvalid=1より1clk遅れだがOK
+        if io_write_ready.value == 1:    # cpu_wvalid=1より1clk遅れだがOK
+            pio_val = safe_peek(pio_output, 0)
             dut._log.info(f"PIO data at cycle {waited} = {pio_val:08x}")
 
         if col_mismatch_Assert == 1:
-            col_rmismatch = dut.u_chip.u_4port_sdram_axi.u_sdram_controller.col_rmismatch.value
-            col_wmismatch = dut.u_chip.u_4port_sdram_axi.u_sdram_controller.col_wmismatch.value
+            col_rmismatch = read_mismatch.value
+            col_wmismatch = write_mismatch.value
         else:
             col_rmismatch = 0
             col_wmismatch = 0
@@ -531,7 +578,7 @@ async def run_psc_os_test(dut, send_queue, prompt_ready):
         # Burst仕様違反
         if col_rmismatch or col_wmismatch:
             dut._log.info(f"Burst Fault detected: rmismatch={col_rmismatch}, wmismatch={col_wmismatch}")
-            break
+            raise AssertionError("SDRAM burst fault during PSC-OS simulation")
 
         # UART TX のシリアル信号から復元された byte を処理
         while uart_rx_queue:
@@ -551,6 +598,14 @@ async def run_psc_os_test(dut, send_queue, prompt_ready):
 
             dut._log.info(f"uart_tx serial=0x{ch:02x} ({ch_str})")
 
+            if ch == 0x0A:
+                if uart_line in ("---- user image map start. ----",
+                                 "---- user stack map start. ----"):
+                    dut._log.info(f"[BOOT TIMING] cycle={waited}: {uart_line}")
+                uart_line = ""
+            elif ch != 0x0D:
+                uart_line = (uart_line + ch_out)[-160:]
+
             # ----------- ファイルを1文字ごとに追記して閉じる -----------
             with open(logfile, "a") as f:
                 f.write(ch_out)
@@ -566,10 +621,10 @@ async def run_psc_os_test(dut, send_queue, prompt_ready):
 
                     prompt_count += 1
                     dut._log.info(
-                        f'[PSC-OS] Prompt "PSC_OS>" detected. '
-                        f'Prompt #{prompt_count}.'
+                        f'[PSC-OS] Prompt "{prompt_target}" detected. '
+                        f'Prompt #{prompt_count}. cycle={waited}'
                     )
-                    if UART_AUTO_PROMPT:
+                    if UART_AUTO_PROMPT and prompt_target == "PSC_OS>":
                         send_queue.put(("auto", PROMPT_TEXT))
                     prompt_ready.set()
             else:
@@ -599,7 +654,12 @@ async def run_psc_os_test(dut, send_queue, prompt_ready):
         # waited インクリメント
         waited += 1
 
+        if (STOP_AFTER_BOOT and prompt_detected_cycle is not None
+                and waited >= prompt_detected_cycle + stop_after_prompt_cycles):
+            break
+
     # ---- Stop & settle ----
+    assert prompt_count > 0, f"PSC-OS did not reach {prompt_target!r} before timeout"
     dut._log.info(
         f"PSC-OS test stopped after {prompt_count} prompts."
     )

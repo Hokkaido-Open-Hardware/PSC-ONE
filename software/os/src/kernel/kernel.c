@@ -10,6 +10,9 @@
 #include "../drivers/mem_test.h"
 #include "../api/speech_recognition_api.h"
 
+// if 1 : multitask mode
+#define MULTITASK_MODE 0 
+
 extern uint8_t _binary_shell_bin_start[];
 extern uint8_t _binary_shell_bin_end[];
 extern char __bss[], __bss_end[], __kernel_stack_top[];
@@ -169,13 +172,13 @@ __attribute__((used)) void kernel_main(void) {
     s_printf("NPU TEST\n");
     s_call_sa_api(4, true, true);
 #endif
-#if 1
+#if 0
     s_printf("Draw PSC Logo\n");
     lcd_draw_boot_logo();
 #endif
     s_printf("PSC_OS Boot Start.........\n");
     s_printf("--- memset done ---\n");
-    s_printf("Test Ver: test_1.7.0\n");
+    s_printf("Test Ver: test_1.8.0\n");
     s_printf(
         "\n"
         "+--------------------------------------------------+\n"
@@ -183,7 +186,7 @@ __attribute__((used)) void kernel_main(void) {
         "|            Minimal RISC-V Kernel Boot            |\n"
         "+--------------------------------------------------+\n"
         "| Build : %s %s\n"
-        "| CPU   : RV32 (Supervisor mode)\n"
+        "| CPU   : PSC_RV32\n"
         "| MMU   : SV32\n"
         "| UART  : SBI console or\n"
         "| UART  : MMIO console\n"
@@ -225,7 +228,7 @@ __attribute__((used)) void kernel_main(void) {
     __asm__ __volatile__("fence.i" ::: "memory");
 
 // if 1 : multitask mode
-#if 0
+#if MULTITASK_MODE
     /* 
     task2: kernel内テストtask 
     */

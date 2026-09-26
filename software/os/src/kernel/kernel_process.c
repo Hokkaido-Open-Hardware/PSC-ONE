@@ -3,6 +3,11 @@
 #include "../api/synap_api.h"
 #include "../drivers/timer_api.h"
 
+/* Set to 0 to compare the original CPU copy with DMA during process loading. */
+#ifndef KERNEL_PROCESS_USE_DMA
+#define KERNEL_PROCESS_USE_DMA 1
+#endif
+
 struct process procs[PROCS_MAX];
 struct process *current_proc;
 struct process *idle_proc;
@@ -106,7 +111,11 @@ struct process *create_process(const void *image, size_t image_size) {
             paddr_t page = alloc_pages(1);
             size_t remaining = image_size - off;
             size_t copy_size = (remaining < PAGE_SIZE) ? remaining : PAGE_SIZE;
+#if KERNEL_PROCESS_USE_DMA && !defined(USE_SBI_CONSOLE)
+            memcpy_dma((void *)page, (const uint8_t *)image + off, copy_size);
+#else
             memcpy((void *)page, (const uint8_t *)image + off, copy_size);
+#endif
             map_page(page_table, USER_BASE + off, page,
                      PAGE_U | PAGE_R | PAGE_W | PAGE_X);
         }

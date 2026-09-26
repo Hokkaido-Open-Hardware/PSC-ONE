@@ -6,10 +6,10 @@
 #include "../api/tflite/tflite_api.h"
 
 // micropythonを含めるとSIM時間が長すぎる場合のオプション
-//#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON
+#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON 1
 
 // JPEG LCD表示なしの場合のオプション
-//#define PSC_OS_DEBUG_WITHOUT_JPEGLCD
+#define PSC_OS_DEBUG_WITHOUT_JPEGLCD 1
 
 extern int psc_micropython_run(void);
 
@@ -381,10 +381,10 @@ prompt:
 
         // ---- Helps出力 ----
         } else if (strcmp(argv[0], "help") == 0) {
-            printf("  run FILE.ELF\n");
             printf("commands:\n");
             printf("  microPython | micropython\n");
             printf("  jpeg TEST.JPG\n");
+            printf("  run FILE.ELF\n");
             printf("  tflite_info MODEL.TFL (inspect only)\n");
             printf("  tflite_run MODEL.TFL [cpu|npu]\n");
             printf("  tflite_bench MODEL.TFL (CPU/NPU comparison)\n");
