@@ -142,6 +142,16 @@ FAT32処理はシェル側、SDセクタI/Oはカーネルのドライバ経由�
 PT_LOAD、範囲、整列、権限、重複、entryを検査してからkernel所有ページへ配置します。
 `p_memsz - p_filesz` とページ余白はゼロ初期化します。
 
+サンプル `HELLO.ELF` の実行例:
+
+```text
+PSC_OS> run HELLO.ELF
+ELF: entry=00400000 sp=00500000 pages=3
+Hello from user ELF!
+run: exit 0
+PSC_OS>
+```
+
 - 同時に1つのforeground ELF。
 - 最大8 program headers、PT_LOAD用16ページ（64 KiB）。
 - スタック4ページ（16 KiB）と未マップguard。

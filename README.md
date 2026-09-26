@@ -352,6 +352,16 @@ PSC-OS serves both as the runtime environment for the PSC-ONE SoC and as an expe
 PSC-OS includes an ELF loader for running RISC-V user programs from the SD card. The loader reads an ELF executable through the FAT32 filesystem, places its loadable segments in memory, and starts execution at the entry point specified by the file.
 This allows user applications to be built as ELF executables instead of being converted to raw memory images. It also provides a foundation for expanding PSC-OS’s user-program support.
 
+Example of running the sample `HELLO.ELF` from the PSC-OS shell:
+
+```text
+PSC_OS> run HELLO.ELF
+ELF: entry=00400000 sp=00500000 pages=3
+Hello from user ELF!
+run: exit 0
+PSC_OS>
+```
+
 ------------------------------------------------------------------------
 
 ### MicroPython on PSC-OS
@@ -483,36 +493,6 @@ The system successfully boots and executes software on a fully integrated hardwa
        alt="Watch the demo"
        width="500">
 </a>
-
-------------------------------------------------------------------------
-
-### PSC-OS Boot
-
-This video demonstrates the PSC system running `PSC-OS` on FPGA hardware after boot.\
-It shows prime number computation executed on the custom `PSC_RV32` CPU, with results transmitted over UART.\
-The demo highlights a fully functional hardware-software stack, from boot to program execution.
-
-<a href="https://youtu.be/lV74ni7FAt4">
-  <img src="https://img.youtube.com/vi/lV74ni7FAt4/maxresdefault.jpg"
-       alt="Watch the demo"
-       width="500">
-</a>
-
-------------------------------------------------------------------------
-
-### PSC-OS Boot from SD Card
-
-This demo uses a Kioxia 32GB SD card for storage.
-
-<img src="docs/images/PSC_FPGA_SD_Card.jpg" width="400" alt="PSC FPGA SD Card">
-
-This video demonstrates the PSC system booting PSC-OS from an SD card on FPGA hardware.\
-It shows the SD interface operating in serial mode, with CRC checks performed during data transfer.\
-If an error is detected, the system automatically retries the read operation, ensuring reliable boot execution from external storage.\
-
-[![Watch the demo](https://img.youtube.com/vi/FILxQiaqKrk/maxresdefault.jpg)](https://youtu.be/FILxQiaqKrk?si=9KQKO3LVkketo0ZM)
-
-
 
 ------------------------------------------------------------------------
 
