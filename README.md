@@ -18,6 +18,10 @@ RISC-V CSR registers and accesses matrix data through the shared
 cache/memory subsystem. This reduces explicit data transfers and
 redundant memory copies during matrix operations and future neural-network workloads.
 
+## Introduction Video
+
+[![PSC-ONE demo video](https://img.youtube.com/vi/9yecOCtIT3k/maxresdefault.jpg)](https://youtu.be/9yecOCtIT3k)
+
 <!-- contents -->
 - [What is PSC-ONE?](#what-is-psc-one)
 - [PSC-ONE SoC Architecture](#psc-one-soc-architecture)
