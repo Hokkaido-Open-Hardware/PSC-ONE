@@ -170,7 +170,7 @@ TFLITE_CPPFLAGS := -I$(TFLITE_DIR) -I$(TFLITE_VENDOR) \
 	-isystem /usr/lib/picolibc/riscv64-unknown-elf/include \
 	-DFLATBUFFERS_LOCALE_INDEPENDENT=0 -DTFLITE_SINGLE_ROUNDING=0 -DNDEBUG \
 	-DPSC_HAS_CV_DOTSP_B=$(TFLITE_CV_DOTSP_B)
-TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/api/sa_transfer.h \
+TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/api/sa_transfer.h $(Src)/api/sa_limits.h \
 	$(TFLITE_VENDOR)/psc/pulp_fc.h $(Build)/tflite_cpu_config \
 	$(shell rg --files $(TFLITE_VENDOR)/tensorflow $(TFLITE_VENDOR)/gemmlowp) \
 	$(TFLITE_VENDOR)/schema_generated.h \

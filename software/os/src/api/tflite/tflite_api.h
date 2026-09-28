@@ -1,8 +1,9 @@
 #ifndef PSC_TFLITE_API_H
 #define PSC_TFLITE_API_H
 #include "tflite_inspect.h"
+#include "../sa_limits.h"
 #define PSC_TFLITE_ARENA_CAPACITY 4096u
-enum psc_tflite_fc_backend { PSC_TFLITE_FC_CPU=0, PSC_TFLITE_FC_SYNAP=1, PSC_TFLITE_FC_PULP=2 };
+enum psc_tflite_fc_backend { PSC_TFLITE_FC_CPU=0, PSC_TFLITE_FC_SYNAP=1, PSC_TFLITE_FC_PULP=2, PSC_TFLITE_FC_AUTO=3 };
 enum { PSC_TFLITE_ERR_SYNAP=-206, PSC_TFLITE_ERR_SYNAP_TIMEOUT=-207,
        PSC_TFLITE_ERR_SYNAP_ARGUMENT=-208, PSC_TFLITE_ERR_SYNAP_BUSY=-209 };
 #ifdef __cplusplus
@@ -21,9 +22,10 @@ const int8_t *psc_tflite_get_output(size_t *bytes);
 int psc_tflite_invoke(void);
 size_t psc_tflite_arena_used(void);
 /* Default CPU and tile=4 after load/prepare/reset. Switching invalidates only
-   output, preserving the prepared model and input. PULP falls back to CPU when unavailable; Synap errors never fall back. */
+   output, preserving the prepared model and input. PULP falls back to CPU when unavailable; Synap errors never fall back.
+   AUTO owns its calibrated NPU tile; the explicit tile setting is unchanged. */
 int psc_tflite_set_fc_backend(enum psc_tflite_fc_backend backend);
-int psc_tflite_set_synap_tile_size(unsigned size); /* 4,8,12,16 */
+int psc_tflite_set_synap_tile_size(unsigned size); /* multiples of 4, up to SA_MAT_MAX */
 typedef struct {
     uint32_t tiles, packing_us, syscall_us, copy_in_us, execute_us, copy_out_us;
     uint32_t partial_us, post_us;
@@ -41,12 +43,18 @@ int psc_tflite_invoke_traced(psc_tflite_trace_fn trace,
 typedef void (*psc_tflite_trace_ex_fn)(void *,unsigned layer,unsigned channel,
     int32_t raw,int32_t corrected,int32_t biased,int32_t requant,int8_t output);
 int psc_tflite_invoke_detailed(psc_tflite_trace_ex_fn trace, void *user);
+/* Read-only selection diagnostics, outside timed inference. No callback or
+   formatting overhead inside invoke. channel in trace APIs is row*N+column. */
+const char *psc_tflite_backend_name(enum psc_tflite_fc_backend backend);
+int psc_tflite_debug_selection(psc_tflite_log_fn log, void *user);
 /* Read-only diagnostics, outside timed inference. */
 int psc_tflite_debug_model(const void *model, size_t size, psc_tflite_log_fn log, void *user);
 int psc_tflite_debug_fc(psc_tflite_log_fn log, void *user);
+void cmd_tflite_diagnostics(int enabled); /* shell diagnostics; default on */
 void cmd_tflite_run(const char *name);
 void cmd_tflite_run_backend(const char *name, enum psc_tflite_fc_backend backend);
 void cmd_tflite_bench(const char *name);
+void cmd_tflite_bench_quick(const char *name);
 #ifdef __cplusplus
 }
 #endif

@@ -174,3 +174,5 @@ Actual FPGA/physical SD-card operation has not been tested in this session.
 Phase 3 remains a separate task: integrate the official integer FC/reference
 requantization kernels, allocate an arena, and compare layer outputs. Phase
 0–2 makes no claim that an inference kernel has already been ported or measured.
+
+Automatic CPU/NPU/PULP dispatch, batched FC, diagnostics and validation: [AUTO.md](AUTO.md).

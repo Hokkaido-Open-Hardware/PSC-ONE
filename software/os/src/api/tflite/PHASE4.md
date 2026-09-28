@@ -248,3 +248,5 @@ Conv2Dへ進む場合は、出力位置を複数列に並べて行列利用率�
 im2colの生成・SRAM容量・転送量、padding時に実数0を表すinput zero_pointを使うこと、
 per-channel scale、出力channel/K/空間方向のtileと部分和を検討する必要がある。
 既存のCPU referenceと量子化oracleを保持し、転送を含む総時間で効果を判断する。
+
+Current CLI also supports `pulp` and `auto`; see [AUTO.md](AUTO.md) for batched FC, dispatch calibration and the distinction from these historical Phase 4 measurements.

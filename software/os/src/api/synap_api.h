@@ -1,7 +1,7 @@
 // synap_api.h
 #pragma once
 
-#define SA_MAT_MAX 16u
+#include "sa_limits.h"
 
 /* ============================================================
    MMIO definitions used by kernel.c

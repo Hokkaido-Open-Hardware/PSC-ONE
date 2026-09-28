@@ -332,16 +332,23 @@ prompt:
             } 
 
         // ---- tf run ----
+        } else if (strcmp(argv[0], "tflite_diag") == 0) {
+            if(argc==2 && strcmp(argv[1],"on")==0) cmd_tflite_diagnostics(1);
+            else if(argc==2 && strcmp(argv[1],"off")==0) cmd_tflite_diagnostics(0);
+            else printf("usage: tflite_diag [on|off]\n");
         } else if (strcmp(argv[0], "tflite_run") == 0) {
             if (argc==2) cmd_tflite_run(argv[1]);
             else if(argc==3 && strcmp(argv[2],"cpu")==0) cmd_tflite_run_backend(argv[1],PSC_TFLITE_FC_CPU);
             else if(argc==3 && strcmp(argv[2],"npu")==0) cmd_tflite_run_backend(argv[1],PSC_TFLITE_FC_SYNAP);
-            else printf("usage: tflite_run MODEL.TFL [cpu|npu]\n");
+            else if(argc==3 && strcmp(argv[2],"pulp")==0) cmd_tflite_run_backend(argv[1],PSC_TFLITE_FC_PULP);
+            else if(argc==3 && strcmp(argv[2],"auto")==0) cmd_tflite_run_backend(argv[1],PSC_TFLITE_FC_AUTO);
+            else printf("usage: tflite_run MODEL.TFL [cpu|npu|pulp|auto]\n");
 
         // ---- tf bench ----
         } else if (strcmp(argv[0], "tflite_bench") == 0) {
             if(argc==2)cmd_tflite_bench(argv[1]);
-            else printf("usage: tflite_bench MODEL.TFL\n");
+            else if(argc==3 && strcmp(argv[2],"quick")==0)cmd_tflite_bench_quick(argv[1]);
+            else printf("usage: tflite_bench MODEL.TFL [quick]\n");
 
         // ---- tf info ----
         } else if (strcmp(argv[0], "tflite_info") == 0) {
@@ -386,8 +393,9 @@ prompt:
             printf("  jpeg TEST.JPG\n");
             printf("  run FILE.ELF\n");
             printf("  tflite_info MODEL.TFL (inspect only)\n");
-            printf("  tflite_run MODEL.TFL [cpu|npu]\n");
-            printf("  tflite_bench MODEL.TFL (CPU/NPU comparison)\n");
+            printf("  tflite_run MODEL.TFL [cpu|npu|pulp|auto]\n");
+            printf("  tflite_diag [on|off] (outside inference; default on)\n");
+            printf("  tflite_bench MODEL.TFL [quick] (CPU/NPU/PULP/auto comparison)\n");
             printf("  hello\n");
             printf("  dump [addr] [len]\n");
             printf("  primes [max]\n");

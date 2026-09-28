@@ -6,6 +6,8 @@
 static _Alignas(16) uint8_t model_buffer[PSC_TFLITE_MODEL_CAPACITY];
 static int busy;
 static int debug_load;
+static int run_diagnostics = 1;
+void cmd_tflite_diagnostics(int enabled) { run_diagnostics = enabled != 0; }
 static uint32_t resident_size;
 static void shell_log(void *user, const char *text);
 
@@ -120,45 +122,52 @@ static void demo_layer(void *user, unsigned layer, int begin) {
     }
 }
 void cmd_tflite_run_backend(const char *name, enum psc_tflite_fc_backend backend) {
-    debug_load = 1;
+    debug_load = run_diagnostics;
     int rc = psc_tflite_load(name);
     debug_load = 0;
-    if (!rc) {
+    if (!rc && run_diagnostics) {
         printf("CONSTANTS after prepare\n");
         psc_tflite_debug_model(model_buffer, resident_size, shell_log, 0);
     }
     size_t bytes;
     int8_t *input = psc_tflite_get_input(&bytes);
-    if (rc || !input || bytes != sizeof(demo_input)) {
-        printf("TFLite run error %d: %s\n", rc, rc ? psc_tflite_error_string(rc) : "demo requires input [1,16]");
+    if (rc || !input) {
+        printf("TFLite run error %d: %s\n", rc, rc ? psc_tflite_error_string(rc) : "input unavailable");
         return;
     }
     rc = psc_tflite_set_fc_backend(backend);
     if (rc) { printf("TFLite backend error %d\n", rc); return; }
-    memcpy(input, demo_input, sizeof(demo_input));
-    psc_tflite_debug_fc(shell_log, 0);
+    if (run_diagnostics) psc_tflite_debug_selection(shell_log, 0);
+    size_t input_bytes = bytes;
+    for (size_t i=0; i<input_bytes; ++i) input[i]=demo_input[i % sizeof(demo_input)];
+    if (run_diagnostics) psc_tflite_debug_fc(shell_log, 0);
     demo_result_t result = {.valid = 1, .fc_us = {-1,-1}};
     rc = psc_tflite_invoke_traced(demo_capture, 0, &result);
     if (rc) { printf("TFLite invoke error %d\n", rc); return; }
-    printf("CONSTANTS after first invoke\n");
-    psc_tflite_debug_model(model_buffer, resident_size, shell_log, 0);
+    if (run_diagnostics) {
+        printf("CONSTANTS after first invoke\n");
+        psc_tflite_debug_model(model_buffer, resident_size, shell_log, 0);
+    }
     int timing = call_timer_measure_begin();
     rc = psc_tflite_invoke(); /* timing excludes trace capture and UART */
     int invoke_us = timing == 0 ? call_timer_measure_end_us() : -1;
     if (!rc) rc = psc_tflite_invoke_traced(0, demo_layer, &result);
     const int8_t *output = psc_tflite_get_output(&bytes);
     if (rc || !output) { printf("TFLite invoke error %d\n", rc); return; }
-    printf("TFLite inference (%s INT8)\nInput : [", backend==PSC_TFLITE_FC_CPU?"CPU":"Synap");
-    for (unsigned i=0; i<sizeof(demo_input); ++i) printf("%s%d", i ? "," : "", input[i]);
+    printf("TFLite inference (%s INT8)\nInput : [", psc_tflite_backend_name(backend));
+    for (unsigned i=0; i<input_bytes; ++i) printf("%s%d", i ? "," : "", input[i]);
     printf("]\n");
     for (unsigned i=0; i<result.count; ++i) {
-        printf("FC%d channel=%d acc=%d requant=%d output=%d\n", i<16?1:2, (int)(i<16?i:i-16),
+        if (run_diagnostics) printf("FC%d channel=%d acc=%d requant=%d output=%d\n", i<16?1:2, (int)(i<16?i:i-16),
                result.trace[i][0], result.trace[i][1], result.trace[i][2]);
         for (unsigned j=0; j<3; ++j) if (result.trace[i][j] != demo_trace[i][j]) result.valid=0;
     }
     printf("Output: [");
     for (unsigned i=0; i<bytes; ++i) printf("%s%d", i ? "," : "", output[i]);
-    printf("]\nValidation (demo oracle): %s\n", result.valid && result.count==20 && bytes==4 ? "PASS" : "FAIL");
+    printf("]\n");
+    if (input_bytes==16 && result.count==20 && bytes==4)
+        printf("Validation (demo oracle): %s\n", result.valid ? "PASS" : "FAIL");
+    else printf("Input uses repeated demo vector; validate with application input via API.\n");
     printf("Time us: load=%d prepare=%d invoke=%d FC1=%d FC2=%d\n", load_us, prepare_us, invoke_us, result.fc_us[0], result.fc_us[1]);
     printf("Arena: %d / %d bytes\n", (int)psc_tflite_arena_used(), (int)PSC_TFLITE_ARENA_CAPACITY);
 }
@@ -180,17 +189,81 @@ static void compare_trace(void *user,unsigned layer,unsigned channel,
     ++r->count;
 }
 static int benchmark_invoke(int *us,int *fc1,int *fc2) {
+    int rc=psc_tflite_invoke(); /* identical warm policy, after any UART output */
+    if(rc)return rc;
     int timing=call_timer_measure_begin();
-    int rc=psc_tflite_invoke();
+    rc=psc_tflite_invoke();
     *us=timing==0?call_timer_measure_end_us():-1;
     demo_result_t result={.fc_us={-1,-1}};
     if(!rc)rc=psc_tflite_invoke_traced(0,demo_layer,&result);
     *fc1=result.fc_us[0];*fc2=result.fc_us[1];return rc;
 }
-void cmd_tflite_bench(const char *name) {
+/* General FC graph benchmark. Fixed storage, shared model/input for all modes. */
+static int8_t graph_reference[PSC_TFLITE_ARENA_CAPACITY];
+typedef struct { int start, valid; unsigned count; int us[PSC_TFLITE_MAX_OPERATORS]; } graph_times_t;
+static void graph_layer(void *user,unsigned layer,int begin) {
+    graph_times_t *t=user;
+    if(layer>=PSC_TFLITE_MAX_OPERATORS) {t->valid=0;return;}
+    if(begin)t->start=call_timer_measure_begin();
+    else {
+        t->us[layer]=t->start==0?call_timer_measure_end_us():-1;
+        if(t->us[layer]<0)t->valid=0;
+        if(t->count<=layer)t->count=layer+1;
+    }
+}
+static void benchmark_graph(int8_t *input,size_t input_bytes,int quick) {
+    for(size_t i=0;i<input_bytes;++i)input[i]=demo_input[i%sizeof(demo_input)];
+    int rc=psc_tflite_invoke();size_t bytes;
+    const int8_t *output=psc_tflite_get_output(&bytes);
+    if(rc || !output || bytes>sizeof(graph_reference)) {printf("Comparison: FAIL reference\n");return;}
+    size_t expected_bytes=bytes;memcpy(graph_reference,output,bytes);
+    const enum psc_tflite_fc_backend modes[]={PSC_TFLITE_FC_CPU,PSC_TFLITE_FC_PULP,
+        PSC_TFLITE_FC_SYNAP,PSC_TFLITE_FC_SYNAP,PSC_TFLITE_FC_SYNAP,PSC_TFLITE_FC_SYNAP,
+        PSC_TFLITE_FC_SYNAP,PSC_TFLITE_FC_SYNAP,PSC_TFLITE_FC_AUTO};
+    const unsigned tiles[]={4,4,32,16,4,8,12,64,4};
+    const unsigned shortlist[]={0,1,2,3,8}; /* CPU, PULP, NPU32, NPU16, AUTO */
+    unsigned count=quick?5:9;
+    for(unsigned sample=0;sample<3;++sample)for(unsigned turn=0;turn<count;++turn) {
+        unsigned mode=(sample+turn)%count;
+        if(quick)mode=shortlist[mode];
+        unsigned tile=tiles[mode];
+        psc_tflite_set_fc_backend(modes[mode]);psc_tflite_set_synap_tile_size(tile);
+        if(run_diagnostics)psc_tflite_debug_selection(shell_log,0);
+        rc=psc_tflite_invoke(); /* warm after diagnostics */
+        if(rc) {printf("Comparison: FAIL warm error=%d\n",rc);return;}
+        int timing=call_timer_measure_begin();rc=psc_tflite_invoke();
+        int us=timing==0?call_timer_measure_end_us():-1;
+        output=psc_tflite_get_output(&bytes);
+        if(rc || !output || bytes!=expected_bytes || memcmp(output,graph_reference,bytes)) {
+            printf("Comparison: FAIL backend=%s error=%d\n",psc_tflite_backend_name(modes[mode]),rc);return;
+        }
+        graph_times_t times={.valid=1};
+        rc=psc_tflite_invoke_traced(0,graph_layer,&times);
+        output=psc_tflite_get_output(&bytes);
+        if(rc || !output || bytes!=expected_bytes || memcmp(output,graph_reference,bytes)) {
+            printf("Comparison: FAIL layer timing error=%d\n",rc);return;
+        }
+        printf("BENCH_GRAPH sample=%d backend=%s tile=%d invoke=%d",(int)sample,
+            psc_tflite_backend_name(modes[mode]),modes[mode]==PSC_TFLITE_FC_SYNAP?(int)tile:0,us);
+        for(unsigned i=0;i<times.count;++i)printf(" FC%d=%d",(int)i+1,times.us[i]);
+        printf(" valid=%d us\n",us>=0 && times.valid);
+    }
+    printf("Comparison: PASS (all graph outputs, cpu/npu/pulp/auto, three warm samples)\n");
+    if(quick)printf("Output bytes: %d (all matched)\n",(int)expected_bytes);
+    else {
+        printf("Output: [");
+        for(size_t i=0;i<expected_bytes;++i)printf("%s%d",i?",":"",graph_reference[i]);
+        printf("]\n");
+    }
+    psc_tflite_set_fc_backend(PSC_TFLITE_FC_CPU);psc_tflite_set_synap_tile_size(4);
+    rc=psc_tflite_invoke();if(rc)printf("Benchmark error %d\n",rc);
+}
+
+static void benchmark(const char *name,int quick) {
     int rc=psc_tflite_load(name);size_t bytes;
     int8_t *input=psc_tflite_get_input(&bytes);
-    if(rc || !input || bytes!=16) {printf("TFLite bench error %d\n",rc?rc:PSC_TFLITE_ERR_GRAPH);return;}
+    if(rc || !input) {printf("TFLite bench error %d\n",rc?rc:PSC_TFLITE_ERR_GRAPH);return;}
+    if(bytes!=16) {benchmark_graph(input,bytes,quick);return;}
     memcpy(input,demo_input,16);
     comparison_t comparison={.valid=1};
     rc=psc_tflite_invoke_detailed(compare_trace,&comparison);
@@ -214,7 +287,7 @@ void cmd_tflite_bench(const char *name) {
         comparison.compare=1;comparison.count=0;
         rc=psc_tflite_invoke_detailed(compare_trace,&comparison);
         if(rc || comparison.count!=20 || !comparison.valid)break;
-        for(unsigned i=0;i<20;++i)
+        for(unsigned i=0;run_diagnostics && i<20;++i)
             printf("MATCH tile=%d FC%d channel=%d raw=%d corrected=%d bias=%d requant=%d output=%d\n",
                 (int)tile,i<16?1:2,(int)(i<16?i:i-16),comparison.row[i][0],comparison.row[i][1],
                 comparison.row[i][2],comparison.row[i][3],comparison.row[i][4]);
@@ -243,6 +316,20 @@ void cmd_tflite_bench(const char *name) {
     if(rc || !comparison.valid || comparison.count!=20) {
         printf("Comparison: FAIL error=%d (%s)\n",rc,psc_tflite_error_string(rc));return;
     }
+    for(unsigned mode=PSC_TFLITE_FC_PULP;mode<=PSC_TFLITE_FC_AUTO;++mode) {
+        psc_tflite_set_fc_backend(PSC_TFLITE_FC_CPU);
+        comparison.compare=0;comparison.count=0;
+        rc=psc_tflite_invoke_detailed(compare_trace,&comparison);
+        if(rc) {printf("Comparison: FAIL error=%d\n",rc);return;}
+        psc_tflite_set_fc_backend((enum psc_tflite_fc_backend)mode);
+        comparison.compare=1;comparison.count=0;
+        rc=psc_tflite_invoke_detailed(compare_trace,&comparison);
+        if(rc || comparison.count!=20 || !comparison.valid) {printf("Comparison: FAIL error=%d\n",rc);return;}
+        rc=benchmark_invoke(&us,&fc1,&fc2);
+        if(rc) {printf("Benchmark error %d\n",rc);return;}
+        printf("BENCH backend=%s tile=0 invoke=%d FC1=%d FC2=%d us\n",
+            psc_tflite_backend_name((enum psc_tflite_fc_backend)mode),us,fc1,fc2);
+    }
     /* Invalid requests must be rejected before touching the engine/buffers. */
     int32_t dummy[16];
     if(call_sa_matmul_int8(input,input,dummy,0,0)!=-1 ||
@@ -257,3 +344,5 @@ void cmd_tflite_bench(const char *name) {
     printf("Comparison: %s (all 20 channels, five stages, changed inputs, backend switching)\n",comparison.valid?"PASS":"FAIL");
     printf("Output: [%d,%d,%d,%d]\n",output[0],output[1],output[2],output[3]);
 }
+void cmd_tflite_bench(const char *name) { benchmark(name,0); }
+void cmd_tflite_bench_quick(const char *name) { benchmark(name,1); }

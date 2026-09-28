@@ -236,7 +236,7 @@ int inspect(const void *data, size_t size, const Log &out, psc_tflite_info_t &in
         if (x->type() != tflite::TensorType_INT8 || w->type() != tflite::TensorType_INT8 ||
             y->type() != tflite::TensorType_INT8) { unsupported = true; continue; }
         if (count(x->shape()) != 2 || count(w->shape()) != 2 || count(y->shape()) != 2 ||
-            x->shape()->Get(0) != 1 || y->shape()->Get(0) != 1) {
+            x->shape()->Get(0) != y->shape()->Get(0)) {
             unsupported = true; continue;
         }
         if (x->shape()->Get(1) != w->shape()->Get(1) || y->shape()->Get(1) != w->shape()->Get(0) ||

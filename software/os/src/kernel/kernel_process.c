@@ -97,11 +97,15 @@ struct process *create_process(const void *image, size_t image_size) {
 
     s_printf("---- SA core data address map start. ----\n");
     uintptr_t sa_data_page = PSC_SA_DATA_BASE & ~(PAGE_SIZE - 1);
-    map_page(page_table, sa_data_page, sa_data_page, PAGE_R | PAGE_W);
+    for (size_t off = 0; off < SA_MAT_MAX * SA_MAT_MAX; off += PAGE_SIZE)
+        map_page(page_table, sa_data_page + off, sa_data_page + off, PAGE_R | PAGE_W);
 
     s_printf("---- SA core data wb address map start. ----\n");
     uintptr_t sa_data_wb_page = PSC_SA_DATA_WB & ~(PAGE_SIZE - 1);
-    map_page(page_table, sa_data_wb_page, sa_data_wb_page, PAGE_R | PAGE_W);
+    /* C contains INT32 results: 64x64 spans four pages, not one.
+       Keep all engine buffers supervisor-only. */
+    for (size_t off = 0; off < SA_MAT_MAX * SA_MAT_MAX * sizeof(uint32_t); off += PAGE_SIZE)
+        map_page(page_table, sa_data_wb_page + off, sa_data_wb_page + off, PAGE_R | PAGE_W);
 #endif
 
     // ---- User Program Mapping (U=1) ----

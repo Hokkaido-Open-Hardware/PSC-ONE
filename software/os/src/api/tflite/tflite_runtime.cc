@@ -11,7 +11,7 @@ struct FC {
     const uint8_t *bias;
     int8_t *y;
     int32_t *row_sum;
-    int k, n, input_zero, output_zero, multiplier, shift, minimum;
+    int m, k, n, input_zero, output_zero, multiplier, shift, minimum;
 };
 struct Runtime {
     alignas(16) uint8_t arena[PSC_TFLITE_ARENA_CAPACITY];
@@ -25,6 +25,8 @@ struct Runtime {
     bool prepared, output_valid, invoking;
 };
 Runtime rt;
+// Shared synchronous scratch, protected by rt.invoking; never put a 64x64 tile on the stack.
+alignas(16) int32_t dots[SA_MAT_MAX*SA_MAT_MAX];
 void *allocate(size_t bytes) {
     size_t pos = (rt.used + 3) & ~size_t(3);
     if (bytes > sizeof(rt.arena) - pos) return nullptr;
@@ -33,6 +35,28 @@ void *allocate(size_t bytes) {
 }
 int32_t bias_at(const FC &f, int c) {
     return f.bias ? flatbuffers::ReadScalar<int32_t>(f.bias + 4*c) : 0;
+}
+// Conservative, measured shape allowlist; do not extrapolate to padded tiles.
+// See AUTO.md and tests/tflite/auto_results.json. Selection is O(1) per FC.
+psc_tflite_fc_backend select(const FC &f, const char **reason, unsigned *tile) {
+    *tile=rt.tile;
+    if (rt.backend==PSC_TFLITE_FC_CPU || rt.backend==PSC_TFLITE_FC_SYNAP) {
+        *reason="explicit backend"; return rt.backend;
+    }
+    if(rt.backend==PSC_TFLITE_FC_AUTO && (f.m==16 || f.m==32) && f.k==f.m && f.n==f.m) {
+        *tile=f.m; *reason="measured OS FC advantage including packing/copies/start/wait; one unpadded tile";
+        return PSC_TFLITE_FC_SYNAP;
+    }
+#if PSC_HAS_CV_DOTSP_B || defined(PSC_PULP_TEST_EMULATE)
+    if(f.k>=4 && f.k<=8192) {
+        *reason=rt.backend==PSC_TFLITE_FC_AUTO ? "outside calibrated NPU shapes; SIMD FC" : "explicit PULP";
+        return PSC_TFLITE_FC_PULP;
+    }
+    *reason="FC depth below SIMD width";
+#else
+    *reason="PULP disabled in this build; CPU fallback";
+#endif
+    return PSC_TFLITE_FC_CPU;
 }
 int prepare(const void *data, size_t size) {
     int rc = psc_tflite_inspect(data, size, nullptr, nullptr, nullptr);
@@ -63,7 +87,7 @@ int prepare(const void *data, size_t size) {
         f.w = reinterpret_cast<const int8_t *>(m->buffers()->Get(w->buffer())->data()->data());
         f.y = tensors[yi];
         f.bias = bi < 0 ? nullptr : m->buffers()->Get(g->tensors()->Get(bi)->buffer())->data()->data();
-        f.k=w->shape()->Get(1); f.n=w->shape()->Get(0);
+        f.m=x->shape()->Get(0); f.k=w->shape()->Get(1); f.n=w->shape()->Get(0);
         f.input_zero=x->quantization()->zero_point()->Get(0);
         f.output_zero=y->quantization()->zero_point()->Get(0);
         double scale=static_cast<double>(x->quantization()->scale()->Get(0)) *
@@ -121,12 +145,12 @@ extern "C" const int8_t *psc_tflite_get_output(size_t *bytes) {
 extern "C" size_t psc_tflite_arena_used(void) { return rt.used; }
 extern "C" int psc_tflite_set_fc_backend(psc_tflite_fc_backend backend) {
     if(rt.invoking) return PSC_TFLITE_ERR_BUSY;
-    if(backend!=PSC_TFLITE_FC_CPU && backend!=PSC_TFLITE_FC_SYNAP && backend!=PSC_TFLITE_FC_PULP) return PSC_TFLITE_ERR_UNSUPPORTED;
+    if(backend!=PSC_TFLITE_FC_CPU && backend!=PSC_TFLITE_FC_SYNAP && backend!=PSC_TFLITE_FC_PULP && backend!=PSC_TFLITE_FC_AUTO) return PSC_TFLITE_ERR_UNSUPPORTED;
     rt.backend=backend;rt.output_valid=false;return 0;
 }
 extern "C" int psc_tflite_set_synap_tile_size(unsigned tile) {
     if(rt.invoking) return PSC_TFLITE_ERR_BUSY;
-    if(tile<4 || tile>16 || tile%4) return PSC_TFLITE_ERR_UNSUPPORTED;
+    if(tile<4 || tile>SA_MAT_MAX || tile%4) return PSC_TFLITE_ERR_UNSUPPORTED;
     rt.tile=tile;rt.output_valid=false;return 0;
 }
 extern "C" int psc_tflite_set_profiling(int enabled) {
@@ -141,41 +165,45 @@ static int invoke(psc_tflite_trace_fn trace,psc_tflite_trace_ex_fn detail,psc_tf
     for (unsigned i=0; i<rt.count; ++i) {
         const FC &f=rt.fc[i];
         if (layer) layer(user,i,1);
-        unsigned block=rt.backend==PSC_TFLITE_FC_SYNAP ? rt.tile : 1;
-        for(unsigned first=0;first<unsigned(f.n);first+=block) {
+        const char *reason; unsigned tile;
+        const auto backend=select(f,&reason,&tile);
+        unsigned block=backend==PSC_TFLITE_FC_SYNAP ? tile : 1;
+        for(unsigned row=0;row<unsigned(f.m);row+=block) {
+          unsigned m=unsigned(f.m)-row<block ? unsigned(f.m)-row : block;
+          for(unsigned first=0;first<unsigned(f.n);first+=block) {
             unsigned n=unsigned(f.n)-first<block ? unsigned(f.n)-first : block;
-            int32_t dots[16];
-            if(rt.backend==PSC_TFLITE_FC_SYNAP) {
-                int rc=psc_tflite_synap_dot(f.x,f.w+first*f.k,f.k,n,rt.tile,dots,rt.profiling?&rt.profile:nullptr);
+            const int8_t *x=f.x+row*f.k;
+            if(backend==PSC_TFLITE_FC_SYNAP) {
+                int rc=psc_tflite_synap_batch(x,f.w+first*f.k,m,f.k,n,tile,dots,rt.profiling?&rt.profile:nullptr);
                 if(rc) {
                     if(layer) layer(user,i,0);
                     rt.profile.valid=0;rt.invoking=false;return rc;
                 }
-            } else if(rt.backend==PSC_TFLITE_FC_PULP &&
-                      psc_tflite_pulp::try_dot(f.x,f.w+first*f.k,f.k,0,true,&dots[0])) {
-                // prepare/inspect validated INT8, symmetric weights and shape.
-                // Share the original row-sum correction and postprocessing below.
+            } else if(backend==PSC_TFLITE_FC_PULP &&
+                      psc_tflite_pulp::try_dot(x,f.w+first*f.k,f.k,0,true,&dots[0])) {
+                // Raw dot only; all backends share quantization below.
             } else {
-                // Phase 3 CPU reference dot is retained, including INT32 accumulation.
                 dots[0]=0;
-                for(int k=0;k<f.k;++k) dots[0]+=int32_t(f.x[k])*f.w[first*f.k+k];
+                for(int k=0;k<f.k;++k) dots[0]+=int32_t(x[k])*f.w[first*f.k+k];
             }
             int before=rt.profiling?psc_tflite_clock_us():-1;
-            for(unsigned local=0;local<n;++local) {
-                unsigned c=first+local;int32_t dot=dots[local];
+            for(unsigned sample=0;sample<m;++sample) for(unsigned local=0;local<n;++local) {
+                unsigned c=first+local, index=(row+sample)*f.n+c;
+                int32_t dot=dots[sample*n+local];
                 int32_t corrected=static_cast<int32_t>(int64_t(dot)-int64_t(f.input_zero)*f.row_sum[c]);
                 int32_t acc=static_cast<int32_t>(int64_t(corrected)+bias_at(f,c));
                 int32_t q=psc_tflite_requantize(acc,f.multiplier,f.shift)+f.output_zero;
                 int32_t clamped=q<f.minimum ? f.minimum : (q>127 ? 127 : q);
-                f.y[c]=static_cast<int8_t>(clamped);
-                if(trace) trace(user,i,c,acc,q,f.y[c]);
-                if(detail) detail(user,i,c,dot,corrected,acc,q,f.y[c]);
+                f.y[index]=static_cast<int8_t>(clamped);
+                if(trace) trace(user,i,index,acc,q,f.y[index]);
+                if(detail) detail(user,i,index,dot,corrected,acc,q,f.y[index]);
             }
             if(rt.profiling) {
                 int after=psc_tflite_clock_us();
                 if(before<0 || after<before) rt.profile.valid=0;
                 else rt.profile.post_us+=uint32_t(after-before);
             }
+          }
         }
         if (layer) layer(user,i,0);
     }
@@ -268,4 +296,30 @@ extern "C" int psc_tflite_debug_fc(psc_tflite_log_fn log,void *user) {
     }
     out.value("FC1 c=0 raw_dot=",dot);out.value(" row_sum=",f.row_sum[0]);
     out.value(" bias=",bias_at(f,0));out.text("\n");return 0;
+}
+
+extern "C" const char *psc_tflite_backend_name(psc_tflite_fc_backend backend) {
+    switch(backend) {
+    case PSC_TFLITE_FC_CPU:return "cpu";
+    case PSC_TFLITE_FC_SYNAP:return "npu";
+    case PSC_TFLITE_FC_PULP:return "pulp";
+    case PSC_TFLITE_FC_AUTO:return "auto";
+    default:return "unknown";
+    }
+}
+extern "C" int psc_tflite_debug_selection(psc_tflite_log_fn log,void *user) {
+    if(rt.invoking)return PSC_TFLITE_ERR_BUSY;
+    if(!rt.prepared)return PSC_TFLITE_ERR_GRAPH;
+    DebugLog out{log,user};
+    for(unsigned i=0;i<rt.count;++i) {
+        const FC &f=rt.fc[i]; const char *reason; unsigned tile;
+        auto backend=select(f,&reason,&tile);
+        out.value("FC=",i+1);out.value(" M=",f.m);out.value(" K=",f.k);out.value(" N=",f.n);
+        out.value(" npu_tile=",tile);
+        out.value(" npu_tiles=",((f.m+tile-1)/tile)*((f.k+tile-1)/tile)*((f.n+tile-1)/tile));
+        out.value(" tail_M=",f.m%tile);out.value(" tail_K=",f.k%tile);out.value(" tail_N=",f.n%tile);
+        out.text(" backend=");out.text(psc_tflite_backend_name(backend));
+        out.text(" reason=");out.text(reason);out.text("\n");
+    }
+    return 0;
 }

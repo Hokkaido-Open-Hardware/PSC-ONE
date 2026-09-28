@@ -22,6 +22,8 @@ redundant memory copies during matrix operations and future neural-network workl
 
 [![PSC-ONE demo video](https://img.youtube.com/vi/9yecOCtIT3k/maxresdefault.jpg)](https://youtu.be/9yecOCtIT3k)
 
+## Contents
+
 <!-- contents -->
 - [What is PSC-ONE?](#what-is-psc-one)
 - [PSC-ONE SoC Architecture](#psc-one-soc-architecture)
@@ -617,6 +619,7 @@ FST Viewer is intended to make PSC_RV32 CPU development and verification easier 
 - [x] RV32I Base Integer Instruction Set
 - [x] RV32M Multiply/Divide Extension
 - [x] Zicsr and Zifencei Extensions
+- [x] Selected PULP SIMD instructions (`cv.dotup.h`, `cv.dotsp.b`)
 - [ ] Full Pipeline Execution
 - [x] Partial Pipeline Execution for selected instruction types
 - [x] Branch Instructions
