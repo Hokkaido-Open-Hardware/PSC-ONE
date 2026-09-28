@@ -15,3 +15,6 @@
 [submodule "hardware/sim/coremark"]
 	path = hardware/sim/coremark
 	url = https://github.com/eembc/coremark.git
+[submodule "toolchain/riscv-gnu-toolchain"]
+	path = toolchain/riscv-gnu-toolchain
+	url = https://github.com/nharu1977/riscv-gnu-toolchain.git
