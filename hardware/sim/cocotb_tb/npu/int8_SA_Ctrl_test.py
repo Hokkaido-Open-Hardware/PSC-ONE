@@ -158,6 +158,8 @@ async def test_systolic_array_driver_4x4(dut):
 
     # reset
     dut.reset_n.value       = 0
+    if hasattr(dut, "matrix_size_m"):
+        dut.matrix_size_m.value = 0
     dut.signed_mode.value = 0
     dut.sa_clear.value      = 0
     dut.rd_read_ready.value = 0
@@ -312,6 +314,8 @@ async def test_systolic_array_driver_8x8(dut):
 
     # reset
     dut.reset_n.value       = 0
+    if hasattr(dut, "matrix_size_m"):
+        dut.matrix_size_m.value = 0
     dut.sa_clear.value      = 0
     dut.rd_read_ready.value = 0
     dut.sa_state_reset.value = 0
@@ -476,6 +480,8 @@ async def test_systolic_array_driver_32x32(dut):
 
     # reset
     dut.reset_n.value = 0
+    if hasattr(dut, "matrix_size_m"):
+        dut.matrix_size_m.value = 0
     dut.sa_clear.value = 0
     dut.rd_read_ready.value = 0
     dut.c_write_ready.value = 0
@@ -664,6 +670,8 @@ async def test_systolic_array_driver_64x64(dut):
 
     # reset
     dut.reset_n.value = 0
+    if hasattr(dut, "matrix_size_m"):
+        dut.matrix_size_m.value = 0
     dut.sa_clear.value = 0
     dut.rd_read_ready.value = 0
     dut.c_write_ready.value = 0
@@ -863,6 +871,8 @@ async def test_systolic_array_driver_4x8(dut):
 
     # reset
     dut.reset_n.value = 0
+    if hasattr(dut, "matrix_size_m"):
+        dut.matrix_size_m.value = 0
     dut.sa_clear.value = 0
     dut.rd_read_ready.value = 0
     dut.c_write_ready.value = 0
@@ -1103,6 +1113,8 @@ async def test_systolic_array_driver_4x4_signed(dut):
 
     # reset
     dut.reset_n.value = 0
+    if hasattr(dut, "matrix_size_m"):
+        dut.matrix_size_m.value = 0
     dut.signed_mode.value = 1
     dut.sa_clear.value = 0
     dut.rd_read_ready.value = 0
@@ -1278,12 +1290,36 @@ async def test_controller_pipeline_backpressure(dut):
     Existing six matrix tests remain unchanged. This test adds dimensions
     outside their set and checks every memory transaction, not just done.
     """
+    cases = [
+        (12, 20, 0, 0), (20, 12, 1, 0), (252, 4, 1, 0),
+        (4, 8, 1, 0), (8, 8, 0, 0), (12, 12, 1, 0),
+    ]
+    cases += [
+        # A:1x4, B:4x4, unsigned and signed.
+        (4, 4, 0, 1), (4, 4, 1, 1),
+        # A:1x8, B:8x8, unsigned and signed (K/N span two tiles each).
+        (8, 8, 0, 1), (8, 8, 1, 1),
+        # A:2x4, B:4x4, unsigned and signed; then K/N tiling.
+        (4, 4, 0, 2), (4, 4, 1, 2), (8, 8, 0, 2),
+        # Partial final row tiles, full explicit tile and 8-bit M limit.
+        (4, 4, 1, 3), (4, 4, 0, 4), (8, 8, 1, 5),
+        (8, 12, 0, 6), (4, 8, 1, 7), (4, 4, 1, 255),
+        # Return to the original M=Y contract without a hardware reset.
+        (4, 4, 0, 0),
+    ]
+    await run_controller_backpressure(dut, cases)
+
+
+async def run_controller_backpressure(dut, cases):
+    """Check exact MxK / KxN memory bounds, result writes and restart."""
     import random
     from cocotb.triggers import FallingEdge, Timer
 
     rng = random.Random(0x4E505550)
     cocotb.start_soon(Clock(dut.clock, 10, unit="ns").start())
     dut.reset_n.value = 0
+    if hasattr(dut, "matrix_size_m"):
+        dut.matrix_size_m.value = 0
     dut.start.value = 0
     dut.sa_state_reset.value = 0
     dut.sa_clear.value = 0
@@ -1346,10 +1382,10 @@ async def test_controller_pipeline_backpressure(dut):
             writes[address] = data
             write_pending = cycle + rng.randrange(1, 10)
 
-    for x, y, mode in [(12, 20, 0), (20, 12, 1), (252, 4, 1),
-                       (4, 8, 1), (8, 8, 0), (12, 12, 1)]:
+    for x, y, mode, m in cases:
+        rows = m or y
         values = [-128, -1, 0, 1, 127] if mode else [0, 1, 127, 128, 255]
-        a = np.array([[rng.choice(values) for _ in range(x)] for _ in range(y)],
+        a = np.array([[rng.choice(values) for _ in range(x)] for _ in range(rows)],
                      dtype=np.int64)
         b = np.array([[rng.choice(values) for _ in range(y)] for _ in range(x)],
                      dtype=np.int64)
@@ -1360,6 +1396,10 @@ async def test_controller_pipeline_backpressure(dut):
         writes, reads = {}, 0
         dut.matrix_size_x.value = x
         dut.matrix_size_y.value = y
+        if hasattr(dut, "matrix_size_m"):
+            dut.matrix_size_m.value = m
+        else:
+            assert m == 0, "matrix_size_m is required for independent A rows"
         dut.signed_mode.value = mode
         dut.start.value = 1
         await tick()
@@ -1369,12 +1409,13 @@ async def test_controller_pipeline_backpressure(dut):
             if int(dut.done.value):
                 break
         else:
-            assert False, f"timeout x={x} y={y} signed={mode}"
+            assert False, f"timeout m={m} x={x} y={y} signed={mode}"
         assert writes == expected, "missing output writes"
-        assert reads == (x // 4) * (y // 4)**2 * 8, "missing/extra tile reads"
+        expected_reads = (x // 4) * (y // 4) * (rows + 4 * ((rows + 3) // 4))
+        assert reads == expected_reads, "missing/extra tile reads"
         assert read_pending is None and write_pending is None, "done before final ack"
-        dut._log.info("PASS stalled/restart x=%d y=%d signed=%d: %d cycles",
-                      x, y, mode, elapsed + 1)
+        dut._log.info("PASS stalled/restart m=%d x=%d y=%d signed=%d: %d cycles",
+                      m, x, y, mode, elapsed + 1)
         for _ in range(3):
             await tick()
             assert int(dut.done.value), "done must stay asserted until state reset"

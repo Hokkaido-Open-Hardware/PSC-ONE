@@ -33,6 +33,8 @@ def regression(args):
     else:
         sa += pe
     ctrl = sa + [src/'PSC_NPU_Controller.v',src/'PSC_NPU_ReadController.v']
+    if args.baseline:
+        ctrl += [src/'PSC_NPU_Engine.sv', src/'PSC_LPU_Controller.sv']
     cases = [
         ('pe','PSC_NPU_PE_SimTop','int8_PE_test',pe,''),
         ('sa2','PSC_NPU_SystolicArray2x2','int8_SA_test',pe+[legacy/'PSC_NPU_SystolicArray2x2.v'],''),
@@ -45,6 +47,7 @@ def regression(args):
     ]
     legacy_ctrl = pe + [legacy/'PSC_NPU_ReadController.v',
                        legacy/'PSC_NPU_Controller.v',legacy/'PSC_NPU_SystolicArray4x4.v']
+    legacy_ctrl += [legacy/'PSC_NPU_Engine.sv', legacy/'PSC_LPU_Controller.sv']
     cases.append(('legacy_controller1','PSC_NPU_Controller','int8_SA_Ctrl_test',
                   legacy_ctrl,'-PPSC_NPU_Controller.MUL_NUM=1'))
     if not args.baseline:
@@ -80,6 +83,8 @@ def timing(args):
         'PSC_NPU_MACScheduler.sv','PSC_NPU_Mul4.sv','PSC_NPU_AccBank.sv']
     sources = [wrapper]+[args.src/n for n in [
         'PSC_NPU_Controller.v','PSC_NPU_ReadController.v','PSC_NPU_SystolicArray4x4.v',*datapath]]
+    if args.baseline:
+        sources += [args.src/'PSC_NPU_Engine.sv', args.src/'PSC_LPU_Controller.sv']
     output = args.build/'npu.json'
     script = ('read_verilog -sv '+' '.join(str(p) for p in sources)+'; '
               'hierarchy -check -top PSC_NPU_Timing; flatten; '

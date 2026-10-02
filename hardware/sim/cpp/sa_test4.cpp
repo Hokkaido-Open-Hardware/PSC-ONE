@@ -22,10 +22,10 @@ extern "C" volatile uint32_t timer_data;
 //   bit 1 : state_reset
 //   bit 3 : signed_mode
 //
-//   [23:16] : matrix_size_x
-//   [31:24] : matrix_size_y
+//   bit 4 : os_mode
+//   [11:8] : os_instruction
 //
-// CSR 0x7C4 : SA Mode
+// CSR 0x7C4 : SA Size (X[7:0], Y[15:8], M[23:16])
 // CSR 0x7C8 : SA Status
 //
 // signed_mode:
@@ -80,8 +80,9 @@ static constexpr uint32_t TEST_END_CODE = 0xEE01;
 // ============================================================
 
 static constexpr uint32_t SA_MATRIX_SIZE =
-    (0x04u << 24) |
-    (0x04u << 16);
+    (4u << 16) | (4u << 8) | 4u;
+
+static constexpr uint32_t SA_OS_MODE = (1u << 4);
 
 static constexpr uint32_t SA_SIGNED_MODE =
     (1u << 3);
@@ -336,7 +337,7 @@ extern "C" void run()
 
     CSR_WRITE(
         0x7C0,
-        SA_MATRIX_SIZE
+        SA_OS_MODE
         |
         SA_SIGNED_MODE
         |
@@ -345,19 +346,19 @@ extern "C" void run()
 
     CSR_WRITE(
         0x7C0,
-        SA_MATRIX_SIZE
+        SA_OS_MODE
         |
         SA_SIGNED_MODE
     );
 
 
     // --------------------------------------------------------
-    // 4. Output-Stationary mode
+    // 4. SA size: M=4, Y=4, X=4
     // --------------------------------------------------------
 
     CSR_WRITE(
         0x7C4,
-        0x01
+        SA_MATRIX_SIZE
     );
 
 
@@ -369,7 +370,7 @@ extern "C" void run()
 
     CSR_WRITE(
         0x7C0,
-        SA_MATRIX_SIZE
+        SA_OS_MODE
         |
         SA_SIGNED_MODE
         |
@@ -378,7 +379,7 @@ extern "C" void run()
 
     CSR_WRITE(
         0x7C0,
-        SA_MATRIX_SIZE
+        SA_OS_MODE
         |
         SA_SIGNED_MODE
     );

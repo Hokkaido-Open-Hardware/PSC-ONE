@@ -45,6 +45,8 @@ async def matrix_cycles_and_transactions(dut):
             writes[addr] = data
             pending_write = cycle+delay
 
+    if hasattr(dut, 'matrix_size_m'):
+        dut.matrix_size_m.value = 0
     await tick(reset_n=0,start=0,sa_state_reset=0,sa_clear=0,sa_os_instruction=0,
                signed_mode=0,matrix_size_x=4,matrix_size_y=4,
                BASE_ADDR_A=0x12000,BASE_ADDR_B=0x24000,BASE_ADDR_C=0x48000)

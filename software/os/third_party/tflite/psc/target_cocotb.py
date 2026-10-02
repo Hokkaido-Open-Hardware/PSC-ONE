@@ -40,7 +40,20 @@ async def validate(dut):
         pos+=7
     assert len(samples)==30 and words[pos]==0xee50
     values=words[pos+1:pos+101]
-    assert len(values)==100 and words[pos+101:]==[0xee01,0x600d600d]
+    assert len(values)==100
+    pos+=101
+    rectangular=[]
+    while words[pos]==0xee60:
+        sample,sign,m,us=words[pos+1:pos+5]
+        assert sample in range(3) and sign in (0,1) and m in (1,16) and us>0
+        rectangular.append(dict(sample=sample,signed=sign,m=m,us=us))
+        pos+=5
+    assert len(rectangular)==12 and words[pos:]==[0xee01,0x600d600d]
+    for sign in (0,1):
+        square=min(r['us'] for r in rectangular if r['signed']==sign and r['m']==16)
+        vector=min(r['us'] for r in rectangular if r['signed']==sign and r['m']==1)
+        assert vector<square, (sign,square,vector)
+        dut._log.info('A[1][16] * B[16][16] signed=%d: padded=%d us, M=1=%d us',sign,square,vector)
     signed=lambda x:x if x<2**31 else x-2**32
     rows=[list(map(signed,values[i:i+5])) for i in range(0,100,5)]
     assert [r[-1] for r in rows[-4:]]==[-36,27,18,8]
@@ -51,6 +64,6 @@ async def validate(dut):
         best.append(min(selected,key=lambda r:r['invoke_us']))
     report=dict(clock_mhz=100,cpu='v1',npu='legacy',platform='bare metal, original sa_run_checked driver; no OS syscall',
                 cache='same ELF/data; warm each backend immediately before every timed invoke',
-                best=best,samples=samples,rows=rows,output=[-36,27,18,8],bit_exact=True)
+                best=best,samples=samples,rows=rows,rectangular=rectangular,output=[-36,27,18,8],bit_exact=True)
     (build/'timing.json').write_text(json.dumps(report,indent=2)+'\n')
     dut._log.info('PASS full model five-stage FC1/FC2 comparison; best samples %s',best)

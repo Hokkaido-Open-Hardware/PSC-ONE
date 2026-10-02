@@ -44,9 +44,9 @@
 /* ============================================================
    SynapEngine execution
 
-   A/B are tightly packed matrix_N x matrix_N arrays.
+   A[M][K] and B[K][N] are tightly packed row-major arrays.
    RTL performs all 4x4 tiling internally.
-   C is returned as a tightly packed matrix_N x matrix_N array.
+   C[M][N] is returned tightly packed; only M rows are computed.
    ============================================================ */
 #ifndef SA_DEBUG
 #define SA_DEBUG 0
@@ -59,20 +59,23 @@
 #endif
 
 static int sa_active;
-int sa_run_checked(
+int sa_run_rect_checked(
     const uint8_t *in_A,
     const uint8_t *in_B,
-    uint8_t matrix_N,
+    uint32_t m, uint32_t k, uint32_t n,
     uint32_t *out_C,
     bool signed_mode)
 {
-    if (!in_A || !in_B || !out_C || matrix_N == 0 ||
-        matrix_N > SA_MAT_MAX || (matrix_N & 3u)) return -1;
+    if (!in_A || !in_B || !out_C || !m || !k || !n ||
+        m > SA_MAT_MAX || k > SA_MAT_MAX || n > SA_MAT_MAX ||
+        (k & 3u) || (n & 3u)) return -1;
     if (sa_active) return -3;
     sa_active = 1;
-    uint32_t config =
-        ((uint32_t)matrix_N << 24) |
-        ((uint32_t)matrix_N << 16);
+    uint32_t config = (1u << 4); /* OS mode; instruction[11:8] = 0. */
+    const uint32_t size =
+        (m << 16) | /* M: A/C rows */
+        (n << 8) |  /* Y: B/C columns */
+        k;          /* X: reduction dimension */
 
     /*
      * CSR_SA_CTRL bit3
@@ -88,11 +91,11 @@ int sa_run_checked(
         (volatile const uint32_t *)(uintptr_t)PSC_SA_ADDR_C;
 
     SA_LOG(
-        "SA A=%x B=%x C=%x N=%d signed=%d\n",
+        "SA A=%x B=%x C=%x M=%d K=%d N=%d signed=%d\n",
         (uint32_t)(uintptr_t)in_A,
         (uint32_t)(uintptr_t)in_B,
         (uint32_t)PSC_SA_ADDR_C,
-        (int)matrix_N,
+        (int)m, (int)k, (int)n,
         (int)signed_mode
     );
 
@@ -110,6 +113,8 @@ int sa_run_checked(
         CSR_SA_ADDR_C,
         PSC_SA_ADDR_C
     );
+
+    CSR_WRITE(CSR_SA_SIZE, size);
 
     __asm__ volatile("fence rw, rw" ::: "memory");
 
@@ -190,7 +195,7 @@ int sa_run_checked(
 
     /*
      * start bitだけ落とす。
-     * signed_mode bit3は維持される。
+     * signed_mode bit3とOS mode bit4は維持される。
      */
     CSR_WRITE(
         CSR_SA_CTRL,
@@ -199,9 +204,7 @@ int sa_run_checked(
 
     __asm__ volatile("fence rw, rw" ::: "memory");
 
-    const uint32_t count =
-        (uint32_t)matrix_N *
-        (uint32_t)matrix_N;
+    const uint32_t count = m * n;
 
     for (uint32_t index = 0u;
          index < count;
@@ -222,6 +225,11 @@ int sa_run_checked(
     SA_LOG("SA run complete\n");
     sa_active = 0;
     return 0;
+}
+
+int sa_run_checked(const uint8_t *a, const uint8_t *b, uint8_t n,
+                   uint32_t *c, bool signed_mode) {
+    return sa_run_rect_checked(a, b, n, n, n, c, signed_mode);
 }
 
 void sa_run(const uint8_t *a, const uint8_t *b, uint8_t n,

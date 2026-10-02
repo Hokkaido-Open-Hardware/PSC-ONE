@@ -171,7 +171,7 @@ module PSC_ONE_RV32_core #(
     // Csr to SynapEngine
     // --------------------------------
     wire [31:0]  csr_SA_CTRL;
-    wire [31:0]  csr_SA_MODE;
+    wire [31:0]  csr_SA_SIZE;
     wire [31:0]  csr_SA_STATUS;
     wire [31:0]  csr_SA_ADDR_A;
     wire [31:0]  csr_SA_ADDR_B;
@@ -261,7 +261,7 @@ module PSC_ONE_RV32_core #(
         .csr_DMA_STATUS             (csr_DMA_STATUS), 
 
         .csr_SA_CTRL                (csr_SA_CTRL),      // SynapEngine
-        .csr_SA_MODE                (csr_SA_MODE), 
+        .csr_SA_SIZE                (csr_SA_SIZE), 
         .csr_SA_STATUS              (csr_SA_STATUS),
         .csr_SA_ADDR_A              (csr_SA_ADDR_A),
         .csr_SA_ADDR_B              (csr_SA_ADDR_B),
@@ -293,14 +293,15 @@ module PSC_ONE_RV32_core #(
     wire sa_state_reset   = csr_SA_CTRL[1];
     wire sa_clear         = csr_SA_CTRL[2];
     wire signed_mode      = csr_SA_CTRL[3];
+    wire sa_os_mode       = csr_SA_CTRL[4];
     wire [3:0] sa_os_instruction 
                           = csr_SA_CTRL[11:8];
-    wire [7:0] sa_matrix_size_x
-                          = csr_SA_CTRL[23:16];
-    wire [7:0] sa_matrix_size_y
-                          = csr_SA_CTRL[31:24];
-
-    //wire sa_os_mode = csr_SA_MODE[0];
+    wire [7:0] sa_matrix_size_x 
+                          = csr_SA_SIZE[7:0];
+    wire [7:0] sa_matrix_size_y 
+                          = csr_SA_SIZE[15:8];
+    wire [7:0] sa_matrix_size_m
+                          = csr_SA_SIZE[23:16];
     
     // addr, data, valid
     wire sa_valid = sa_read_valid | sa_write_valid;
@@ -320,8 +321,8 @@ module PSC_ONE_RV32_core #(
     wire sa_rw = sa_write_valid;
     wire sa_req_ready;
 
-    //PSC_NPU_Controller u_systolic (
-    PSC_NPU_Controller u_systolic (
+    //PSC_NPU_Controller u_npu (
+    PSC_NPU_Controller u_npu (
         .clock              (clock),
         `ifdef SystolicArray_OFF
         .reset_n            (1'b0),
@@ -338,6 +339,7 @@ module PSC_ONE_RV32_core #(
 
         .matrix_size_x      (sa_matrix_size_x),
         .matrix_size_y      (sa_matrix_size_y),
+        .matrix_size_m      (sa_matrix_size_m),
 
         // SDRAM base address
         .BASE_ADDR_A        (csr_SA_ADDR_A),

@@ -61,15 +61,15 @@ static const uint8_t weight2[4] = {
 static inline void sa_clear()
 {
     // bit[2] = accumulator clear
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x04u);
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00u);
+    CSR_WRITE(0x7C0, (1u << 4) | 0x04u);
+    CSR_WRITE(0x7C0, (1u << 4) | 0x00u);
 }
 
 static inline void sa_state_reset()
 {
     // bit[1] = controller state reset
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x02u);
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00u);
+    CSR_WRITE(0x7C0, (1u << 4) | 0x02u);
+    CSR_WRITE(0x7C0, (1u << 4) | 0x00u);
 }
 
 static inline void sa_wait_done()
@@ -118,10 +118,10 @@ static inline void sa_matmul4x4(
     sa_set_B(B);
 
     sa_state_reset();
-    CSR_WRITE(0x7C4, 0x01u); // Output Stationary mode
+    CSR_WRITE(0x7C4, (4u << 16) | (4u << 8) | 4u); // SA size: M=4, Y=4, X=4
 
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x01u); // start
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00u);
+    CSR_WRITE(0x7C0, (1u << 4) | 0x01u); // start
+    CSR_WRITE(0x7C0, (1u << 4) | 0x00u);
 
     sa_wait_done();
     sa_read_C(C);

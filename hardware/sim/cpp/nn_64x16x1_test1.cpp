@@ -139,23 +139,25 @@ static inline uint8_t weight2_at(
 // ============================================================
 // SA Control
 //
-// csr_SA_CTRL[23:16] : matrix_size_x
-// csr_SA_CTRL[31:24] : matrix_size_y
-// csr_SA_CTRL[7:0]   : control bits
+// csr_SA_SIZE[7:0]   : matrix_size_x (K)
+// csr_SA_SIZE[15:8]  : matrix_size_y (N)
+// csr_SA_SIZE[23:16] : matrix_size_m (M)
+// csr_SA_CTRL[4]     : OS mode
+// csr_SA_CTRL[3:0]   : control bits
 // ============================================================
 
 static constexpr uint32_t SA_CTRL_START       = 0x01u;
 static constexpr uint32_t SA_CTRL_STATE_RESET = 0x02u;
 static constexpr uint32_t SA_CTRL_CLEAR       = 0x04u;
 
-static constexpr uint32_t sa_make_ctrl(
+static constexpr uint32_t sa_make_size(
     uint32_t matrix_size_x,
-    uint32_t matrix_size_y,
-    uint32_t control)
+    uint32_t matrix_size_y)
 {
-    return ((matrix_size_y & 0xFFu) << 24) |
-           ((matrix_size_x & 0xFFu) << 16) |
-           (control & 0xFFFFu);
+    // Existing matrices have M=Y rows; X is the reduction dimension.
+    return ((matrix_size_y & 0xFFu) << 16) |
+           ((matrix_size_y & 0xFFu) << 8) |
+           (matrix_size_x & 0xFFu);
 }
 
 static inline void sa_write_ctrl(
@@ -163,10 +165,8 @@ static inline void sa_write_ctrl(
     uint32_t matrix_size_y,
     uint32_t control)
 {
-    CSR_WRITE(
-        0x7C0,
-        sa_make_ctrl(matrix_size_x, matrix_size_y, control)
-    );
+    CSR_WRITE(0x7C4, sa_make_size(matrix_size_x, matrix_size_y));
+    CSR_WRITE(0x7C0, (1u << 4) | control);
 }
 
 static inline void sa_clear(
@@ -495,7 +495,7 @@ extern "C" void run()
     CSR_WRITE(0x7D8, SA_BASE_ADDR_C);
 
     // SA有効化
-    CSR_WRITE(0x7C4, 0x01u);
+    CSR_WRITE(0x7C0, (1u << 4));
 
     // ------------------------------------------------
     // CPU calculation

@@ -66,7 +66,7 @@ module Csr (
 
     // to SynapEngine
     output logic [31:0]       out_SA_CTRL,
-    output logic [31:0]       out_SA_MODE,
+    output logic [31:0]       out_SA_SIZE,
     input  logic [31:0]       in_SA_STATUS,
     output logic [31:0]       out_SA_ADDR_A,
     output logic [31:0]       out_SA_ADDR_B,
@@ -120,7 +120,7 @@ module Csr (
 
     // ---------------- SynapEngine CSRs ----------------
     logic  [31:0] csr_SA_CTRL;
-    logic  [31:0] csr_SA_MODE;
+    logic  [31:0] csr_SA_SIZE;
     logic  [31:0] csr_SA_STATUS;
     logic  [31:0] csr_SA_ADDR_A;
     logic  [31:0] csr_SA_ADDR_B;
@@ -240,7 +240,7 @@ module Csr (
         out_DMA_SRC     = csr_DMA_SRC;
         out_DMA_DST     = csr_DMA_DST;
         out_SA_CTRL     = csr_SA_CTRL;
-        out_SA_MODE     = csr_SA_MODE;
+        out_SA_SIZE     = csr_SA_SIZE;
         out_SA_ADDR_A   = csr_SA_ADDR_A;
         out_SA_ADDR_B   = csr_SA_ADDR_B;
         out_SA_ADDR_C   = csr_SA_ADDR_C;
@@ -350,7 +350,7 @@ module Csr (
             csr_DMA_DST     <= 32'b0; 
             // SA
             csr_SA_CTRL     <= 32'b0; 
-            csr_SA_MODE     <= 32'b0; 
+            csr_SA_SIZE     <= 32'b0; 
             csr_SA_ADDR_A   <= SA_ADDR_A;
             csr_SA_ADDR_B   <= SA_ADDR_B;
             csr_SA_ADDR_C   <= SA_ADDR_C;
@@ -411,7 +411,7 @@ module Csr (
 
                     // ===== SynapEngine =====
                     12'h7C0: csr_SA_CTRL    <= csr_write_newv;
-                    12'h7C4: csr_SA_MODE    <= csr_write_newv;
+                    12'h7C4: csr_SA_SIZE    <= csr_write_newv;
                     // 7C8: csr_SA_STATUS
                     12'h7D0: csr_SA_ADDR_A  <= csr_write_newv;
                     12'h7D4: csr_SA_ADDR_B  <= csr_write_newv;

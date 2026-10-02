@@ -509,3 +509,79 @@ async def test_systolic_array_4x4(dut):
 
     for _ in range(5):
         await RisingEdge(dut.clock)
+
+
+@cocotb.test(timeout_time=100, timeout_unit="us")
+async def test_systolic_array_1x4_4x4(dut):
+    """A:1×4、B:4×4の行列積と未使用PE行のゼロを検証する。"""
+    cocotb.start_soon(Clock(dut.clock, 10, unit="ns").start())
+
+    # 固定ベクトルで全k・全列の寄与とINT8の境界値を確認する。
+    cases = [
+        (0, np.array([[1, 2, 3, 255]], dtype=np.int64),
+         np.array([[1, 2, 3, 4],
+                   [5, 6, 7, 8],
+                   [9, 10, 11, 12],
+                   [13, 14, 15, 255]], dtype=np.int64)),
+        (1, np.array([[-128, -1, 2, 127]], dtype=np.int64),
+         np.array([[127, -128, 3, -4],
+                   [-5, 6, -7, 8],
+                   [9, -10, 11, -12],
+                   [-128, 127, -15, 16]], dtype=np.int64)),
+    ]
+
+    for signed_mode, A, B in cases:
+        label = "SIGNED INT8" if signed_mode else "UNSIGNED INT8"
+        log_section(dut, f"{label} 1x4 x 4x4")
+
+        dut.reset_n.value = 0
+        dut.signed_mode.value = signed_mode
+        dut.data_clear.value = 1
+        dut.en_b_shift_bottom.value = 0
+        dut.en_shift_right.value = 0
+        dut.start_pulse.value = 0
+        dut.ps_select.value = 0
+        dut.a_left_in_bus.value = 0
+        dut.b_top_in_bus.value = 0
+
+        for _ in range(5):
+            await RisingEdge(dut.clock)
+
+        dut.reset_n.value = 1
+        dut.data_clear.value = 0
+        for _ in range(3):
+            await RisingEdge(dut.clock)
+
+        C_expected = A @ B
+        log_matrix(dut, "A (1x4)", A)
+        log_matrix(dut, "B (4x4)", B)
+        log_matrix(dut, "Expected (1x4)", C_expected)
+
+        # Aは行0のみに投入。B[k,j]はt=k+jに投入する。
+        for t in range(2 * N - 1):
+            a_values = [int(A[0, t]) if t < N else 0, 0, 0, 0]
+            b_values = [
+                int(B[t - col, col]) if 0 <= t - col < N else 0
+                for col in range(N)
+            ]
+            await execute_mac_step(dut, a_values, b_values)
+
+        for _ in range(N):
+            await execute_mac_step(dut, [0] * N, [0] * N)
+
+        C_hw = await read_ps_acc_matrix(dut)
+        if signed_mode:
+            width = len(dut.ps_acc_out)
+            C_hw = np.where(C_hw & (1 << (width - 1)),
+                            C_hw - (1 << width), C_hw)
+
+        log_matrix(dut, "HW (1x4)", C_hw[:1, :])
+        assert np.array_equal(C_hw[:1, :], C_expected), (
+            f"{label} 1x4 x 4x4 matrix mismatch\n"
+            f"A=\n{A}\nB=\n{B}\n"
+            f"Expected=\n{C_expected}\nHW=\n{C_hw[:1, :]}\n"
+        )
+        assert np.all(C_hw[1:, :] == 0), (
+            f"{label} unused PE rows must remain zero:\n{C_hw[1:, :]}"
+        )
+        dut._log.info(f"✅ {label} 1x4 x 4x4 PASS")

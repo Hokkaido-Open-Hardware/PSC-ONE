@@ -13,9 +13,9 @@ module PSC_NPU_ReadController #(
 
     // Matrix dimensions:
     //
-    // A = matrix_size_y x matrix_size_x
+    // A = M x matrix_size_x
     // B = matrix_size_x x matrix_size_y
-    // C = matrix_size_y x matrix_size_y
+    // C = M x matrix_size_y
     //
     // Both sizes must be non-zero multiples of four.
     input  wire [7:0]       matrix_size_x,
@@ -41,7 +41,10 @@ module PSC_NPU_ReadController #(
     // One 4x4 tile:
     // 4 rows x 32 bits
     output reg [127:0]      a_data_out,
-    output reg [127:0]      b_data_out
+    output reg [127:0]      b_data_out,
+
+    // A rows: zero (or omitted port) preserves M=matrix_size_y.
+    input  wire [7:0]       matrix_size_m = 8'd0
 );
 
     localparam [2:0]
@@ -61,6 +64,8 @@ module PSC_NPU_ReadController #(
 
     reg [7:0] matrix_size_x_r;
     reg [7:0] matrix_size_y_r;
+    wire [7:0] matrix_rows = (matrix_size_m == 8'd0) ? matrix_size_y : matrix_size_m;
+    reg [1:0] a_last_row_r;
 
     // Sequential address cursors.  The first address of each tile is
     // calculated once when the request is accepted; subsequent rows are
@@ -131,7 +136,7 @@ module PSC_NPU_ReadController #(
      * Aタイルの各行アドレス
      *
      * A:
-     *     rows = matrix_size_y
+     *     rows = M
      *     cols = matrix_size_x
      *
      * 対象タイル:
@@ -212,6 +217,7 @@ module PSC_NPU_ReadController #(
 
             matrix_size_x_r   <= 8'd0;
             matrix_size_y_r   <= 8'd0;
+            a_last_row_r     <= 2'd3;
             a_addr_cur         <= 32'd0;
             b_addr_cur         <= 32'd0;
 
@@ -237,6 +243,13 @@ module PSC_NPU_ReadController #(
 
                         matrix_size_x_r <= matrix_size_x;
                         matrix_size_y_r <= matrix_size_y;
+                        // Precompute the last valid A row before issuing
+                        // memory requests; later handshakes use a 2-bit compare.
+                        if ((matrix_rows[1:0] != 2'd0)
+                            && (i_idx == {2'b00, matrix_rows[7:2]}))
+                            a_last_row_r <= matrix_rows[1:0] - 2'd1;
+                        else
+                            a_last_row_r <= 2'd3;
 
                         // First row of A[i_idx][k_idx] and B[k_idx][j_idx].
                         // Only this request-capture cycle contains the tile
@@ -290,7 +303,9 @@ module PSC_NPU_ReadController #(
                                 ;
                         endcase
 
-                        if (read_idx == 2'd3) begin
+                        // Unread A rows stay zero from R_IDLE. Never request
+                        // memory beyond the final valid row of A.
+                        if (read_idx == a_last_row_r) begin
                             read_idx <= 2'd0;
                             state    <= R_B_START;
                         end else begin

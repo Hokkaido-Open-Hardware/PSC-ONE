@@ -5,9 +5,10 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* Platform boundary: real SYS_SA_RUN on PSC-OS; square-matmul mock on host. */
+/* Platform boundary: A[m][k] * B[k][n] = C[m][n], row-major.
+   Real rectangular SYS_SA_RUN on PSC-OS; matrix multiplication mock on host. */
 int psc_tflite_sa_tile(const int8_t *a,const int8_t *b,int32_t *c,
-                        unsigned n,psc_sa_profile_t *profile);
+                        unsigned m,unsigned k,unsigned n,psc_sa_profile_t *profile);
 int psc_tflite_clock_us(void);
 /* Batched FC: x[m,k], w[n,k], dot[m,n], m,n <= tile. */
 int psc_tflite_synap_batch(const int8_t *x,const int8_t *w,unsigned m,unsigned k,unsigned n,

@@ -32,9 +32,18 @@ ACC clear and start are accepted only while idle; clear has priority. The A/B
 shift registers still respond to their enables/clear during a batch, while the
 snapshot protects in-flight operands. `ps_acc_out` can change while busy; the
 Controller reads it after done. The public Controller ports, CSR/software
-format, memory handshakes and Controller done/reset behavior remain unchanged.
+format, memory handshakes and Controller done/reset behavior remain unchanged
+apart from the optional matrix row input described below.
 
-`../npu` is the unmodified legacy implementation. It supplies the legacy PE
+The Controller supports `A[M][K] * B[K][N] = C[M][N]` through
+`matrix_size_m=M`, `matrix_size_x=K`, and `matrix_size_y=N`.
+M may be 1..255; K/N remain non-zero multiples of four. M=0 or an omitted M
+port preserves the original M=N behavior. Partial row tiles need no memory
+padding: unused A rows are zero-filled and only valid C rows are written.
+See [matrix dimensions and examples](../npu/README.md#legacy-controller-matrix-dimensions).
+CPU CSR wiring retains M=N until a separate software/CSR extension drives M.
+
+`../npu` is the configurable-multiplier legacy implementation. It supplies the legacy PE
 atomic-commit, 2x2 and one-MUL Controller regression tests. Do not compile both
 versions together: their public module names intentionally match, so the CPU
 RTL does not need to change.

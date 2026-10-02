@@ -71,12 +71,17 @@ void handle_syscall(struct trap_frame *f) {
         const uint8_t *user_A = (const uint8_t *)(uintptr_t)f->a0;
         const uint8_t *user_B = (const uint8_t *)(uintptr_t)f->a1;
         uint32_t *user_C = (uint32_t *)(uintptr_t)f->a2;
-        uint32_t n = f->a4;
+        int rectangular = (f->a5 & PSC_SA_RECT_FLAG) != 0;
+        uint32_t m = rectangular ? (f->a4 >> 16) & 255u : f->a4;
+        uint32_t k = rectangular ? f->a4 & 255u : f->a4;
+        uint32_t n = rectangular ? (f->a4 >> 8) & 255u : f->a4;
         bool option = (bool)(f->a5 & 1u);
         int profiling = (f->a5 & PSC_SA_PROFILE_FLAG) != 0;
         psc_sa_profile_t profile = {0};
 
-        if (n == 0 || n > SA_MAT_MAX || (n & 3u) != 0u) {
+        if (!m || !k || !n || m > SA_MAT_MAX || k > SA_MAT_MAX ||
+            n > SA_MAT_MAX || (k & 3u) || (n & 3u) ||
+            (rectangular && (f->a4 >> 24))) {
             f->a0 = (uint32_t)-1;
             break;
         }
@@ -85,9 +90,9 @@ void handle_syscall(struct trap_frame *f) {
         static _Alignas(4) uint8_t kernel_B[SA_MAT_MAX * SA_MAT_MAX];
         static uint32_t kernel_C[SA_MAT_MAX * SA_MAT_MAX];
 
-        uint32_t elements = n * n;
-        if ((f->a2 & 3u) || !user_accessible(f->a0, elements, PAGE_R) ||
-            !user_accessible(f->a1, elements, PAGE_R) ||
+        uint32_t a_elements = m * k, b_elements = k * n, elements = m * n;
+        if ((f->a2 & 3u) || !user_accessible(f->a0, a_elements, PAGE_R) ||
+            !user_accessible(f->a1, b_elements, PAGE_R) ||
             !user_accessible(f->a2, elements * 4, PAGE_W) ||
             (profiling && ((f->a6 & 3u) || !user_accessible(f->a6, sizeof(profile), PAGE_W)))) {
             f->a0 = (uint32_t)-1;
@@ -95,14 +100,12 @@ void handle_syscall(struct trap_frame *f) {
         }
 
         int t0 = profiling ? timer_measure_read_us() : -1;
-        for (uint32_t i = 0; i < elements; ++i) {
-            kernel_A[i] = user_A[i];
-            kernel_B[i] = user_B[i];
-            kernel_C[i] = 0;
-        }
+        for (uint32_t i = 0; i < a_elements; ++i) kernel_A[i] = user_A[i];
+        for (uint32_t i = 0; i < b_elements; ++i) kernel_B[i] = user_B[i];
+        for (uint32_t i = 0; i < elements; ++i) kernel_C[i] = 0;
 
         int t1 = profiling ? timer_measure_read_us() : -1;
-        int status = sa_run_checked(kernel_A, kernel_B, (uint8_t)n, kernel_C, option);
+        int status = sa_run_rect_checked(kernel_A, kernel_B, m, k, n, kernel_C, option);
         if (status) { f->a0 = (uint32_t)status; break; }
         int t2 = profiling ? timer_measure_read_us() : -1;
 

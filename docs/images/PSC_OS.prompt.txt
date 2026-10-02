@@ -1,0 +1,67 @@
+PSC-OS diagram generation record
+Tool: built-in image_gen (no CLI/API fallback)
+Date: 2026-10-03
+Outputs: PSC-ONE/docs/images/PSC_OS.jpg; PSC-ONE/software/docs/PSC_OS.jpg
+References: previous PSC_OS.jpg, PSC_RV32_V1.jpg, PSC_RV32_V2.jpg
+Source review: software/os/Makefile; src/kernel/kernel.c, kernel_syscall.c,
+  kernel_process.c; src/shell/shell.c; src/boot/psc_mbios.S;
+  docs/psc_os.md; docs/psc_os_api.md.
+Generated PNG converted to JPEG at quality 96 with 4:4:4 chroma sampling.
+
+Initial prompt:
+Use case: infographic-diagram.
+Redraw the old PSC-OS architecture diagram (input 1), replacing ALL its obsolete contents with the accurately specified architecture below. Inputs 2 and 3 are STYLE REFERENCES ONLY: PSC_RV32_V1 and PSC_RV32_V2. Match their white background, deep royal blue rounded title badge, medium blue 2-3 px box outlines, bold clean sans-serif typography, saturated green/orange/purple/red functional boxes, light blue detail boxes, straight blue arrows, precise spacious engineering block diagram look. No gradients, shadows, 3D, decorative icons, watermarks. A landscape high-resolution diagram, roughly 3:2 aspect ratio. All text in English and perfectly spelled. Large enough to read; avoid cramming source filenames. Title badge "PSC-OS". Header to its right "Current software architecture | 2026-10-03".
+
+LAYOUT: main runtime area occupies left ~76% of width; right ~22% a distinct boot/firmware panel. Hardware band spans full width below them. White margins. Make clearly nested boxes distinguish execution/linking boundaries.
+
+LEFT MAIN AREA:
+1) Upper green-outlined large white container heading "U-mode | User applications".
+Inside it on left 74%: green panel labeled "Shell + embedded libraries (one user image)" with a pale blue top bar "UART shell / diagnostics / built-in commands".
+Below it 4 neatly arranged colored small boxes, using a 2x2 grid:
+orange "MicroPython" / "REPL + psc module"
+light blue "FAT32" / "File operations / stream I/O"
+teal "JPEG / TJpgDec" / "Streaming RGB888 decode"
+purple with white text "TFLite INT8 FC" / "CPU / Synap / PULP backends"
+To right inside U-mode: orange-outlined white box "External ELF32" / "One foreground app" / "Console + exit ABI" / "Exit / fault returns to shell".
+An arrow from shell toward external ELF labeled "run".
+2) Gap below U-mode containing blue vertical double-headed arrow labeled "ECALL / return". Show this links U-mode and kernel dispatcher.
+3) Large red-outlined white container heading "S-mode | PSC-OS kernel".
+Top red band with white text "Trap handling / syscall dispatch".
+Below, three equal pale-blue boxes:
+"Task switching" / "idle + shell / yield"
+"Memory management" / "4 KiB pages / Sv32 tables"
+"ELF loader" / "Validate / map / restore"
+One small legible note beneath them: "Timer preemption implemented; disabled in normal boot."
+Lower purple panel with white heading "Drivers / kernel services"; pale blue inner boxes in TWO balanced rows if needed, exact labels:
+"UART / console", "SD sector I/O", "LCD / I2S mic", "GPIO / timer", "DMA", "SynapEngine / speech".
+Avoid implying user FAT32 is in kernel.
+4) Arrow from bottom of kernel straight down to full-width Hardware band, labeled "MMIO / memory / DMA". Must NOT route through MBIOS.
+
+RIGHT SIDE PANEL: heading "Boot / firmware".
+Upper gray-filled white-text box "M-mode | BootROM / MBIOS" and lines "Privilege setup" / "Trap delegation" / "SBI services".
+Below a dashed blue arrow to orange-outline white box "S-mode | SD bootloader" and lines "FAT32 or raw-sector".
+Below an arrow to pale blue box "Load kernel + user images".
+Below an arrow to pale blue box "Kernel init" / "Pages / idle / shell".
+Below an arrow to green-filled white-text box "U-mode shell".
+Small note "SD boot path shown".
+A dashed control/services connection from MBIOS toward the S-mode kernel may be drawn across reserved white gap, only if uncluttered. Do not imply MBIOS mediates all device I/O.
+
+BOTTOM full-width blue-outlined hardware container heading "PSC-ONE hardware".
+Two rows or spacious single row of light blue boxes, labels:
+"PSC_RV32 CPU" / "M / S / U + Sv32"
+"SDRAM"
+"UART / GPIO / timer"
+"SD card / SPI"
+"LCD / I2S mic"
+"DMA / SynapEngine"
+Use distinct colors for peripheral boxes consistent with CPU references if useful.
+
+FOOTER below hardware: "Full shell configuration | PULP backend depends on CPU/build configuration"
+Second smaller line: "Current MMU: U/S and A/D checks are not enforced."
+Small legend if space permits: solid arrow "Call / data flow"; dashed arrow "Boot / control".
+
+Technical invariants: MicroPython and TFLite run in the shell user image, not independent processes; FAT32 runtime is user-side while SD block driver is kernel-side; bootloader FAT32 is separate boot-specific logic. ELF executes foreground via kernel mapping and restores shell on exit/fault; not a newly spawned task. TFLite is a limited INT8 fully connected runtime, not a full TFLM interpreter. MBIOS initializes mode and delegation; SD bootloader runs S-mode. Keep all boxes, arrows and labels readable, no crossing text. Preserve the CPU-reference visual style, but do not copy CPU pipeline blocks into the OS diagram.
+
+Final correction prompt:
+Precise technical diagram correction. Preserve this entire image exactly: all text, typography, colors, layout, dimensions, boxes, and all other arrows. Make ONLY this one edit: remove the horizontal dashed blue arrow at y~216 between the left edge of the gray M-mode BootROM/MBIOS box and the right edge of the External ELF32 box. This arrow incorrectly points from MBIOS directly into ELF. Erase that arrow completely, restoring white background and restoring any underlying solid green and blue vertical container borders unbroken. Do not add any replacement arrow or move anything. Keep the vertical dashed arrow from MBIOS down to the SD bootloader. Keep the shell-to-ELF solid run arrow. Everything else stays unchanged.
+

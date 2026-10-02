@@ -56,7 +56,7 @@ async def full_tflite_fc1_fc2_all_samples(dut):
         cpu = {(int(r['sample']),int(r['layer']),int(r['channel'])):r
                for r in csv.DictReader(f)}
     await tick(reset_n=0,start=0,sa_state_reset=0,sa_clear=0,sa_os_instruction=0,
-               signed_mode=1,matrix_size_x=16,matrix_size_y=4,
+               signed_mode=1,matrix_size_x=16,matrix_size_y=4,matrix_size_m=0,
                BASE_ADDR_A=0x12000,BASE_ADDR_B=0x24000,BASE_ADDR_C=0x48000)
     await tick(reset_n=1)
     for sample,data in enumerate(samples):

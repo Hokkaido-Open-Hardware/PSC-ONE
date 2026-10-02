@@ -109,6 +109,8 @@ PE_FILE = $(LEGACY_SRC_DIR)/PSC_NPU_PE_INT.sv \
 VERILOG_FILE_SA_2x2 = $(LEGACY_SRC_DIR)/PSC_NPU_SystolicArray2x2.v $(PE_FILE)
 VERILOG_FILE_SA_4x4 = $(LEGACY_SRC_DIR)/PSC_NPU_SystolicArray4x4.v $(PE_FILE)
 NPU_CTRL_FILE 	    = $(LEGACY_SRC_DIR)/PSC_NPU_Controller.v \
+	$(LEGACY_SRC_DIR)/PSC_NPU_Engine.sv \
+	$(LEGACY_SRC_DIR)/PSC_LPU_Controller.sv \
 	                  $(LEGACY_SRC_DIR)/PSC_NPU_ReadController.v
 
 NPU_RTL_FILES		= $(NPU_CTRL_FILE) $(VERILOG_FILE_SA_4x4)
@@ -164,10 +166,10 @@ endif
 #--------------------------------------------------
 # Targets
 #--------------------------------------------------
-.PHONY: simulate_all simulate_PE simulate_SA_2x2 simulate_SA_4x4 simulate_SA_Ctrl simulate_SA_multicycle_Ctrl
+.PHONY: simulate_all simulate_PE simulate_SA_2x2 simulate_SA_4x4 simulate_SA_Ctrl
 
 # まとめて実行
-simulate_all: simulate_PE simulate_SA_2x2 simulate_SA_4x4 simulate_SA_Ctrl simulate_SA_multicycle_Ctrl
+simulate_all: simulate_PE simulate_SA_2x2 simulate_SA_4x4 simulate_SA_Ctrl
 		
 # Output Stationary.
 simulate_SA_Ctrl: 

@@ -36,11 +36,13 @@ Linuxや既存RTOSをベースにしたOSではなく、MicroPython、JPEGデコ
 | シェル | コマンド実行、FAT32、ELF起動、MicroPython | [shell.c](../software/os/src/shell/shell.c) |
 | ELF | 形式検査、配置、実行と復帰 | [elf_loader.c](../software/os/src/kernel/elf_loader.c)、[kernel_elf.c](../software/os/src/kernel/kernel_elf.c) |
 
-<img src="images/PSC_OS.jpg" width="800" alt="PSC-OS conceptual software architecture">
+<img src="images/PSC_OS.jpg" width="800" alt="PSC-OS architecture: U-mode shell and libraries, S-mode kernel and drivers, BootROM and SD boot flow, PSC-ONE hardware">
 
-> 画像は従来の概念図を維持しています。図ではFAT32がカーネル内にありますが、現行のshell/ELF経路は
-> FAT32をユーザーイメージへリンクし、SDアクセスをシステムコール経由で行います。
-> この図を実装上の特権境界やリンク配置そのものとは解釈しないでください。
+図は2026-10-03時点のfull shell構成です。FAT32、MicroPython、JPEG、TFLiteは
+シェルのユーザーイメージへリンクされ、SDなどのデバイス操作はシステムコール経由で行います。
+外部ELFはforegroundで実行し、終了・処理可能なfaultでシェルへ復帰します。
+右側はSD起動経路で、M-modeのBootROM / MBIOSからS-modeのbootloaderへ移ります。
+図のmode区分と現行MMUの保護機能の制限は、下記「メモリと権限」を参照してください。
 
 ## 起動フロー
 
@@ -110,7 +112,7 @@ FPGAへ登録するBootROM/bootloaderと、カード上のkernel/userを同じ�
 `yield()` は実行可能タスクを選び、ページテーブルと実行contextを切り替えます。
 M-mode timer trapによるプリエンプション経路もあり、スケジューラ用tickは1 msです。
 通常起動はidleとshellを作り、`yield()`でshellへ移ります。
-`kernel_main()` 内の追加kernel taskと `preemption_start()` は現在 `#if 0` です。
+`kernel_main()` 内の追加kernel taskと `preemption_start()` は現在 `MULTITASK_MODE=0` により無効です。
 プリエンプションの実装があることと、通常起動で有効なことを区別してください。
 
 U-mode trapではユーザーSPをそのままカーネルスタックに使わず、プロセスごとの8 KiBスタックへ切り替えます。

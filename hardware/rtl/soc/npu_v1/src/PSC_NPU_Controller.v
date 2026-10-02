@@ -18,6 +18,9 @@ module PSC_NPU_Controller #(
     input  wire [7:0]       matrix_size_x,
     input  wire [7:0]       matrix_size_y,
 
+    // A/C rows: 1..255. Zero (or omitted port) preserves M=matrix_size_y.
+    input  wire [7:0]       matrix_size_m,
+
     // SDRAM base address
     input  wire [31:0]      BASE_ADDR_A,
     input  wire [31:0]      BASE_ADDR_B,
@@ -59,19 +62,27 @@ module PSC_NPU_Controller #(
     `endif
 
     // Runtime dimensions:
-    //   A = matrix_size_y x matrix_size_x
+    //   A = M x matrix_size_x
     //   B = matrix_size_x x matrix_size_y
-    //   C = matrix_size_y x matrix_size_y
+    //   C = M x matrix_size_y
     //
-    // Both dimensions must be non-zero multiples of four.
+    // X/K and Y/N must be non-zero multiples of four. M may be 1..255.
+    // Keep dimensions and base addresses stable until done. Capture M at start.
+    reg [7:0] matrix_rows;
     wire [7:0] tile_count_k = matrix_size_x >> 2;
     wire [7:0] tile_count_y = matrix_size_y >> 2;
+    wire [7:0] last_matrix_row = matrix_rows - 8'd1;
 
     // 4x4 tile loop indices:
     // C[i_idx][j_idx] += A[i_idx][k_idx] * B[k_idx][j_idx]
     reg [7:0] i_idx;
     reg [7:0] j_idx;
     reg [7:0] k_idx;
+
+    // Precompute the final PE selector once per tile to keep the
+    // write-ack control path free of row-address arithmetic.
+    reg [5:0] tile_last_output;
+    reg       last_m_tile;
 
     //--------------------------------------------
     // C address helpers
@@ -180,6 +191,7 @@ module PSC_NPU_Controller #(
 
         .matrix_size_x      (matrix_size_x),
         .matrix_size_y      (matrix_size_y),
+        .matrix_size_m      (matrix_rows),
 
         .i_idx              (i_idx),
         .j_idx              (j_idx),
@@ -326,6 +338,9 @@ module PSC_NPU_Controller #(
             i_idx             <= 8'd0;
             j_idx             <= 8'd0;
             k_idx             <= 8'd0;
+            matrix_rows       <= 8'd0;
+            tile_last_output  <= 6'd15;
+            last_m_tile       <= 1'b0;
 
             cur_a_data        <= 32'd0;
             cur_b_data        <= 32'd0;
@@ -355,6 +370,8 @@ module PSC_NPU_Controller #(
                 //--------------------------------------------
                 S_IDLE: begin
                     if (start) begin
+                        matrix_rows   <= (matrix_size_m == 8'd0)
+                                         ? matrix_size_y : matrix_size_m;
                         i_idx         <= 8'd0;
                         j_idx         <= 8'd0;
                         k_idx         <= 8'd0;
@@ -370,6 +387,11 @@ module PSC_NPU_Controller #(
                 // new C[i_idx][j_idx] output tile.
                 //--------------------------------------------
                 S_CLEAR: begin
+                    last_m_tile <= (i_idx == {2'b00, last_matrix_row[7:2]});
+                    if (i_idx == {2'b00, last_matrix_row[7:2]})
+                        tile_last_output <= {2'b00, last_matrix_row[1:0], 2'b11};
+                    else
+                        tile_last_output <= 6'd15;
                     data_clear <= 1'b1;
                     row_s      <= 6'd0;
                     k_idx      <= 8'd0;
@@ -507,14 +529,15 @@ module PSC_NPU_Controller #(
                 //--------------------------------------------
                 S_OUTPUT_MEMORY_W: begin
                     if (c_write_ready) begin
-                        if (row_s == PE_N*PE_N - 1) begin
+                        if (row_s == tile_last_output) begin
                             row_s <= 6'd0;
-                            k_idx <= 8'd0;
+                            // S_CLEAR resets K before the next tile. Avoid
+                            // feeding the write-ack/tile-end path into K's CE.
 
                             if (j_idx != tile_count_y - 8'd1) begin
                                 j_idx <= j_idx + 8'd1;
                                 state <= S_CLEAR;
-                            end else if (i_idx != tile_count_y - 8'd1) begin
+                            end else if (!last_m_tile) begin
                                 i_idx <= i_idx + 8'd1;
                                 j_idx <= 8'd0;
                                 state <= S_CLEAR;

@@ -50,7 +50,7 @@ module PSC_RV32_core #(
     input  wire [31:0]      csr_DMA_STATUS,
     // SynapEngine
     output wire [31:0]      csr_SA_CTRL,
-    output wire [31:0]      csr_SA_MODE,
+    output wire [31:0]      csr_SA_SIZE,
     input  wire [31:0]      csr_SA_STATUS,
     output wire [31:0]      csr_SA_ADDR_A,
     output wire [31:0]      csr_SA_ADDR_B,
@@ -277,7 +277,7 @@ module PSC_RV32_core #(
 
         // SynapEngine
         .out_SA_CTRL        (csr_SA_CTRL),
-        .out_SA_MODE        (csr_SA_MODE),
+        .out_SA_SIZE        (csr_SA_SIZE),
         .in_SA_STATUS       (csr_SA_STATUS),
         .out_SA_ADDR_A      (csr_SA_ADDR_A),
         .out_SA_ADDR_B      (csr_SA_ADDR_B),

@@ -130,6 +130,8 @@ The software side of PSC-ONE currently includes:
 
 ### CPU Architecture
 
+`cpu_legacy` is the CPU core developed during the initial prototyping phase of PSC-ONE.
+
 <img src="docs/images/PSC_RV32.jpg" width="800" alt="PSC RV32">
 
 

@@ -13,7 +13,8 @@ extern "C" volatile uint32_t timer_data;
 // SynapEngine CSR
 // ============================================================
 // CSR 0x7C0 : SA Control
-// CSR 0x7C4 : SA Status
+// CSR 0x7C4 : SA Size (X[7:0], Y[15:8], M[23:16])
+// CSR 0x7C8 : SA Status
 // ============================================================
 #define SA_BASE_ADDR_A      0x020000
 #define SA_BASE_ADDR_B      0x021000
@@ -200,10 +201,10 @@ extern "C" void run() {
     // 4. SA開始
     // --------------------------------------------------------
     // sa_state_reset
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x02);
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00);
-    // sa_mode : OS mode.
-    CSR_WRITE(0x7C4, 0x01);
+    CSR_WRITE(0x7C0, (1u << 4) | 0x02);
+    CSR_WRITE(0x7C0, (1u << 4) | 0x00);
+    // SA size: M=4, Y=4, X=4.
+    CSR_WRITE(0x7C4, (4u << 16) | (4u << 8) | 4u);
     // sa_start
     //CSR_WRITE(0x7C0, 0x01);   // SA start
     //CSR_WRITE(0x7C0, 0x00);   // clear start
@@ -211,8 +212,8 @@ extern "C" void run() {
     // TIMER書き込み start
     TIMER_MMIOADDR_W = 0x100FF;
 
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x01);   // SA start
-    CSR_WRITE(0x7C0, (0x04 << 24) | (0x04 << 16) | 0x00);   // clear start
+    CSR_WRITE(0x7C0, (1u << 4) | 0x01);   // SA start
+    CSR_WRITE(0x7C0, (1u << 4) | 0x00);   // clear start
 
     // SA計算待ち
     //tiny_delay(100);

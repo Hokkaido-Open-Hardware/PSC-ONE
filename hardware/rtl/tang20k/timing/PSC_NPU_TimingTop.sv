@@ -42,7 +42,8 @@ module PSC_NPU_Timing (
     // PSC_NPU_Controller input stimulus
     //
     // matrix_size_x/y are always non-zero multiples of four, matching the
-    // runtime matrix-size contract of PSC_NPU_Controller.  The upper stimulus
+    // K/N contract of PSC_NPU_Controller. M uses all eight bits (0 means M=N).
+    // The upper stimulus
     // bits vary the matrix size so address-generation logic is not reduced to
     // a single compile-time constant case.
     // ------------------------------------------------------------------------
@@ -122,6 +123,7 @@ module PSC_NPU_Timing (
 
         .matrix_size_x      (matrix_size_x),
         .matrix_size_y      (matrix_size_y),
+        .matrix_size_m      (stimulus[31:24]),
 
         .BASE_ADDR_A        (BASE_ADDR_A),
         .BASE_ADDR_B        (BASE_ADDR_B),

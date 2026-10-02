@@ -106,7 +106,7 @@ static constexpr uint32_t sa_command(
     uint32_t command)
 {
     return
-        (MATRIX_SIZE << 24) | (MATRIX_SIZE << 16) |
+        (1u << 4) |
         command;
 }
 
@@ -305,8 +305,8 @@ extern "C" void run()
     // C行列出力先
     CSR_WRITE(0x7D8, SA_BASE_ADDR_C);
 
-    // SA有効化
-    CSR_WRITE(0x7C4, 0x01u);
+    // SA size: M=Y=X=MATRIX_SIZE
+    CSR_WRITE(0x7C4, (MATRIX_SIZE << 16) | (MATRIX_SIZE << 8) | MATRIX_SIZE);
 
     initialize_matrices();
 

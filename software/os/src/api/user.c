@@ -790,3 +790,19 @@ int call_sa_matmul_int8(const int8_t *a, const int8_t *b, int32_t *c,
         : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6) : "memory");
     return (int)a0;
 }
+
+int call_sa_matmul_int8_rect(const int8_t *a, const int8_t *b, int32_t *c,
+                        unsigned m, unsigned k, unsigned n, psc_sa_profile_t *profile) {
+    if (!m || !k || !n || m > SA_MAT_MAX || k > SA_MAT_MAX ||
+        n > SA_MAT_MAX || (k & 3u) || (n & 3u)) return -1;
+    register uint32_t a0 __asm__("a0") = (uint32_t)(uintptr_t)a;
+    register uint32_t a1 __asm__("a1") = (uint32_t)(uintptr_t)b;
+    register uint32_t a2 __asm__("a2") = (uint32_t)(uintptr_t)c;
+    register uint32_t a3 __asm__("a3") = SYS_SA_RUN;
+    register uint32_t a4 __asm__("a4") = PSC_SA_DIMS(m,k,n);
+    register uint32_t a5 __asm__("a5") = 1u | PSC_SA_RECT_FLAG | (profile ? PSC_SA_PROFILE_FLAG : 0u);
+    register uint32_t a6 __asm__("a6") = (uint32_t)(uintptr_t)profile;
+    __asm__ volatile("ecall" : "+r"(a0)
+        : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6) : "memory");
+    return (int)a0;
+}

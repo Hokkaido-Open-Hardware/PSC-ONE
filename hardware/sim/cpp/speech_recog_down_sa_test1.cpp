@@ -144,20 +144,21 @@ alignas(4) static const uint8_t kW2Npu[HIDDEN][SA_ROWS] = {
 static const uint32_t kW2NpuSums[SA_ROWS] = {2088u,1961u,2216u,2048u};
 
 
-static constexpr uint32_t sa_make_ctrl(uint32_t matrix_size_x,
-                                       uint32_t matrix_size_y,
-                                       uint32_t control)
+static constexpr uint32_t sa_make_size(uint32_t matrix_size_x,
+                                      uint32_t matrix_size_y)
 {
-    return ((matrix_size_y & 0xFFu) << 24) |
-           ((matrix_size_x & 0xFFu) << 16) |
-           (control & 0xFFFFu);
+    // Existing matrices have M=Y rows; X is the reduction dimension.
+    return ((matrix_size_y & 0xFFu) << 16) |
+           ((matrix_size_y & 0xFFu) << 8) |
+           (matrix_size_x & 0xFFu);
 }
 
 static inline void sa_write_ctrl(uint32_t matrix_size_x,
                                  uint32_t matrix_size_y,
                                  uint32_t control)
 {
-    CSR_WRITE(0x7C0, sa_make_ctrl(matrix_size_x, matrix_size_y, control));
+    CSR_WRITE(0x7C4, sa_make_size(matrix_size_x, matrix_size_y));
+    CSR_WRITE(0x7C0, (1u << 4) | control);
 }
 
 static inline void sa_command_pulse(uint32_t matrix_size_x,
@@ -299,7 +300,7 @@ static uint32_t run_nn_sa()
     }
 
     CSR_WRITE(0x7D8, SA_BASE_ADDR_C);
-    CSR_WRITE(0x7C4, 0x01u);
+    CSR_WRITE(0x7C0, (1u << 4));
 
     dense1_sa();
     dense2_sa();

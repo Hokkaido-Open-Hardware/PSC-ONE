@@ -93,3 +93,6 @@ int call_timer_measure_read_us(void);
 #include "sa_transfer.h"
 int call_sa_matmul_int8(const int8_t *a, const int8_t *b, int32_t *c,
                         unsigned n, psc_sa_profile_t *profile);
+/* Row-major A[m][k] * B[k][n] = C[m][n]; m=1..64, k/n multiples of 4. */
+int call_sa_matmul_int8_rect(const int8_t *a, const int8_t *b, int32_t *c,
+                             unsigned m, unsigned k, unsigned n, psc_sa_profile_t *profile);

@@ -25,6 +25,7 @@ SDRAM_MODEL  		= ../rtl/model/SDRAM_model/w9825g6kh_verilator.v
 GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram_verilator.v
 SDCARD_MODEL 		= ../rtl/model/SDCARD_model/sdcard_spi_model.v
 TOP_COMPILE_ARGS 	= -DTOP_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_FST
 
 ifeq ($(SIM_FAST),1)
 EXTRA_ARGS = \
@@ -225,6 +226,8 @@ NPU_V2_FILES = \
 # Legacy NPU
 NPU_LEGACY_FILES = \
 	$(NPU_LEGACY_DIR)/PSC_NPU_Controller.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Engine.sv \
+	$(NPU_LEGACY_DIR)/PSC_LPU_Controller.sv \
 	$(NPU_LEGACY_DIR)/PSC_NPU_ReadController.v \
 	$(NPU_LEGACY_DIR)/PSC_NPU_SystolicArray4x4.v \
 	$(NPU_LEGACY_DIR)/PSC_NPU_PE_INT.sv \
@@ -298,7 +301,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	boot_test1:RV32ISP_chip_test:./mem/boot_test1.mem:0x00001321 \
+	lpu_test1:RV32ISP_chip_test:./mem/lpu_test1.mem:0x0000beef \
 
 # ============================================================
 # 複数テスト定義
@@ -310,6 +313,7 @@ PSCONE_SINGLE_TEST = \
 PSCONE_BASIC_TESTS = \
 	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
 	add_test2:RV32ISP_chip_test:./mem/add_test2.mem:0x00000000 \
+	lpu_test1:RV32ISP_chip_test:./mem/lpu_test1.mem:0x0000beef \
 	timer_irq_test1:RV32ISP_chip_test:./mem/timer_irq_test1.mem:0x00000321 \
 	timer_irq_test2:RV32ISP_chip_test:./mem/timer_irq_test2.mem:0x00000322 \
 	forwarding_test1:RV32ISP_chip_test:./mem/forwarding_test1.mem:0x00000011 \

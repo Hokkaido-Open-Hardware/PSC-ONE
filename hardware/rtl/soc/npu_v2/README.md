@@ -9,6 +9,13 @@ Tang Nano 20K上で乗算器を2項のshift/addへ置き換える独立実験。
 既存 `../npu_v1`、CPU RTL、OSソフトウェアは変更していない。
 Makefileからの `NPU_VERSION=v2` 選択に対応した（末尾の手順を参照）。FPGA実機試験は行っていない。
 
+Controllerは `matrix_size_m=M`、`matrix_size_x=K`、`matrix_size_y=N` で
+`A[M][K] * B[K][N] = C[M][N]` に対応する。Mは1～255、K/Nは非ゼロの4の倍数。
+M=0またはポート省略時は従来どおりM=N。未使用のA行は読み出さずゼロ埋めし、
+Cは有効行だけ書き戻す。Bは引き続きv2固有の重みコードを使用する。
+CPUの既存CSR接続はM=Nを維持する。
+指定例は[行列サイズの説明](../npu/README.md#legacy-controller-matrix-dimensions)を参照。
+
 測定結果: 演算用MULT9X9を4個削減したが、LUTが増えFmaxが低下した。
 8 laneで同一clock時のv1 throughputを回復できるものの、DSP不足がない用途で
 v1を置き換える優位性は確認できなかった。末尾にnextpnrの全比較を記載する。

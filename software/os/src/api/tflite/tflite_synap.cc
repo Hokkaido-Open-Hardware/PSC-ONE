@@ -18,14 +18,16 @@ extern "C" int psc_tflite_synap_batch(const int8_t *x,const int8_t *w,unsigned m
     for (unsigned base=0;base<k;base+=tile) {
         int t0=p?psc_tflite_clock_us():-1;
         unsigned count=k-base<tile ? k-base : tile;
-        memset(a,0,tile*tile);memset(b,0,tile*tile);
-        for(unsigned row=0;row<n;++row)
-            for(unsigned col=0;col<count;++col) a[row*tile+col]=w[row*k+base+col];
+        // A contains only real input rows; B is transposed weights.
+        // M=m avoids computing and copying the padded tile rows.
+        memset(a,0,m*tile);memset(b,0,tile*tile);
+        for(unsigned sample=0;sample<m;++sample)
+            for(unsigned col=0;col<count;++col) a[sample*tile+col]=x[sample*k+base+col];
         for(unsigned row=0;row<count;++row)
-            for(unsigned sample=0;sample<m;++sample) b[row*tile+sample]=x[sample*k+base+row];
+            for(unsigned col=0;col<n;++col) b[row*tile+col]=w[col*k+base+row];
         int t1=p?psc_tflite_clock_us():-1;
         psc_sa_profile_t device={};
-        int rc=psc_tflite_sa_tile(a,b,c,tile,p?&device:nullptr);
+        int rc=psc_tflite_sa_tile(a,b,c,m,tile,tile,p?&device:nullptr);
         int t2=p?psc_tflite_clock_us():-1;
         if(p) {
             ++p->tiles;p->device_status=rc;
@@ -40,7 +42,7 @@ extern "C" int psc_tflite_synap_batch(const int8_t *x,const int8_t *w,unsigned m
             return PSC_TFLITE_ERR_SYNAP;
         }
         for(unsigned sample=0;sample<m;++sample)
-            for(unsigned row=0;row<n;++row) dot[sample*n+row]+=c[row*tile+sample];
+            for(unsigned row=0;row<n;++row) dot[sample*n+row]+=c[sample*tile+row];
         if(p) elapsed(p,t2,psc_tflite_clock_us(),p->partial_us);
     }
     return 0;

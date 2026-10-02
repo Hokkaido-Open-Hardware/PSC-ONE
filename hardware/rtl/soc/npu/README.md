@@ -437,6 +437,36 @@ The current execution mode is Output-Stationary.
 
 Weight-Stationary mode is not currently implemented.
 
+### Legacy controller matrix dimensions
+
+The legacy `PSC_NPU_Controller` supports `A[M][K] * B[K][N] = C[M][N]`:
+
+| Input | Meaning | Supported values |
+| --- | --- | --- |
+| `matrix_size_x` | K: A columns / B rows | 4..252, multiples of four |
+| `matrix_size_y` | N: B/C columns | 4..252, multiples of four |
+| `matrix_size_m` | M: A/C rows | 1..255; 0 uses `matrix_size_y` |
+
+For `A[1][4] * B[4][4]`, set `(matrix_size_m, matrix_size_x, matrix_size_y)`
+to `(1, 4, 4)`. For `A[2][4] * B[4][4]`, use `(2, 4, 4)`.
+The output contains respectively four or eight 32-bit elements.
+
+A and B contain contiguous row-major bytes; C contains contiguous row-major
+32-bit results. No extra rows or memory padding are required for A or C.
+The read controller leaves unused A tile rows at zero and issues no reads for
+them. Writeback emits only the valid rows. Signed and unsigned modes use the
+same dimensions and memory layout.
+
+`matrix_size_m` is captured on `start`. Keep the other dimensions, addresses
+and `signed_mode` stable until `done`, as before. The optional M input defaults
+to zero when omitted from a module instance, preserving the existing M=N
+behavior. Testbenches driving the controller as a top-level module should
+explicitly initialize M to zero for the original behavior.
+
+NPU v1/v2 support the same M input and row handling; v2 retains its own encoded
+weight arithmetic. Existing CPU CSR connections do not drive M and retain
+M=N; software selection of M requires a separate CSR integration change.
+
 ---
 
 ## Systolic Array vs PicoRV32 — Yosys Analysis
@@ -634,6 +664,121 @@ This separation may allow the same hardware resources to support multiple comput
 The current 4×4 Output-Stationary matrix engine is the first working implementation of this concept.
 
 ---
+
+## PSC-LPU v0.1
+
+`src/PSC_NPU_Controller.v` is the common port wrapper. Its input/output ports
+are unchanged. The existing NPU implementation is in `src/PSC_NPU_Engine.sv`;
+the ternary engine and its independent FSM are in `src/PSC_LPU_Controller.sv`.
+The NPU engine body is unchanged from the original controller.
+
+| ENABLE_NPU | ENABLE_LPU | Configuration |
+|---|---|---|
+| 1 | 0 | Existing NPU (default) |
+| 0 | 1 | PSC-LPU |
+| 0 | 0 | All outputs zero |
+| 1 | 1 | Elaboration / synthesis configuration error |
+
+For LPU, use signed INT8 A in row-major order and packed ternary B. Each
+32-bit B word contains a 4x4 tile, row-major, first element in bits [1:0].
+Codes 00, 01, 10 mean 0, +1, -1; 11 is reserved and treated as zero by RTL.
+Software must not generate 11. B tile `(kt, nt)` is at
+`BASE_ADDR_B + 4 * (kt * (N/4) + nt)`.
+
+K and N must be multiples of four in 4..252. M is 1..255; M=0 means M=N.
+All bases must be word-aligned, and the A/B/C regions must not overlap.
+Invalid dimensions or unaligned bases are ignored in IDLE without memory
+traffic. Region overlap and 32-bit address overflow are software constraints.
+Unlike the legacy NPU reader, the LPU does not mask upper address bits.
+
+The datapath has sixteen signed INT32 accumulators and four shared addition
+lanes. Negation widens A before subtracting, so `-(-128)` accumulates +128.
+A full 4x4x4 tile takes 16 accumulation cycles after its data is loaded.
+Reserved/zero codes leave accumulators unchanged. Address cursors advance
+using addition; neither the dot products nor addresses use multipliers.
+
+`OUT_SHIFT` (0..31, default 0) performs an arithmetic right shift followed
+by saturation to [-128,127]. Four output bytes pack as `{c3,c2,c1,c0}`;
+the C address is `BASE_ADDR_C + m*N + n`. There is no rounding, bias, ReLU,
+zero-point correction, or TFLite-compatible requantization.
+`LPU_OUTPUT_INT32=1` bypasses shift/saturation and writes raw accumulators
+at `BASE_ADDR_C + 4*(m*N+n)`. Software must allocate the larger C buffer.
+
+Dimensions and all bases are captured at start. `signed_mode` is ignored.
+Only one pulse/response transaction is outstanding: check `sa_req_ready`,
+issue one clock of valid, then wait for `rd_read_ready` or `c_write_ready`.
+The real `cache_dma_controller_io.sv` captures SA requests into its pending
+slot, even if another client wins arbitration after the ready check. Both
+response inputs connect to `sa_ready` in the SoC. Final `done` occurs only
+after the final write response, and remains high until `sa_state_reset`.
+Additional starts and clear/reset commands during busy are ignored;
+`sa_clear` clears datapath state in IDLE.
+
+### LPU / NPU logic-size comparison (2026-10-03)
+
+Both configurations were synthesized with Yosys 0.68+136 (`c30457480`),
+`synth_gowin -family gw2a -noiopads`, top `PSC_NPU_Controller`, `MUL_NUM=4`,
+and `OUT_SHIFT=0`. The NPU measurement includes its reader, array, shared
+multiplier, accumulator state and controller. The LPU measurement includes
+its complete reader, datapath, quantization and controller. CPU, cache,
+SDRAM controller and I/O pads are excluded from both measurements.
+
+| Resource | NPU | LPU INT8 | LPU/NPU | LPU INT32 | LPU/NPU |
+|---|---:|---:|---:|---:|---:|
+| LUT1..LUT4 | 2,439 | 1,753 | 0.719 | 1,679 | 0.688 |
+| FF | 2,142 | 1,112 | 0.519 | 1,114 | 0.520 |
+| ALU primitives | 788 | 645 | 0.819 | 449 | 0.570 |
+| Wide MUX primitives | 356 | 456 | 1.281 | 348 | 0.978 |
+| MULT9X9 DSP primitives | 7 | 0 | 0.000 | 0 | 0.000 |
+
+The default INT8 LPU therefore reduces LUT count by **28.1%** and FF count
+by **48.1%**, while eliminating DSP use. Its wide-MUX count increases by
+**28.1%**. These are mapped primitive counts, not a single physical area
+ratio: LUTs, ALUs, MUXs, FFs and DSPs cannot simply be added as equal units.
+ALU primitives are bit-slice mapping resources, not the number of 32-bit
+arithmetic lanes. The seven NPU DSP primitives include address arithmetic.
+INT32 mode avoids the four saturation converters, explaining its lower
+combinational count despite additional writes. This comparison is against
+the legacy NPU in this directory, not `npu_v1` or `npu_v2`.
+Placement/routing, maximum frequency and board execution are not measured.
+
+Reproduce from the repository root (activate the project's Python environment):
+
+```bash
+python PSC-ONE/hardware/rtl/soc/npu/tests/run_lpu.py --build /tmp/lpu-tests
+python PSC-ONE/hardware/rtl/soc/npu/tests/synthesize_lpu.py \
+  --build /tmp/lpu-area --yosys PSC-ONE/hardware/sim/yosys/build/yosys
+python PSC-ONE/hardware/sim/cocotb_tb/npu/run_streaming_validation.py \
+  --baseline --case controller,legacy_controller1,controller_cycles \
+  --build /tmp/lpu-npu-regression
+```
+
+`run_lpu.py` checks 276 matrices per configuration, with INT8 shifts 0/1/7/31
+and raw INT32 at shifts 0/7: **1,656 matrix cases PASS**. Coverage includes
+all 256 four-lane 2-bit code patterns, A=-128/127, multiple K/N/M tiles,
+M=1/2/3/4/5/255, K/N=252, M=0 fallback, bounds, packing, saturation,
+negative shifts, zero-wait and randomized response delays, shared read/write
+completion, delayed final writes, input snapshots, busy-time controls,
+sticky done, and command restart. Disabled outputs and invalid configuration
+rejection also pass. Legacy NPU controller tests: **15 PASS**, including
+`MUL_NUM=1` and `MUL_NUM=4`. Verilator lint and Yosys `check -assert` pass.
+The synthesis runner also asserts that no `$mul` cell remains in either LPU.
+
+`hardware/sim/cpp/lpu_test1.cpp` uses the existing CSRs and packs B once before
+inference. It checks M=1..5 and M=0, K=12, N=8, all output elements against
+a CPU reference, guard words, completion status and restart. Success is
+PIO `0xEE01` followed by `0xBEEF`; failure is `0xDEAD0001`..`0xDEAD0006`.
+Build with `make -C PSC-ONE/hardware/sim/cpp lpu_test1`. The software macros
+`LPU_OUT_SHIFT` and `LPU_OUTPUT_INT32` must match hardware parameters.
+The isolated SoC runner configures generated copies of the controller and
+boot ROM for LPU execution, keeping CPU RTL and repository defaults intact:
+
+```bash
+python PSC-ONE/hardware/rtl/soc/npu/tests/run_lpu_chip.py --build /tmp/lpu-chip
+```
+
+CPU v1 + LPU + actual cache/SDRAM simulation: **PASS**, PIO=`0x0000BEEF`.
+The C++ program builds with the existing strict warning/error flags.
 
 ## License
 

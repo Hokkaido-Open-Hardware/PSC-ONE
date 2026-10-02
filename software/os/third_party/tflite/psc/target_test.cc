@@ -15,13 +15,13 @@ static void check(bool ok,unsigned line) {
     if(!ok) { PIO=0xbad00001;PIO=line;PIO=0xee01;PIO=0xbad0bad0;for(;;)asm volatile("nop"); }
 }
 #define CHECK(x) check(bool(x),__LINE__)
-extern "C" int sa_run_checked(const uint8_t *,const uint8_t *,uint8_t,uint32_t *,int);
+extern "C" int sa_run_rect_checked(const uint8_t *,const uint8_t *,uint32_t,uint32_t,uint32_t,uint32_t *,int);
 static unsigned sa_calls;
-extern "C" int psc_tflite_sa_tile(const int8_t *a,const int8_t *b,int32_t *c,unsigned n,psc_sa_profile_t *p) {
+extern "C" int psc_tflite_sa_tile(const int8_t *a,const int8_t *b,int32_t *c,unsigned m,unsigned k,unsigned n,psc_sa_profile_t *p) {
     ++sa_calls;
     int start=psc_tflite_clock_us();
-    int rc=sa_run_checked(reinterpret_cast<const uint8_t *>(a),reinterpret_cast<const uint8_t *>(b),
-                          n,reinterpret_cast<uint32_t *>(c),1);
+    int rc=sa_run_rect_checked(reinterpret_cast<const uint8_t *>(a),reinterpret_cast<const uint8_t *>(b),
+                          m,k,n,reinterpret_cast<uint32_t *>(c),1);
     if(p)*p={1,0,unsigned(psc_tflite_clock_us()-start),0};
     return rc;
 }
@@ -64,6 +64,37 @@ extern "C" __attribute__((noinline)) int32_t audit_scalar(const int8_t *x,const 
 extern "C" __attribute__((noinline)) int32_t audit_pulp(const int8_t *x,const int8_t *w,int k) {
     int32_t r=0;if(!psc_tflite_pulp::try_dot(x,w,k,0,true,&r))r=audit_scalar(x,w,k);return r;
 }
+// Compare the legacy padded 16x16 path with A[1][16] * B[16][16]
+// using identical buffers and a warm driver, outside model timing.
+static void rectangular_benchmark() {
+    alignas(4) static uint8_t a[16*16], b[16*16];
+    static uint32_t out[16*16+1];
+    for(unsigned i=0;i<256;++i) { a[i]=uint8_t(i*79+13);b[i]=uint8_t(i*53+7); }
+    const unsigned rows[]={1,2,3,4,5,7,16};
+    for(unsigned sign=0;sign<2;++sign) {
+        for(unsigned m:rows) {
+            for(auto &v:out)v=0x12345678;
+            CHECK(sa_run_rect_checked(a,b,m,16,16,out,sign)==0);
+            for(unsigned r=0;r<m;++r)for(unsigned c=0;c<16;++c) {
+                int32_t ref=0;
+                for(unsigned k=0;k<16;++k)
+                    ref+=(sign?int32_t(int8_t(a[r*16+k])):int32_t(a[r*16+k]))*
+                         (sign?int32_t(int8_t(b[k*16+c])):int32_t(b[k*16+c]));
+                CHECK(out[r*16+c]==uint32_t(ref));
+            }
+            for(unsigned i=m*16;i<257;++i)CHECK(out[i]==0x12345678);
+        }
+        for(unsigned sample=0;sample<3;++sample)for(unsigned turn=0;turn<2;++turn) {
+            unsigned m=((sample+turn)&1)?1:16;
+            CHECK(sa_run_rect_checked(a,b,m,16,16,out,sign)==0);
+            timer_start();unsigned begin=psc_tflite_clock_us();
+            int rc=sa_run_rect_checked(a,b,m,16,16,out,sign);
+            unsigned us=psc_tflite_clock_us()-begin;
+            CHECK(rc==0 && us>0 && TIMER_R>0);
+            PIO=0xee60;PIO=sample;PIO=sign;PIO=m;PIO=us;
+        }
+    }
+}
 extern "C" void run() {
     alignas(4) int8_t x[40],w[40];
     for(int ax=0;ax<4;++ax)for(int aw=0;aw<4;++aw)for(int k=1;k<=33;++k) {
@@ -101,6 +132,7 @@ extern "C" void run() {
     }
     PIO=0xee50;
     for(unsigned i=0;i<20;++i)for(unsigned j=0;j<5;++j)PIO=uint32_t(reference_rows[i][j]);
+    rectangular_benchmark();
     PIO=0xee01;PIO=0x600d600d;
     for(;;)asm volatile("nop");
 }

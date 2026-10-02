@@ -98,8 +98,8 @@
     "psc/run_host.py": "ae8f9fd59413df9ab0b4fa36ef4e33c6b63231f2b889e487ec5f3a29bd882e31",
     "psc/runtime-integration.patch": "6b655046ce30e98021b7d6ce587eb8a2d9e649ba09e1fd04c013b859a8c37689",
     "psc/run_target.py": "c4f0b5b45213287be001ad85802ab7b385e0791a838d4d49c79f597a7a9ce97e",
-    "psc/target_cocotb.py": "e13cd329e5abbd69a7766c67a709dae94a436cc47ee3caf27f071712845271a4",
-    "psc/target_test.cc": "2a9af28f50d321e7c7d5d84a5ce38f1e048b89aa972a0ccc94fbd8920507314f",
+    "psc/target_cocotb.py": "984f9f78b8ffb33046571f63fc5b577485b696898d3f2502ff4b10cf18259234",
+    "psc/target_test.cc": "5617a1c363fb53a328e7fd0904a0be54809aa9b3befecd2d3230dcd6dd7d8f92",
     "psc/validation.json": "9a1ca23cb7e2e6d348800cbf15c546a43758aa434267aa5ae821512277f2e63c"
   },
   "gemmlowp": {

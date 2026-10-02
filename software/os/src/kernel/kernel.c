@@ -13,6 +13,9 @@
 // if 1 : multitask mode
 #define MULTITASK_MODE 0 
 
+#define NPU_TESTMODE 1
+#define PSC_LOGOMODE 0
+
 extern uint8_t _binary_shell_bin_start[];
 extern uint8_t _binary_shell_bin_end[];
 extern char __bss[], __bss_end[], __kernel_stack_top[];
@@ -168,11 +171,11 @@ __attribute__((used)) void kernel_main(void) {
     s_printf("memset = ON\n");
     memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
 #endif
-#if 0
+#if NPU_TESTMODE
     s_printf("NPU TEST\n");
     s_call_sa_api(4, true, true);
 #endif
-#if 0
+#if PSC_LOGOMODE
     s_printf("Draw PSC Logo\n");
     lcd_draw_boot_logo();
 #endif

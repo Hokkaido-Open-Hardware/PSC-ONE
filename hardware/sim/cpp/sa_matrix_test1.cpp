@@ -20,8 +20,10 @@ extern "C" volatile uint32_t timer_data;
 //          bit[0]     start
 //          bit[1]     state reset
 //          bit[2]     clear
+//          bit[4]     OS mode
 //          bit[11:8]  instruction
-//          bit[23:16] matrix size
+//
+// 0x7C4 : SA Size (X[7:0], Y[15:8], M[23:16])
 //
 // 0x7C8 : SA Status
 //          bit[0] done
@@ -49,7 +51,10 @@ static constexpr uint32_t TEST_END_CODE = 0x0000EE01u;
 static constexpr uint32_t MATRIX_SIZE = 8u;
 
 static constexpr uint32_t SA_CTRL_CONFIG =
-    MATRIX_SIZE << 24 | MATRIX_SIZE << 16;
+    (1u << 4);
+
+static constexpr uint32_t SA_SIZE_CONFIG =
+    (MATRIX_SIZE << 16) | (MATRIX_SIZE << 8) | MATRIX_SIZE;
 
 /* ============================================================
    CSR helpers
@@ -220,10 +225,12 @@ static void run_sa_8x8()
         SA_BASE_ADDR_C
     );
 
+    CSR_WRITE(0x7C4, SA_SIZE_CONFIG);
+
     /*
      * FSMをIDLEへ戻す
      *
-     * matrix_sizeの上位ビットは必ず維持する。
+     * OS mode bitは必ず維持する。
      */
     CSR_WRITE(
         0x7C0,
