@@ -6,7 +6,8 @@ import PSC_Types::*;
 module PSC_RV32_core #(
     parameter logic [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,     // 未使用.
     parameter logic [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
-    parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0
+    parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0,
+    parameter bit ENABLE_PULP = 1'b1
 )(
     input logic         clock,
     input logic         reset_n,
@@ -407,7 +408,7 @@ module PSC_RV32_core #(
 
     assign illegal_instruction = decoder_ctrl.raise_illegal_instruction;
 
-    PSC_RV32_InstructionEngine u_inst_engine(
+    PSC_RV32_InstructionEngine #(.ENABLE_PULP(ENABLE_PULP)) u_inst_engine(
         // clock, reset
         .clock                      (clock),
         .reset_n                    (reset_n),

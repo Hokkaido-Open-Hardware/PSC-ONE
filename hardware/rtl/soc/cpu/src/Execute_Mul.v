@@ -21,20 +21,18 @@ module Execute_Mul (
 
     reg [1:0] state;
 
-    reg signed [63:0] mul_ss;
-    reg signed [64:0] mul_su;
-    reg        [63:0] mul_uu;
+    wire signed [32:0] multiplicand;
+    wire signed [32:0] multiplier;
+    wire signed [65:0] product;
 
     assign busy = (state != IDLE);
 
-    always @(*) begin
-        mul_ss = $signed(data_1) * $signed(data_2);
-
-        mul_su = $signed({data_1[31], data_1})
-               * $signed({1'b0, data_2});
-
-        mul_uu = data_1 * data_2;
-    end
+    // One signed 33x33 product implements all four RV32M variants.
+    // Preserve the legacy live-input contract: RUN samples these operands
+    // and alucon, with no new registers or extra completion cycles.
+    assign multiplicand = {(alucon == 2'b01 || alucon == 2'b10) && data_1[31], data_1};
+    assign multiplier = {(alucon == 2'b01) && data_2[31], data_2};
+    assign product = multiplicand * multiplier;
 
     always @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
@@ -53,27 +51,8 @@ module Execute_Mul (
                 end
 
                 RUN: begin
-                    case (alucon)
-                        2'b00: begin
-                            // MUL: 下位32bit
-                            mul_out <= mul_uu[31:0];
-                        end
-
-                        2'b01: begin
-                            // MULH: signed × signed 上位32bit
-                            mul_out <= mul_ss[63:32];
-                        end
-
-                        2'b10: begin
-                            // MULHSU: signed × unsigned 上位32bit
-                            mul_out <= mul_su[63:32];
-                        end
-
-                        2'b11: begin
-                            // MULHU: unsigned × unsigned 上位32bit
-                            mul_out <= mul_uu[63:32];
-                        end
-                    endcase
+                    mul_out <= (alucon == 2'b00) ? product[31:0]
+                                                : product[63:32];
 
                     done  <= 1'b1;
                     state <= IDLE;

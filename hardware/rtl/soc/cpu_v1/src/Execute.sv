@@ -4,7 +4,8 @@ import PSC_Types::*;
 
 module Execute #(
     parameter bit ENABLE_MUL = 1'b1,
-    parameter bit ENABLE_DIV = 1'b1
+    parameter bit ENABLE_DIV = 1'b1,
+    parameter bit ENABLE_PULP = 1'b1
 )(
     input  logic        clock,
     input  logic        reset_n,
@@ -52,8 +53,9 @@ module Execute #(
                        (decoder_ctrl.alucon[4:2] == 3'b111);
     assign is_mul_op = ENABLE_MUL &&
                        ((decoder_ctrl.alucon[4:2] == 3'b110) ||
-                        (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTUP_H) ||
-                        (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTSP_B));
+                       (ENABLE_PULP &&
+                       ((decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTUP_H) ||
+                        (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTSP_B))));
     assign div_signed = (decoder_ctrl.alucon == 5'b1_1100) ||
                         (decoder_ctrl.alucon == 5'b1_1110);
     assign div_start = execute_enb && (state == IDLE) && is_div_op;
@@ -72,13 +74,13 @@ module Execute #(
         .remainder   (div_remainder)
     );
 
-    Execute_Mul u_multiplier (
+    Execute_Mul #(.ENABLE_PULP(ENABLE_PULP)) u_multiplier (
         .clk     (clock),
         .reset_n (reset_n),
         .start   (mul_start),
         .alucon  (decoder_ctrl.alucon[1:0]),
-        .dotup_h (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTUP_H),
-        .dotsp_b (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTSP_B),
+        .dotup_h (ENABLE_PULP && (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTUP_H)),
+        .dotsp_b (ENABLE_PULP && (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTSP_B)),
         .data_1  (operand_1),
         .data_2  (operand_2),
         .busy    (mul_busy),

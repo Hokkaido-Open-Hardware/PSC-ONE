@@ -5,7 +5,8 @@ import PSC_Types::*;
 module PSC_RV32_InstructionEngine #(
     parameter logic [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,
     parameter logic [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
-    parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0
+    parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0,
+    parameter bit ENABLE_PULP = 1'b1
 )(
     input  logic        clock,
     input  logic        reset_n,
@@ -243,7 +244,7 @@ module PSC_RV32_InstructionEngine #(
         .execute_task_done    (execute_task_done)
     );
 
-    Decorder u_Decorder (
+    Decorder #(.ENABLE_PULP(ENABLE_PULP)) u_Decorder (
         .clock                (clock),
         .reset_n              (reset_n),
         .decode_enb           (decode_enb),
@@ -256,7 +257,8 @@ module PSC_RV32_InstructionEngine #(
 
     Execute #(
         .ENABLE_MUL           (1'b1),
-        .ENABLE_DIV           (1'b1)
+        .ENABLE_DIV           (1'b1),
+        .ENABLE_PULP          (ENABLE_PULP)
     ) u_execute (
         .clock                (clock),
         .reset_n              (reset_n),

@@ -171,7 +171,7 @@ module PSC_ONE_RV32_core #(
     // Csr to SynapEngine
     // --------------------------------
     wire [31:0]  csr_SA_CTRL;
-    wire [31:0]  csr_SA_MODE;
+    wire [31:0]  csr_SA_SIZE;
     wire [31:0]  csr_SA_STATUS;
     wire [31:0]  csr_SA_ADDR_A;
     wire [31:0]  csr_SA_ADDR_B;

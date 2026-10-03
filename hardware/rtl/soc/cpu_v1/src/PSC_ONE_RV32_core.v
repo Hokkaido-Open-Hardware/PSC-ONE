@@ -49,7 +49,8 @@ module PSC_ONE_RV32_core #(
     parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_RX         = 32'h1000_7000,
     parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_ST         = 32'h1000_7004,
     parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_DATA         = 32'h1000_8000,
-    parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_CTRL         = 32'h1000_8004
+    parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_CTRL         = 32'h1000_8004,
+    parameter ENABLE_PULP = 1'b1
 )(
     // CLK, RESET
     input  wire                         clock,
@@ -219,7 +220,8 @@ module PSC_ONE_RV32_core #(
     // CORE
     // --------------------------------
     PSC_RV32_core #(
-        .COUNTER_MMIO_ADDR          (32'hF004_FFF0)
+        .COUNTER_MMIO_ADDR          (32'hF004_FFF0),
+        .ENABLE_PULP                (ENABLE_PULP)
     ) u_core (
         .clock                      (clock),
         .reset_n                    (reset_n),

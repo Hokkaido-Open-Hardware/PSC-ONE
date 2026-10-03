@@ -124,7 +124,7 @@ module PSC_CPU_TimingTop (
     (* keep = "true" *) logic [31:0] csr_DMA_DST;
 
     (* keep = "true" *) logic [31:0] csr_SA_CTRL;
-    (* keep = "true" *) logic [31:0] csr_SA_MODE;
+    (* keep = "true" *) logic [31:0] csr_SA_SIZE;
     (* keep = "true" *) logic [31:0] csr_SA_ADDR_A;
     (* keep = "true" *) logic [31:0] csr_SA_ADDR_B;
     (* keep = "true" *) logic [31:0] csr_SA_ADDR_C;
@@ -182,7 +182,7 @@ module PSC_CPU_TimingTop (
 
         // SynapEngine
         .csr_SA_CTRL                (csr_SA_CTRL),
-        .csr_SA_MODE                (csr_SA_MODE),
+        .csr_SA_SIZE                (csr_SA_SIZE),
         .csr_SA_STATUS              (csr_SA_STATUS),
         .csr_SA_ADDR_A              (csr_SA_ADDR_A),
         .csr_SA_ADDR_B              (csr_SA_ADDR_B),

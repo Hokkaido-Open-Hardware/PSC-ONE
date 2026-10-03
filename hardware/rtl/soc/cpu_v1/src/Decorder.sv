@@ -2,7 +2,9 @@
 
 import PSC_Types::*;
 
-module Decorder (
+module Decorder #(
+    parameter bit ENABLE_PULP = 1'b1
+)(
     input  logic        clock,
     input  logic        reset_n,
     input  logic        decode_enb,
@@ -44,8 +46,8 @@ module Decorder (
     localparam [6:0] MULDIV        = 7'b0110011; // (未使用なら無視)
 
     // Exact register/register forms only; all other custom-3 encodings trap.
-    wire is_cv_dotup_h = (opcode & 32'hfe00_707f) == 32'h8000_007b;
-    wire is_cv_dotsp_b = (opcode & 32'hfe00_707f) == 32'h9000_107b;
+    wire is_cv_dotup_h = ENABLE_PULP && ((opcode & 32'hfe00_707f) == 32'h8000_007b);
+    wire is_cv_dotsp_b = ENABLE_PULP && ((opcode & 32'hfe00_707f) == 32'h9000_107b);
     wire is_pulp = is_cv_dotup_h || is_cv_dotsp_b;
     wire illegal_pulp = (op == 7'h7b) && !is_pulp;
 
