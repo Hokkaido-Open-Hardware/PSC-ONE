@@ -34,7 +34,12 @@ module PSC_ONE_SOC #(
     parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_RX     = 32'h1000_7000,
     parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_ST     = 32'h1000_7004,
     parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_DATA     = 32'h1000_8000,    // TBD
-    parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_CTRL     = 32'h1000_8004     // TBD
+    parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_CTRL     = 32'h1000_8004,    // TBD
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_INPUT      = 32'h1000_9000,
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_STATUS     = 32'h1000_9004,
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT     = 32'h1000_9008,
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL    = 32'h1000_900C,
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ        = 32'h1000_9010
 )(
     // ==== RV32IS CPU IF ====
     input  wire         clock,
@@ -46,6 +51,10 @@ module PSC_ONE_SOC #(
     // ---- UART(RS-232C) ----
     input  wire         UART_RXD,
     output wire         UART_TXD,
+
+    // ---------------- PSC-ONE I2C ----------------
+    input  wire         PSCONE_SCL,
+    output wire         PSCONE_SDA,
 
     // ---------------- PSC-ONE SW ----------------
     input wire          PSCONE_SW1,
@@ -223,6 +232,7 @@ module PSC_ONE_SOC #(
     reg [31:0]  mmio_rdata;
     wire [31:0] mmio_rdata_pio;
     wire [31:0] mmio_rdata_uart;
+    wire [31:0] mmio_i2c_rdata;
     wire [31:0] mmio_rdata_timer;
     wire [31:0] mmio_rdata_led;     // not used
     wire [31:0] mmio_rdata_lcd;
@@ -248,6 +258,11 @@ module PSC_ONE_SOC #(
             TIMER_ST_ADDR:       mmio_rdata = mmio_rdata_timer;
             PSC_PFE_IF_DATA:     mmio_rdata = mmio_rdata_pfe;
             PSC_PFE_IF_CTRL:     mmio_rdata = mmio_rdata_pfe;
+            I2C_ADDR_INPUT:      mmio_rdata = mmio_i2c_rdata;
+            I2C_ADDR_STATUS:     mmio_rdata = mmio_i2c_rdata;
+            I2C_ADDR_OUTPUT:     mmio_rdata = mmio_i2c_rdata;
+            I2C_ADDR_CONTROL:    mmio_rdata = mmio_i2c_rdata;
+            I2C_ADDR_SEQ:        mmio_rdata = mmio_i2c_rdata;
             default: mmio_rdata = 32'd0;
         endcase
     end
@@ -262,6 +277,8 @@ module PSC_ONE_SOC #(
     wire    mmio_wready_pio;
     wire    mmio_rready_uart;
     wire    mmio_wready_uart;
+    wire    mmio_i2c_wready;
+    wire    mmio_i2c_rready;
     wire    mmio_wready_timer;
     wire    mmio_rready_timer;
     wire    mmio_rready_sd;
@@ -276,9 +293,10 @@ module PSC_ONE_SOC #(
     wire    mmio_wready_pfe;
 
     wire    mmio_ready = 
-                mmio_rready_pio | mmio_wready_pio | 
-                mmio_rready_uart | mmio_wready_uart | 
-                mmio_wready_timer | mmio_rready_timer | 
+                mmio_rready_pio | mmio_wready_pio |
+                mmio_rready_uart | mmio_wready_uart |
+                mmio_i2c_rready  | mmio_i2c_wready |
+                mmio_wready_timer | mmio_rready_timer |
                 mmio_rready_sd | 
                 mmio_rready_i2s | 
                 mmio_wready_i2s | 
@@ -571,6 +589,48 @@ module PSC_ONE_SOC #(
         .cpu_rready     (mmio_rready_uart),
 
         .irq_rx         ()
+    );
+
+    //==========================================================
+    // I2C Slave Controller
+    //==========================================================
+    wire        i2c_sda_drive_low;
+    wire        i2c_irq_rx;
+
+    // Open Drain SDA
+    assign PSCONE_SDA = i2c_sda_drive_low ? 1'b0 : 1'bz;
+
+    PSC_RV32_I2C #(
+        .ADDR_WIDTH       (32),
+        .SLAVE_ADDRESS    (7'h42),
+        .I2C_ADDR_INPUT   (I2C_ADDR_INPUT),
+        .I2C_ADDR_STATUS  (I2C_ADDR_STATUS),
+        .I2C_ADDR_OUTPUT  (I2C_ADDR_OUTPUT),
+        .I2C_ADDR_CONTROL (I2C_ADDR_CONTROL),
+        .I2C_ADDR_SEQ     (I2C_ADDR_SEQ)
+    ) u_i2c (
+        .clock          (clock),
+        .reset_n        (reset_n),
+
+        // I2C Interface
+        .scl_i          (PSCONE_SCL),
+        .sda_i          (PSCONE_SDA),
+        .sda_drive_low  (i2c_sda_drive_low),
+
+        // CPU Write Interface
+        .cpu_wvalid     (mmio_valid & mmio_rw),
+        .cpu_waddr      (mmio_addr),
+        .cpu_wdata      (mmio_wdata),
+        .cpu_wready     (mmio_i2c_wready),
+
+        // CPU Read Interface
+        .cpu_rvalid     (mmio_valid & ~mmio_rw),
+        .cpu_raddr      (mmio_addr),
+        .cpu_rdata      (mmio_i2c_rdata),
+        .cpu_rready     (mmio_i2c_rready),
+
+        // Interrupt
+        .irq_rx         (i2c_irq_rx)
     );
 
     //==========================================================

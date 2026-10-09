@@ -99,6 +99,12 @@ module PSC_ONE_Chip #(
     output wire         PSCONE_TP_TCS,
     output wire         PSCONE_TP_TCK,
 
+    // ------------------ Robot ------------------
+    input  wire         PSCONE_LV1,
+    output wire         PSCONE_LV2,
+    output wire         PSCONE_LV3,
+    output wire         PSCONE_LV4,
+
     // ------------------ LEDs ------------------
     output wire [5:0]   PSCONE_LED_OUT
 );
@@ -533,6 +539,10 @@ module PSC_ONE_Chip #(
         // UART
         .UART_RXD           (UART_RXD),
         .UART_TXD           (UART_TXD),
+
+        // I2C
+        .PSCONE_SCL         (PSCONE_LV1),   // in
+        .PSCONE_SDA         (PSCONE_LV2),   // out
 
         // Switch
         .PSCONE_SW1         (PSCONE_SW1),

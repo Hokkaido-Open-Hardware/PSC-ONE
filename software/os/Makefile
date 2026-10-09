@@ -251,6 +251,7 @@ SRCS_KERNEL := \
 	$(Src)/lib/common.c \
 	$(Src)/drivers/dma.c \
 	$(Src)/api/synap_api.c \
+	$(Src)/api/i2c_api.c \
 	$(Src)/drivers/sdcard_api.c \
 	$(Src)/drivers/timer_api.c \
 	$(Src)/drivers/timer_measure.c \

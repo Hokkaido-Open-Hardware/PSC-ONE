@@ -26,6 +26,7 @@ PSC-OSの組込みアプリケーション、ロードしたELF、MicroPythonで
 | --- | --- | --- |
 | 組込みCアプリ／シェル | [user.h](../software/os/src/api/user.h) / [user.c](../software/os/src/api/user.c) | ECALLラッパー、コンソール、デバイス呼出し |
 | カーネル | [syscall.h](../software/os/src/kernel/syscall.h) / [dispatch](../software/os/src/kernel/kernel_syscall.c) | 呼出し番号、引数、許可範囲 |
+| I2Cスレーブ（カーネル） | [i2c_api.h](../software/os/src/api/i2c_api.h) / [実装](../software/os/src/api/i2c_api.c) | INT8入力4個の受信、INT8結果の返却、状態管理 |
 | FAT32 | [fat32.h](../software/os/src/fs/fat32.h) | rootディレクトリ、ファイル読出し |
 | JPEG | [jpeg_view.h](../software/os/src/api/jpeg/jpeg_view.h) | FAT32のJPEGをLCDへ表示 |
 | TFLite | [tflite_api.h](../software/os/src/api/tflite/tflite_api.h) | モデル準備・推論・backend選択 |
@@ -91,6 +92,62 @@ ELFから同じように呼び出せるわけではありません。
 引数規約とサンプルのビルドは[ELFアプリガイド](../software/os/elf_apps/README.md)を参照してください。
 
 ## 組込みC API
+
+### I2Cスレーブ（PSC_RV32_I2C）
+
+`i2c_api.h` はカーネル／ベアメタルから使う32-bit MMIO APIです。
+SoCの割当 `0x10009000`〜`0x10009010` を使用します（単体RTLの既定値
+`0x10002000` とは異なります）。アドレスを変更した構成では、APIのコンパイル時に
+`PSC_I2C_ADDR_INPUT/STATUS/OUTPUT/CONTROL/SEQ` を個別に定義してください。
+ECALLやMicroPythonへの公開はありません。
+
+外部マスターは7-bitアドレス `0x42` へレジスタ番号 `0x00` に続けて
+signed INT8を4個書き込みます。CPUは受信フラグを確認して入力を取得し、
+結果を書き込みます。マスターはレジスタ `0x04` のbit 1（output_ready）を待ち、
+レジスタ `0x08` からsigned INT8結果を読みます。読出しは
+`START, ADDR+W, register, RESTART, ADDR+R, data, NACK, STOP` です。
+
+```c
+#include "api/i2c_api.h"  /* src/をinclude pathに指定 */
+
+/* マスターとの通信開始前に一度実行 */
+i2c_init();
+
+int8_t input[PSC_I2C_INPUT_COUNT];
+if (i2c_wait_input(100000u) == I2C_OK &&
+    i2c_read_input(input) == I2C_OK) {
+    uint32_t status = i2c_get_status();
+    uint8_t sequence = i2c_get_sequence();
+    /* 必要に応じてstatusのOVERRUNとsequenceを記録 */
+    (void)status;
+    (void)sequence;
+    i2c_clear_status(PSC_I2C_STATUS_INPUT_READY | PSC_I2C_STATUS_OVERRUN);
+    i2c_write_output(input[0]);  /* 例: 最初の入力を返す。推論結果へ置換可能 */
+}
+```
+
+- `i2c_read_input()` は非ブロッキングで、成功0、NULL引数-1、未受信-2。
+  読出しだけではフラグをクリアしません。OVERRUNがあっても現在の入力を返します。
+- `i2c_wait_input(max_polls)` は最大ポーリング回数を指定します。時間単位ではなく、
+  0回ならMMIOへアクセスせずタイムアウト-3を返します。
+- `i2c_get_status()` と `i2c_clear_status(mask)` はINPUT_READY(bit 0)、
+  OUTPUT_READY(bit 1)、OVERRUN(bit 2)を扱います。クリアはW1Cです。
+- `i2c_write_output()` はOUTPUT_READYをセットします。マスターが結果を読んでも
+  フラグは残り、次の4-byte入力完了または明示的クリアで落ちます。
+- `i2c_read_output()` は保持中のsigned INT8結果、`i2c_get_sequence()` は
+  完全な4-byte入力ごとに増える8-bit番号（255の次は0）を返します。
+- `i2c_set_irq_enabled()` / `i2c_get_irq_enabled()` は周辺回路のirq_rx許可を操作します。
+  現行SoCではこの信号がCPU割込みへ接続されていないため、ポーリングを使います。
+
+入力レジスタは各byteの受信中にも更新され、スナップショットやFIFOはありません。
+マスターは結果を読み終えてから次の入力を送信してください。SEQが変化していなくても
+次フレームの一部が届く場合があり、連続送信中の一貫性はこのAPIでは保証できません。
+CPU側も複数タスク／割込みからのアクセスを直列化してください。
+`i2c_init()` はIRQを無効化して全状態フラグを消去しますが、入力・結果・SEQは保持します。
+
+APIのMMIOモデルテスト、RV32コンパイル、C++ヘッダ確認はリポジトリルートから
+`python3 PSC-ONE/software/os/tests/i2c/run.py --build /tmp/psc-i2c-api`
+で実行できます。モデルテストは実機のバス通信を検証するものではありません。
 
 ### FAT32
 

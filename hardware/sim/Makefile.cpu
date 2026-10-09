@@ -149,6 +149,7 @@ CPU_V2_CORE_FILES = \
 
 MMIO_DIR	= ../rtl/soc/mmio/MMIO
 UART_DIR	= ../rtl/soc/mmio/UART
+I2C_DIR		= ../rtl/soc/mmio/I2C
 LED_DIR		= ../rtl/soc/mmio/LED
 
 # ============================================================
@@ -172,6 +173,7 @@ CPU_FILES = \
 	$(SELECTED_CPU_CORE_FILES) \
 	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
 	$(UART_DIR)/PSC_RV32IS_UART.v \
+	$(I2C_DIR)/PSC_RV32_I2C.sv \
 	$(LED_DIR)/PSC_RV32IS_LED.v \
 	$(CACHE_DIR)/cache_dma_controller.sv \
 	$(CACHE_DIR)/cache_dma_controller_io.sv \
@@ -301,7 +303,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	lpu_test1:RV32ISP_chip_test:./mem/lpu_test1.mem:0x0000beef \
+	i2c_test1:RV32ISP_chip_test:./mem/i2c_test1.mem:0x600dcafe \
 
 # ============================================================
 # 複数テスト定義
@@ -313,6 +315,7 @@ PSCONE_SINGLE_TEST = \
 PSCONE_BASIC_TESTS = \
 	add_test1:RV32ISP_chip_test:./mem/add_test1.mem:0xff00ff0b \
 	add_test2:RV32ISP_chip_test:./mem/add_test2.mem:0x00000000 \
+	i2c_test1:RV32ISP_chip_test:./mem/i2c_test1.mem:0x600dcafe \
 	lpu_test1:RV32ISP_chip_test:./mem/lpu_test1.mem:0x0000beef \
 	timer_irq_test1:RV32ISP_chip_test:./mem/timer_irq_test1.mem:0x00000321 \
 	timer_irq_test2:RV32ISP_chip_test:./mem/timer_irq_test2.mem:0x00000322 \
@@ -381,6 +384,7 @@ PSCONE_PULP_TESTS = \
 # ============================================================
 
 PSCONE_LONG_TESTS = \
+	robot_mujoco_test1:RV32ISP_chip_test:./mem/robot_mujoco_test1.mem:0x600dcafe \
 	pio_uart_test1:RV32ISP_chip_test:./mem/pio_uart_test1.mem:0x00001212 \
 	fencei_test1:RV32ISP_chip_test:./mem/fencei_test1.mem:0xabcd5678 \
 	sret_test1:RV32ISP_chip_test:./mem/sret_test1.mem:0x0000DC12 \

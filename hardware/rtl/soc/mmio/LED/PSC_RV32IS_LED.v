@@ -52,6 +52,7 @@ module PSC_RV32IS_LED #(
             MMIO_out_reg  <= 8'd0;
             cpu_rready    <= 1'b0;
             cpu_wready    <= 1'b0;
+            cpu_rdata     <= 32'h0;
         end else begin
             cpu_rready    <= 1'b0;
             cpu_wready    <= 1'b0;

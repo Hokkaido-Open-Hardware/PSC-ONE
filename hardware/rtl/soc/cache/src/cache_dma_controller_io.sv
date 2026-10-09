@@ -45,7 +45,12 @@ module cache_dma_controller_io #(
     parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_RX     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_ST     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_DATA     = {ADDR_WIDTH{1'b0}},
-    parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_CTRL     = {ADDR_WIDTH{1'b0}}
+    parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_CTRL     = {ADDR_WIDTH{1'b0}},
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_INPUT      = {ADDR_WIDTH{1'b0}},
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_STATUS     = {ADDR_WIDTH{1'b0}},
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT     = {ADDR_WIDTH{1'b0}},
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL    = {ADDR_WIDTH{1'b0}},
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ        = {ADDR_WIDTH{1'b0}}
 )(
     input  wire                             clock,
     input  wire                             reset_n,
@@ -303,7 +308,12 @@ module cache_dma_controller_io #(
                  ((PSC_I2S_ADDR_RX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_I2S_ADDR_RX      )) |
                  ((PSC_I2S_ADDR_ST      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_I2S_ADDR_ST      )) |
                  ((PSC_PFE_IF_DATA      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_PFE_IF_DATA      )) |
-                 ((PSC_PFE_IF_CTRL      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_PFE_IF_CTRL      )));
+                 ((PSC_PFE_IF_CTRL      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PSC_PFE_IF_CTRL      )) |
+                 ((I2C_ADDR_INPUT       != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == I2C_ADDR_INPUT       )) |
+                 ((I2C_ADDR_STATUS      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == I2C_ADDR_STATUS      )) |
+                 ((I2C_ADDR_OUTPUT      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == I2C_ADDR_OUTPUT      )) |
+                 ((I2C_ADDR_CONTROL     != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == I2C_ADDR_CONTROL     )) |
+                 ((I2C_ADDR_SEQ         != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == I2C_ADDR_SEQ         )));
         end
     endfunction
 

@@ -22,6 +22,10 @@ module PSC_ONE_Chip_sim #(
     input  wire         uart_rx,
     output wire         uart_tx,
 
+    // ---- I2C ----
+    input  wire         PSCONE_SCL,
+    output wire         PSCONE_SDA,
+
     // ---------------- PSC-ONE SW ----------------
     input wire          PSCONE_SW1,
     input wire          PSCONE_SW2,
@@ -123,6 +127,12 @@ module PSC_ONE_Chip_sim #(
         .PSCONE_TP_TDI       (),
         .PSCONE_TP_TCS       (),
         .PSCONE_TP_TCK       (),
+
+        // ---- Robot ----
+        .PSCONE_LV1          (PSCONE_SCL),  // in
+        .PSCONE_LV2          (PSCONE_SDA),  // out
+        .PSCONE_LV3          (),            // out
+        .PSCONE_LV4          (),            // out
 
         // ---- LED ----
         .PSCONE_LED_OUT      (led_out)

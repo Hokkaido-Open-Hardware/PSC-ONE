@@ -174,6 +174,7 @@ CPU_V2_CORE_FILES = \
 
 MMIO_DIR	= ../rtl/soc/mmio/MMIO
 UART_DIR	= ../rtl/soc/mmio/UART
+I2C_DIR		= ../rtl/soc/mmio/I2C
 LED_DIR		= ../rtl/soc/mmio/LED
 
 # ============================================================
@@ -197,6 +198,7 @@ CPU_FILES = \
 	$(SELECTED_CPU_CORE_FILES) \
 	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
 	$(UART_DIR)/PSC_RV32IS_UART.v \
+	$(I2C_DIR)/PSC_RV32_I2C.sv \
 	$(LED_DIR)/PSC_RV32IS_LED.v \
 	$(CACHE_DIR)/cache_dma_controller.sv \
 	$(CACHE_DIR)/cache_dma_controller_io.sv \

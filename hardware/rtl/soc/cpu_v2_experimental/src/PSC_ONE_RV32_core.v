@@ -49,7 +49,12 @@ module PSC_ONE_RV32_core #(
     parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_RX         = 32'h1000_7000,
     parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_ST         = 32'h1000_7004,
     parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_DATA         = 32'h1000_8000,
-    parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_CTRL         = 32'h1000_8004
+    parameter [ADDR_WIDTH-1:0]  PSC_PFE_IF_CTRL         = 32'h1000_8004,
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_INPUT          = 32'h1000_9000,
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_STATUS         = 32'h1000_9004,
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT         = 32'h1000_9008,
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL        = 32'h1000_900C,
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 32'h1000_9010
 )(
     // CLK, RESET
     input  wire                         clock,
@@ -474,7 +479,12 @@ module PSC_ONE_RV32_core #(
         .PSC_I2S_ADDR_RX     (PSC_I2S_ADDR_RX),
         .PSC_I2S_ADDR_ST     (PSC_I2S_ADDR_ST),
         .PSC_PFE_IF_DATA     (PSC_PFE_IF_DATA),
-        .PSC_PFE_IF_CTRL     (PSC_PFE_IF_CTRL)
+        .PSC_PFE_IF_CTRL     (PSC_PFE_IF_CTRL),
+        .I2C_ADDR_INPUT      (I2C_ADDR_INPUT),
+        .I2C_ADDR_STATUS     (I2C_ADDR_STATUS),
+        .I2C_ADDR_OUTPUT     (I2C_ADDR_OUTPUT),
+        .I2C_ADDR_CONTROL    (I2C_ADDR_CONTROL),
+        .I2C_ADDR_SEQ        (I2C_ADDR_SEQ)
     ) u_data_dma_ctrl (
         .clock              (clock),
         .reset_n            (reset_n),
