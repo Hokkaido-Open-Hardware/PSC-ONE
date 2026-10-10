@@ -9,6 +9,7 @@
 #include "../api/fft_api.h"
 #include "../drivers/mem_test.h"
 #include "../api/speech_recognition_api.h"
+#include "../api/robot/robot_control.h"
 
 // if 1 : multitask mode
 #define MULTITASK_MODE 0 
@@ -190,6 +191,10 @@ __attribute__((used)) void kernel_main(uint32_t warm) {
     }
     while (bss < end) *(volatile uint8_t *)bss++ = 0;
     s_printf("memset = ON\n");
+#ifdef PSC_ROBOT_SIM
+    /* Dedicated integration image; normal OS startup is unchanged. */
+    robot_control_run();
+#endif
 #if NPU_TESTMODE
     s_printf("NPU TEST\n");
     s_call_sa_api(4, true, true);
