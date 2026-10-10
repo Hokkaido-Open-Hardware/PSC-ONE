@@ -100,8 +100,10 @@ module PSC_ONE_Chip #(
     output wire         PSCONE_TP_TCK,
 
     // ------------------ Robot ------------------
+`ifdef COCOTB_SIM
     inout  wire         PSCONE_LV1,
     inout  wire         PSCONE_LV2,
+`endif
     inout  wire         PSCONE_LV3,
     inout  wire         PSCONE_LV4,
 
@@ -136,6 +138,9 @@ module PSC_ONE_Chip #(
     // --------------------------------
     // 1 = Lowを出力、0 = Hi-Z
     wire [3:0] lv_drive_low;
+    wire i2c_sda_drive_low;
+    // I2C slave on LV3=SCL, LV4=SDA; release SCL and unused pins.
+    assign lv_drive_low = {i2c_sda_drive_low, 1'b0, 2'b00};
 
     // 外部ピン
     assign PSCONE_LV1 = lv_drive_low[0] ? 1'b0 : 1'bz;
@@ -563,8 +568,9 @@ module PSC_ONE_Chip #(
         .UART_TXD           (UART_TXD),
 
         // I2C
-        .PSCONE_SCL         (lv_drive_low[2]),   // in
-        .PSCONE_SDA         (lv_drive_low[3]),   // out
+        .PSCONE_SCL         (lv_input[2]),
+        .PSCONE_SDA         (lv_input[3]),
+        .PSCONE_SDA_DRIVE_LOW(i2c_sda_drive_low),
 
         // Switch
         .PSCONE_SW1         (PSCONE_SW1),

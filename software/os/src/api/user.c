@@ -5,6 +5,14 @@
 #include "synap_api.h"
 #include "../fs/fat32.h"
 #include <stdint.h>
+#include "robot/robot_control.h"
+
+void call_robot_control(void)
+{
+    register uint32_t a0 __asm__("a0") = 0;
+    register uint32_t a3 __asm__("a3") = SYS_ROBOT_CONTROL;
+    __asm__ __volatile__("ecall" : "+r"(a0) : "r"(a3) : "memory");
+}
 
 extern char __user_stack_top[];
 

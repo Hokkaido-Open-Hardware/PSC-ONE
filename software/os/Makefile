@@ -235,7 +235,7 @@ ifeq ($(SIM_USER),minimal)
   USER_OBJCOPY_FLAGS =
 else ifeq ($(SIM_USER),full)
   USER_SRCS = $(SRCS_USER)
-  USER_DEPS = $(SRCS_USER) $(MICROPY_LIB) $(JPEG_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/shell/user.ld $(Src)/api/user.h $(Src)/kernel/syscall.h $(Src)/kernel/elf_loader.h $(Src)/kernel/user_memory.h
+  USER_DEPS = $(SRCS_USER) $(MICROPY_LIB) $(JPEG_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/shell/user.ld $(Src)/api/user.h $(Src)/api/robot/robot_control.h $(Src)/kernel/syscall.h $(Src)/kernel/elf_loader.h $(Src)/kernel/user_memory.h
   USER_LIBS = $(TFLITE_OBJ) $(MICROPY_LIB) $(LIBM) $(LIBC)
   USER_OBJCOPY_FLAGS = --set-section-flags .bss=alloc,contents
 else
@@ -252,6 +252,7 @@ SRCS_KERNEL := \
 	$(Src)/drivers/dma.c \
 	$(Src)/api/synap_api.c \
 	$(Src)/api/i2c_api.c \
+	$(Src)/api/robot/robot_control.c \
 	$(Src)/drivers/sdcard_api.c \
 	$(Src)/drivers/timer_api.c \
 	$(Src)/drivers/timer_measure.c \
@@ -483,7 +484,7 @@ endif
 $(KERNEL_ELF): \
 	$(Build) \
 	$(SRCS_KERNEL) \
-	$(wildcard $(Src)/*/*.h) $(Src)/kernel/kernel_fpga.ld \
+	$(wildcard $(Src)/*/*.h) $(Src)/api/robot/robot_control.h $(Src)/kernel/kernel_fpga.ld \
 	$(USER_BIN) \
 	$(Build)/divmodsi3.o $(KERNEL_BUILTINS) Makefile
 

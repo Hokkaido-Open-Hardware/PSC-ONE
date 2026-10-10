@@ -10,6 +10,7 @@
 #include "../api/jpeg_display.h"
 #include "../api/speech_recognition_api.h"
 #include "../api/sa_transfer.h"
+#include "../api/robot/robot_control.h"
 
 #ifndef PIO32_ADDR
 #define PIO32_ADDR (*(volatile uint32_t *)0x10001000)
@@ -41,6 +42,10 @@ void handle_syscall(struct trap_frame *f) {
         return;
     }
     switch (f->a3) {
+    case SYS_ROBOT_CONTROL:
+        robot_control();
+        f->a0 = 0;
+        break;
     case SYS_ELF_RUN:
         elf_run(f);
         break;

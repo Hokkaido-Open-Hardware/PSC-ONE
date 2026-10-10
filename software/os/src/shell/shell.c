@@ -4,6 +4,7 @@
 #include "../kernel/elf_loader.h"
 #include "../api/jpeg/jpeg_view.h"
 #include "../api/tflite/tflite_api.h"
+#include "../api/robot/robot_control.h"
 
 // micropythonを含めるとSIM時間が長すぎる場合のオプション
 #define PSC_OS_DEBUG_WITHOUT_MICROPYTHON 0
@@ -223,8 +224,7 @@ prompt:
 
         // ---- ロボット制御 ----
         } else if (strcmp(argv[0], "robot_control") == 0) {
-            //TBD
-            //robot_i2c(TBD);
+            call_robot_control();
 
         // ---- I2S MIC READ ----
         } else if (strcmp(argv[0], "mic_read") == 0) {

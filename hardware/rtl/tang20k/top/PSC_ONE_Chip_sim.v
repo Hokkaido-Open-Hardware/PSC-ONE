@@ -24,7 +24,12 @@ module PSC_ONE_Chip_sim #(
 
     // ---- I2C ----
     inout  wire         PSCONE_SCL,
+    `ifdef PSC_ROBOT_SIM
+    input  wire         i2c_master_sda_low,
+    output wire         i2c_sda_bus,
+    `else
     inout  wire         PSCONE_SDA,
+    `endif
 
     // ---------------- PSC-ONE SW ----------------
     input wire          PSCONE_SW1,
@@ -33,6 +38,13 @@ module PSC_ONE_Chip_sim #(
     // ==== LED ====
     output wire [5:0]   led_out
 );
+
+    `ifdef PSC_ROBOT_SIM
+    // External pull-up and master open-drain driver, resolved with the chip.
+    tri1 PSCONE_SDA;
+    assign PSCONE_SDA = i2c_master_sda_low ? 1'b0 : 1'bz;
+    assign i2c_sda_bus = PSCONE_SDA;
+    `endif
 
     // --------------------------------
     // wave file
@@ -129,10 +141,10 @@ module PSC_ONE_Chip_sim #(
         .PSCONE_TP_TCK       (),
 
         // ---- Robot ----
-        .PSCONE_LV1          (PSCONE_SCL),  // in
-        .PSCONE_LV2          (PSCONE_SDA),  // out
-        .PSCONE_LV3          (),            // out
-        .PSCONE_LV4          (),            // out
+        .PSCONE_LV1          (),  // inout
+        .PSCONE_LV2          (),  // inout
+        .PSCONE_LV3          (PSCONE_SCL),  // inout
+        .PSCONE_LV4          (PSCONE_SDA),  // inout
 
         // ---- LED ----
         .PSCONE_LED_OUT      (led_out)

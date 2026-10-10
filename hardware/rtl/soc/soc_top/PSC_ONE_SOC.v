@@ -54,7 +54,8 @@ module PSC_ONE_SOC #(
 
     // ---------------- PSC-ONE I2C ----------------
     input  wire         PSCONE_SCL,
-    output wire         PSCONE_SDA,
+    input  wire         PSCONE_SDA,
+    output wire         PSCONE_SDA_DRIVE_LOW,
 
     // ---------------- PSC-ONE SW ----------------
     input wire          PSCONE_SW1,
@@ -597,8 +598,8 @@ module PSC_ONE_SOC #(
     wire        i2c_sda_drive_low;
     wire        i2c_irq_rx;
 
-    // Open Drain SDA
-    assign PSCONE_SDA = i2c_sda_drive_low ? 1'b0 : 1'bz;
+    // Resolve open-drain SDA at the physical chip boundary.
+    assign PSCONE_SDA_DRIVE_LOW = i2c_sda_drive_low;
 
     PSC_RV32_I2C #(
         .ADDR_WIDTH       (32),

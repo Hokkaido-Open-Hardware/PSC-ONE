@@ -1,0 +1,782 @@
+# =========================================================
+# PSC-ONE OS TEST: cocotb top test 
+#   - 安全な int 変換 (X/Z 解決)
+#   - レベル待ち + タイムアウト
+#   - ユーティリティ関数で見通し改善
+# =========================================================
+# GUI 対話実行 (リポジトリの仮想環境を有効にしてから):
+#   cd PSC-ONE/hardware/sim
+#   make -f Makefile.pscos.robot simulate_ROBOT
+# DISPLAY があれば UART GUI を自動起動。GUI のキーを既存の UART RX へ送信する。
+# PSC_UART_GUI=0 で GUI を無効化、1 で明示的に有効化 (Python tkinter が必要)。
+# PSC_OS> が表示されたら、GUI に robot_control + Enter を手入力する。
+# 自動テスト時のみ PSC_UART_AUTO_PROMPT=1 でコマンドを自動送信できる。
+# 右の INPUT0..3 に16進数 (00..FF) を指定し、Send I2C を押す。
+# OSの受信結果がUARTへ返るまで次の送信は待機する。
+# PSC_ROBOT_AUTOTEST=1 は固定2フレームの送受信とシェル復帰を検証して終了。
+# [UART RX] の送信ログと log_uart/log_*.log のコマンド一覧/次の PSC_OS> を確認する。
+# RUN_CYCLES で実行時間を延長可能。SIM の終了は起動端末で Ctrl-C。
+# PSC_UART_INTERACTIVE: 既定は stdin が端末なら有効。パイプ入力には明示的に 1。
+# PSC_UART_AUTO_PROMPT: 既定は 0。明示的に 1 を指定した場合のみ PROMPT_TEXT を送る。
+# 両環境変数とも 1/true/yes/on で有効、0/false/no/off で無効。
+# PSC_UART_KEY_INTERVAL_MS: 文字ごとの追加待ち時間 [シミュレーション ms]。
+# 既定は 0.1 (100 us)。従来は 2。0 で追加待ちなし (OS の取りこぼしに注意)。
+import os
+import select
+import sys
+import threading
+import cocotb
+from cocotb.clock import Clock
+from collections import deque
+from queue import Empty, Queue
+from cocotb.handle import SimHandleBase
+from cocotb.triggers import Event, Timer, RisingEdge, FallingEdge, First
+from cocotb_tb.psc_robot.uart_gui import UartGui
+from cocotb_tb.psc_robot.i2c_master import RobotI2CMaster, FRAMES, hex_payload
+
+
+def stdin_is_terminal():
+    try:
+        return sys.stdin is not None and sys.stdin.isatty()
+    except (OSError, ValueError):
+        return False
+
+
+def env_flag(name, default):
+    return os.getenv(name, "1" if default else "0").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+
+# ========= 設定 =========
+Assert = 1
+col_mismatch_Assert = 0
+logfile = os.getenv("PSC_UART_LOGFILE", "./log_uart/default_uart_log.txt")
+
+# ★ MEM_FILE > PROGRAM_FILE > 既定値 の優先順に変更
+MEM_FILE_ENV   = os.getenv("MEM_FILE", "").strip()
+PROGRAM_FILE   = (MEM_FILE_ENV if MEM_FILE_ENV else
+                  os.getenv("PROGRAM_FILE", "./mem/kernel.mem"))
+
+EXPECTED_STR = os.getenv("EXPECTED_RESULT", "").strip()
+CLK_PERIOD_NS = int(os.getenv("CLK_PERIOD_NS", "10"))     # 100 MHz
+# FST_UART_MODE: BAUDRATE = 11520000 * 2
+# UART RTL is driven by 100 MHz and uses an integer clock divider.
+# 100 MHz / 23.04 MHz -> 4 clocks/bit -> 40 ns/bit.
+UART_BIT_NS = int(os.getenv("UART_BIT_NS", "40"))
+#PROMPT_TEXT = "primes\r"
+#PROMPT_TEXT = "help\r"
+PROMPT_TEXT = "robot_control\r"
+UART_INTERACTIVE = env_flag("PSC_UART_INTERACTIVE", stdin_is_terminal())
+UART_GUI = env_flag("PSC_UART_GUI", bool(os.getenv("DISPLAY")))
+STOP_AFTER_BOOT = env_flag("PSC_OS_STOP_AFTER_BOOT", False)
+VERIFY_DMA = env_flag("PSC_OS_VERIFY_DMA", False)
+BOOT_MARKER = os.getenv("PSC_OS_BOOT_MARKER", "simulation shell start."
+                        if os.getenv("SIM_USER") == "minimal" else "PSC_OS>")
+if not BOOT_MARKER:
+    raise ValueError("PSC_OS_BOOT_MARKER must not be empty")
+UART_KEY_INTERVAL_MS = float(os.getenv("PSC_UART_KEY_INTERVAL_MS", "0.1"))
+if not 0 <= UART_KEY_INTERVAL_MS < float("inf"):
+    raise ValueError("PSC_UART_KEY_INTERVAL_MS must be finite and >= 0")
+#RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "1000_0000"))   # lcd test
+RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "3_0000_0000"))
+SDRAM_INIT_TIMEOUT = int(os.getenv("SDRAM_INIT_TIMEOUT", "50_0000"))  # cycles
+BOOT_ROM_TIMEOUT   = int(os.getenv("BOOT_ROM_TIMEOUT", "5000_0000"))  # cycles
+# ======================
+val_str = os.getenv("EXPECTED_RESULT")
+if not val_str or val_str.strip() == "":
+    EXPECTED_VALUE = 0x0000001e
+else:
+    EXPECTED_VALUE = int(val_str, 0)
+
+# ---------- Utils ----------
+def int_resolved(x, xfill: str = "0") -> int:
+    """
+    cocotb 2.0対応: 安全に int 変換(X/Z を解決）
+    """
+    # Handleの場合
+    if isinstance(x, SimHandleBase):
+        v = x.value
+    else:
+        v = x
+
+    # すでに int の場合
+    if isinstance(v, int):
+        return v
+    # LogicArray / Logic の場合
+    try:
+        s = str(v)   # ← ここがポイント（binstrではない）
+    except Exception:
+        return 0
+
+    if not s:
+        return 0
+    # X/Z 解決
+    s = s.lower().replace('x', xfill).replace('z', xfill)
+
+    try:
+        return int(s, 2)
+    except ValueError:
+        return 0
+
+async def ncycles(clock, n: int):
+    if n > 0:
+        await Timer(n * CLK_PERIOD_NS, unit="ns")
+
+
+async def wait_level(sig, level: int, clock, timeout_cycles: int | None = None) -> bool:
+    """
+    sig の値が level(0/1) になるまで待つ。timeout_cycles が None でない場合、超えたら False を返す。
+    """
+    waited = 0
+    while int_resolved(sig) != (1 if level else 0):
+        step = min(100, timeout_cycles - waited) if timeout_cycles is not None else 100
+        await ncycles(clock, step)
+        waited += step
+        if timeout_cycles is not None and waited >= timeout_cycles:
+            return False
+    return True
+
+
+def safe_peek(handle: SimHandleBase, default: int = 0) -> int:
+    """X/Z 解決付きでハンドル値を int 取得（失敗は default）。"""
+    try:
+        return int_resolved(handle)
+    except Exception:
+        return default
+# -------------------------
+
+async def generate_clock(dut, period_ns=CLK_PERIOD_NS):
+    """Free-running clock."""
+    await Clock(dut.clock, period_ns, unit="ns", impl="gpi").start(start_high=False)
+
+
+async def watch_page_faults(dut):
+    """Catch even one-cycle faults while the UART/report loop polls in batches."""
+    core = dut.u_chip.u_soc.u_rv32_core_axi.u_core
+    await First(RisingEdge(core.i_pf), RisingEdge(core.d_pf))
+    raise AssertionError("Page fault during PSC-OS robot simulation")
+
+def GW2AR_sdram_read32(dut, paddr):
+    """GW2AR の SDRAM の物理アドレス paddr から 32bit を読む"""
+    index = paddr >> 2      # 32bit 単位
+    # mem[] が dut.sdram_inst.mem などの場合は適宜修正
+    data = dut.u_sdram_model.mem[index].value.to_unsigned()
+
+    return data
+
+def sdram_read32(dut, paddr):
+    """SDRAM の物理アドレス paddr から 32bit を読む"""
+    index = paddr >> 1      # 16bit 単位
+    # mem[] が dut.sdram_inst.mem などの場合は適宜修正
+    lo = dut.u_sdram_model.mem[index].value.to_unsigned()
+    hi = dut.u_sdram_model.mem[index + 1].value.to_unsigned()
+
+    return (hi << 16) | lo
+
+def dump_page_table(dut, root_pt_paddr):
+    print("\n===== PAGE TABLE DUMP (from SDRAM) =====")
+    log = None
+    if logfile is not None:
+        log = open(logfile, "a")
+
+    line = f"L1 root @ 0x{root_pt_paddr:08x}"
+    print(line)
+    if log:
+        log.write("\n===== PAGE TABLE DUMP (from SDRAM) =====\n")
+        log.write(line + "\n")
+
+    try:
+        # L1 = 1024 entries
+        for vpn1 in range(1024):
+
+            l1_pte_addr = root_pt_paddr + vpn1 * 4
+            l1_pte = sdram_read32(dut, l1_pte_addr)
+
+            if (l1_pte & 0x1) == 0:
+                continue  # invalid entry
+
+            ppn1 = (l1_pte >> 10) & 0xFFFFF
+            l0_addr = ppn1 << 12
+
+            line = f"\nL1[{vpn1:03}] PTE={l1_pte:08x}  → L0 @ 0x{l0_addr:08x}"
+            print(line)
+            log.write(line + "\n")
+
+            # L0 を走査
+            for vpn0 in range(1024):
+
+                l0_pte_addr = l0_addr + vpn0 * 4
+                l0_pte = sdram_read32(dut, l0_pte_addr)
+
+                if (l0_pte & 0x1) == 0:
+                    continue
+
+                ppn0 = (l0_pte >> 10) & 0xFFFFF
+                phys = ppn0 << 12
+
+                flags = l0_pte & 0x3FF
+
+                line = f"  L0[{vpn0:03}] PTE={l0_pte:08x}  → PADDR=0x{phys:08x} flags={flags:03x}"
+                print(line)
+                log.write(line + "\n")
+    finally:
+        log.write("\n")
+        log.close()
+
+    print("===== PAGE TABLE END =====\n")
+
+def dump_sdram_mem(dut, mode, start_addr, datanum=16):
+    print("\n===== MEM DUMP (from SDRAM) =====")
+    log = None
+    if logfile is not None:
+        log = open(logfile, "a")
+
+    try:
+        log.write("===== MEM DUMP (from SDRAM) =====\n")
+        for i in range(datanum):
+            if mode == "GW2AR":
+                raddr = start_addr + i * 4
+                rdata = GW2AR_sdram_read32(dut, raddr)
+                line = f"raddr = {raddr:08x} : rdata = {rdata:08x}"
+                print(line)
+                log.write(line + "\n")
+            else :
+                raddr = start_addr + i * 4
+                rdata = sdram_read32(dut, raddr)
+                line = f"raddr = {raddr:08x} : rdata = {rdata:08x}"
+                print(line)
+                log.write(line + "\n")
+    finally:
+        log.write("\n")
+        log.close()
+
+    print("===== MEM DUMP END =====\n")
+
+async def uart_serial_decoder(tx, rx_queue):
+    """
+    UART TX serial line をデコードして 8bit データに戻す。
+
+    Format:
+        1 start bit
+        8 data bits (LSB first)
+        1 stop bit
+    """
+
+    bit_ns = UART_BIT_NS
+
+    while True:
+
+        # Idle=1 → Start bit=0
+        await FallingEdge(tx)
+
+        # Start bit中央まで待つ
+        await Timer(bit_ns // 2, unit="ns")
+
+        # 本当に Start bit か確認
+        if int_resolved(tx) != 0:
+            continue
+
+        value = 0
+
+        # data bit 0～7
+        for bit in range(8):
+
+            # 次のbit中央へ
+            await Timer(bit_ns, unit="ns")
+
+            bit_value = int_resolved(tx)
+
+            if bit_value:
+                value |= (1 << bit)
+
+        # stop bit中央
+        await Timer(bit_ns, unit="ns")
+
+        stop_bit = int_resolved(tx)
+
+        if stop_bit != 1:
+            # framing error
+            continue
+
+        rx_queue.append(value)
+
+async def uart_serial_send(dut, rx, text: str, key_interval_ms: float = UART_KEY_INTERVAL_MS):
+    """
+    PC側から UART RX へ文字列を送信する。
+
+    Format:
+        1 start bit
+        8 data bits (LSB first)
+        1 stop bit
+
+    key_interval_ms:
+        文字と文字の間隔 [ms]
+    """
+
+    bit_ns = UART_BIT_NS
+
+    # UART idle
+    rx.value = 1
+
+    # 最初のstart bitを確実に検出させる
+    await Timer(bit_ns * 80, unit="ns")
+
+    dut._log.info(
+        f'[UART RX] Send start: "{text}" '
+        f"(key interval={key_interval_ms} ms)"
+    )
+
+    for ch in text:
+        value = ord(ch) & 0xFF
+
+        dut._log.info(
+            f'[UART RX] Send value=0x{value:02X} ({repr(ch)})'
+        )
+
+        # start bit
+        rx.value = 0
+        await Timer(bit_ns, unit="ns")
+
+        # data bits 0-7, LSB first
+        for bit in range(8):
+            rx.value = (value >> bit) & 1
+            await Timer(bit_ns, unit="ns")
+
+        # stop bit
+        rx.value = 1
+        await Timer(bit_ns, unit="ns")
+
+        # キー入力間隔
+        if key_interval_ms > 0:
+            await Timer(key_interval_ms, unit="ms")
+
+def uart_stdin_reader(stream, send_queue, stop):
+    """OS スレッドで行入力を受ける。DUT/cocotb API には触れない。"""
+    pending = bytearray()
+    previous_cr = False
+    try:
+        if stream is None:
+            raise ValueError("stdin is unavailable")
+        fd = stream.fileno()
+        encoding = stream.encoding or "utf-8"
+        while not stop.is_set():
+            # select + os.read なら、未入力でも終了要求を確認でき、Python の
+            # buffered stdin のロックを保持したまま終了することもない。
+            readable, _, _ = select.select([fd], [], [], 0.1)
+            if not readable:
+                continue
+            chunk = os.read(fd, 4096)
+            if not chunk:
+                if pending:
+                    send_queue.put(("stdin", pending.decode(encoding, errors="replace") + "\r"))
+                send_queue.put(("notice", "stdin EOF; terminal input stopped."))
+                return
+            for byte in chunk:
+                # LF / CRLF / CR をコマンド終端の CR 1 個に正規化する。
+                if byte == 10 and previous_cr:
+                    previous_cr = False
+                    continue
+                previous_cr = byte == 13
+                if byte in (10, 13):
+                    send_queue.put(("stdin", pending.decode(encoding, errors="replace") + "\r"))
+                    pending.clear()
+                else:
+                    pending.append(byte)
+    except (OSError, ValueError, AttributeError, TypeError) as exc:
+        send_queue.put(("notice", f"stdin unavailable; terminal input stopped: {exc}"))
+
+
+async def uart_send_worker(dut, send_queue, prompt_ready):
+    """自動送信・端末入力・GUI 入力を唯一の送信タスクから順番に送る。"""
+    await prompt_ready.wait()
+    while True:
+        try:
+            source, text = send_queue.get_nowait()
+        except Empty:
+            # Queue.get() や OS の待機でシミュレータをブロックしない。
+            await Timer(UART_BIT_NS * 10, unit="ns")
+            continue
+        if source == "notice":
+            dut._log.info(f"[UART input] {text}")
+        else:
+            dut._log.info(f"[UART RX] Queued {source}: {text!r}")
+            # RX has one byte of storage. Automatic commands also start while
+            # the OS is still printing the prompt's trailing ANSI sequence.
+            for ch in text:
+                while int_resolved(dut.u_chip.u_soc.u_uart.rx_avail):
+                    await Timer(UART_BIT_NS * 10, unit="ns")
+                await uart_serial_send(dut, dut.uart_rx, ch,
+                                       key_interval_ms=UART_KEY_INTERVAL_MS)
+                await Timer(UART_BIT_NS * 2, unit="ns")
+
+
+# ---------- メインテスト ---------------
+async def verify_dma_copies(dut, stats):
+    """Check completed DMA transfers against SDRAM, independently of CPU caches."""
+    soc = dut.u_chip.u_soc
+    while True:
+        await RisingEdge(soc.dma_busy)
+        src = int(soc.csr_DMA_SRC.value)
+        dst = int(soc.csr_DMA_DST.value)
+        words = int(soc.csr_DMA_WORDS.value)
+        assert words > 0 and (src | dst) & 3 == 0
+        await RisingEdge(soc.dma_done)
+        for offset in range(0, words * 4, 4):
+            assert GW2AR_sdram_read32(dut, src + offset) == GW2AR_sdram_read32(dut, dst + offset), (
+                f"DMA copy mismatch: src=0x{src + offset:08x} dst=0x{dst + offset:08x}"
+            )
+        stats["transfers"] += 1
+        stats["bytes"] += words * 4
+
+
+@cocotb.test()
+async def RV32IS_chip_test1(dut):
+    send_queue = Queue()
+    i2c_queue = Queue()
+    prompt_ready = Event()
+    stop_stdin = threading.Event()
+    gui = None
+    sender = cocotb.start_soon(uart_send_worker(dut, send_queue, prompt_ready))
+    dma_stats = {"transfers": 0, "bytes": 0}
+    dma_checker = cocotb.start_soon(verify_dma_copies(dut, dma_stats)) if VERIFY_DMA else None
+    fault_checker = cocotb.start_soon(watch_page_faults(dut))
+    try:
+        if UART_GUI:
+            try:
+                gui = UartGui(send_queue, logfile, i2c_queue)
+            except (OSError, RuntimeError) as exc:
+                if "PSC_UART_GUI" in os.environ:
+                    raise RuntimeError(f"Cannot start UART GUI: {exc}") from exc
+                dut._log.warning(f"[UART GUI] {exc}; using terminal/log output.")
+        auto_prompt = env_flag("PSC_UART_AUTO_PROMPT", False)
+        dut._log.info(
+            f"[CONF] PSC_UART_GUI={int(gui is not None)}, "
+            f"PSC_UART_INTERACTIVE={int(UART_INTERACTIVE)}, "
+            f"PSC_UART_AUTO_PROMPT={int(auto_prompt)}, "
+            f"PSC_UART_KEY_INTERVAL_MS={UART_KEY_INTERVAL_MS}"
+        )
+        if UART_INTERACTIVE:
+            threading.Thread(
+                target=uart_stdin_reader,
+                args=(sys.stdin, send_queue, stop_stdin),
+                name="psc-os-stdin",
+                daemon=True,
+            ).start()
+            dut._log.info("[UART stdin] Enter commands followed by Enter; waiting for PSC_OS>.")
+        await run_psc_os_test(dut, send_queue, prompt_ready, gui, auto_prompt, i2c_queue)
+        if VERIFY_DMA:
+            assert dma_stats["transfers"] > 0, "No completed DMA copies observed"
+            dut._log.info(f"[DMA VERIFY] {dma_stats}")
+    finally:
+        stop_stdin.set()
+        sender.cancel()
+        fault_checker.cancel()
+        if dma_checker is not None:
+            dma_checker.cancel()
+        if gui is not None:
+            gui.close()
+
+
+async def run_psc_os_test(dut, send_queue, prompt_ready, gui=None, auto_prompt=False, i2c_queue=None):
+    if i2c_queue is None:
+        i2c_queue = Queue()
+    autotest = env_flag("PSC_ROBOT_AUTOTEST", not (UART_INTERACTIVE or gui))
+    robot_ready = False
+    robot_stopped = False
+    received = 0
+    master_task = None
+    pending_frame = None
+    report_deadline = None
+    master = None
+    dut._log.info("==============================================================")
+    dut._log.info("Start PSC-ONE PSC_OS test")
+    dut._log.info("Boot from ROM")
+
+    dut._log.info("==============================================================")
+    dut._log.info("Start PSC-ONE Chip test")
+    dut._log.info(f"[CONF] PROGRAM_FILE={PROGRAM_FILE}")
+    if not os.path.exists(PROGRAM_FILE):
+        dut._log.info(f"[FAIL] PROGRAM_FILE not found: {PROGRAM_FILE}")
+
+    rom_write_num = dut.u_chip.u_soc.u_bt_rom.ROM_WORD.value
+    dut._log.info(f"PSC_ONE_Boot_axi ROM_WORD : {rom_write_num}")
+
+    # uart
+    uart_rx_queue = deque()
+
+    cocotb.start_soon(generate_clock(dut, CLK_PERIOD_NS))
+    cocotb.start_soon(
+        uart_serial_decoder(
+            dut.uart_tx,
+            uart_rx_queue
+        )
+    )
+
+    # ---- reset & hold CPU ----
+    #dut.PIO_external_in.value  = 3          # PIO_IN = 3 for PIO_test1.cpp　　
+    dut.uart_rx.value          = 1
+    dut.PSCONE_SCL.value       = 1
+    dut.PSCONE_SW1.value       = 1
+    dut.PSCONE_SW2.value       = 1
+    if hasattr(dut, "i2c_master_sda_low"):
+        dut.i2c_master_sda_low.value = 0
+    dut.rst.value              = 0
+
+    #dump_sdram_mem(dut, 0x0000_0000, 24)
+    #dump_page_table(dut, 0x024)
+
+    # ---- reset ----
+    await ncycles(dut.clock, 2)
+    dut.rst.value              = 1
+    await ncycles(dut.clock, 50)
+    dut.rst.value              = 0
+
+    # ---- SDRAM init level wait (timeout 付き) ----
+    ok_init = await wait_level(dut.u_chip.sdram_init_fin, 1, dut.clock, timeout_cycles=SDRAM_INIT_TIMEOUT)
+    if not ok_init:
+        raise RuntimeError("[FAIL] Timeout waiting for sdram_init_fin == 1")
+    await ncycles(dut.clock, 100)
+
+    # ---- Boot_rom_done wait (timeout 付き) ----
+    ok_boot = await wait_level(dut.u_chip.Boot_rom_done, 1, dut.clock, timeout_cycles=BOOT_ROM_TIMEOUT)
+    if not ok_boot:
+        raise RuntimeError("[FAIL] Timeout waiting for Boot_rom_done == 1")
+    await ncycles(dut.clock, 100)
+
+    # ---- Run CPU ----
+    dut._log.info("Boot_rom_done=H. Start CPU")
+
+    # ---- uart_txをキャプチャしながらウェイト ----
+    dut._log.info("Waiting for Uart tx data...")
+    timeout_cycles = RUN_CYCLES
+    waited = 0
+    last_uart_byte = None
+    uart_line = ""
+
+    # ---- PSC-OS prompt detection ----
+    # "PSC_OS> " がUARTに出力されたら、そのXX万クロック後に停止する。
+    prompt_target = BOOT_MARKER
+    prompt_index = 0
+    prompt_count = 0
+    prompt_detected_cycle = None
+    stop_after_prompt_cycles = 1000000
+
+    # Resolve hierarchy once, rather than repeating VPI lookups every cycle.
+    clock = dut.clock
+    core = dut.u_chip.u_soc.u_rv32_core_axi.u_core
+    fault_i, fault_d = core.i_pf, core.d_pf
+    io = dut.u_chip.u_soc.u_mmap_io
+    pio_output, io_write_ready = io.PIO_out_reg, io.cpu_wready
+    if col_mismatch_Assert == 1:
+        sdram = dut.u_chip.u_4port_sdram_axi.u_sdram_controller
+        read_mismatch, write_mismatch = sdram.col_rmismatch, sdram.col_wmismatch
+
+    #dump_sdram_mem(dut, "GW2AR", 0x0000_0000, 24)
+    #dump_sdram_mem(dut, "GW2AR", 0x0010_0000, 24)
+    #dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
+    #dump_sdram_mem(dut, "GW2AR", 0x0010_4440, 24)
+    
+    #dump_sdram_mem(dut, "GW2AR", 0x0020_0000, 24)
+    #dump_sdram_mem(dut, "GW2AR", 0x0020_1400, 84)
+    #dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
+    #dump_page_table(dut, 0x024)
+    #satp_val = int(dut.u_chip.u_soc.u_rv32_core_axi.u_core.u_csr.csr_satp.value)
+
+    while waited < timeout_cycles:
+        # UART decoding and I2C edges have their own timed tasks; faults also
+        # have an edge watcher, so batching does not miss a one-cycle fault.
+        step = min(100, timeout_cycles - waited)
+        await ncycles(clock, step)
+
+        page_fault_i = fault_i.value
+        page_fault_d = fault_d.value
+
+        # PageFaultでbreak
+        if page_fault_i or page_fault_d:
+            dut._log.info("==============================================================")
+            dut._log.info(f"Page Fault detected: I={page_fault_i}, D={page_fault_d}")
+            dump_sdram_mem(dut, "GW2AR", 0x0020_0000, 64)
+            dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 64)
+            dump_sdram_mem(dut, "GW2AR", 0x0025_B000, 64)
+            # SP
+            dump_sdram_mem(dut, "GW2AR", 0x0027_E000, 1024)
+
+            # 正しい page table の物理アドレスを取得
+            satp_val = int(dut.u_chip.u_soc.u_rv32_core_axi.u_core.u_csr.csr_satp.value)
+            ppn = satp_val & 0b11_1111_1111_1111_1111_1111    # 22bit and
+            root_pt = ppn << 12
+
+            dut._log.info(f"SATP = 0x{satp_val:08x} → root PT = 0x{root_pt:08x}")
+            dump_page_table(dut, root_pt)
+            raise AssertionError("Page fault during PSC-OS simulation")
+
+        # PIO
+        if io_write_ready.value == 1:    # cpu_wvalid=1より1clk遅れだがOK
+            pio_val = safe_peek(pio_output, 0)
+            dut._log.info(f"PIO data at cycle {waited} = {pio_val:08x}")
+
+        if col_mismatch_Assert == 1:
+            col_rmismatch = read_mismatch.value
+            col_wmismatch = write_mismatch.value
+        else:
+            col_rmismatch = 0
+            col_wmismatch = 0
+
+        # Burst仕様違反
+        if col_rmismatch or col_wmismatch:
+            dut._log.info(f"Burst Fault detected: rmismatch={col_rmismatch}, wmismatch={col_wmismatch}")
+            raise AssertionError("SDRAM burst fault during PSC-OS simulation")
+
+        # UART TX のシリアル信号から復元された byte を処理
+        while uart_rx_queue:
+            ch = uart_rx_queue.popleft()
+            last_uart_byte = ch
+            if gui is not None:
+                gui.write_byte(ch)
+
+            # 表示用文字
+            if ch in (0x0A, 0x0D):
+                ch_str = "\\n" if ch == 0x0A else "\\r"
+                ch_out = "\n"  # ファイルにはそのまま改行
+            elif 0x20 <= ch <= 0x7E:
+                ch_str = chr(ch)
+                ch_out = chr(ch)
+            else:
+                ch_str = f"\\x{ch:02x}"
+                ch_out = ""  # ファイルに入れない（必要なら変更可）
+
+            dut._log.info(f"uart_tx serial=0x{ch:02x} ({ch_str})")
+
+            if ch == 0x0A:
+                if uart_line.startswith("robot_control: ready"):
+                    assert not robot_ready or robot_stopped, "Unexpected robot command restart"
+                    robot_ready = True
+                    robot_stopped = False
+                    assert hasattr(dut, "i2c_master_sda_low"), (
+                        "I2C top-level wiring needs the reviewed RTL change: "
+                        "missing i2c_master_sda_low / i2c_sda_bus")
+                    master = RobotI2CMaster(dut)
+                    if autotest:
+                        for frame in FRAMES:
+                            i2c_queue.put(frame)
+                    if gui is not None:
+                        gui.i2c_state(True, "Ready — enter four HEX bytes and send")
+                elif uart_line.startswith("I2C RX "):
+                    assert robot_ready and pending_frame is not None, "Unexpected I2C report"
+                    expected = f"I2C RX seq={(received + 1) & 255} HEX={hex_payload(pending_frame)}"
+                    assert uart_line == expected, f"UART I2C mismatch: {uart_line!r} != {expected!r}"
+                    # Complete STOP before the next frame; no overlapping writes.
+                    await master_task
+                    received += 1
+                    pending_frame = None
+                    report_deadline = None
+                    dut._log.info(f"[ROBOT VERIFY] frame {received}: {expected}")
+                    if gui is not None:
+                        gui.i2c_state(True, f"Received by OS: {expected.split('HEX=')[1]}")
+                    if autotest and received == len(FRAMES):
+                        send_queue.put(("auto", "q"))
+                elif uart_line == "robot_control: stopped":
+                    robot_stopped = True
+                    if gui is not None:
+                        gui.i2c_state(False, "Stopped — run robot_control again")
+                elif "I2C overrun" in uart_line:
+                    raise AssertionError(uart_line)
+                if uart_line in ("---- user image map start. ----",
+                                 "---- user stack map start. ----"):
+                    dut._log.info(f"[BOOT TIMING] cycle={waited}: {uart_line}")
+                uart_line = ""
+            elif ch != 0x0D:
+                uart_line = (uart_line + ch_out)[-160:]
+
+            # ----------- ファイルを1文字ごとに追記して閉じる -----------
+            with open(logfile, "a") as f:
+                f.write(ch_out)
+            # ----------------------------------------------------------
+
+            # ---- "PSC_OS>" prompt sequence detection ----
+            if ch == ord(prompt_target[prompt_index]):
+                prompt_index += 1
+
+                if prompt_index == len(prompt_target):
+                    prompt_detected_cycle = waited
+                    prompt_index = 0
+
+                    prompt_count += 1
+                    if autotest and prompt_count > 1:
+                        assert robot_ready, "robot_control command was not accepted by the shell"
+                    dut._log.info(
+                        f'[PSC-OS] Prompt "{prompt_target}" detected. '
+                        f'Prompt #{prompt_count}. cycle={waited}'
+                    )
+                    if auto_prompt and prompt_target == "PSC_OS>" and prompt_count == 1:
+                        send_queue.put(("auto", PROMPT_TEXT))
+                    prompt_ready.set()
+                    if gui is not None:
+                        gui.prompt_ready()
+            else:
+                # 現在文字が先頭 'P' なら、次の候補として1文字目を保持
+                prompt_index = 1 if ch == ord(prompt_target[0]) else 0
+
+        if robot_ready and not robot_stopped and pending_frame is None:
+            try:
+                frame = i2c_queue.get_nowait()
+            except Empty:
+                pass
+            else:
+                assert len(frame) == 4 and all(type(b) is int and 0 <= b <= 255 for b in frame)
+                pending_frame = frame
+                report_deadline = waited + 5_000_000
+                dut._log.info(f"[I2C MASTER] Send HEX={hex_payload(frame)}")
+                if gui is not None:
+                    gui.i2c_state(False, "Sending… waiting for OS receive report")
+                master_task = cocotb.start_soon(master.write_frame(frame))
+        if report_deadline is not None:
+            assert waited < report_deadline, "Timed out waiting for OS I2C receive report"
+
+        # ↓デバッグログ
+        if ((waited % 10000000) == 0):
+            pc_val  = safe_peek(dut.u_chip.u_soc.u_rv32_core_axi.u_core.pc, 0)
+            adr_val = safe_peek(dut.u_chip.u_soc.u_rv32_core_axi.program_mem_read_address, 0)
+            uart_dbg = (
+                f"0x{last_uart_byte:02x}"
+                if last_uart_byte is not None
+                else "--"
+            )
+            dut._log.info(
+                f"[dbg] cycle={waited}, last_uart={uart_dbg}, "
+                f"pc=0x{pc_val:08x}, data_addr=0x{adr_val:08x}"
+            )
+            log = None
+            if logfile is not None:
+                log = open(logfile, "a")
+                log.write(f"[dbg] cycle={waited}, last_uart={uart_dbg}, ")
+                log.write(f"pc=0x{pc_val:08x}, data_addr=0x{adr_val:08x}\n")
+                log.close()
+        
+        # waited インクリメント
+        waited += step
+
+        if autotest and robot_stopped and prompt_count >= 2:
+            break
+
+        if (STOP_AFTER_BOOT and prompt_detected_cycle is not None
+                and waited >= prompt_detected_cycle + stop_after_prompt_cycles):
+            break
+
+    # ---- Stop & settle ----
+    assert prompt_count > 0, f"PSC-OS did not reach {prompt_target!r} before timeout"
+    if not STOP_AFTER_BOOT:
+        assert robot_ready, "robot_control was not started before timeout"
+        if autotest:
+            assert received == len(FRAMES), f"Only {received}/{len(FRAMES)} I2C frames received"
+            assert robot_stopped and prompt_count >= 2, "robot_control did not return to shell"
+        assert pending_frame is None, "Simulation ended before the OS received the last I2C frame"
+    dut._log.info(
+        f"PSC-OS test stopped after {prompt_count} prompts."
+    )
+    await ncycles(dut.clock, 100000)
+    dut._log.info("Uart tx-rx wait.")
+    await ncycles(dut.clock, 50000)
+
+    # Simulation End
+    dut._log.info("Simulation End.")

@@ -8,6 +8,7 @@
 
 // --- SA ---
 #define SYS_SA_RUN          10
+#define SYS_ROBOT_CONTROL   11
 
 // --- MIC ---
 #define I2S_MIC_READ        20
