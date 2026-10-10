@@ -14,6 +14,9 @@
 # 通常テスト
 #make -f Makefile.pscos simulate_PSCOS
 
+# 通常テスト（UART GUI OFF）
+#make -f Makefile.pscos simulate_PSCOS PSC_UART_GUI=0
+
 # FST Dump
 #make -f Makefile.pscos simulate_PSCOS DUMP_FST=1
 

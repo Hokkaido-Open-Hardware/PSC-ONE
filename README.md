@@ -8,7 +8,17 @@
 
 [日本語・開発の目的](README_JP.md) · [Documentation](docs/README.md)
 
-An open-source full-stack RISC-V SoC platform for FPGA-based edge computing and AI acceleration.\
+### Technical Specifications (PDF)
+
+- **[PSC-ONE SoC Specification (Rev.0.9)](./docs/PSC-ONE_SpecSheet.pdf)**  
+  CPU, MMU, cache, SDRAM, NPU, peripherals, and SoC architecture.
+
+- **[PSC-OS Specification (Rev.0.9)](./docs/PSC_OS/PSC_OS_Specs.pdf)**  
+  OS architecture, boot process, system calls, ELF loader, FAT32, MicroPython, and TFLite runtime.
+
+------------------------------------------------------------------------
+
+An open-source full-stack RISC-V SoC platform for FPGA-based edge computing and AI acceleration.  
 PSC-ONE integrates a custom CPU, memory subsystem, peripherals,
 operating system, and AI accelerator into a unified architecture,
 enabling end-to-end hardware/software co-design.
@@ -21,6 +31,8 @@ redundant memory copies during matrix operations and future neural-network workl
 ## Introduction Video
 
 [![PSC-ONE demo video](https://img.youtube.com/vi/9yecOCtIT3k/maxresdefault.jpg)](https://youtu.be/9yecOCtIT3k)
+  
+------------------------------------------------------------------------
 
 ## Contents
 

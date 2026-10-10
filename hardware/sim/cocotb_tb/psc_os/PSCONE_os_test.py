@@ -4,13 +4,14 @@
 #   - レベル待ち + タイムアウト
 #   - ユーティリティ関数で見通し改善
 # =========================================================
-# 対話実行 (リポジトリの仮想環境を有効にしてから):
+# GUI 対話実行 (リポジトリの仮想環境を有効にしてから):
 #   cd PSC-ONE/hardware/sim
-#   PSC_UART_INTERACTIVE=1 PSC_UART_AUTO_PROMPT=0 \
-#     make -f Makefile.pscos simulate_PSCOS CPU_VERSION=v1 SIM_FAST=1
-# 最初の PSC_OS> 検出後、端末に help + Enter を入力する。
+#   make -f Makefile.pscos simulate_PSCOS
+# DISPLAY があれば UART GUI を自動起動。GUI のキーを既存の UART RX へ送信する。
+# PSC_UART_GUI=0 で GUI を無効化、1 で明示的に有効化 (Python tkinter が必要)。
+# 最初の PSC_OS> 検出後、GUI に help + Enter を入力する。
 # [UART RX] の送信ログと log_uart/log_*.log のコマンド一覧/次の PSC_OS> を確認する。
-# RUN_CYCLES で実行時間を延長可能。終了は Ctrl-C。
+# RUN_CYCLES で実行時間を延長可能。SIM の終了は起動端末で Ctrl-C。
 # PSC_UART_INTERACTIVE: 既定は stdin が端末なら有効。パイプ入力には明示的に 1。
 # PSC_UART_AUTO_PROMPT: 既定は対話時 0、それ以外 1。1 で従来の PROMPT_TEXT を送る。
 # 両環境変数とも 1/true/yes/on で有効、0/false/no/off で無効。
@@ -26,6 +27,7 @@ from collections import deque
 from queue import Empty, Queue
 from cocotb.handle import SimHandleBase
 from cocotb.triggers import Event, Timer, RisingEdge, FallingEdge
+from cocotb_tb.psc_os.uart_gui import UartGui
 
 
 def stdin_is_terminal():
@@ -60,7 +62,7 @@ UART_BIT_NS = int(os.getenv("UART_BIT_NS", "40"))
 #PROMPT_TEXT = "help\r"
 PROMPT_TEXT = "exit\r"
 UART_INTERACTIVE = env_flag("PSC_UART_INTERACTIVE", stdin_is_terminal())
-UART_AUTO_PROMPT = env_flag("PSC_UART_AUTO_PROMPT", not UART_INTERACTIVE)
+UART_GUI = env_flag("PSC_UART_GUI", bool(os.getenv("DISPLAY")))
 STOP_AFTER_BOOT = env_flag("PSC_OS_STOP_AFTER_BOOT", False)
 VERIFY_DMA = env_flag("PSC_OS_VERIFY_DMA", False)
 BOOT_MARKER = os.getenv("PSC_OS_BOOT_MARKER", "simulation shell start."
@@ -380,7 +382,7 @@ def uart_stdin_reader(stream, send_queue, stop):
 
 
 async def uart_send_worker(dut, send_queue, prompt_ready):
-    """自動送信も端末入力も、唯一の送信タスクから順番に送る。"""
+    """自動送信・端末入力・GUI 入力を唯一の送信タスクから順番に送る。"""
     await prompt_ready.wait()
     while True:
         try:
@@ -390,10 +392,22 @@ async def uart_send_worker(dut, send_queue, prompt_ready):
             await Timer(UART_BIT_NS * 10, unit="ns")
             continue
         if source == "notice":
-            dut._log.info(f"[UART stdin] {text}")
+            dut._log.info(f"[UART input] {text}")
         else:
             dut._log.info(f"[UART RX] Queued {source}: {text!r}")
-            await uart_serial_send(dut, dut.uart_rx, text, key_interval_ms=UART_KEY_INTERVAL_MS)
+            if source == "gui":
+                # RX is a single-byte register. Keep rapid GUI keystrokes in
+                # the host queue until the OS consumes the previous byte.
+                for ch in text:
+                    while int_resolved(dut.u_chip.u_soc.u_uart.rx_avail):
+                        await Timer(UART_BIT_NS * 10, unit="ns")
+                    await uart_serial_send(dut, dut.uart_rx, ch,
+                                           key_interval_ms=UART_KEY_INTERVAL_MS)
+                    # Let the receiver finish its stop-bit sampling even when
+                    # PSC_UART_KEY_INTERVAL_MS=0 was explicitly requested.
+                    await Timer(UART_BIT_NS * 2, unit="ns")
+            else:
+                await uart_serial_send(dut, dut.uart_rx, text, key_interval_ms=UART_KEY_INTERVAL_MS)
 
 
 # ---------- メインテスト ---------------
@@ -420,15 +434,25 @@ async def RV32IS_chip_test1(dut):
     send_queue = Queue()
     prompt_ready = Event()
     stop_stdin = threading.Event()
+    gui = None
     sender = cocotb.start_soon(uart_send_worker(dut, send_queue, prompt_ready))
     dma_stats = {"transfers": 0, "bytes": 0}
     dma_checker = cocotb.start_soon(verify_dma_copies(dut, dma_stats)) if VERIFY_DMA else None
-    dut._log.info(
-        f"[CONF] PSC_UART_INTERACTIVE={int(UART_INTERACTIVE)}, "
-        f"PSC_UART_AUTO_PROMPT={int(UART_AUTO_PROMPT)}, "
-        f"PSC_UART_KEY_INTERVAL_MS={UART_KEY_INTERVAL_MS}"
-    )
     try:
+        if UART_GUI:
+            try:
+                gui = UartGui(send_queue, logfile)
+            except (OSError, RuntimeError) as exc:
+                if "PSC_UART_GUI" in os.environ:
+                    raise RuntimeError(f"Cannot start UART GUI: {exc}") from exc
+                dut._log.warning(f"[UART GUI] {exc}; using terminal/log output.")
+        auto_prompt = env_flag("PSC_UART_AUTO_PROMPT", not (UART_INTERACTIVE or gui))
+        dut._log.info(
+            f"[CONF] PSC_UART_GUI={int(gui is not None)}, "
+            f"PSC_UART_INTERACTIVE={int(UART_INTERACTIVE)}, "
+            f"PSC_UART_AUTO_PROMPT={int(auto_prompt)}, "
+            f"PSC_UART_KEY_INTERVAL_MS={UART_KEY_INTERVAL_MS}"
+        )
         if UART_INTERACTIVE:
             threading.Thread(
                 target=uart_stdin_reader,
@@ -437,7 +461,7 @@ async def RV32IS_chip_test1(dut):
                 daemon=True,
             ).start()
             dut._log.info("[UART stdin] Enter commands followed by Enter; waiting for PSC_OS>.")
-        await run_psc_os_test(dut, send_queue, prompt_ready)
+        await run_psc_os_test(dut, send_queue, prompt_ready, gui, auto_prompt)
         if VERIFY_DMA:
             assert dma_stats["transfers"] > 0, "No completed DMA copies observed"
             dut._log.info(f"[DMA VERIFY] {dma_stats}")
@@ -446,9 +470,11 @@ async def RV32IS_chip_test1(dut):
         sender.cancel()
         if dma_checker is not None:
             dma_checker.cancel()
+        if gui is not None:
+            gui.close()
 
 
-async def run_psc_os_test(dut, send_queue, prompt_ready):
+async def run_psc_os_test(dut, send_queue, prompt_ready, gui=None, auto_prompt=False):
     dut._log.info("==============================================================")
     dut._log.info("Start PSC-ONE PSC_OS test")
     dut._log.info("Boot from ROM")
@@ -584,6 +610,8 @@ async def run_psc_os_test(dut, send_queue, prompt_ready):
         while uart_rx_queue:
             ch = uart_rx_queue.popleft()
             last_uart_byte = ch
+            if gui is not None:
+                gui.write_byte(ch)
 
             # 表示用文字
             if ch in (0x0A, 0x0D):
@@ -624,9 +652,11 @@ async def run_psc_os_test(dut, send_queue, prompt_ready):
                         f'[PSC-OS] Prompt "{prompt_target}" detected. '
                         f'Prompt #{prompt_count}. cycle={waited}'
                     )
-                    if UART_AUTO_PROMPT and prompt_target == "PSC_OS>":
+                    if auto_prompt and prompt_target == "PSC_OS>":
                         send_queue.put(("auto", PROMPT_TEXT))
                     prompt_ready.set()
+                    if gui is not None:
+                        gui.prompt_ready()
             else:
                 # 現在文字が先頭 'P' なら、次の候補として1文字目を保持
                 prompt_index = 1 if ch == ord(prompt_target[0]) else 0
