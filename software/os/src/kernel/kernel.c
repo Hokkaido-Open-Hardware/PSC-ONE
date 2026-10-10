@@ -157,20 +157,39 @@ __attribute__((section(".text.boot")))
 __attribute__((naked))
 void boot(void) {
     __asm__ __volatile__(
-        "mv sp, %[stack_top]\n"
+        "la sp, __kernel_stack_top\n"
+        "li a0, 0\n"
         "j kernel_main\n"
-        :
-        : [stack_top] "r" (__kernel_stack_top)
     );
 }
 
-__attribute__((used)) void kernel_main(void) {
-#if BSS_CLEAR_OFF
-    s_printf("memset = OFF\n");
+__attribute__((naked, used)) void kernel_warm_boot(void) {
+    __asm__ __volatile__(
+        "la sp, __kernel_stack_top\n"
+        "li a0, 1\n"
+        "j kernel_main\n"
+    );
+}
+
+__attribute__((used)) void kernel_main(uint32_t warm) {
+#ifndef USE_SBI_CONSOLE
+    extern char __data[], __data_end[], __data_initial[];
+    size_t data_size = (size_t)__data_end - (size_t)__data;
+    if (warm) memcpy(__data, __data_initial, data_size);
+    else memcpy(__data_initial, __data, data_size);
 #else
-    s_printf("memset = ON\n");
-    memset(__bss, 0, (size_t)__bss_end - (size_t)__bss);
+    (void)warm;
 #endif
+    /* Required on warm boot even in simulations that pre-zero RAM. The
+       linker aligns __bss to 4 bytes; clear the large buffers a word at a
+       time, including any byte tail. Volatile keeps this as word stores. */
+    uintptr_t bss = (uintptr_t)__bss, end = (uintptr_t)__bss_end;
+    while (end - bss >= sizeof(uint32_t)) {
+        *(volatile uint32_t *)bss = 0;
+        bss += sizeof(uint32_t);
+    }
+    while (bss < end) *(volatile uint8_t *)bss++ = 0;
+    s_printf("memset = ON\n");
 #if NPU_TESTMODE
     s_printf("NPU TEST\n");
     s_call_sa_api(4, true, true);
@@ -200,6 +219,7 @@ __attribute__((used)) void kernel_main(void) {
         "| CMD   : fat32_info, fat32_ls, fat32_cat\n"
         "| CMD   : fat32_touch\n"
         "| CMD   : speech\n"
+        "| CMD   : robot_control\n"
         "| CMD   : microPython\n"
         "| CMD   : run (.ELF)\n"
         "| microPython exit: Ctl+D.\n"

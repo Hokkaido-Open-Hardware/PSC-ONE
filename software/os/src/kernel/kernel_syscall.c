@@ -263,7 +263,7 @@ void handle_syscall(struct trap_frame *f) {
             elf_finish(f, 0, (int)f->a0);
             break;
         }
-        s_printf("process %d exited\n", current_proc->pid);
+        s_printf("Restarting PSC-OS...\n");
         reboot();
         __builtin_unreachable();
 

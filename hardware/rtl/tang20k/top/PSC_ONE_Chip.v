@@ -100,10 +100,10 @@ module PSC_ONE_Chip #(
     output wire         PSCONE_TP_TCK,
 
     // ------------------ Robot ------------------
-    input  wire         PSCONE_LV1,
-    output wire         PSCONE_LV2,
-    output wire         PSCONE_LV3,
-    output wire         PSCONE_LV4,
+    inout  wire         PSCONE_LV1,
+    inout  wire         PSCONE_LV2,
+    inout  wire         PSCONE_LV3,
+    inout  wire         PSCONE_LV4,
 
     // ------------------ LEDs ------------------
     output wire [5:0]   PSCONE_LED_OUT
@@ -130,6 +130,28 @@ module PSC_ONE_Chip #(
 `ifdef INIT_CLEAR_MEM_BANKS
     wire init_clear_mem_banks_mode = 1'b1;
 `endif
+
+    // --------------------------------
+    // オープンドレイン
+    // --------------------------------
+    // 1 = Lowを出力、0 = Hi-Z
+    wire [3:0] lv_drive_low;
+
+    // 外部ピン
+    assign PSCONE_LV1 = lv_drive_low[0] ? 1'b0 : 1'bz;
+    assign PSCONE_LV2 = lv_drive_low[1] ? 1'b0 : 1'bz;
+    assign PSCONE_LV3 = lv_drive_low[2] ? 1'b0 : 1'bz;
+    assign PSCONE_LV4 = lv_drive_low[3] ? 1'b0 : 1'bz;
+
+    // 入力値
+    wire [3:0] lv_input;
+
+    assign lv_input = {
+        PSCONE_LV4,
+        PSCONE_LV3,
+        PSCONE_LV2,
+        PSCONE_LV1
+    };
 
     // --------------------------------
     // 内部クロック/リセット
@@ -541,8 +563,8 @@ module PSC_ONE_Chip #(
         .UART_TXD           (UART_TXD),
 
         // I2C
-        .PSCONE_SCL         (PSCONE_LV1),   // in
-        .PSCONE_SDA         (PSCONE_LV2),   // out
+        .PSCONE_SCL         (lv_drive_low[2]),   // in
+        .PSCONE_SDA         (lv_drive_low[3]),   // out
 
         // Switch
         .PSCONE_SW1         (PSCONE_SW1),

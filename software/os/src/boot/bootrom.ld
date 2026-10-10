@@ -9,4 +9,5 @@ SECTIONS {
         *(.text*)
         *(.rodata*)
     } > BRAM
+    ASSERT(SIZEOF(.text) <= 512, "MBIOS exceeds the hardware 128-word ROM")
 }

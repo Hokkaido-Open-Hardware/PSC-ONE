@@ -315,7 +315,7 @@ else
   BIOS_FLAGS :=
 endif
 
-$(BOOT_ELF): $(Build) $(SRCS_MBIOS) $(Src)/boot/bootrom.ld
+$(BOOT_ELF): $(Build) $(SRCS_MBIOS) $(wildcard $(Src)/boot/mbios.h) $(Src)/boot/bootrom.ld
 	$(CC) $(CFLAGS) $(BIOS_FLAGS) \
 		-Wl,-T$(Src)/boot/bootrom.ld \
 		-o $@ \

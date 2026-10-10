@@ -105,7 +105,8 @@ int elf_is_running(void);
 void elf_run(struct trap_frame *f);
 void elf_finish(struct trap_frame *f, int result, int exit_code);
 __attribute__((section(".text.boot"), naked)) void boot(void);
-void kernel_main(void);
+void kernel_main(uint32_t warm);
+__attribute__((noreturn)) void machine_restart(void);
 
 // --- スケジューラ/プロセス ---
 __attribute__((naked))

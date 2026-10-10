@@ -2,6 +2,7 @@
 #include "kernel.h"
 #include "../api/synap_api.h"
 #include "../drivers/timer_api.h"
+#include "../boot/mbios.h"
 
 /* Set to 0 to compare the original CPU copy with DMA during process loading. */
 #ifndef KERNEL_PROCESS_USE_DMA
@@ -352,10 +353,97 @@ void shell_idle_task(void)
 
 __attribute__((noreturn)) void reboot(void)
 {
-    __asm__ __volatile__("csrw satp, zero\n" "sfence.vma\n" "fence.i\n");
-    void (*boot)(void) = (void (*)(void))0x00000000;
-    boot();
-    while (1) {
-        __asm__ __volatile__("wfi");
-    }
+#ifdef USE_SBI_CONSOLE
+    /* Standard SBI system reset: warm reboot, no reason. */
+    sbi_call(2, 0, 0, 0, 0, 0, 0, 0x53525354);
+#else
+    register uint32_t entry __asm__("a0") = (uint32_t)machine_restart;
+    register uint32_t extension __asm__("a7") = PSC_SBI_RESTART;
+    __asm__ __volatile__("ecall" : "+r"(entry), "+r"(extension) :: "memory");
+#endif
+    PANIC("restart service returned");
 }
+
+#ifndef USE_SBI_CONSOLE
+/* Only MBIOS or the installed machine trap handler may enter here. Abandon
+ * all trap/process stacks before clearing BSS (which contains those stacks).
+ * The kernel is identity mapped, and M-mode fetches physical addresses. */
+__attribute__((naked, noreturn)) void machine_restart(void)
+{
+    __asm__ __volatile__(
+        "csrw mie, zero\n"
+        "csrw mstatus, zero\n"
+        "csrw sie, zero\n"
+        "csrw sstatus, zero\n"
+        "csrw satp, zero\n"
+        "sfence.vma\n"
+        "la sp, __kernel_stack_top\n"
+        "j machine_restart_finish\n"
+    );
+}
+
+__attribute__((used, noinline, noreturn)) void machine_restart_finish(void)
+{
+    /* The shell executes device commands synchronously. Drain DMA before
+       reusing memory; retain SDRAM and the original kernel/shell images. */
+    while (READ_CSR(0x7f0) & 2u) {}
+    WRITE_CSR(0x7e0, 0);
+    WRITE_CSR(0x7e4, 0);
+    WRITE_CSR(0x7e8, 0);
+    WRITE_CSR(0x7ec, 0);
+    WRITE_CSR(0x7c0, 2); /* NPU state reset; no command remains in flight */
+    WRITE_CSR(0x7c0, 0);
+    WRITE_CSR(0x7c4, 0);
+
+    /* Stop first, then W1C pending on a separate transaction so an expiry
+       on the stop cycle cannot leave a stale level interrupt behind. */
+    mmio_w32(0x10002000u, 1u << 19);
+    mmio_w32(0x10002000u, (1u << 19) | (1u << 20));
+    while (mmio_r32(0x10002008u) & ((1u << 7) | (1u << 10))) {}
+    mmio_w32(0x10004000u, 0); /* LEDs agree with the fresh driver's state */
+    mmio_w32(0x10007004u, 1); /* discard old microphone FIFO samples */
+    /* SD/SPI and LCD commands are synchronous. Keep the card initialized
+       and the panel contents; fresh filesystem/LCD state initializes on use. */
+    while (mmio_r32(0x10000008u) & 1u) {} /* finish restart message */
+    while (mmio_r32(0x10000008u) & 2u) (void)mmio_r32(0x10000004u);
+
+    WRITE_CSR(mip, 0);
+    WRITE_CSR(medeleg, 0);
+    WRITE_CSR(sscratch, 0);
+    WRITE_CSR(sepc, 0);
+    WRITE_CSR(scause, 0);
+    WRITE_CSR(stval, 0);
+    WRITE_CSR(stvec, 0);
+    WRITE_CSR(mcause, 0);
+    WRITE_CSR(mtval, 0);
+
+    /* Stackless from here: write back dirty RAM before invalidating D-cache.
+       Serial loads wait for both maintenance sweeps, as in memcpy_dma().
+       MBIOS restores mtvec/mscratch/M-stack, delegation and MPP=S, and mret
+       enters the same kernel initialization on a new S stack. */
+    __asm__ __volatile__(
+        "la t2, __kernel_base\n"
+        "fence rw, rw\n"
+        "li t0, 2\n"
+        "csrw 0x7f0, t0\n"
+        "csrw 0x7f0, zero\n"
+        "lw zero, 0(t2)\n"
+        "li t0, 1\n"
+        "csrw 0x7f0, t0\n"
+        "csrw 0x7f0, zero\n"
+        "lw zero, 0(t2)\n"
+        "fence rw, rw\n"
+        "fence.i\n"
+        "la a1, kernel_warm_boot\n"
+        "li t0, %0\n"
+        "jr t0\n"
+        :: "i"(PSC_MBIOS_WARM_ENTRY) : "t0", "t2", "a1", "memory"
+    );
+    __builtin_unreachable();
+}
+#else
+__attribute__((noreturn)) void machine_restart(void)
+{
+    PANIC("PSC MBIOS restart is unavailable on SBI");
+}
+#endif

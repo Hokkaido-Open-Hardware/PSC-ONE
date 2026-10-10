@@ -23,8 +23,8 @@ module PSC_ONE_Chip_sim #(
     output wire         uart_tx,
 
     // ---- I2C ----
-    input  wire         PSCONE_SCL,
-    output wire         PSCONE_SDA,
+    inout  wire         PSCONE_SCL,
+    inout  wire         PSCONE_SDA,
 
     // ---------------- PSC-ONE SW ----------------
     input wire          PSCONE_SW1,

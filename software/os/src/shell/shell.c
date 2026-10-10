@@ -221,6 +221,11 @@ prompt:
             // SA API call 
             call_sa_api(matrix_max, true);
 
+        // ---- ロボット制御 ----
+        } else if (strcmp(argv[0], "robot_control") == 0) {
+            //TBD
+            //robot_i2c(TBD);
+
         // ---- I2S MIC READ ----
         } else if (strcmp(argv[0], "mic_read") == 0) {
             if (argc < 2) {
@@ -401,7 +406,7 @@ prompt:
             printf("  primes [max]\n");
             printf("  sa_start\n");
             printf("  sd_read\n");
-            printf("  exit | quit | q\n");
+            printf("  exit | quit | q (restart PSC-OS)\n");
 
         } else if (strcmp(argv[0], "exit") == 0 ||
                    strcmp(argv[0], "quit") == 0 ||

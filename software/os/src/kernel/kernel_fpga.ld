@@ -14,7 +14,16 @@ SECTIONS {
     }
 
     .data : ALIGN(4) {
-        *(.data .data.*);
+        __data = .;
+        *(.data .data.* .sdata .sdata.*);
+        __data_end = .;
+    }
+
+    /* Cold-boot snapshot, outside BSS and the allocator. Warm restart keeps
+       the resident text/shell images and restores writable initializers. */
+    .restart_data (NOLOAD) : ALIGN(16) {
+        __data_initial = .;
+        . += SIZEOF(.data);
     }
 
     .bss : ALIGN(4) {
@@ -23,7 +32,7 @@ SECTIONS {
         __bss_end = .;
     }
 
-    . = ALIGN(4);
+    . = ALIGN(16);
     . += 128 * 1024; /* 128KB */
     __kernel_stack_top = .;
 

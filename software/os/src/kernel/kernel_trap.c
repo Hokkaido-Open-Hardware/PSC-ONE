@@ -2,6 +2,7 @@
 #include "kernel.h"
 #include "../drivers/timer_api.h"
 #include "elf_loader.h"
+#include "../boot/mbios.h"
 
 #define MACHINE_CONTEXT_SIZE 160
 
@@ -136,6 +137,8 @@ __attribute__((used)) void handle_machine_trap(struct machine_context *context)
 
     if (context->mcause == MCAUSE_ECALL_S) {
         uint32_t extension = context->x[17]; /* a7 */
+
+        if (extension == PSC_SBI_RESTART) machine_restart();
 
         /* An ECALL is synchronous: resume at the following instruction. */
         context->mepc += 4u;
