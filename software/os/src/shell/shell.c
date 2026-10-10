@@ -7,7 +7,7 @@
 #include "../api/robot/robot_control.h"
 
 // micropythonを含めるとSIM時間が長すぎる場合のオプション
-#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON 0
+#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON 1
 
 // JPEG LCD表示なしの場合のオプション
 #define PSC_OS_DEBUG_WITHOUT_JPEGLCD 1

@@ -191,10 +191,6 @@ __attribute__((used)) void kernel_main(uint32_t warm) {
     }
     while (bss < end) *(volatile uint8_t *)bss++ = 0;
     s_printf("memset = ON\n");
-#ifdef PSC_ROBOT_SIM
-    /* Dedicated integration image; normal OS startup is unchanged. */
-    robot_control_run();
-#endif
 #if NPU_TESTMODE
     s_printf("NPU TEST\n");
     s_call_sa_api(4, true, true);
@@ -232,6 +228,10 @@ __attribute__((used)) void kernel_main(uint32_t warm) {
 
     WRITE_CSR(stvec, (uint32_t)kernel_entry);
 
+#ifdef PSC_ROBOT_SIM
+    /* Dedicated integration image; normal OS startup is unchanged. */
+    robot_control_run();
+#endif
 #ifdef PSC_OS_DUMMY_TEST
     run_multitask_dummy_test();
     PANIC("dummy scheduler test returned");
