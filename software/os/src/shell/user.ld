@@ -25,13 +25,14 @@ SECTIONS {
         *(.bss .bss.* .sbss .sbss.*);
 
         . = ALIGN(16);
-        __user_stack_bottom = .;
-        . += 4K;   /* guard page */
-        __user_stack_start = .;
-        . += 128 * 1024;   /* stack 128KB */
-        __user_stack_top = .;
-
-        ASSERT(__user_stack_top <= USER_MAX, "user image + stack overflow USER_MAX");
+        __user_bss_end = .;
     }
-}
 
+    /* create_process() maps this stack separately. Do not also embed 128KB
+       of zero stack in shell.bin: MicroPython needs that page-pool space. */
+    __user_stack_top = USER_MAX;
+    __user_stack_start = __user_stack_top - 128 * 1024;
+    __user_stack_bottom = __user_stack_start - 4096; /* unmapped guard */
+    ASSERT(__user_bss_end <= __user_stack_bottom,
+           "user image overlaps stack guard")
+}

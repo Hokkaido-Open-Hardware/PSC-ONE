@@ -86,6 +86,8 @@ struct sbiret sbi_call(long arg0, long arg1, long arg2, long arg3,
 void putchar(char ch);
 void uart_putchar(char ch);
 long uart_getchar(void);
+long uart_console_control(uint32_t action, int value);
+void uart_console_irq(void);
 long uart_getchar_timeout(uint32_t timeout);
 
 // --- メモリ管理/ページング ---

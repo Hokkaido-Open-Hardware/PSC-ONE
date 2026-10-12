@@ -6,9 +6,18 @@
 #include "py/mperrno.h"
 
 #include "mphalport.h"
+#include "psc_vfs.h"
 #include <string.h>
 #include "../../../os/src/api/tflite/tflite_api.h"
 
+
+// Return to the calling PSC-OS shell, without redefining Ctrl+D semantics.
+extern bool psc_mp_exit_requested;
+static mp_obj_t psc_exit(void) {
+    psc_mp_exit_requested = true;
+    mp_raise_type(&mp_type_SystemExit);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(psc_exit_obj, psc_exit);
 
 /* ------------------------------------------------------------
  * PSC-OS側関数
@@ -665,6 +674,7 @@ static MP_DEFINE_CONST_FUN_OBJ_0(mod_psc_tflite_arena_used_obj, mod_psc_tflite_a
 
 /* Pythonのpscモジュールに公開する関数名と関数オブジェクトの対応表。 */
 static const mp_rom_map_elem_t psc_module_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_exit), MP_ROM_PTR(&psc_exit_obj) },
 
     { MP_ROM_QSTR(MP_QSTR_tflite_load), MP_ROM_PTR(&mod_psc_tflite_load_obj) },
     { MP_ROM_QSTR(MP_QSTR_tflite_reset), MP_ROM_PTR(&mod_psc_tflite_reset_obj) },
@@ -680,6 +690,7 @@ static const mp_rom_map_elem_t psc_module_globals_table[] = {
     },
 
     /* FAT32 */
+    { MP_ROM_QSTR(MP_QSTR_mount_sd), MP_ROM_PTR(&psc_mount_sd_obj) },
     {
         MP_ROM_QSTR(MP_QSTR_fat32_ls),
         MP_ROM_PTR(&psc_fat32_ls_obj)

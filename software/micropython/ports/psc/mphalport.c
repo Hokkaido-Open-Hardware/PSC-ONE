@@ -2,6 +2,8 @@
 #include <stddef.h>
 
 #include "py/mphal.h"
+#include "py/runtime.h"
+#include "py/stream.h"
 #include "mphalport.h"
 #include "../../../os/src/kernel/syscall.h"
 
@@ -65,30 +67,56 @@ static inline long psc_syscall_sa_run(
  * UART
  * ------------------------------------------------------------ */
 
-mp_uint_t mp_hal_stdout_tx_strn(
-    const char *str,
-    size_t len
-)
-{
-    for (size_t i = 0; i < len; i++) {
-        psc_syscall1(
-            SYS_PUTCHAR,
-            (unsigned char)str[i]
-        );
+static long console_control(long action, long value) {
+    register long a0 __asm__("a0") = action;
+    register long a1 __asm__("a1") = value;
+    register long a3 __asm__("a3") = SYS_MP_CONSOLE;
+    __asm__ volatile ("ecall" : "+r"(a0) : "r"(a1), "r"(a3) : "memory");
+    return a0;
+}
+
+int psc_mp_console_begin(void) {
+    return console_control(PSC_CONSOLE_BEGIN, 0);
+}
+
+void psc_mp_console_end(void) {
+    console_control(PSC_CONSOLE_END, 0);
+}
+
+void mp_hal_set_interrupt_char(int c) {
+    console_control(PSC_CONSOLE_SET_INTERRUPT, c);
+}
+
+void psc_mp_poll(void) {
+    if (console_control(PSC_CONSOLE_POLL_INTERRUPT, 0)) {
+        mp_sched_keyboard_interrupt();
     }
-
-    return (mp_uint_t)len;
 }
 
-
-int mp_hal_stdin_rx_chr(void)
-{
-    return (int)psc_syscall1(
-        SYS_GETCHAR,
-        0
-    );
+mp_uint_t mp_hal_stdout_tx_strn(const char *str, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        psc_syscall1(SYS_PUTCHAR, (unsigned char)str[i]);
+        // Also interrupt long output without waiting for another VM branch.
+        psc_mp_poll();
+        mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
+    }
+    return len;
 }
 
+int mp_hal_stdin_rx_chr(void) {
+    for (;;) {
+        psc_mp_poll();
+        mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
+        int c = console_control(PSC_CONSOLE_READ, 0);
+        if (c >= 0) return c;
+    }
+}
+
+uintptr_t mp_hal_stdio_poll(uintptr_t flags) {
+    int ready = MP_STREAM_POLL_WR;
+    if (console_control(PSC_CONSOLE_AVAILABLE, 0)) ready |= MP_STREAM_POLL_RD;
+    return ready & flags;
+}
 
 /* ------------------------------------------------------------
  * TIMER API

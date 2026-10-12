@@ -3,6 +3,9 @@ myenv/
 __pycache__/
 *.pyc
 
+# VSCode
+.vscode/
+
 # Log
 log_gowin/
 

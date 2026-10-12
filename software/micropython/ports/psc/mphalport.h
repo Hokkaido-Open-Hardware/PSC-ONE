@@ -16,10 +16,11 @@ static inline mp_uint_t mp_hal_ticks_ms(void)
 }
 
 
-static inline void mp_hal_set_interrupt_char(char c)
-{
-    (void)c;
-}
+void mp_hal_set_interrupt_char(int c);
+int psc_mp_console_begin(void);
+void psc_mp_console_end(void);
+void psc_mp_poll(void);
+uintptr_t mp_hal_stdio_poll(uintptr_t poll_flags);
 
 
 /* ------------------------------------------------------------

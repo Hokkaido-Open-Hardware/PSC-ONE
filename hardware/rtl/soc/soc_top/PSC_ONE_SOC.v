@@ -321,6 +321,7 @@ module PSC_ONE_SOC #(
 
     // irq
     wire        irq_tx;
+    wire        irq_uart_cpu;
 
     PSC_ONE_RV32_core #(
         .ADDR_WIDTH          (ADDR_WIDTH),
@@ -353,7 +354,7 @@ module PSC_ONE_SOC #(
         .clock              (clock),
         .reset_n            (reset_n),
         .cpu_stop           (cpu_stop),
-        .timer_irq_ext      (irq_tx),
+        .timer_irq_ext      (irq_tx | irq_uart_cpu),
         .uart_out           (),
 
         // ---- 外部 IO ----
@@ -589,7 +590,8 @@ module PSC_ONE_SOC #(
         .cpu_rdata      (mmio_rdata_uart),
         .cpu_rready     (mmio_rready_uart),
 
-        .irq_rx         ()
+        .irq_rx         (),
+        .irq_cpu        (irq_uart_cpu)
     );
 
     //==========================================================

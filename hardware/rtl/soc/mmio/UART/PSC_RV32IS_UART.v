@@ -33,7 +33,9 @@ module PSC_RV32IS_UART #(
     output reg                      cpu_rready,  // 1clk パルス
 
     // Interrupt (level)
-    output reg                      irq_rx
+    output reg                      irq_rx,
+    // Opt-in CPU routing; legacy status/irq_rx behaviour is unchanged.
+    output wire                     irq_cpu
 );
 
 // 追加: VCD ダンプ用ブロック
@@ -101,6 +103,8 @@ end
     reg         rx_avail;       // SINGLE DRIVER (own always)
     reg         rx_overrun;     // SINGLE DRIVER (own always)
     reg         rx_irq_en;      // SINGLE DRIVER (MMIO write always)
+    reg         rx_cpu_irq_en;
+    assign irq_cpu = irq_rx & rx_cpu_irq_en;
 
     // ---------------- Submodules ----------------
     UART_TX #(
@@ -226,6 +230,7 @@ end
         if (!reset_n) begin
             cpu_wready <= 1'b0;
             rx_irq_en  <= 1'b1;   // default enable (変更可)
+            rx_cpu_irq_en <= 1'b0;
         end else begin
             cpu_wready <= 1'b0;
 
@@ -238,6 +243,7 @@ end
                     UART_ADDR_CT: begin
                         // CTRL: [0]=rx_irq_en, W1C:[1]=irq_clr, W1C:[2]=overrun_clr
                         rx_irq_en  <= cpu_wdata[0];
+                        rx_cpu_irq_en <= cpu_wdata[3]; // CTRL[3]: CPU IRQ routing
                         cpu_wready <= 1'b1;
                     end
                     default: begin
@@ -268,7 +274,7 @@ end
                         cpu_rready <= 1'b1;
                     end
                     UART_ADDR_CT: begin
-                        cpu_rdata  <= {31'h0, rx_irq_en};
+                        cpu_rdata  <= {28'h0, rx_cpu_irq_en, 2'b0, rx_irq_en};
                         cpu_rready <= 1'b1;
                     end
                     UART_ADDR_TX: begin

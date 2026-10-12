@@ -5,6 +5,14 @@
 #define SYS_PUTCHAR         1
 #define SYS_GETCHAR         2
 #define SYS_GETCHAR_TIMEOUT 3
+#define SYS_MP_CONSOLE     4 /* a0: PSC_CONSOLE_*; a1: interrupt character */
+#define PSC_CONSOLE_BEGIN  0
+#define PSC_CONSOLE_END    1
+#define PSC_CONSOLE_READ   2 /* nonblocking, -1 if empty */
+#define PSC_CONSOLE_SET_INTERRUPT 3
+#define PSC_CONSOLE_POLL_INTERRUPT 4 /* consume pending Ctrl+C */
+#define PSC_CONSOLE_AVAILABLE 5
+#define PSC_CONSOLE_OVERRUN 6 /* cumulative lost bytes in this session */
 
 // --- SA ---
 #define SYS_SA_RUN          10

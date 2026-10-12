@@ -129,6 +129,10 @@ void machine_trap_entry(void) {
 __attribute__((used)) void handle_machine_trap(struct machine_context *context)
 {
     if (context->mcause == MCAUSE_TIMER_IRQ) {
+        // UART opts into this shared machine IRQ line only during MicroPython.
+        uart_console_irq();
+        uint32_t timer_irq = TIMER_ST_IRQ_PENDING | TIMER_ST_IRQ_ENABLE;
+        if ((timer_get_status() & timer_irq) != timer_irq) return;
         if (timer_measure_irq()) return;
         schedule_from_machine_trap(context);
         timer_clear_scheduler_irq();

@@ -1,10 +1,22 @@
+PSC_BUILD_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+include $(dir $(PSC_BUILD_MAKEFILE))../../patches/build.mk
+ifeq ($(PSC_PATCH_BUILD_BODY),1)
+
+ifeq ($(wildcard ../../micropython/py/mkenv.mk),)
+$(error MicroPython submodule is missing. Run from the repository root: git submodule update --init --recursive)
+endif
 include ../../micropython/py/mkenv.mk
+
+# Dependency files contain the object target's path verbatim. Use the same
+# spelling for direct builds and PSC-OS builds, including command-line BUILD.
+override BUILD := $(abspath $(BUILD))
 
 # ------------------------------------------------------------
 # PSC-ONE / PSC-RV32ISP
 # ------------------------------------------------------------
 
 QSTR_DEFS = qstrdefsport.h
+QSTR_GLOBAL_DEPENDENCIES += Makefile
 
 MICROPY_ROM_TEXT_COMPRESSION ?= 0
 
@@ -19,6 +31,7 @@ SIZE    := llvm-size
 INC += -I.
 INC += -I$(TOP)
 INC += -I$(BUILD)
+CFLAGS += -DFFCONF_H=\"lib/oofatfs/ffconf.h\"
 
 ARCH = \
 	--target=riscv64-unknown-elf \
@@ -58,27 +71,54 @@ LIBC := /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32i/ilp32/libc.a
 # ------------------------------------------------------------
 
 SRC_S = \
-	start.S
+	start.S \
+	shared/runtime/gchelper_rv32i.s
 
 SRC_C = \
 	main.c \
 	mphalport.c \
+	shared/runtime/gchelper_native.c \
+	shared/runtime/sys_stdio_mphal.c \
+	extmod/modos.c \
+	extmod/vfs.c \
+	extmod/vfs_reader.c \
+	extmod/vfs_blockdev.c \
+	extmod/vfs_fat.c \
+	extmod/vfs_fat_file.c \
+	extmod/vfs_fat_diskio.c \
+	lib/oofatfs/ff.c \
+	lib/oofatfs/ffunicode.c \
+	shared/timeutils/timeutils.c \
+	psc_vfs.c \
 	modpsc.c \
 	shared/libc/printf.c \
 	shared/libc/string0.c \
 	shared/readline/readline.c \
 	shared/runtime/pyexec.c \
-	shared/runtime/stdout_helpers.c \
-	$(BUILD)/_frozen_mpy.c
+	shared/runtime/stdout_helpers.c
 
 SRC_QSTR += \
+	extmod/vfs_blockdev.c \
+	psc_vfs.c \
+	extmod/vfs_fat.c \
+	extmod/vfs_fat_file.c \
+	extmod/vfs_reader.c \
+	shared/runtime/sys_stdio_mphal.c \
+	extmod/modos.c \
+	extmod/vfs.c \
 	shared/readline/readline.c \
 	shared/runtime/pyexec.c \
 	modpsc.c
 
 OBJ += $(PY_CORE_O)
 OBJ += $(addprefix $(BUILD)/, $(SRC_C:.c=.o))
-OBJ += $(addprefix $(BUILD)/, $(SRC_S:.S=.o))
+OBJ += $(addprefix $(BUILD)/, $(patsubst %.s,%.o,$(SRC_S:.S=.o)))
+# Generated sources already live under BUILD; do not prefix BUILD twice.
+OBJ += $(BUILD)/_frozen_mpy.o
+
+# Also rebuild legacy objects whose .P targets used a relative BUILD path.
+# Thereafter compiler-generated dependencies track individual headers.
+$(OBJ): Makefile mpconfigport.h mphalport.h
 
 # ------------------------------------------------------------
 # libgcc
@@ -145,12 +185,12 @@ MICROPY_EMBED_OBJ := $(filter-out \
 	$(BUILD)/shared/libc/printf.o, \
 	$(OBJ))
 
-$(MICROPY_EMBED_MAIN): main.c $(BUILD)/genhdr/qstrdefs.generated.h
+$(MICROPY_EMBED_MAIN): main.c Makefile mpconfigport.h mphalport.h psc_vfs.h $(BUILD)/genhdr/qstrdefs.generated.h
 	$(CC) $(CFLAGS) -DPSC_MICROPY_EMBEDDED=1 -c $< -o $@
 
 $(MICROPY_LIB): $(OBJ) $(MICROPY_EMBED_MAIN)
-	@rm -f $@
-	$(AR) rcs $@ $(MICROPY_EMBED_OBJ) $(MICROPY_EMBED_MAIN)
+	$(AR) rcs $@.new $(MICROPY_EMBED_OBJ) $(MICROPY_EMBED_MAIN)
+	mv $@.new $@
 	@echo "[MP] embedded library generated: $@"
 
 .PHONY: embedded
@@ -170,17 +210,22 @@ all: $(OBJ)
 
 $(BUILD)/_frozen_mpy.c: \
 	$(TOP)/tests/assets/frozentest.mpy \
+	Makefile mpconfigport.h \
 	$(BUILD)/genhdr/qstrdefs.generated.h
 
 	$(ECHO) "MISC freezing bytecode"
 	$(Q)$(TOP)/tools/mpy-tool.py \
 		-f \
 		-q $(BUILD)/genhdr/qstrdefs.preprocessed.h \
-		-mlongint-impl=none \
+		-mlongint-impl=longlong \
 		$< > $@
 
 # ------------------------------------------------------------
 # MicroPython common rules
 # ------------------------------------------------------------
 
+$(BUILD)/shared/runtime/gchelper_rv32i.o: $(TOP)/shared/runtime/gchelper_rv32i.s
+	$(CC) $(CFLAGS) -c $< -o $@
+
 include $(TOP)/py/mkrules.mk
+endif # PSC_PATCH_BUILD_BODY

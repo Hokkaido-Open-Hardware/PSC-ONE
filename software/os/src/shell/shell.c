@@ -7,7 +7,7 @@
 #include "../api/robot/robot_control.h"
 
 // micropythonを含めるとSIM時間が長すぎる場合のオプション
-#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON 1
+#define PSC_OS_DEBUG_WITHOUT_MICROPYTHON 0
 
 // JPEG LCD表示なしの場合のオプション
 #define PSC_OS_DEBUG_WITHOUT_JPEGLCD 1
@@ -382,7 +382,7 @@ prompt:
             cmd_speech();
                     
         // ---- MicroPython REPL ----
-#ifndef PSC_OS_DEBUG_WITHOUT_MICROPYTHON
+#if !PSC_OS_DEBUG_WITHOUT_MICROPYTHON
         } else if (strcmp(argv[0], "microPython") == 0 ||
                    strcmp(argv[0], "micropython") == 0) {
 

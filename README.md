@@ -476,6 +476,25 @@ This demonstrates that the PSC-ONE software stack can execute an interactive Pyt
 
 ------------------------------------------------------------------------
 
+### Thonny on MicroPython
+
+Thonny provides a graphical development environment for working with MicroPython on PSC-OS. It connects to PSC-ONE through a USB-to-UART interface, allowing Python code to be edited on the PC and sent to the board for execution.
+
+The integration uses MicroPython’s raw REPL protocol to transfer code and return execution results. The code runs on the custom PSC_RV32 CPU, while Thonny displays program output and error messages on the PC.
+
+With the PSC-OS Thonny support in place, the basic workflow is:
+
+1. Start MicroPython from the PSC-OS shell using the `microPython` command.
+2. Close the serial terminal to release the UART port.
+3. Select **MicroPython (generic)** in Thonny and choose the serial port connected to PSC-ONE.
+4. Write a Python script in the editor and run it on the board.
+
+Scripts can be transferred and executed directly in RAM without first saving them to the SD card. Access to PSC-ONE-specific functions is provided through the `psc` module.
+
+This integration brings the existing MicroPython environment into a desktop editor, making it easier to develop and test Python programs for PSC-ONE.
+
+------------------------------------------------------------------------
+
 ## Demo
 
 ### PSC-OS LCD Demo

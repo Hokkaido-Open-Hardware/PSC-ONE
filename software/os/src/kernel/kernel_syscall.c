@@ -68,6 +68,10 @@ void handle_syscall(struct trap_frame *f) {
         f->a0 = uart_getchar_timeout(1000);
         break;
 
+    case SYS_MP_CONSOLE:
+        f->a0 = uart_console_control(f->a0, (int)f->a1);
+        break;
+
     case SYS_PRINT_INT:
         s_print_int(f->a0);
         break;
@@ -152,7 +156,9 @@ void handle_syscall(struct trap_frame *f) {
     }
 
     case SYS_SD_WRITE:
-        f->a0 = s_call_sdcard_write_api(f->a0,
+        // Buffered filesystem I/O must not inject diagnostics into Raw REPL.
+        // Verify writes so controller/card rejection is returned as an error.
+        f->a0 = sd_write_sector_quiet(f->a0,
                                          (const uint8_t *)f->a1);
         break;
 

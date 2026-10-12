@@ -27,11 +27,11 @@
 // Use the minimum headroom in the chunk allocator for parse nodes.
 #define MICROPY_ALLOC_PARSE_CHUNK_INIT    (16)
 
-// Disable all optional sys module features.
+// Keep IDE path/argv discovery; shell exit is explicitly psc.exit().
 #define MICROPY_PY_SYS_MODULES            (0)
 #define MICROPY_PY_SYS_EXIT               (0)
-#define MICROPY_PY_SYS_PATH               (0)
-#define MICROPY_PY_SYS_ARGV               (0)
+#define MICROPY_PY_SYS_PATH               (1)
+#define MICROPY_PY_SYS_ARGV               (1)
 
 // type definitions for the specific machine
 
@@ -39,8 +39,8 @@ typedef long mp_off_t;
 
 // We need to provide a declaration/definition of alloca()
 
-#define MICROPY_HW_BOARD_NAME "minimal"
-#define MICROPY_HW_MCU_NAME "unknown-cpu"
+#define MICROPY_HW_BOARD_NAME "PSC-ONE"
+#define MICROPY_HW_MCU_NAME "RV32IM"
 
 #if defined(__linux__) || defined(__APPLE__)
 #define MICROPY_MIN_USE_STDOUT (1)
@@ -62,3 +62,35 @@ typedef long mp_off_t;
 #ifndef alloca
 #define alloca(size) __builtin_alloca(size)
 #endif
+
+// Standard blocking friendly/raw/raw-paste REPL, with a 128-byte paste window.
+#define MICROPY_REPL_EVENT_DRIVEN (0)
+#define MICROPY_REPL_STDIN_BUFFER_MAX (256)
+#define MICROPY_KBD_EXCEPTION (1)
+void psc_mp_poll(void);
+#define MICROPY_VM_HOOK_LOOP psc_mp_poll();
+#define MICROPY_EVENT_POLL_HOOK do { psc_mp_poll(); mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS); } while (0);
+#define MICROPY_PY_SYS_PLATFORM "psc"
+#define MICROPY_PY_SYS_STDFILES (1)
+#define MICROPY_PY_SYS_STDIO_BUFFER (1)
+#define MICROPY_PY_IO (1)
+#define MICROPY_PY_GC (1)
+#define MICROPY_PY_BUILTINS_INPUT (1)
+#define MICROPY_PY_BUILTINS_HELP (1)
+#define MICROPY_PY_BUILTINS_HELP_MODULES (1)
+#define MICROPY_PY_BUILTINS_STR_OP_MODULO (1)
+#define MICROPY_PY_BUILTINS_SLICE (1)
+// Mount PSC-OS's first FAT32 partition at / using its SD sector syscalls.
+#define MICROPY_VFS (1)
+#define MICROPY_VFS_WRITABLE (1)
+#define MICROPY_VFS_FAT (1)
+#define MICROPY_ENABLE_FINALISER (1)
+#define MICROPY_PY_BUILTINS_BYTEARRAY (1)
+// FAT timestamps and SD/file sizes exceed the RV32 tagged small-int range.
+#define MICROPY_LONGINT_IMPL (MICROPY_LONGINT_IMPL_LONGLONG)
+#define MICROPY_FATFS_ENABLE_LFN (2)
+#define MICROPY_FATFS_RPATH (2)
+#define MICROPY_FATFS_NORTC (1)
+#define MICROPY_READER_VFS (1)
+#define MICROPY_PY_OS (1)
+#define MICROPY_PY_OS_STATVFS (1)

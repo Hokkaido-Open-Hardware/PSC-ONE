@@ -7,8 +7,13 @@
 #include "py/runtime.h"
 #include "py/repl.h"
 #include "py/gc.h"
+#include "py/mphal.h"
+#include "py/stackctrl.h"
+#include "shared/runtime/gchelper.h"
+#include "mphalport.h"
 #include "py/mperrno.h"
 #include "shared/runtime/pyexec.h"
+#include "psc_vfs.h"
 
 #if MICROPY_ENABLE_COMPILER
 void do_str(const char *src, mp_parse_input_kind_t input_kind) {
@@ -27,37 +32,38 @@ void do_str(const char *src, mp_parse_input_kind_t input_kind) {
 }
 #endif
 
-static char *stack_top;
 #if MICROPY_ENABLE_GC
-static char heap[MICROPY_HEAP_SIZE];
+static char heap[MICROPY_HEAP_SIZE] __attribute__((aligned(16)));
 #endif
 
+// Explicit shell exit, separate from the standard Ctrl+D soft reset.
+bool psc_mp_exit_requested;
 int psc_micropython_run(void) {
-    int stack_dummy;
-    stack_top = (char *)&stack_dummy;
-
-    #if MICROPY_ENABLE_GC
-    gc_init(heap, heap + sizeof(heap));
-    #endif
-    mp_init();
-    #if MICROPY_ENABLE_COMPILER
-    #if MICROPY_REPL_EVENT_DRIVEN
-    pyexec_event_repl_init();
+    mp_stack_ctrl_init();
+    mp_stack_set_limit(120 * 1024);
+    psc_mp_exit_requested = false;
+    pyexec_mode_kind = PYEXEC_MODE_FRIENDLY_REPL;
+    if (psc_mp_console_begin() != 0) return -1;
     for (;;) {
-        int c = mp_hal_stdin_rx_chr();
-        if (pyexec_event_repl_process_char(c)) {
-            break;
+        #if MICROPY_ENABLE_GC
+        gc_init(heap, heap + sizeof(heap));
+        #endif
+        mp_init();
+        psc_vfs_init();
+        mp_hal_set_interrupt_char(-1);
+        for (;;) {
+            int ret = pyexec_mode_kind == PYEXEC_MODE_RAW_REPL
+                ? pyexec_raw_repl() : pyexec_friendly_repl();
+            if (ret & PYEXEC_FORCED_EXIT) break;
         }
+        mp_hal_set_interrupt_char(-1);
+        // Finalise even reachable files before discarding the heap/mount.
+        gc_sweep_all();
+        mp_deinit();
+        if (psc_mp_exit_requested) break;
+        mp_hal_stdout_tx_str("MPY: soft reboot\r\n");
     }
-    #else
-    pyexec_friendly_repl();
-    #endif
-    // do_str("print('hello world!', list(x+1 for x in range(10)), end='eol\\n')", MP_PARSE_SINGLE_INPUT);
-    // do_str("for i in range(10):\r\n  print(i)", MP_PARSE_FILE_INPUT);
-    #else
-    pyexec_frozen_module("frozentest.py", false);
-    #endif
-    mp_deinit();
+    psc_mp_console_end();
     return 0;
 }
 
@@ -71,16 +77,13 @@ int main(int argc, char **argv) {
 
 #if MICROPY_ENABLE_GC
 void gc_collect(void) {
-    // WARNING: This gc_collect implementation doesn't try to get root
-    // pointers from CPU registers, and thus may function incorrectly.
-    void *dummy;
     gc_collect_start();
-    gc_collect_root(&dummy, ((mp_uint_t)stack_top - (mp_uint_t)&dummy) / sizeof(mp_uint_t));
+    gc_helper_collect_regs_and_stack();
     gc_collect_end();
-    gc_dump_info(&mp_plat_print);
 }
 #endif
 
+#if !MICROPY_VFS
 mp_lexer_t *mp_lexer_new_from_file(qstr filename) {
     mp_raise_OSError(MP_ENOENT);
 }
@@ -88,6 +91,8 @@ mp_lexer_t *mp_lexer_new_from_file(qstr filename) {
 mp_import_stat_t mp_import_stat(const char *path) {
     return MP_IMPORT_STAT_NO_EXIST;
 }
+
+#endif
 
 void nlr_jump_fail(void *val) {
     while (1) {

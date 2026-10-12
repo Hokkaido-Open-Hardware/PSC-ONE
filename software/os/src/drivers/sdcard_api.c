@@ -144,21 +144,21 @@ int sd_read_sector(uint32_t sector, uint8_t *buf)
 }
 
 // -------------------------------------------------------
-int sd_write_sector(uint32_t sector, uint8_t *buf)
+static int sd_write_verified(uint32_t sector, const uint8_t *buf, bool quiet)
 {
     const int retry_max = 3;
 
     for (int retry = 0; retry < retry_max; retry++) {
 
         if (sd_write_once(sector, buf) != 0) {
-            s_printf("WRITE FAIL retry=%d\n", retry);
+            if (!quiet) s_printf("WRITE FAIL retry=%d\n", retry);
             continue;
         }
 
         uint8_t verify[512];
 
         if (sd_read_sector(sector, verify) != 0) {
-            s_printf("VERIFY READ ERROR\n");
+            if (!quiet) s_printf("VERIFY READ ERROR\n");
             continue;
         }
 
@@ -166,8 +166,10 @@ int sd_write_sector(uint32_t sector, uint8_t *buf)
 
         for (int i = 0; i < 512; i++) {
             if (verify[i] != buf[i]) {
-                s_printf("VERIFY ERROR sector=%x byte=%d\n", sector, i);
-                s_printf("WRITE=%x READ=%x\n", buf[i], verify[i]);
+                if (!quiet) {
+                    s_printf("VERIFY ERROR sector=%x byte=%d\n", sector, i);
+                    s_printf("WRITE=%x READ=%x\n", buf[i], verify[i]);
+                }
                 ok = false;
                 break;
             }
@@ -178,6 +180,16 @@ int sd_write_sector(uint32_t sector, uint8_t *buf)
     }
 
     return -1;
+}
+
+int sd_write_sector(uint32_t sector, uint8_t *buf)
+{
+    return sd_write_verified(sector, buf, false);
+}
+
+int sd_write_sector_quiet(uint32_t sector, const uint8_t *buf)
+{
+    return sd_write_verified(sector, buf, true);
 }
 
 // -------------------------------------------------------

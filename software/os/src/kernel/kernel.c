@@ -109,6 +109,92 @@ long uart_getchar(void) {
 
 #endif
 
+/* MicroPython owns this SPSC ring while the shell is inside its command.
+ * M-mode is the sole producer; S-mode is the sole consumer. Never call into
+ * the user VM from M-mode (different address space and exception context).
+ */
+#include "syscall.h"
+#define CONSOLE_RX_SIZE 1024u
+static volatile uint8_t console_rx[CONSOLE_RX_SIZE];
+static volatile uint32_t console_head, console_tail, console_active;
+static volatile uint32_t console_interrupts, console_lost;
+static uint32_t console_seen_interrupts, console_saved_ctrl;
+static volatile int console_interrupt_char = -1;
+
+void uart_console_irq(void) {
+#ifndef USE_SBI_CONSOLE
+    if (!console_active) return;
+    uint32_t status = mmio_r32(UART_MMIO_BASE + UART_ST);
+    if (status & (1u << 3)) {
+        console_lost++;
+        mmio_w32(UART_MMIO_BASE + 12u, 9u | 4u);
+    }
+    if (status & ST_RX_AVAIL) {
+        uint8_t c = mmio_r32(UART_MMIO_BASE + UART_RX);
+        if ((int)c == console_interrupt_char) {
+            console_interrupts++;
+        } else {
+            uint32_t head = console_head;
+            if (head - console_tail < CONSOLE_RX_SIZE) {
+                console_rx[head & (CONSOLE_RX_SIZE - 1u)] = c;
+                console_head = head + 1u;
+            } else {
+                console_lost++;
+            }
+        }
+    }
+#endif
+}
+
+long uart_console_control(uint32_t action, int value) {
+#ifdef USE_SBI_CONSOLE
+    (void)action; (void)value;
+    return -1; // PSC UART service requires PSC hardware.
+#else
+    switch (action) {
+    case PSC_CONSOLE_BEGIN:
+        if (console_active) return -1;
+        console_saved_ctrl = mmio_r32(UART_MMIO_BASE + 12u);
+        console_head = console_tail = 0;
+        console_interrupts = console_seen_interrupts = console_lost = 0;
+        console_interrupt_char = -1;
+        enable_machine_timer_trap();
+        console_active = 1;
+        mmio_w32(UART_MMIO_BASE + 12u, 9u | 6u);
+        return 0;
+    case PSC_CONSOLE_END:
+        mmio_w32(UART_MMIO_BASE + 12u, console_saved_ctrl | 6u);
+        console_active = 0;
+        return 0;
+    case PSC_CONSOLE_READ: {
+        uint32_t tail = console_tail;
+        if (tail == console_head) return -1;
+        uint8_t c = console_rx[tail & (CONSOLE_RX_SIZE - 1u)];
+        console_tail = tail + 1u;
+        return c;
+    }
+    case PSC_CONSOLE_SET_INTERRUPT:
+        console_interrupt_char = value;
+        // Do not carry an execution interrupt past pyexec's NLR boundary
+        // into raw framing, source input, or a freshly initialized VM.
+        if (value < 0) console_seen_interrupts = console_interrupts;
+        return 0;
+    case PSC_CONSOLE_POLL_INTERRUPT: {
+        uint32_t count = console_interrupts;
+        int pending = count != console_seen_interrupts;
+        console_seen_interrupts = count;
+        return pending;
+    }
+    case PSC_CONSOLE_AVAILABLE:
+        return console_head != console_tail;
+    case PSC_CONSOLE_OVERRUN:
+        return console_lost;
+    default:
+        return -1;
+    }
+#endif
+}
+
 /* Publish code copied through PSC's write-back D cache to its separate I cache.
    The maintenance sweep blocks data/MMU admission. A serial load after the
    request waits for that port; fence.i then drops old instruction-cache lines. */
@@ -220,7 +306,8 @@ __attribute__((used)) void kernel_main(uint32_t warm) {
         "            fat32_touch\n"
         "  RUNTIME   microPython, run (.ELF)\n"
         "\n"
-        "  MicroPython exit : Ctrl+D\n"
+        "  MicroPython reset: Ctrl+D\n"
+        "  Return to shell  : import psc; psc.exit()\n"
         "  QEMU exit        : Ctrl+A, C -> q\n"
         "  --------------------------------------------------\n"
         "\n",

@@ -1,0 +1,33 @@
+diff --git a/extmod/vfs_fat.c b/extmod/vfs_fat.c
+index e832992f4..e52600f3e 100644
+--- a/extmod/vfs_fat.c
++++ b/extmod/vfs_fat.c
+@@ -326,14 +326,20 @@ static mp_obj_t fat_vfs_stat(mp_obj_t vfs_in, mp_obj_t path_in) {
+     } else {
+         mode |= MP_S_IFREG;
+     }
+-    mp_timestamp_t seconds = timeutils_seconds_since_epoch(
+-        1980 + ((fno.fdate >> 9) & 0x7f),
+-        (fno.fdate >> 5) & 0x0f,
+-        fno.fdate & 0x1f,
+-        (fno.ftime >> 11) & 0x1f,
+-        (fno.ftime >> 5) & 0x3f,
+-        2 * (fno.ftime & 0x1f)
+-        );
++    // Some producers (including PSC-OS touch) leave FAT dates unset. Avoid
++    // indexing timeutils' month table with month - 1 when the month is zero.
++    unsigned month = (fno.fdate >> 5) & 0x0f;
++    unsigned day = fno.fdate & 0x1f;
++    mp_timestamp_t seconds = 0;
++    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
++        seconds = timeutils_seconds_since_epoch(
++            1980 + ((fno.fdate >> 9) & 0x7f),
++            month, day,
++            (fno.ftime >> 11) & 0x1f,
++            (fno.ftime >> 5) & 0x3f,
++            2 * (fno.ftime & 0x1f)
++            );
++    }
+     t->items[0] = MP_OBJ_NEW_SMALL_INT(mode); // st_mode
+     t->items[1] = MP_OBJ_NEW_SMALL_INT(0); // st_ino
+     t->items[2] = MP_OBJ_NEW_SMALL_INT(0); // st_dev

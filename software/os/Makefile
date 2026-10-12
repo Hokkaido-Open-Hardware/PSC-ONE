@@ -1,3 +1,7 @@
+PSC_BUILD_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+include $(dir $(PSC_BUILD_MAKEFILE))../micropython/patches/build.mk
+ifeq ($(PSC_PATCH_BUILD_BODY),1)
+
 # ========================
 # Src / Build Dirs
 # ========================
@@ -407,21 +411,25 @@ USER_ELF := $(Build)/shell.elf
 # MicroPython embedded library
 # ------------------------------------------------------------
 MICROPY_DIR := ../micropython/ports/psc
-MICROPY_LIB := $(MICROPY_DIR)/build/libmicropython_psc.a
+MICROPY_BUILD ?= $(abspath $(MICROPY_DIR)/build)
+MICROPY_LIB := $(MICROPY_BUILD)/libmicropython_psc.a
 
 PICOLIBC_BASE := /usr/lib/picolibc/riscv64-unknown-elf/lib/rv32i/ilp32
 LIBM := $(PICOLIBC_BASE)/libm.a
 LIBC := $(PICOLIBC_BASE)/libc.a
 
 MICROPY_DEPS := \
+	$(MICROPY_DIR)/main.c $(MICROPY_DIR)/mpconfigport.h \
 	$(TFLITE_DIR)/tflite_api.h $(TFLITE_DIR)/tflite_inspect.h \
 	$(MICROPY_DIR)/modpsc.c \
+	$(MICROPY_DIR)/psc_vfs.c $(MICROPY_DIR)/psc_vfs.h \
+	$(MICROPY_DIR)/../../micropython/extmod/vfs_fat.c \
 	$(MICROPY_DIR)/mphalport.c \
 	$(MICROPY_DIR)/mphalport.h \
 	$(MICROPY_DIR)/Makefile
 
 $(MICROPY_LIB): $(MICROPY_DEPS)
-	$(MAKE) -C $(MICROPY_DIR) embedded
+	$(MAKE) -C $(MICROPY_DIR) BUILD=$(MICROPY_BUILD) embedded
 
 # ------------------------------------------------------------
 # PSC-OS shell + MicroPython -> shell.elf
@@ -623,3 +631,4 @@ disasm_bootloader_fat32:
 
 clean:
 	rm -rf $(Build)
+endif # PSC_PATCH_BUILD_BODY

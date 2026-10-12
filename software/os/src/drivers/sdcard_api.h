@@ -26,6 +26,7 @@ typedef uint32_t vaddr_t;
 
 int sd_read_sector(uint32_t sector, uint8_t *buf);
 int sd_write_sector(uint32_t sector, uint8_t *buf);
+int sd_write_sector_quiet(uint32_t sector, const uint8_t *buf);
 
 void s_call_sdcard_read_api(uint32_t sd_sector_address);
 int s_call_sdcard_write_api(uint32_t sd_sector_address, const uint8_t *buf);
