@@ -42,8 +42,12 @@ static int sd_read_once(uint32_t sd_sector_address, unsigned char *buf)
     PSC_SD_SECTOR = sd_sector_address;
     PSC_SD_IF_CTRL = 0x02;
 
-    // wait
-    tiny_delay(READSECTOR_WAIT);
+    // Wait for the command to start, then for the complete sector. FIFO
+    // non-empty alone does not guarantee a complete four-byte DATA word.
+    timeout = TIMEOUT_CYCLE;
+    while ((PSC_SD_IF_CTRL & 0x04) != 0) {
+        if (--timeout == 0) return -2;
+    }
 
     timeout = TIMEOUT_CYCLE;
     while ((PSC_SD_IF_CTRL & 0x04) == 0) {
@@ -54,12 +58,16 @@ static int sd_read_once(uint32_t sd_sector_address, unsigned char *buf)
     tiny_delay(READDATA_WAIT);
 
     // ---- DATA ----
-    for (int i = 0; i < 512; i++) {
+    for (int i = 0; i < 512; i += 4) {
         timeout = TIMEOUT_CYCLE;
         while (PSC_SD_IF_CTRL & (1 << 3)) {
             if (--timeout == 0) return -3;
         }
-        buf[i] = (unsigned char)(PSC_IF_DATA & 0xFF);
+        const uint32_t word = PSC_IF_DATA;  // one READ consumes four bytes
+        buf[i]     = (uint8_t)word;
+        buf[i + 1] = (uint8_t)(word >> 8);
+        buf[i + 2] = (uint8_t)(word >> 16);
+        buf[i + 3] = (uint8_t)(word >> 24);
     }
 
     return 0;
@@ -108,17 +116,6 @@ static int sd_write_once(uint32_t sd_sector_address, const uint8_t *buf)
 
     // wait
     tiny_delay(READDATA_WAIT);
-
-    // ---- DATA ----
-    /*
-    for (int i = 0; i < 512; i++) {
-        timeout = TIMEOUT_CYCLE;
-        while (PSC_SD_IF_CTRL & (1 << 3)) {
-            if (--timeout == 0) return -3;
-        }
-        buf[i] = (unsigned char)(SD_IF_DATA & 0xFF);
-    }
-    */
 
     return 0;
 }

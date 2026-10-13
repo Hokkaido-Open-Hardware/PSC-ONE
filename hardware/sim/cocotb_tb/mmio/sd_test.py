@@ -4,7 +4,7 @@ import struct
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import ClockCycles, ReadOnly, RisingEdge
+from cocotb.triggers import ClockCycles, FallingEdge, ReadOnly, RisingEdge
 
 
 CLK_NS = 10
@@ -113,6 +113,25 @@ async def cpu_write(dut, address, value, timeout_cycles=100):
     raise AssertionError(f"cpu_wready timeout at address 0x{address:08x}")
 
 
+async def cpu_read_held(dut, address):
+    """Hold valid beyond the response; one assertion is one transaction."""
+    await FallingEdge(dut.clock)
+    dut.cpu_raddr.value = address
+    dut.cpu_rvalid.value = 1
+    responses = []
+    for _ in range(10):
+        await RisingEdge(dut.clock)
+        await ReadOnly()
+        if int(dut.cpu_rready.value):
+            responses.append(int(dut.cpu_rdata.value))
+    await FallingEdge(dut.clock)
+    dut.cpu_rvalid.value = 0
+    await RisingEdge(dut.clock)
+    await FallingEdge(dut.clock)
+    assert len(responses) == 1, f"held READ generated {len(responses)} responses"
+    return responses[0]
+
+
 async def wait_status(dut, mask, expected, description, polls=10000):
     last_status = 0
     for _ in range(polls):
@@ -197,11 +216,22 @@ async def read_sector(dut, lba):
     status = await wait_operation(dut, f"READ LBA 0x{lba:08x}")
     assert not (status & STATUS_FIFO_EMPTY), "read completed with an empty FIFO"
 
-    data = [await cpu_read(dut, SD_IF_DATA) & 0xFF for _ in range(512)]
+    assert int(dut.u_sd.fifo_count.value) == 512
+    start_ptr = int(dut.u_sd.fifo_rd_ptr.value)
+    data = []
+    for index in range(128):
+        read = cpu_read_held if index == 0 else cpu_read
+        word = await read(dut, SD_IF_DATA)
+        data.extend(word.to_bytes(4, "little"))
+        assert int(dut.u_sd.fifo_count.value) == 512 - 4 * (index + 1)
+        assert int(dut.u_sd.fifo_rd_ptr.value) == (start_ptr + 4 * (index + 1)) % 512
 
     final_status = await cpu_read(dut, SD_IF_CTRL)
-    assert final_status & STATUS_FIFO_EMPTY, "FIFO did not empty after 512 reads"
+    assert final_status & STATUS_FIFO_EMPTY, "FIFO did not empty after 128 word reads"
     assert not (final_status & STATUS_BUSY), "busy remained set after FIFO drain"
+    assert await cpu_read_held(dut, SD_IF_DATA) == 0xE0
+    assert int(dut.u_sd.fifo_count.value) == 0
+    assert int(dut.u_sd.fifo_rd_ptr.value) == start_ptr
 
     received_crc = (status >> 16) & 0xFFFF
     expected_crc = crc16_sd(data)
@@ -235,6 +265,7 @@ async def write_sector(dut, lba, data):
 
 
 def assert_sector_equal(actual, expected, lba):
+    assert len(actual) == len(expected) == 512
     if actual != expected:
         mismatch = next(
             index
@@ -328,6 +359,103 @@ async def sd_image_read_write_test(dut):
         assert int(dut.u_sd_model.read_count.value) == 0
     else:
         assert int(dut.u_sd_model.write_count.value) >= 6
+
+
+@cocotb.test()
+async def sd_streaming_word_read_test(dut):
+    """Exercise partial words, simultaneous push/pop and wrap through the bus."""
+    await setup_dut(dut)
+    await initialize_card(dut)
+    expected = Path(os.environ.get("SDCARD_IMAGE", "sdcard/sdcard.img")).read_bytes()[:512]
+    short_counts = set()
+    simultaneous = 0
+    wraps = 0
+
+    # Opposite request phases cover both sides of the registered byte push.
+    # Do not flush between sectors: both FIFO pointers must wrap naturally.
+    for phase in (0, 1):
+        await cpu_write(dut, SD_IF_SECTOR, 0)
+        await cpu_write(dut, SD_IF_CTRL, CTRL_READ)
+        received = bytearray()
+        pushes = 0
+        responses = 0
+        pending = False
+        ram_pending = False
+        previous_valid = False
+        for cycle in range(500000):
+            await FallingEdge(dut.clock)
+            count = int(dut.u_sd.fifo_count.value)
+            rd_ptr = int(dut.u_sd.fifo_rd_ptr.value)
+            wr_ptr = int(dut.u_sd.fifo_wr_ptr.value)
+            push = int(dut.u_sd.fifo_push.value)
+            if push:
+                assert pushes < 512
+                assert int(dut.u_sd.fifo_push_data.value) == expected[pushes]
+                pushes += 1
+
+            # A pulse every other cycle also polls while 0..3 bytes are
+            # available. The response must not consume any of those bytes.
+            valid = (cycle % 2 == phase) and len(received) < 512
+            if phase == 0 and len(received) == 4:
+                # SPI is much slower than the polling CPU. Accumulate data
+                # and align the request pipeline plus synchronous RAM read
+                # with an incoming byte, to require simultaneous push/pop.
+                producing = int(dut.u_sd.state.value) == 11
+                if spi_bypass_enabled(dut):
+                    producing = producing and push
+                else:
+                    producing = producing and not int(dut.u_sd.spi_busy.value)
+                    producing = producing and not int(dut.u_sd.spi_tx_start.value)
+                    producing = producing and not int(dut.u_sd.spi_tx_start_d.value)
+                valid = count >= 8 and producing
+            dut.cpu_raddr.value = SD_IF_DATA
+            dut.cpu_rvalid.value = int(valid)
+            pop = ram_pending
+            response = ram_pending or (pending and count < 4)
+            await RisingEdge(dut.clock)
+            await ReadOnly()
+            assert int(dut.cpu_rready.value) == int(response)
+            if response:
+                word = int(dut.cpu_rdata.value)
+                if pop:
+                    offset = len(received)
+                    assert word == int.from_bytes(expected[offset:offset + 4], "little"), (
+                        f"stream word at byte {offset}: 0x{word:08x}"
+                    )
+                    received.extend(word.to_bytes(4, "little"))
+                    responses += 1
+                    simultaneous += push
+                    wraps += int(rd_ptr == 508)
+                else:
+                    assert word == 0xE0, f"short read with {count} bytes returned 0x{word:08x}"
+                    short_counts.add(count)
+            assert int(dut.u_sd.fifo_count.value) == count + push - (4 if pop else 0)
+            assert int(dut.u_sd.fifo_rd_ptr.value) == (rd_ptr + (4 if pop else 0)) % 512
+            assert int(dut.u_sd.fifo_wr_ptr.value) == (wr_ptr + push) % 512
+            assert 0 <= int(dut.u_sd.fifo_count.value) <= 512
+            ram_pending = pending and count >= 4
+            pending = valid and not previous_valid
+            previous_valid = valid
+            if len(received) == 512:
+                break
+        else:
+            raise AssertionError("streaming READ did not return a complete sector")
+        await FallingEdge(dut.clock)
+        dut.cpu_rvalid.value = 0
+        await ClockCycles(dut.clock, 3)
+        assert pushes == 512
+        assert responses == 128
+        assert received == expected
+        status = await wait_status(dut, STATUS_READY, STATUS_READY, "streaming READ completion")
+        assert status & STATUS_FIFO_EMPTY
+        assert not (status & (STATUS_BUSY | STATUS_ERROR))
+        assert status >> 16 == crc16_sd(expected)
+
+    assert short_counts == {0, 1, 2, 3}, f"short-read coverage: {short_counts}"
+    assert simultaneous > 0, "no simultaneous byte push and word READ exercised"
+    assert wraps == 2
+    dut._log.info("Streaming coverage: short counts=%s, simultaneous=%d, wraps=%d",
+                  sorted(short_counts), simultaneous, wraps)
 
 
 @cocotb.test()

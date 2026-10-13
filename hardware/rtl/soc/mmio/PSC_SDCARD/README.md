@@ -108,7 +108,7 @@ The output shows raw binary data stored in the SD card sector, corresponding to 
 
 | Address      | Name         | Description                    |
 |-------------|--------------|--------------------------------|
-| 0x10006000  | SD_IF_DATA   | Read FIFO pop / write FIFO push (1 byte) |
+| 0x10006000  | SD_IF_DATA   | Read FIFO pop (4 bytes, little-endian) / write FIFO push (1 byte) |
 | 0x10006004  | SD_IF_SECTOR | Sector (LBA) register         |
 | 0x10006008  | SD_IF_CTRL   | Control / Status register     |
 
@@ -146,12 +146,24 @@ Upper bytes contain CRC1 and CRC2 received from the SD card.
 1. Flush the read FIFO and initialize the card if needed.
 2. Wait for initialization with timeout and error handling.
 3. Write the LBA to `SD_IF_SECTOR`, then start CMD17 with control bit 1.
-4. Once data is available, read 512 bytes, checking FIFO empty before each read.
+4. Wait for `sd_rw_ready` to deassert and then assert, and read the sector with
+   128 DATA reads. Each 32-bit result contains four bytes, first byte in bits [7:0].
 5. Compare the received CRC with the software-computed value.
 
 `busy` stays high while unread FIFO data remains; waiting only for busy=0 before
 reading would block. See the [C example](cpp/sdcard_api.c) for polling and delays.
 To write, fill DATA with 512 bytes, set the LBA, and start with control bit 4.
+
+DATA reads with fewer than four buffered bytes acknowledge with `0x000000E0`
+and consume nothing. `fifo_empty` still means zero bytes; it does not indicate
+whether a complete word is available. A successful word response advances the
+byte pointer by four and subtracts four from the byte count (net minus three
+with a simultaneous byte push). Hold the read address through the response;
+one assertion of `cpu_rvalid` generates one response, and a sampled low cycle
+arms the next transaction. READ storage uses a synchronous 32-bit RAM, adding
+one response cycle compared with STATUS/SECTOR reads. SPI and SPI_BYPASS expose
+the same CPU interface. Software using 512 single-byte DATA reads must migrate
+to 128 word reads; byte stores into the destination support unaligned buffers.
 
 ## Internal Architecture
 

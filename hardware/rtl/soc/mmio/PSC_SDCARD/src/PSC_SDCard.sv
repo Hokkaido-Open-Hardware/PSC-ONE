@@ -11,7 +11,7 @@ module PSC_SDCard #(
     parameter CLK_FREQ_MHz      = 80,
     parameter INIT_80CLK        = 80,
     parameter PROTECT_ADDRESS   = 32'h0000_1000,  // > 4098
-    parameter SD_IF_DATA        = 32'h1000_6000,  // READ: FIFO pop (byte)
+    parameter SD_IF_DATA        = 32'h1000_6000,  // READ: 4 bytes LE; WRITE: byte
     parameter SD_IF_SECTOR      = 32'h1000_6004,  // WRITE: LBA
     parameter SD_IF_CTRL        = 32'h1000_6008,  // RW: start/status
     parameter FIFO_DEPTH        = 512,            // 512推奨（将来64/128でも可）
@@ -115,7 +115,6 @@ module PSC_SDCard #(
     logic        init_pulse;     // CPUが書いた「開始」ワンショット（内部）
     logic        read_start;
     logic        fifo_flush;
-    logic        fifo_pop;
     logic        fifo_wdata_push;
     logic        fifo_wdata_pop;
     logic        soft_reset;
@@ -128,8 +127,12 @@ module PSC_SDCard #(
     localparam integer FIFO_AW = 9;     // max 512
     localparam integer FIFO_CW = FIFO_AW + 1;
 
-    // read fifo
-    logic [7:0] fifo_R_mem [0:FIFO_DEPTH-1];
+    // Read FIFO: byte producer, aligned 32-bit consumer. FIFO_DEPTH must be
+    // a multiple of four (4..512). Store complete words for a single RAM
+    // read port; fifo_count and both pointers still use byte units.
+    logic [31:0] fifo_R_mem [0:FIFO_DEPTH/4-1];
+    logic [23:0] fifo_R_pack;
+    logic [31:0] fifo_read_word;
     logic [FIFO_AW-1:0] fifo_wr_ptr, fifo_rd_ptr;
     logic [FIFO_CW-1:0] fifo_count; // 0..FIFO_DEPTH
 
@@ -162,15 +165,59 @@ module PSC_SDCard #(
     // CPU BUS (MMIO)
     // ============================================================
     logic     cpu_rvalid_latch;
+    logic     cpu_rvalid_previous;
     logic     cpu_wvalid_latch;
+    logic     fifo_read_pending;
+
+    // A DATA response consumes a complete word on this same edge. Short
+    // reads acknowledge with 0x000000E0 and leave all queued bytes intact.
+    // STATUS.empty continues to mean zero bytes (not fewer than four).
+    wire fifo_read_clear = fifo_flush
+`ifdef SPI_BYPASS
+                         || soft_reset
+`endif
+                         ;
+    wire fifo_read_request = cpu_rvalid_latch && (cpu_raddr == SD_IF_DATA) &&
+                             (fifo_count >= 4) && !fifo_read_clear;
+    wire fifo_pop = fifo_read_pending && !fifo_read_clear;
+    wire fifo_push_accept = fifo_push &&
+                            ((fifo_count < FIFO_DEPTH) || fifo_pop);
+
+    // Explicit wrap also supports read FIFOs smaller than the pointer width.
+    function automatic [FIFO_AW-1:0] fifo_read_offset;
+        input [FIFO_AW-1:0] ptr;
+        input integer offset;
+        integer next_ptr;
+        begin
+            next_ptr = int'(ptr) + offset;
+            if (next_ptr >= FIFO_DEPTH) next_ptr = next_ptr - FIFO_DEPTH;
+            fifo_read_offset = FIFO_AW'(next_ptr);
+        end
+    endfunction
+
+    // No asynchronous reset on RAM data or its output register, allowing
+    // block RAM inference. Partial incoming words cannot be read by the CPU.
+    always @(posedge clock) begin
+        if (reset_n && !fifo_read_clear && fifo_push_accept) begin
+            fifo_R_pack <= {fifo_push_data, fifo_R_pack[23:8]};
+            if (fifo_wr_ptr[1:0] == 2'b11)
+                fifo_R_mem[fifo_wr_ptr[FIFO_AW-1:2]] <= {fifo_push_data, fifo_R_pack};
+        end
+        if (fifo_read_request)
+            fifo_read_word <= fifo_R_mem[fifo_rd_ptr[FIFO_AW-1:2]];
+    end
     
     // ---------------- cpu_valid latch ----------------
     always @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             cpu_rvalid_latch    <= 1'b0;
+            cpu_rvalid_previous <= 1'b0;
             cpu_wvalid_latch    <= 1'b0;
         end else begin
-            cpu_rvalid_latch    <= cpu_rvalid;
+            // One response per assertion, even if valid remains high after
+            // ready. A sampled low cycle arms the next transaction.
+            cpu_rvalid_previous <= cpu_rvalid;
+            cpu_rvalid_latch    <= cpu_rvalid && !cpu_rvalid_previous;
             cpu_wvalid_latch    <= cpu_wvalid;
         end
     end
@@ -181,6 +228,7 @@ module PSC_SDCard #(
             cpu_wready       <= 1'b0;
             cpu_rready       <= 1'b0;
             cpu_rdata        <= 32'h0;
+            fifo_read_pending <= 1'b0;
 
             sector_reg   <= 32'h0;
             init_pulse   <= 1'b0;  // one-shot
@@ -188,7 +236,6 @@ module PSC_SDCard #(
             fifo_flush   <= 1'b0;
             soft_reset   <= 1'b0;
 
-            fifo_pop         <= 1'b0;
             fifo_wdata_push  <= 1'b0;
 
             write_start   <= 1'b0; 
@@ -210,11 +257,11 @@ module PSC_SDCard #(
             cpu_wready       <= 1'b0;
             cpu_rready       <= 1'b0;
             cpu_rdata        <= 1'b0;
+            fifo_read_pending <= fifo_read_request;
             init_pulse       <= 1'b0;   // one-shot
             fifo_flush       <= 1'b0;
             soft_reset       <= 1'b0;
 
-            fifo_pop         <= 1'b0;
             fifo_wdata_push  <= 1'b0;
 
             // read_startをリセット
@@ -237,12 +284,9 @@ module PSC_SDCard #(
             if (cpu_rvalid_latch) begin
                 case (cpu_raddr)
                     SD_IF_DATA: begin
-                        cpu_rready <= 1'b1;
-                        if (!fifo_empty) begin
-                            cpu_rdata <= {24'h0, fifo_R_mem[fifo_rd_ptr]};
-                            fifo_pop  <= 1'b1;
-                        end else begin
-                            cpu_rdata <= 32'h0000_00E0; // empty marker (好みで)
+                        if (!fifo_read_request) begin
+                            cpu_rready <= 1'b1;
+                            cpu_rdata <= 32'h0000_00E0; // fewer than 4 bytes: no pop
                         end
                     end
                     SD_IF_SECTOR: begin
@@ -266,6 +310,13 @@ module PSC_SDCard #(
                     end
                     default: ;
                 endcase
+            end
+
+            // The synchronous RAM output is available one cycle after the
+            // request. Consume four bytes only when returning this response.
+            if (fifo_read_pending) begin
+                cpu_rready <= 1'b1;
+                cpu_rdata <= fifo_pop ? fifo_read_word : 32'h0000_00E0;
             end
 
             // WRITE
@@ -315,11 +366,7 @@ module PSC_SDCard #(
 
             // ------------ READ FIFO ----------------
             // flush
-            if (fifo_flush
-`ifdef SPI_BYPASS
-                || soft_reset
-`endif
-            ) begin
+            if (fifo_read_clear) begin
                 fifo_wr_ptr <= {FIFO_AW{1'b0}};
                 fifo_rd_ptr <= {FIFO_AW{1'b0}};
                 fifo_count  <= {FIFO_CW{1'b0}};
@@ -327,17 +374,20 @@ module PSC_SDCard #(
                 crc_data2   <= 8'h0;
             end
 
-            // push
-            else if (fifo_push && !fifo_full) begin
-                fifo_R_mem[fifo_wr_ptr] <= fifo_push_data;
-                fifo_wr_ptr <= fifo_wr_ptr + FIFO_AW'(1);
-                fifo_count  <= fifo_count + FIFO_CW'(1);
-            end
-
-            // pop
-            else if (fifo_pop && !fifo_empty) begin
-                fifo_rd_ptr <= fifo_rd_ptr + FIFO_AW'(1);
-                fifo_count  <= fifo_count - FIFO_CW'(1);
+            else begin
+                // Push and word pop are independent; neither may be lost
+                // when the SPI producer and CPU complete on the same edge.
+                if (fifo_push_accept) begin
+                    fifo_wr_ptr <= fifo_read_offset(fifo_wr_ptr, 1);
+                end
+                if (fifo_pop)
+                    fifo_rd_ptr <= fifo_read_offset(fifo_rd_ptr, 4);
+                case ({fifo_push_accept, fifo_pop})
+                    2'b10: fifo_count <= fifo_count + FIFO_CW'(1);
+                    2'b01: fifo_count <= fifo_count - FIFO_CW'(4);
+                    2'b11: fifo_count <= fifo_count - FIFO_CW'(3);
+                    default: ;
+                endcase
             end
 
             // crc
@@ -827,10 +877,9 @@ module PSC_SDCard #(
                 // state = 11
                 ST_READ_DATA: begin
 `ifdef SPI_BYPASS
-                    // Space pushes so the shared FIFO never loses a pop
-                    // if software reads DATA before the sector is complete.
-                    if (!fifo_full && !fifo_push && !fifo_pop && !fifo_flush &&
-                        !(cpu_rvalid_latch && cpu_raddr == SD_IF_DATA)) begin
+                    // Allow CPU word reads during the transfer. Keep a gap
+                    // for the registered push to update the full flag.
+                    if (!fifo_full && !fifo_push && !fifo_flush) begin
                         fifo_push_data <= bypass_image[bypass_base + {22'd0, byte_cnt}];
                         fifo_push <= 1'b1;
                         bypass_crc <= bypass_crc16_byte(bypass_crc,
@@ -1103,10 +1152,10 @@ module PSC_SDCard #(
     end
 
     // debug
-    wire [7:0] fifo_rd0 = fifo_R_mem[0];
-    wire [7:0] fifo_rd1 = fifo_R_mem[1];
-    wire [7:0] fifo_rd2 = fifo_R_mem[2];
-    wire [7:0] fifo_rd3 = fifo_R_mem[3];
+    wire [7:0] fifo_rd0 = fifo_R_mem[0][7:0];
+    wire [7:0] fifo_rd1 = fifo_R_mem[0][15:8];
+    wire [7:0] fifo_rd2 = fifo_R_mem[0][23:16];
+    wire [7:0] fifo_rd3 = fifo_R_mem[0][31:24];
 
     // debug
     wire [7:0] fifo_wd0 = fifo_W_mem[0];

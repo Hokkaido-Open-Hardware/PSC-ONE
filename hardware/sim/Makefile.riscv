@@ -11,20 +11,46 @@ RISCV_BUILD_DIR := riscv_build
 
 RISCV_LINKER_SCRIPT := riscv/link_psc.ld
 
-ABI ?= ilp32
+# ISA is also passed explicitly by Makefile.riscv.sim. Keep TEST_GROUPS as
+# a backwards-compatible spelling when ISA is not supplied.
+ISA ?= $(or $(TEST_GROUPS),rv32ui rv32um)
+override ISA := $(strip $(ISA))
+ifneq ($(filter-out rv32ui rv32um rv64ui,$(ISA)),)
+$(error Unsupported ISA=$(ISA); use rv32ui rv32um or rv64ui)
+endif
+ifeq ($(ISA),)
+$(error ISA must not be empty)
+endif
+ifneq ($(filter rv64ui,$(ISA)),)
+ifneq ($(filter rv32%,$(ISA)),)
+$(error Cannot mix RV32 and RV64 test groups in one build)
+endif
+RISCV_XLEN := 64
+RISCV_ABI := lp64
+else
+RISCV_XLEN := 32
+RISCV_ABI := ilp32
+endif
+ABI ?= $(RISCV_ABI)
+ifneq ($(ABI),$(RISCV_ABI))
+$(error ISA=$(ISA) requires ABI=$(RISCV_ABI), got $(ABI))
+endif
+override TEST_GROUPS := $(ISA)
+# Separate the p environment and XLEN/ABI from the old flat build directory.
+RISCV_OUTPUT_DIR := $(RISCV_BUILD_DIR)/rv$(RISCV_XLEN)-$(ABI)-p
 
 # ============================================================
 # Build target groups
 #
 # rv32ui : RV32I integer instructions
 # rv32um : RV32M multiply/divide instructions
+# rv64ui : RV64I integer instructions (lp64, bare-metal p environment)
 #
 # Example:
 #   make -f Makefile.riscv TEST_GROUPS="rv32ui"
 #   make -f Makefile.riscv TEST_GROUPS="rv32ui rv32um"
+#   make -f Makefile.riscv ISA=rv64ui
 # ============================================================
-
-TEST_GROUPS ?= rv32ui rv32um
 
 # ============================================================
 # Source discovery
@@ -43,10 +69,17 @@ TEST_TARGETS := $(foreach source,$(TEST_SOURCES), \
 TEST_IDS := $(foreach source,$(TEST_SOURCES), \
 	$(notdir $(patsubst %/,%,$(dir $(source))))-$(notdir $(basename $(source))))
 
-TEST_ELFS := $(addprefix $(RISCV_BUILD_DIR)/,$(addsuffix .elf,$(TEST_IDS)))
-TEST_BINS := $(addprefix $(RISCV_BUILD_DIR)/,$(addsuffix .bin,$(TEST_IDS)))
-TEST_DUMPS := $(addprefix $(RISCV_BUILD_DIR)/,$(addsuffix .dump,$(TEST_IDS)))
-TEST_MEMS := $(addprefix $(RISCV_BUILD_DIR)/,$(addsuffix .mem,$(TEST_IDS)))
+TEST_ELFS := $(addprefix $(RISCV_OUTPUT_DIR)/,$(addsuffix .elf,$(TEST_IDS)))
+TEST_BINS := $(addprefix $(RISCV_OUTPUT_DIR)/,$(addsuffix .bin,$(TEST_IDS)))
+TEST_DUMPS := $(addprefix $(RISCV_OUTPUT_DIR)/,$(addsuffix .dump,$(TEST_IDS)))
+TEST_MEMS := $(addprefix $(RISCV_OUTPUT_DIR)/,$(addsuffix .mem,$(TEST_IDS)))
+
+# RV32 sources include RV64 .S files; startup lives in env/p/riscv_test.h.
+RISCV_BUILD_DEPS := $(lastword $(MAKEFILE_LIST)) \
+	$(wildcard $(RISCV_TEST_ROOT)/env/p/*.h $(RISCV_TEST_ROOT)/env/*.h) \
+	$(wildcard $(RISCV_TEST_ROOT)/isa/macros/scalar/*.h) \
+	$(wildcard $(RISCV_TEST_ROOT)/isa/rv32ui/*.S $(RISCV_TEST_ROOT)/isa/rv32um/*.S) \
+	$(wildcard $(RISCV_TEST_ROOT)/isa/rv64ui/*.S $(RISCV_TEST_ROOT)/isa/rv64um/*.S)
 
 # ============================================================
 # Compiler flags
@@ -69,9 +102,7 @@ RISCV_LDFLAGS := \
 # グループごとのISA設定
 ARCH_rv32ui := rv32i_zicsr_zifencei
 ARCH_rv32um := rv32im_zicsr_zifencei
-
-# 未定義グループのデフォルト
-DEFAULT_ARCH := rv32im_zicsr_zifencei
+ARCH_rv64ui := rv64i_zicsr_zifencei
 
 # ============================================================
 # Targets
@@ -88,6 +119,9 @@ DEFAULT_ARCH := rv32im_zicsr_zifencei
 	help
 
 all: build dump mem
+
+# Keep intermediate binaries; do not delete other tests' build artifacts.
+.SECONDARY:
 
 build: $(TEST_ELFS)
 
@@ -115,18 +149,18 @@ mem: $(TEST_MEMS)
 
 define BUILD_ELF_template
 
-$(RISCV_BUILD_DIR)/$(1)-%.elf: \
+$(RISCV_OUTPUT_DIR)/$(1)-%.elf: \
 	$(RISCV_TEST_ROOT)/isa/$(1)/%.S \
-	$(RISCV_LINKER_SCRIPT)
-	@mkdir -p $(RISCV_BUILD_DIR)
+	$(RISCV_LINKER_SCRIPT) $(RISCV_BUILD_DEPS)
+	@mkdir -p $(RISCV_OUTPUT_DIR)
 	@echo "========================================"
 	@echo "[BUILD] $(1)-$$*"
-	@echo "[ARCH ] $$(or $$(ARCH_$(1)),$$(DEFAULT_ARCH))"
+	@echo "[ARCH ] $$(ARCH_$(1)) / $$(ABI) / p"
 	@echo "[SRC  ] $$<"
 	@echo "[ELF  ] $$@"
 	@echo "========================================"
 	$$(RISCV_GCC) \
-		-march=$$(or $$(ARCH_$(1)),$$(DEFAULT_ARCH)) \
+		-march=$$(ARCH_$(1)) \
 		$$(RISCV_COMMON_CFLAGS) \
 		$$(RISCV_LDFLAGS) \
 		$$< \
@@ -141,7 +175,7 @@ $(foreach group,$(TEST_GROUPS), \
 # Disassembly dump
 # ============================================================
 
-$(RISCV_BUILD_DIR)/%.dump: $(RISCV_BUILD_DIR)/%.elf
+$(RISCV_OUTPUT_DIR)/%.dump: $(RISCV_OUTPUT_DIR)/%.elf
 	@echo "[DUMP ] $@"
 	$(RISCV_OBJDUMP) -D $< > $@
 
@@ -149,7 +183,7 @@ $(RISCV_BUILD_DIR)/%.dump: $(RISCV_BUILD_DIR)/%.elf
 # Raw binary
 # ============================================================
 
-$(RISCV_BUILD_DIR)/%.bin: $(RISCV_BUILD_DIR)/%.elf
+$(RISCV_OUTPUT_DIR)/%.bin: $(RISCV_OUTPUT_DIR)/%.elf
 	@echo "[BIN  ] $@"
 	$(RISCV_OBJCOPY) -O binary $< $@
 
@@ -160,7 +194,7 @@ $(RISCV_BUILD_DIR)/%.bin: $(RISCV_BUILD_DIR)/%.elf
 # one 32-bit hexadecimal word per line.
 # ============================================================
 
-$(RISCV_BUILD_DIR)/%.mem: $(RISCV_BUILD_DIR)/%.bin
+$(RISCV_OUTPUT_DIR)/%.mem: $(RISCV_OUTPUT_DIR)/%.bin
 	@echo "[MEM  ] $@"
 	hexdump -v -e '1/4 "%08x\n"' $< > $@
 
@@ -169,6 +203,7 @@ $(RISCV_BUILD_DIR)/%.mem: $(RISCV_BUILD_DIR)/%.bin
 # ============================================================
 
 list:
+	@echo "ISA=$(ISA) ABI=$(ABI) ENV=p"
 	@echo "TEST_GROUPS=$(TEST_GROUPS)"
 	@echo ""
 	@echo "Detected tests:"
@@ -201,6 +236,8 @@ help:
 	@echo ""
 	@echo "  Generate only ELF files:"
 	@echo "    make -f Makefile.riscv build"
+	@echo "  Build RV64UI tests:"
+	@echo "    make -f Makefile.riscv ISA=rv64ui"
 	@echo ""
 	@echo "  Generate only BIN files:"
 	@echo "    make -f Makefile.riscv bin"
@@ -215,4 +252,4 @@ help:
 	@echo "    make -f Makefile.riscv clean"
 	@echo ""
 	@echo "Build directory:"
-	@echo "  $(RISCV_BUILD_DIR)"
+	@echo "  $(RISCV_OUTPUT_DIR)"

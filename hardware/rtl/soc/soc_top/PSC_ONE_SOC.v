@@ -13,7 +13,7 @@ module PSC_ONE_SOC #(
     parameter integer DATA_WIDTH   = 32,   // AXI Data bus. fixed 32bit Bus
 
     // MMIO MASK BITS
-    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS     = 32'h1000_F00F,
+    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS     = 32'h1000_FFFF,
     // MMIO アドレス（0なら無効）
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_TX     = 32'h1000_0000,
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_RX     = 32'h1000_0004,
@@ -252,6 +252,7 @@ module PSC_ONE_SOC #(
             UART_ADDRESS_CT:     mmio_rdata = mmio_rdata_uart;
             LCD_PIXS_ST:         mmio_rdata = mmio_rdata_lcd;
             PSC_SD_IF_READ_DATA: mmio_rdata = mmio_rdata_sd;
+            PSC_SD_IF_SECTOR:    mmio_rdata = mmio_rdata_sd;
             PSC_SD_IF_CTRL:      mmio_rdata = mmio_rdata_sd;
             PSC_I2S_ADDR_RX:     mmio_rdata = mmio_rdata_i2s;
             PSC_I2S_ADDR_ST:     mmio_rdata = mmio_rdata_i2s;

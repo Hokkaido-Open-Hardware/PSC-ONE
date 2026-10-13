@@ -148,7 +148,14 @@ static int boot_sd_read_sector(uint32_t lba, uint8_t *dst)
         PSC_SD_SECTOR = lba;
 
         PSC_SD_IF_CTRL = SD_CTRL_READ_TRIG;
-        tiny_delay(50);
+        timeout = 50000u;
+        while ((PSC_SD_IF_CTRL & SD_ST_RW_READY) != 0u) {
+            if (--timeout == 0u) {
+                bl_print("SD READ START TIMEOUT\n");
+                return -1;
+            }
+            cpu_relax();
+        }
 
         timeout = 50000u;
 
@@ -165,7 +172,7 @@ static int boot_sd_read_sector(uint32_t lba, uint8_t *dst)
 
         tiny_delay(20);
 
-        for (int i = 0; i < 512; i++) {
+        for (int i = 0; i < 512; i += 4) {
             timeout = 50000u;
 
             while (PSC_SD_IF_CTRL & SD_ST_FIFO_EMPTY) {
@@ -179,7 +186,11 @@ static int boot_sd_read_sector(uint32_t lba, uint8_t *dst)
                 cpu_relax();
             }
 
-            dst[i] = (uint8_t)(PSC_IF_DATA & 0xFFu);
+            const uint32_t word = PSC_IF_DATA;  // one READ consumes four bytes
+            dst[i]     = (uint8_t)word;
+            dst[i + 1] = (uint8_t)(word >> 8);
+            dst[i + 2] = (uint8_t)(word >> 16);
+            dst[i + 3] = (uint8_t)(word >> 24);
         }
 
         {

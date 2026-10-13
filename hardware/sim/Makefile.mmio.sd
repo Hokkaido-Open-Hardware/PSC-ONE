@@ -5,6 +5,7 @@
 #make -f Makefile.mmio.sd simulate_PSC_SD MODE=icarus
 #or
 #make -f Makefile.mmio.sd simulate_PSC_SD MODE=verilator
+#make -f Makefile.mmio.sd simulate_PSC_SD SPI_BYPASS=1
 
 # ============================================================
 #  SIMULATOR 切り替え (MODE=icarus / verilator)
@@ -32,6 +33,10 @@ endif
 #  Cocotb / コンパイル共通設定
 # ============================================================
 DEFS += COCOTB_SIM=1
+ifeq ($(SPI_BYPASS),1)
+DEFS += SPI_BYPASS
+SD_BUILD_SUFFIX := -bypass
+endif
 ifeq ($(READ_MEM),1)
 DEFS += READ_MEM
 endif
@@ -65,9 +70,9 @@ simulate_PSC_SD:
 	TOPLEVEL=sim_PSC_SDCard TOPLEVEL_LANG=verilog \
 	SIM=$(SIM) \
 	VERILOG_SOURCES="$(SRC_SD)" \
-	COMPILE_ARGS="-DCOCOTB_SIM $(VCD_COMPILE_ARGS)" \
+	COMPILE_ARGS="$(addprefix -D,$(DEFS)) $(VCD_COMPILE_ARGS)" \
 	VLOG_ARGS="$(VLOG_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
 	$(MAKE) -f $(COCOTB_MAKEFILE) \
-		SIM_BUILD=build/sdcard-model-$(MODE) \
-		COCOTB_RESULTS_FILE=build/sdcard-model-$(MODE).xml
+		SIM_BUILD=build/sdcard-model-$(MODE)$(SD_BUILD_SUFFIX) \
+		COCOTB_RESULTS_FILE=build/sdcard-model-$(MODE)$(SD_BUILD_SUFFIX).xml

@@ -63,11 +63,3 @@ FAT32: find ok
 FAT32: loading USER.MEM size=382176
 FAT32: USER.MEM read=16384/382176 bytes
 [dbg] cycle=80000000, last_uart=0x0a, pc=0x00103150, data_addr=0x00103140
-FAT32: USER.MEM read=32768/382176 bytes
-[dbg] cycle=90000000, last_uart=0x0a, pc=0x0010312c, data_addr=0x00103120
-FAT32: USER.MEM read=49152/382176 bytes
-FAT32: USER.MEM read=65536/382176 bytes
-[dbg] cycle=100000000, last_uart=0x0a, pc=0x0010076c, data_addr=0x00100780
-FAT32: USER.MEM read=81920/382176 bytes
-[dbg] cycle=110000000, last_uart=0x0a, pc=0x001007b8, data_addr=0x001007c0
-FAT32: USER.MEM read=98304/382176 bytes

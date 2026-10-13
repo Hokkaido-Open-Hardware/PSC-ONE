@@ -2,14 +2,18 @@
 # Usage
 # ============================================================
 
-#make -f Makefile.riscv.sim simulate_CPU_CORE CPU_VERSION=legacy
-#or
-#make -f Makefile.riscv.sim simulate_CPU_CORE CPU_VERSION=v1
+# デフォルト: rv32ui rv32um
+# make -f Makefile.riscv.sim simulate_CPU_CORE CPU_VERSION=legacy
+# make -f Makefile.riscv.sim simulate_CPU_CORE CPU_VERSION=v1
+# RV64UIテスト（CPU_VERSION未指定ならrv64コアを選択）
+# make -f Makefile.riscv.sim simulate_CPU_CORE ISA=rv64ui
+
+.DEFAULT_GOAL := simulate_CPU_CORE
 
 # ============================================================
 #  MODE で一括切り替え（verilator / icarus）
 # ============================================================
-# デフォルトはicarus
+# デフォルトはverilator
 MODE = verilator
 #MODE = icarus
 
@@ -46,6 +50,38 @@ endif
 # ============================================================
 #  以下、元の Makefile の変数定義など（SDRAM_MODEL を置き換え）
 # ============================================================
+
+# Keep ISA/ABI selection in sync with Makefile.riscv.
+RISCV_BUILD_DIR := riscv_build
+RISCV_TEST_ROOT := riscv_tests
+RISCV_NM ?= riscv64-unknown-elf-nm
+# ISA is also passed explicitly by Makefile.riscv.sim. Keep TEST_GROUPS as
+# a backwards-compatible spelling when ISA is not supplied.
+ISA ?= $(or $(TEST_GROUPS),rv32ui rv32um)
+override ISA := $(strip $(ISA))
+ifneq ($(filter-out rv32ui rv32um rv64ui,$(ISA)),)
+$(error Unsupported ISA=$(ISA); use rv32ui rv32um or rv64ui)
+endif
+ifeq ($(ISA),)
+$(error ISA must not be empty)
+endif
+ifneq ($(filter rv64ui,$(ISA)),)
+ifneq ($(filter rv32%,$(ISA)),)
+$(error Cannot mix RV32 and RV64 test groups in one build)
+endif
+RISCV_XLEN := 64
+RISCV_ABI := lp64
+else
+RISCV_XLEN := 32
+RISCV_ABI := ilp32
+endif
+ABI ?= $(RISCV_ABI)
+ifneq ($(ABI),$(RISCV_ABI))
+$(error ISA=$(ISA) requires ABI=$(RISCV_ABI), got $(ABI))
+endif
+override TEST_GROUPS := $(ISA)
+# Separate the p environment and XLEN/ABI from the old flat build directory.
+RISCV_OUTPUT_DIR := $(RISCV_BUILD_DIR)/rv$(RISCV_XLEN)-$(ABI)-p
 
 CPU_TOP 	 = PSC_RV32_core
 
@@ -121,11 +157,42 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/Csr.sv \
 	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
 
+# Same standalone dependencies as Makefile.cpu_rv64.core; package first.
+CPU_RV64_SRC_DIR = ../rtl/soc/cpu_rv64/src
+CPU_RV64_CORE_FILES = \
+	$(CPU_RV64_SRC_DIR)/PSC_Types.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_RV64_core.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_RV64_FetchUnit.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_FetchPredict.sv \
+	$(CPU_RV64_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_RV64_SRC_DIR)/Fetch.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_RV64_InstructionEngine.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_RV64_SRC_DIR)/Decorder.sv \
+	$(CPU_RV64_SRC_DIR)/Execute.sv \
+	$(CPU_RV64_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_RV64_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_RV64_SRC_DIR)/Branch.sv \
+	$(CPU_RV64_SRC_DIR)/MemoryStore.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_Register.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_PC.sv \
+	$(CPU_RV64_SRC_DIR)/MMU.sv \
+	$(CPU_RV64_SRC_DIR)/Csr.sv
+
 # ============================================================
-# CPUコアの切り替え（v1 / legacy）
+# CPUコアの切り替え（legacy / v1 / v2 / rv64）
 # ============================================================
-# デフォルトはV1
-CPU_VERSION ?= v1
+# RV32 defaults to v1; RV64 must never run on an RV32 core.
+CPU_VERSION ?= $(if $(filter 64,$(RISCV_XLEN)),rv64,v1)
+ifeq ($(RISCV_XLEN),64)
+ifneq ($(CPU_VERSION),rv64)
+$(error ISA=$(ISA) requires CPU_VERSION=rv64; $(CPU_VERSION) is an RV32 core)
+endif
+else
+ifeq ($(CPU_VERSION),rv64)
+$(error CPU_VERSION=rv64 requires ISA=rv64ui; RV32 binaries use an RV32 core)
+endif
+endif
 
 ifeq ($(CPU_VERSION),v1)
 SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)
@@ -133,8 +200,11 @@ else ifeq ($(CPU_VERSION),v2)
 SELECTED_CPU_CORE_FILES = $(CPU_V2_CORE_FILES)
 else ifeq ($(CPU_VERSION),legacy)
 SELECTED_CPU_CORE_FILES = $(CPU_CORE_FILES)
+else ifeq ($(CPU_VERSION),rv64)
+CPU_TOP = PSC_RV64_core
+SELECTED_CPU_CORE_FILES = $(CPU_RV64_CORE_FILES)
 else
-$(error CPU_VERSION=$(CPU_VERSION) は不正です。v1 または legacy を指定してください)
+$(error CPU_VERSION=$(CPU_VERSION) は不正です。legacy, v1, v2, rv64 を指定してください)
 endif
 
 INPUT_CPU_CORE_SIM_FILE = \
@@ -152,61 +222,70 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE CPU CORE単体テスト
 # tang 20k 
 RISCV_SINGLE_TEST = \
-	rv32ui-ld_st:RV32ISP_riscv_test:./riscv_build/rv32ui-ld_st.mem:0x00000001:0x00002000 \
+	rv32ui-ld_st:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-ld_st.mem:0x00000001 \
 
 RISCV_BASIC_TEST = \
-	rv32ui-add:RV32ISP_riscv_test:./riscv_build/rv32ui-add.mem:0x00000001:0x00001000 \
-	rv32ui-addi:RV32ISP_riscv_test:./riscv_build/rv32ui-addi.mem:0x00000001:0x00001000 \
-	rv32ui-and:RV32ISP_riscv_test:./riscv_build/rv32ui-and.mem:0x00000001:0x00001000 \
-	rv32ui-andi:RV32ISP_riscv_test:./riscv_build/rv32ui-andi.mem:0x00000001:0x00001000 \
-	rv32ui-auipc:RV32ISP_riscv_test:./riscv_build/rv32ui-auipc.mem:0x00000001:0x00001000 \
-	rv32ui-lb:RV32ISP_riscv_test:./riscv_build/rv32ui-lb.mem:0x00000001:0x00001000 \
-	rv32ui-lbu:RV32ISP_riscv_test:./riscv_build/rv32ui-lbu.mem:0x00000001:0x00001000 \
-	rv32ui-lh:RV32ISP_riscv_test:./riscv_build/rv32ui-lh.mem:0x00000001:0x00001000 \
-	rv32ui-lhu:RV32ISP_riscv_test:./riscv_build/rv32ui-lhu.mem:0x00000001:0x00001000 \
-	rv32ui-lui:RV32ISP_riscv_test:./riscv_build/rv32ui-lui.mem:0x00000001:0x00001000 \
-	rv32ui-lw:RV32ISP_riscv_test:./riscv_build/rv32ui-lw.mem:0x00000001:0x00001000 \
-	rv32ui-sb:RV32ISP_riscv_test:./riscv_build/rv32ui-sb.mem:0x00000001:0x00001000 \
-	rv32ui-sh:RV32ISP_riscv_test:./riscv_build/rv32ui-sh.mem:0x00000001:0x00001000 \
-	rv32ui-fence_i:RV32ISP_riscv_test:./riscv_build/rv32ui-fence_i.mem:0x00000001:0x00001000 \
-	rv32ui-beq:RV32ISP_riscv_test:./riscv_build/rv32ui-beq.mem:0x00000001:0x00001000 \
-	rv32ui-bge:RV32ISP_riscv_test:./riscv_build/rv32ui-bge.mem:0x00000001:0x00001000 \
-	rv32ui-bgeu:RV32ISP_riscv_test:./riscv_build/rv32ui-bgeu.mem:0x00000001:0x00001000 \
-	rv32ui-blt:RV32ISP_riscv_test:./riscv_build/rv32ui-blt.mem:0x00000001:0x00001000 \
-	rv32ui-bltu:RV32ISP_riscv_test:./riscv_build/rv32ui-bltu.mem:0x00000001:0x00001000 \
-	rv32ui-bne:RV32ISP_riscv_test:./riscv_build/rv32ui-bne.mem:0x00000001:0x00001000 \
-	rv32ui-jal:RV32ISP_riscv_test:./riscv_build/rv32ui-jal.mem:0x00000001:0x00001000 \
-	rv32ui-jalr:RV32ISP_riscv_test:./riscv_build/rv32ui-jalr.mem:0x00000001:0x00001000 \
-	rv32ui-or:RV32ISP_riscv_test:./riscv_build/rv32ui-or.mem:0x00000001:0x00001000 \
-	rv32ui-ori:RV32ISP_riscv_test:./riscv_build/rv32ui-ori.mem:0x00000001:0x00001000 \
-	rv32ui-simple:RV32ISP_riscv_test:./riscv_build/rv32ui-simple.mem:0x00000001:0x00001000 \
-	rv32ui-sll:RV32ISP_riscv_test:./riscv_build/rv32ui-sll.mem:0x00000001:0x00001000 \
-	rv32ui-slli:RV32ISP_riscv_test:./riscv_build/rv32ui-slli.mem:0x00000001:0x00001000 \
-	rv32ui-slt:RV32ISP_riscv_test:./riscv_build/rv32ui-slt.mem:0x00000001:0x00001000 \
-	rv32ui-slti:RV32ISP_riscv_test:./riscv_build/rv32ui-slti.mem:0x00000001:0x00001000 \
-	rv32ui-sltiu:RV32ISP_riscv_test:./riscv_build/rv32ui-sltiu.mem:0x00000001:0x00001000 \
-	rv32ui-sltu:RV32ISP_riscv_test:./riscv_build/rv32ui-sltu.mem:0x00000001:0x00001000 \
-	rv32ui-sra:RV32ISP_riscv_test:./riscv_build/rv32ui-sra.mem:0x00000001:0x00001000 \
-	rv32ui-srai:RV32ISP_riscv_test:./riscv_build/rv32ui-srai.mem:0x00000001:0x00001000 \
-	rv32ui-srl:RV32ISP_riscv_test:./riscv_build/rv32ui-srl.mem:0x00000001:0x00001000 \
-	rv32ui-srli:RV32ISP_riscv_test:./riscv_build/rv32ui-srli.mem:0x00000001:0x00001000 \
-	rv32ui-st_ld:RV32ISP_riscv_test:./riscv_build/rv32ui-st_ld.mem:0x00000001:0x00001000 \
-	rv32ui-sub:RV32ISP_riscv_test:./riscv_build/rv32ui-sub.mem:0x00000001:0x00001000 \
-	rv32ui-sw:RV32ISP_riscv_test:./riscv_build/rv32ui-sw.mem:0x00000001:0x00001000 \
-	rv32ui-xor:RV32ISP_riscv_test:./riscv_build/rv32ui-xor.mem:0x00000001:0x00001000 \
-	rv32ui-xori:RV32ISP_riscv_test:./riscv_build/rv32ui-xori.mem:0x00000001:0x00001000 \
-	rv32um-div:RV32ISP_riscv_test:./riscv_build/rv32um-div.mem:0x00000001:0x00001000 \
-	rv32um-divu:RV32ISP_riscv_test:./riscv_build/rv32um-divu.mem:0x00000001:0x00001000 \
-	rv32um-mul:RV32ISP_riscv_test:./riscv_build/rv32um-mul.mem:0x00000001:0x00001000 \
-	rv32um-mulh:RV32ISP_riscv_test:./riscv_build/rv32um-mulh.mem:0x00000001:0x00001000 \
-	rv32um-mulhsu:RV32ISP_riscv_test:./riscv_build/rv32um-mulhsu.mem:0x00000001:0x00001000 \
-	rv32um-mulhu:RV32ISP_riscv_test:./riscv_build/rv32um-mulhu.mem:0x00000001:0x00001000 \
-	rv32um-rem:RV32ISP_riscv_test:./riscv_build/rv32um-rem.mem:0x00000001:0x00001000 \
-	rv32um-remu:RV32ISP_riscv_test:./riscv_build/rv32um-remu.mem:0x00000001:0x00001000 \
-	rv32ui-ld_st:RV32ISP_riscv_test:./riscv_build/rv32ui-ld_st.mem:0x00000001:0x00002000 \
+	rv32ui-add:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-add.mem:0x00000001 \
+	rv32ui-addi:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-addi.mem:0x00000001 \
+	rv32ui-and:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-and.mem:0x00000001 \
+	rv32ui-andi:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-andi.mem:0x00000001 \
+	rv32ui-auipc:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-auipc.mem:0x00000001 \
+	rv32ui-lb:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-lb.mem:0x00000001 \
+	rv32ui-lbu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-lbu.mem:0x00000001 \
+	rv32ui-lh:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-lh.mem:0x00000001 \
+	rv32ui-lhu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-lhu.mem:0x00000001 \
+	rv32ui-lui:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-lui.mem:0x00000001 \
+	rv32ui-lw:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-lw.mem:0x00000001 \
+	rv32ui-sb:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-sb.mem:0x00000001 \
+	rv32ui-sh:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-sh.mem:0x00000001 \
+	rv32ui-fence_i:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-fence_i.mem:0x00000001 \
+	rv32ui-beq:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-beq.mem:0x00000001 \
+	rv32ui-bge:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-bge.mem:0x00000001 \
+	rv32ui-bgeu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-bgeu.mem:0x00000001 \
+	rv32ui-blt:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-blt.mem:0x00000001 \
+	rv32ui-bltu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-bltu.mem:0x00000001 \
+	rv32ui-bne:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-bne.mem:0x00000001 \
+	rv32ui-jal:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-jal.mem:0x00000001 \
+	rv32ui-jalr:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-jalr.mem:0x00000001 \
+	rv32ui-or:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-or.mem:0x00000001 \
+	rv32ui-ori:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-ori.mem:0x00000001 \
+	rv32ui-simple:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-simple.mem:0x00000001 \
+	rv32ui-sll:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-sll.mem:0x00000001 \
+	rv32ui-slli:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-slli.mem:0x00000001 \
+	rv32ui-slt:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-slt.mem:0x00000001 \
+	rv32ui-slti:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-slti.mem:0x00000001 \
+	rv32ui-sltiu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-sltiu.mem:0x00000001 \
+	rv32ui-sltu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-sltu.mem:0x00000001 \
+	rv32ui-sra:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-sra.mem:0x00000001 \
+	rv32ui-srai:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-srai.mem:0x00000001 \
+	rv32ui-srl:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-srl.mem:0x00000001 \
+	rv32ui-srli:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-srli.mem:0x00000001 \
+	rv32ui-st_ld:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-st_ld.mem:0x00000001 \
+	rv32ui-sub:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-sub.mem:0x00000001 \
+	rv32ui-sw:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-sw.mem:0x00000001 \
+	rv32ui-xor:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-xor.mem:0x00000001 \
+	rv32ui-xori:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-xori.mem:0x00000001 \
+	rv32um-div:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32um-div.mem:0x00000001 \
+	rv32um-divu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32um-divu.mem:0x00000001 \
+	rv32um-mul:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32um-mul.mem:0x00000001 \
+	rv32um-mulh:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32um-mulh.mem:0x00000001 \
+	rv32um-mulhsu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32um-mulhsu.mem:0x00000001 \
+	rv32um-mulhu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32um-mulhu.mem:0x00000001 \
+	rv32um-rem:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32um-rem.mem:0x00000001 \
+	rv32um-remu:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32um-remu.mem:0x00000001 \
+	rv32ui-ld_st:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-ld_st.mem:0x00000001 \
 
 # 非アラインアクセス試験のため除外
-#rv32ui-ma_data:RV32ISP_riscv_test:./riscv_build/rv32ui-ma_data.mem:0x00000001 \
+#rv32ui-ma_data:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-ma_data.mem:0x00000001 \
+
+# RV64UI includes every source, including ma_data; do not hide RTL failures.
+ifeq ($(RISCV_XLEN),64)
+RISCV_BASIC_TEST := $(foreach src,$(wildcard $(RISCV_TEST_ROOT)/isa/rv64ui/*.S),rv64ui-$(basename $(notdir $(src))):RV64_riscv_test:$(RISCV_OUTPUT_DIR)/rv64ui-$(basename $(notdir $(src))).mem:0x00000001)
+RISCV_SINGLE_TEST := rv64ui-ld_st:RV64_riscv_test:$(RISCV_OUTPUT_DIR)/rv64ui-ld_st.mem:0x00000001
+else
+RISCV_BASIC_TEST := $(filter $(addsuffix -%,$(ISA)),$(RISCV_BASIC_TEST))
+RISCV_SINGLE_TEST := $(filter $(addsuffix -%,$(ISA)),$(RISCV_SINGLE_TEST))
+endif
 
 # ============================================================
 # テストプログラムの切り替え（basic / single）
@@ -215,41 +294,54 @@ RISCV_BASIC_TEST = \
 TEST_PROGRAM_LIST ?= basic
 
 ifeq ($(TEST_PROGRAM_LIST),basic)
-RV32ISP_TEST = $(RISCV_BASIC_TEST)
+RISCV_TESTS = $(RISCV_BASIC_TEST)
 else ifeq ($(TEST_PROGRAM_LIST),single)
-RV32ISP_TEST = $(RISCV_SINGLE_TEST)
+RISCV_TESTS = $(RISCV_SINGLE_TEST)
 else
-$(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic または long, single を指定してください)
+$(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic または single を指定してください)
 endif
 
-# run test
+ifeq ($(strip $(RISCV_TESTS)),)
+$(error No tests for ISA=$(ISA) TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST))
+endif
+
+# Include compile options as well as XLEN/core/simulator in the cache identity.
+RISCV_SIM_CONFIG := rv$(RISCV_XLEN)-$(CPU_VERSION)-$(SIM)-$(shell printf '%s' '$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS) $(EXTRA_ARGS) $(VDEF)' | cksum | cut -d' ' -f1)
 RISCV_RUN_DIR ?= $(CURDIR)/build/riscv-$(CPU_VERSION)
+RISCV_SIM_BUILD := $(abspath $(RISCV_RUN_DIR))/sim_build-$(RISCV_SIM_CONFIG)
+RISCV_SIM_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+
+.PHONY: simulate_CPU_CORE
+simulate_CPU_CORE: simulate_RISCV_TESTS
 
 .PHONY: simulate_RISCV_TESTS
 simulate_RISCV_TESTS:
-	$(MAKE) -f Makefile.riscv all
+	$(MAKE) -f Makefile.riscv all ISA="$(ISA)" ABI="$(ABI)" RISCV_BUILD_DIR="$(RISCV_BUILD_DIR)"
 	@echo "MODE=$(MODE)"
 	@echo "SIM=$(SIM)"
-	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "CPU_VERSION=$(CPU_VERSION) ISA=$(ISA) ABI=$(ABI) ENV=p"
 	@echo "TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST)"
 	@echo "TOP_COMPILE_ARGS=$(TOP_COMPILE_ARGS)"
 	@echo "COMPILE_ARGS=$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)"
 	@mkdir -p ./wave "$(RISCV_RUN_DIR)"
-	@set -e; \
-	for t in $(RV32ISP_TEST); do \
+	@set -e; passed=0; failed=0; \
+	for t in $(RISCV_TESTS); do \
 		name=$$(echo $$t | cut -d: -f1); \
 		cocotb_file=$$(echo $$t | cut -d: -f2); \
 		mem_file=$$(echo $$t | cut -d: -f3); \
 		expected=$$(echo $$t | cut -d: -f4); \
-		tohost_addr=$$(echo $$t | cut -d: -f5); \
+		tohost_addr=$$($(RISCV_NM) "$${mem_file%.mem}.elf" | awk '$$3 == "tohost" { print "0x" $$1 }'); \
+		test -n "$$tohost_addr" || { echo "Missing tohost in $$mem_file"; exit 1; }; \
 		echo "========================================"; \
 		echo "[TEST] $$name"; \
 		echo "[MEM ] $$mem_file"; \
 		echo "[EXP ] $$expected"; \
 		echo "========================================"; \
-		SIM_BUILD="$(RISCV_RUN_DIR)/sim_build" \
-		COCOTB_RESULTS_FILE="$(RISCV_RUN_DIR)/$$name-results.xml" \
-		PROGRAM_FILE="$(CURDIR)/$$mem_file" \
+		if PYTHONPATH="$(CURDIR):$$PYTHONPATH" \
+		CUSTOM_COMPILE_DEPS="$(RISCV_SIM_MAKEFILE)" \
+		SIM_BUILD="$(RISCV_SIM_BUILD)" \
+		COCOTB_RESULTS_FILE="$(abspath $(RISCV_RUN_DIR))/$(RISCV_SIM_CONFIG)-$$name-results.xml" \
+		PROGRAM_FILE="$$(realpath "$$mem_file")" \
 		COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
 		TOHOST_ADDR="$$tohost_addr" \
 		EXPECTED_RESULT=$$expected \
@@ -258,13 +350,18 @@ simulate_RISCV_TESTS:
 		VERILOG_SOURCES="$(INPUT_CPU_CORE_SIM_FILE)" \
 		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
-		make --silent -f $(COCOTB_MAKEFILE); \
+		$(MAKE) --silent -f $(COCOTB_MAKEFILE); then \
+			passed=$$((passed + 1)); \
+		else \
+			echo "[FAIL] $$name"; failed=$$((failed + 1)); \
+		fi; \
 	done; \
 	printf '\a'; \
 	echo ""; \
 	echo "========================================"; \
-	echo "✅ All riscv tests completed"; \
-	echo "========================================"
+	echo "PASS=$$passed FAIL=$$failed"; \
+	echo "========================================"; \
+	test "$$failed" -eq 0
 	
 
 # ============================================================
@@ -274,7 +371,7 @@ JOBS ?= 16
 # Keep large parallel builds off /tmp (often a size-limited tmpfs).
 # Each invocation gets its own run root without creating directories at parse time.
 ifndef PARALLEL_RUN_DIR
-PARALLEL_RUN_DIR := $(CURDIR)/parallel_run/$(CPU_VERSION)-$(shell date +%Y%m%d-%H%M%S-%N)
+PARALLEL_RUN_DIR := $(CURDIR)/parallel_run/$(RISCV_SIM_CONFIG)-$(shell date +%Y%m%d-%H%M%S-%N)
 endif
 
 .PHONY: run_RISCV_TEST_PARALLEL
@@ -285,18 +382,20 @@ run_RISCV_TEST_PARALLEL:
 	cocotb_file=$$(echo "$$t" | cut -d: -f2); \
 	mem_file=$$(echo "$$t" | cut -d: -f3); \
 	expected=$$(echo "$$t" | cut -d: -f4); \
-	tohost_addr=$$(echo "$$t" | cut -d: -f5); \
+	tohost_addr=$$($(RISCV_NM) "$${mem_file%.mem}.elf" | awk '$$3 == "tohost" { print "0x" $$1 }'); \
+	test -n "$$tohost_addr" || { echo "Missing tohost in $$mem_file"; exit 1; }; \
 	run_dir="$(abspath $(PARALLEL_RUN_DIR))/$$name"; \
 	echo "========================================"; \
 	echo "[START] $$name"; \
 	echo "[MEM  ] $$mem_file"; \
 	echo "[EXP  ] $$expected"; \
 	echo "========================================"; \
-	mkdir -p "$$run_dir/mem"; \
 	mkdir -p "$$run_dir/wave"; \
 	mkdir -p "$$run_dir/tmp"; \
-	head -n 4096 "$$mem_file" > "$$run_dir/mem/test_program.mem"; \
+	program_file=$$(realpath "$$mem_file"); \
 	cd "$$run_dir"; \
+	PROGRAM_FILE="$$program_file" \
+	CUSTOM_COMPILE_DEPS="$(RISCV_SIM_MAKEFILE)" \
 	TMPDIR="$$run_dir/tmp" \
 	PYTHONPATH="$(CURDIR):$$PYTHONPATH" \
 	COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
@@ -305,17 +404,17 @@ run_RISCV_TEST_PARALLEL:
 	TOPLEVEL="$(CPU_TOP)" \
 	TOPLEVEL_LANG=verilog \
 	SIM="$(SIM)" \
-	SIM_BUILD="sim_build" \
+	SIM_BUILD="sim_build-$(RISCV_SIM_CONFIG)" \
 	VERILOG_SOURCES="$(foreach f,$(INPUT_CPU_CORE_SIM_FILE),$(abspath $(f)))" \
 	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
-	make --silent -f "$(COCOTB_MAKEFILE)" > simulation.log 2>&1; \
+	$(MAKE) --silent -f "$(COCOTB_MAKEFILE)" > simulation.log 2>&1; \
 	echo "[PASS] $$name"
 
 .PHONY: simulate_RISCV_TESTS_PARALLEL
 simulate_RISCV_TESTS_PARALLEL:
 	@mkdir -p "$(PARALLEL_RUN_DIR)/tmp"
-	TMPDIR="$(abspath $(PARALLEL_RUN_DIR))/tmp" $(MAKE) -f Makefile.riscv all
+	TMPDIR="$(abspath $(PARALLEL_RUN_DIR))/tmp" $(MAKE) -f Makefile.riscv all ISA="$(ISA)" ABI="$(ABI)" RISCV_BUILD_DIR="$(RISCV_BUILD_DIR)"
 	@echo ""
 	@echo "========================================"
 	@echo " Parallel RISC-V tests"
@@ -327,13 +426,13 @@ simulate_RISCV_TESTS_PARALLEL:
 	@echo "JOBS              = $(JOBS)"
 	@echo "PARALLEL_RUN_DIR  = $(PARALLEL_RUN_DIR)"
 	@echo "========================================"
-	@printf '%s\n' $(RV32ISP_TEST) | \
+	@printf '%s\n' $(RISCV_TESTS) | \
 	xargs -P $(JOBS) -I {} \
 	$(MAKE) --no-print-directory \
 		-f Makefile.riscv.sim \
 		run_RISCV_TEST_PARALLEL \
 		MODE="$(MODE)" \
-		CPU_VERSION="$(CPU_VERSION)" \
+		CPU_VERSION="$(CPU_VERSION)" ISA="$(ISA)" ABI="$(ABI)" \
 		SIM_FAST="$(SIM_FAST)" \
 		PARALLEL_RUN_DIR="$(PARALLEL_RUN_DIR)" \
 		TEST_ENTRY="{}"; \

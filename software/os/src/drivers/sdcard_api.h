@@ -3,6 +3,10 @@
 
 /* ===== MMIO 定義 ===== */
 
+// DATA READ pops four bytes, first byte in bits [7:0]; 128 reads per sector.
+// Wait for the read command to finish before draining. With fewer than four
+// bytes, DATA returns 0x000000E0 without consuming data; EMPTY means zero bytes.
+// DATA WRITE still pushes only bits [7:0] (512 writes per sector).
 #define PSC_IF_DATA     (*(volatile uint32_t*)0x10006000u)
 #define PSC_SD_SECTOR   (*(volatile uint32_t*)0x10006004u)
 #define PSC_SD_IF_CTRL  (*(volatile uint32_t*)0x10006008u)

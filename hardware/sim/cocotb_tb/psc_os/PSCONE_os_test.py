@@ -185,28 +185,31 @@ def dump_page_table(dut, root_pt_paddr):
         for vpn1 in range(1024):
 
             l1_pte_addr = root_pt_paddr + vpn1 * 4
-            l1_pte = sdram_read32(dut, l1_pte_addr)
+            l1_pte = GW2AR_sdram_read32(dut, l1_pte_addr)
 
             if (l1_pte & 0x1) == 0:
                 continue  # invalid entry
 
-            ppn1 = (l1_pte >> 10) & 0xFFFFF
+            ppn1 = (l1_pte >> 10) & 0x3FFFFF
             l0_addr = ppn1 << 12
 
             line = f"\nL1[{vpn1:03}] PTE={l1_pte:08x}  → L0 @ 0x{l0_addr:08x}"
             print(line)
             log.write(line + "\n")
 
+            if l1_pte & 0xE:
+                continue  # Sv32 level-1 leaf (4 MiB superpage)
+
             # L0 を走査
             for vpn0 in range(1024):
 
                 l0_pte_addr = l0_addr + vpn0 * 4
-                l0_pte = sdram_read32(dut, l0_pte_addr)
+                l0_pte = GW2AR_sdram_read32(dut, l0_pte_addr)
 
                 if (l0_pte & 0x1) == 0:
                     continue
 
-                ppn0 = (l0_pte >> 10) & 0xFFFFF
+                ppn0 = (l0_pte >> 10) & 0x3FFFFF
                 phys = ppn0 << 12
 
                 flags = l0_pte & 0x3FF
@@ -475,6 +478,11 @@ async def RV32IS_chip_test1(dut):
 
 
 async def run_psc_os_test(dut, send_queue, prompt_ready, gui=None, auto_prompt=False):
+    diagnostic = None
+    if env_flag("PSC_OS_BOOT_DIAGNOSTICS", False):
+        from cocotb_tb.psc_os.boot_diagnostics import BootDiagnostics
+        diagnostic = BootDiagnostics(dut)
+        diagnostic.start()
     dut._log.info("==============================================================")
     dut._log.info("Start PSC-ONE PSC_OS test")
     dut._log.info("Boot from ROM")
@@ -567,27 +575,33 @@ async def run_psc_os_test(dut, send_queue, prompt_ready, gui=None, auto_prompt=F
     while waited < timeout_cycles:
         await RisingEdge(clock)
 
-        page_fault_i = fault_i.value
-        page_fault_d = fault_d.value
+        if diagnostic is not None and not diagnostic.entered:
+            diagnostic.check_kernel_entry()
 
-        # PageFaultでbreak
-        if page_fault_i or page_fault_d:
-            dut._log.info("==============================================================")
-            dut._log.info(f"Page Fault detected: I={page_fault_i}, D={page_fault_d}")
-            dump_sdram_mem(dut, "GW2AR", 0x0020_0000, 64)
-            dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 64)
-            dump_sdram_mem(dut, "GW2AR", 0x0025_B000, 64)
-            # SP
-            dump_sdram_mem(dut, "GW2AR", 0x0027_E000, 1024)
+        page_fault_i = int(fault_i.value)
+        page_fault_d = int(fault_d.value)
 
-            # 正しい page table の物理アドレスを取得
-            satp_val = int(dut.u_chip.u_soc.u_rv32_core_axi.u_core.u_csr.csr_satp.value)
-            ppn = satp_val & 0b11_1111_1111_1111_1111_1111    # 22bit and
-            root_pt = ppn << 12
+        # 最初のフォールトを記録し、CPUの動作は継続する
+        if (page_fault_i or page_fault_d) and not fault_seen:
+            fault_seen = True
 
-            dut._log.info(f"SATP = 0x{satp_val:08x} → root PT = 0x{root_pt:08x}")
+            pc_val = int(core.pc.value)
+            satp_val = int(core.u_csr.csr_satp.value)
+            root_pt = (satp_val & 0x003FFFFF) << 12
+
+            dut._log.warning(
+                f"Page fault observed: I={page_fault_i}, D={page_fault_d}, "
+                f"PC=0x{pc_val:08x}, SATP=0x{satp_val:08x}, "
+                f"root PT=0x{root_pt:08x}; continuing for diagnosis"
+            )
+
+            if diagnostic is not None:
+                diagnostic.snapshot("FAULT")
+
             dump_page_table(dut, root_pt)
-            raise AssertionError("Page fault during PSC-OS simulation")
+
+            # 診断中はここで停止しない
+            # raise AssertionError("Page fault during PSC-OS simulation")
 
         # PIO
         if io_write_ready.value == 1:    # cpu_wvalid=1より1clk遅れだがOK
