@@ -14,7 +14,7 @@
 
 module PSC_ONE_RV32_core #(
     // Mode 
-`ifdef OS_SIM
+`ifdef PSCOS_SIM
     parameter PROTECT_MODE         = 1,
     parameter PROTECT_ADDR         = 32'h0001_0000,
 `else
@@ -28,7 +28,7 @@ module PSC_ONE_RV32_core #(
     parameter integer CPU_DATA_WIDTH  = 32,  
 
     // MMIO MASK BITS
-    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS         = 32'h1000_F00F,
+    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS         = 32'h1000_FFFF,
     // MMIO アドレス（0なら無効）
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_TX         = 32'h1000_0000,
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_RX         = 32'h1000_0004,

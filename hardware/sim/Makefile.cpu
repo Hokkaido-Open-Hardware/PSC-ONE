@@ -278,7 +278,7 @@ I2S_MIC_MODEL = ../rtl/model/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v
 
 LCD_ILI9488_MODEL = ../rtl/model/LCD_model/PSC_LCD_ILI9488_MODEL.v 
 
-INPUT_32bit_FILE = \
+INPUT_PSCONE_SIM_FILE = \
 	$(PSCONE_SIM_TOP_FILE) $(PSCONE_TOP_FILE) $(PSCONE_SOC_TOP_FILE) \
 	$(CPU_FILES) $(SDRAM_32bit_AXI_FILES) \
 	$(PSC_ONE_BOOT_FILE) $(PSC_ONE_DMA_FILE) \
@@ -288,7 +288,7 @@ INPUT_32bit_FILE = \
 	$(SDCARD_MODEL)
 
 INPUT_FILE_PSCONE = \
-	$(INPUT_32bit_FILE)
+	$(INPUT_PSCONE_SIM_FILE)
 
 COCOTB_CFG       := $(shell which cocotb-config)
 COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
@@ -303,7 +303,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	i2c_test1:RV32ISP_chip_test:./mem/i2c_test1.mem:0x600dcafe \
+	sd_card_test1:RV32ISP_chip_test:./mem/sd_card_test1.mem:0x000000e0 \
 
 # ============================================================
 # 複数テスト定義

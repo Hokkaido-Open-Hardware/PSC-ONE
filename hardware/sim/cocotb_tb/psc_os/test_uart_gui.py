@@ -121,6 +121,48 @@ class GuiTests(unittest.TestCase):
         finally:
             root.destroy()
 
+    def test_mouse_selection_and_copy(self):
+        import tkinter as tk
+        root = tk.Tk()
+        messages = []
+        try:
+            console = Console(root, "test.log", messages.append)
+            text = console.text
+            for value in b"boot\r\nPSC_OS> help\r\n":
+                console.write_byte(value)
+            text.focus_force()
+            root.update()
+            start = text.bbox("1.0")
+            end = text.bbox("2.7")
+            text.event_generate("<ButtonPress-1>", x=start[0], y=start[1])
+            text.event_generate("<B1-Motion>", x=end[0], y=end[1])
+            text.event_generate("<ButtonRelease-1>", x=end[0], y=end[1])
+            root.update()
+            self.assertEqual(text.get("sel.first", "sel.last"), "boot\nPSC_OS>")
+            text.event_generate("<Control-KeyPress-c>")
+            root.update()
+            self.assertEqual(root.clipboard_get(), "boot\nPSC_OS>")
+            self.assertEqual(messages, [])
+            text.clipboard_clear()
+            console.copy_menu.invoke(0)
+            self.assertEqual(root.clipboard_get(), "boot\nPSC_OS>")
+            # Ongoing output must not pull the selection out of view.
+            for value in b"line\r\n" * 80:
+                console.write_byte(value)
+            root.update()
+            self.assertEqual(text.index("@0,0"), "1.0")
+            self.assertEqual(text.get("sel.first", "sel.last"), "boot\nPSC_OS>")
+            text.tag_remove("sel", "1.0", "end")
+            text.event_generate("<Control-Shift-KeyPress-C>")
+            root.update()
+            self.assertEqual(messages, [])
+            text.event_generate("<Control-KeyPress-c>")
+            root.update()
+            self.assertEqual(messages, [("key", "\x03")])
+            self.assertEqual(str(text.cget("state")), "disabled")
+        finally:
+            root.destroy()
+
     def test_process_lifecycle(self):
         gui = UartGui(Queue(), "test.log")
         for value in b"PSC_OS> ":

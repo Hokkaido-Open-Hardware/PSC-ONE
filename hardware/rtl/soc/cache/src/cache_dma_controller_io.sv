@@ -24,7 +24,7 @@ module cache_dma_controller_io #(
     parameter TAG_ENTRY_WIDTH   = TAG_WIDTH + 2,               // {tag,valid,dirty}
 
     // MMIO MASK BITS
-    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS     = 32'h1000_F00F,
+    parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS     = 32'h1000_FFFF,
     // MMIO アドレス（0なら無効）
     parameter [ADDR_WIDTH-1:0]  PIO_ADDRESS         = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_TX     = {ADDR_WIDTH{1'b0}},

@@ -2,6 +2,9 @@
 # ユーザ設定
 ###############################################################################
 RISCV_PREFIX ?= riscv64-unknown-elf-
+# RV64: make -B <target> ARCH=rv64im_zicsr_zifencei ABI=lp64
+ARCH ?= rv32im_zicsr_zifencei
+ABI  ?= ilp32
 CC      := $(RISCV_PREFIX)g++
 OBJCOPY := $(RISCV_PREFIX)objcopy
 LINKER  := link.ld
@@ -43,7 +46,7 @@ divmodsi3.o: divmodsi3.c
 ###############################################################################
 # コンパイル/リンクフラグ
 ###############################################################################
-CXXFLAGS := -std=c++23 -march=rv32im_zicsr_zifencei -mabi=ilp32 -O2 -g \
+CXXFLAGS := -std=c++23 -march=$(ARCH) -mabi=$(ABI) -O2 -g \
   -ffreestanding -nostdlib -fno-rtti -fno-exceptions -fimplicit-constexpr \
   -fno-toplevel-reorder -Wfatal-errors -Werror -Wall -Wextra -Wpedantic \
   -Wshadow -Wnon-virtual-dtor -Wcast-align -Woverloaded-virtual \

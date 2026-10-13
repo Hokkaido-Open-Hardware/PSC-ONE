@@ -306,7 +306,7 @@ I2S_MIC_MODEL = ../rtl/model/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v
 
 LCD_ILI9488_MODEL = ../rtl/model/LCD_model/PSC_LCD_ILI9488_MODEL.v
 
-INPUT_32bit_FILE = \
+INPUT_PSCONE_SIM_FILE = \
 	$(PSCONE_SIM_TOP_FILE) $(PSCONE_TOP_FILE) $(PSCONE_SOC_TOP_FILE) \
 	$(CPU_FILES) $(SDRAM_32bit_AXI_FILES) \
 	$(PSC_ONE_BOOT_FILE) $(PSC_ONE_DMA_FILE) \
@@ -316,7 +316,7 @@ INPUT_32bit_FILE = \
 	$(SDCARD_MODEL)
 
 INPUT_FILE_PSCONE = \
-	$(INPUT_32bit_FILE)
+	$(INPUT_PSCONE_SIM_FILE)
 
 COCOTB_CFG       := $(shell which cocotb-config)
 COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
@@ -334,11 +334,12 @@ endif
 # ============================================================
 # PSC-OS テスト
 
-MODE = verilator
-
-VDEF = -DFST_UART_MODE -DOS_SIM
+simulate_PSCOS: MODE = verilator
+simulate_PSCOS: SIM = verilator
+simulate_PSCOS: VDEF = -DFST_UART_MODE -DPSCOS_SIM
 
 simulate_PSCOS: 
+	$(MAKE) mem_clean
 	$(MAKE) clean
 	$(MAKE) -C ../../software/os $(if $(SIM_USER),SIM_USER=$(SIM_USER),) sim_mem
 	cp ../../software/os/build/bootrom.mem ./mem/
@@ -351,7 +352,6 @@ simulate_PSCOS:
 	test -f ./mem/user.mem
 
 	grep -n -v '^00000000$$' ./mem/bootrom.mem | tail -n 1
-	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
 	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
 	grep -n -v '^00000000$$' ./mem/user.mem | tail -n 1
 
@@ -374,9 +374,58 @@ simulate_PSCOS:
 	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
 	SIM=$(SIM) \
 	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
-	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
-	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
-	make --silent -f $(COCOTB_MAKEFILE); \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS) $(VDEF)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	$(MAKE) --silent -f $(COCOTB_MAKEFILE); \
+	printf '\a'
+
+# ============================================================
+# シミュレーションターゲット
+# ============================================================
+# SDカードからPSC-OS テスト
+
+simulate_SD_PSCOS: MODE = verilator
+simulate_SD_PSCOS: SIM = verilator
+simulate_SD_PSCOS: VDEF = -DFST_UART_MODE -DPSCOS_SIM -DFPGA_BOOT_LOADER_MODE
+
+simulate_SD_PSCOS:
+	$(MAKE) mem_clean
+	$(MAKE) clean
+	$(MAKE) -C ../bootloader bootloader_fat32
+	cp ../bootloader/mem/bootloader_fat32.mem ./mem/
+	$(MAKE) -C ../bootloader clean
+
+	$(MAKE) -C ../firmware firmware_fat32
+	cp ../firmware/mem/kernel.mem ./mem/
+	cp ../firmware/mem/user.mem ./mem/
+	$(MAKE) -C ../firmware clean
+
+	test -f ./mem/bootloader_fat32.mem
+	test -f ./mem/kernel.mem
+	test -f ./mem/user.mem
+
+	grep -n -v '^00000000$$' ./mem/bootloader_fat32.mem | tail -n 1
+	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
+	grep -n -v '^00000000$$' ./mem/user.mem | tail -n 1
+	
+	@mkdir -p ./wave
+	@mkdir -p ./log_uart
+
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo VDEF=$(VDEF)
+	@echo EXTRA_ARGS=$(EXTRA_ARGS)
+
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
+	MODULE=cocotb_tb.psc_os.PSCONE_os_test \
+	PSC_UART_LOGFILE=./log_uart/log_$$(date +%Y_%m_%d_%H%M%S).log \
+	EXPECTED_RESULT=0xff00ff1b \
+	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
+	SIM=$(SIM) \
+	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS) $(VDEF)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	$(MAKE) --silent -f $(COCOTB_MAKEFILE); \
 	printf '\a'
 
 # ============================================================
@@ -437,62 +486,5 @@ simulate_PSCOS_MULTITASK_LOG:
 	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
 	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
-	make --silent -f $(COCOTB_MAKEFILE); \
-	printf '\a'
-
-# ============================================================
-# PSC-OS テスト from SD-Card
-# ============================================================
-
-MODE = verilator
-
-# define FPGA_BOOT_LOADER_MODE
-SD_VDEF = -DFST_UART_MODE -DOS_SIM -DFPGA_BOOT_LOADER_MODE
-
-simulate_SD_PSCOS: 
-	$(MAKE) clean
-
-	# BOOT LOADER
-	$(MAKE) -C ../../hardware/bootloader bootloader
-
-	cp ../../hardware/bootloader/mem/bootrom.mem 	./mem/
-	cp ../../hardware/bootloader/mem/kernel.mem 	./mem/
-	cp ../../hardware/bootloader/mem/user.mem 		./mem/
-	cp ../../hardware/bootloader/mem/bootloader.mem ./mem/
-
-	test -f ./mem/bootrom.mem
-	test -f ./mem/kernel.mem
-	test -f ./mem/user.mem
-	test -f ./mem/bootloader.mem
-
-	grep -n -v '^00000000$$' ./mem/kernel.mem | tail -n 1
-	grep -n -v '^00000000$$' ./mem/user.mem | tail -n 1
-	grep -n -v '^00000000$$' ./mem/bootloader.mem | tail -n 1
-
-	@tmp=$$(mktemp); \
-	head -n 128 ./mem/bootrom.mem > $$tmp; \
-	mv $$tmp ./mem/bootrom.mem
-
-	@tmp=$$(mktemp); \
-	head -n 4500 ./mem/bootloader.mem > $$tmp; \
-	mv $$tmp ./mem/bootloader.mem
-	
-	@mkdir -p ./wave
-	@mkdir -p ./log_uart
-
-	@echo "MODE=$(MODE)"
-	@echo "CPU_VERSION=$(CPU_VERSION)"
-	@echo VDEF=$(SD_VDEF)
-	@echo EXTRA_ARGS=$(EXTRA_ARGS)
-
-	@echo "[SIM] MODE=$(MODE), SIM=$(SIM)"
-	MODULE=cocotb_tb.psc_os.PSCONE_os_test \
-	PSC_UART_LOGFILE=./log_uart/log_$$(date +%Y_%m_%d_%H%M%S).log \
-	EXPECTED_RESULT=0xff00ff1b \
-	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
-	SIM=$(SIM) \
-	VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
-	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
-	EXTRA_ARGS="$(EXTRA_ARGS) $(SD_VDEF)" \
 	make --silent -f $(COCOTB_MAKEFILE); \
 	printf '\a'

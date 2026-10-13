@@ -4,8 +4,8 @@
 // cocotb
 `define COCOTB_SIM
 
-// icarusの場合はdefine OS_SIM
-//`define OS_SIM
+// icarusの場合はdefine PSCOS_SIM
+//`define PSCOS_SIM
 
 // SDRAM_Model Debug log=ON
 //`define SDRAM_Debug_log
@@ -51,6 +51,7 @@ module PSC_ONE_Chip_sim #(
     // --------------------------------
     `ifdef COCOTB_SIM
     initial begin
+        $display("========================");
         $display("COCOTB_SIM TOP ENABLE");
     end
     `ifdef TOP_SIM
@@ -207,7 +208,7 @@ module PSC_ONE_Chip_sim #(
     sdcard_spi_model #(
         .INIT_R1_IDLE (8'h01),          // CMD0/CMD8応答(Idle)
         .R1_READY     (8'h00),          // ready時
-        .DATA_HEX     ("")              // ""なら固定パターン
+        .IMAGE_HEX    ("sdcard/sdcard.hex") // Makefile.sdcardで生成するカード全体
     ) u_sd_model (
         .clock      (clock),
         .cs         (SDI_CS),

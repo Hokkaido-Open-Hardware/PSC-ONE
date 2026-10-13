@@ -1,0 +1,161 @@
+# Standalone RV64 core with C++ tests; does not build RV32, SD images or the SoC.
+.DEFAULT_GOAL        := simulate_RV64_CORE
+RV64_MAKEFILE        := $(abspath $(lastword $(MAKEFILE_LIST)))
+RV64_SIM_DIR         := $(dir $(RV64_MAKEFILE))
+RV64_SRC_DIR         := $(abspath $(RV64_SIM_DIR)/../rtl/soc/cpu_rv64/src)
+RV64_BUILD           ?= $(abspath $(RV64_SIM_DIR)/../../..)/build/rv64-core
+export CCACHE_DIR    ?= $(RV64_BUILD)/ccache
+RV64_RESULTS         ?= $(RV64_BUILD)/results.xml
+COCOTB_CONFIG        ?= cocotb-config
+VERILATOR            ?= verilator
+RUN_CYCLES           ?= 500000
+RESET_CYCLES         ?= 10
+CLK_PERIOD_NS        ?= 10
+
+# PROGRAM_FILE overrides the image only for TEST_PROGRAM_LIST=single.
+PROGRAM_FILE         ?= ./mem/$(TEST_PROGRAM).mem
+PROGRAM_BASE         ?= 0
+MEM_LATENCY          ?= 2
+TEST_PROGRAM_LIST    ?= basic
+TEST_PROGRAM         ?= divmod_test1
+
+# Same programs and order as RV32ISP_BASIC_TEST in Makefile.cpu.core.
+# Each entry is program:expected_PIO32_result (after the 0xEE01 marker).
+RV64_BASIC_TESTS     := \
+	add_test1:0xff00ff0b \
+	add_test2:0x00000000 \
+	forwarding_timing_test1:0x00008000 \
+	sbwrite_test1:0xE500000F \
+	jal_test1:0x12345678 \
+	jalr_test1:0x00005AA5 \
+	mul_test1:0x00000063 \
+	mul_test2:0x00000033 \
+	nn_test1:0x00000170 \
+	montepi_test1:0x0000beef \
+	rem_test1:0x00000001 \
+	matrix_test1:0x0000ABCD \
+	shift_test1:0x00001234 \
+	jump_test1:0x12345678 \
+	lui_test1:0x12345000 \
+	divmod_test1:0x00000e02 \
+	sp_test1:0x00005AA5 \
+	ecall_test1:0x00000321 \
+	ret_test1:0x12345678 \
+	prime_test1:0x00000061 \
+	audipc_test1:0xFFFFFFF8 \
+	alu_mul_test1:0x00000000 \
+	fft_test1:0x0000beef \
+	q15_fft_test1:0x0000beef \
+	fft_N8_test1:0x0000beef \
+	sret_test1:0x0000DC12 \
+	memcpy_test1:0x00002521 \
+
+# A single test uses its listed value unless explicitly overridden.
+EXPECTED_RESULT      ?= $(word 2,$(subst :, ,$(filter $(TEST_PROGRAM):%,$(RV64_BASIC_TESTS))))
+
+ifeq ($(TEST_PROGRAM_LIST),basic)
+RV64_TESTS           := $(RV64_BASIC_TESTS)
+else ifeq ($(TEST_PROGRAM_LIST),single)
+RV64_TESTS           := $(TEST_PROGRAM):$(EXPECTED_RESULT)
+else
+$(error Unsupported TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST); use basic or single)
+endif
+
+# Package first. Keep the core-only dependencies explicit and reviewable.
+RV64_SOURCES         := \
+	$(RV64_SRC_DIR)/PSC_Types.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_core.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_FetchUnit.sv \
+	$(RV64_SRC_DIR)/PSC_FetchPredict.sv \
+	$(RV64_SRC_DIR)/Fetch_Fifo.sv \
+	$(RV64_SRC_DIR)/Fetch.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_InstructionEngine.sv \
+	$(RV64_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(RV64_SRC_DIR)/Decorder.sv \
+	$(RV64_SRC_DIR)/Execute.sv \
+	$(RV64_SRC_DIR)/Execute_Divider.sv \
+	$(RV64_SRC_DIR)/Execute_Mul.sv \
+	$(RV64_SRC_DIR)/Branch.sv \
+	$(RV64_SRC_DIR)/MemoryStore.sv \
+	$(RV64_SRC_DIR)/PSC_Register.sv \
+	$(RV64_SRC_DIR)/PSC_PC.sv \
+	$(RV64_SRC_DIR)/MMU.sv \
+	$(RV64_SRC_DIR)/Csr.sv
+
+# The SoC-facing wrapper is not part of the standalone simulation.
+RV64_WRAPPER_SOURCES := $(RV64_SOURCES) \
+	$(RV64_SRC_DIR)/PSC_RV64_Monitor.v \
+	$(RV64_SRC_DIR)/PSC_RV64_AXI.sv \
+	$(RV64_SRC_DIR)/PSC_ONE_RV64_core.v
+
+.PHONY: simulate_RV64_CORE lint_RV64_CORE lint_RV64_ALL
+lint_RV64_CORE:
+	$(VERILATOR) --lint-only --top-module PSC_RV64_core $(RV64_SOURCES)
+
+# Elaborate every retained entry point, including leaves absent from the core.
+lint_RV64_ALL: lint_RV64_CORE
+	$(VERILATOR) --lint-only --top-module PSC_ONE_RV64_core $(RV64_WRAPPER_SOURCES)
+	$(VERILATOR) --lint-only --top-module MemoryStore $(RV64_SOURCES)
+	$(VERILATOR) --lint-only --top-module Fetch_Fifo $(RV64_SOURCES)
+
+simulate_RV64_CORE:
+	@echo "MODE=verilator"
+	@echo "SIM=verilator"
+	@echo "CPU_VERSION=rv64"
+	@echo "TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST)"
+	@echo "TOP_COMPILE_ARGS="
+	@echo "COMPILE_ARGS=$(COMPILE_ARGS)"
+	@command -v $(COCOTB_CONFIG) >/dev/null || { echo 'Activate a Python environment with cocotb 2.x first'; exit 1; }
+	+@set -eu; \
+	cd "$(RV64_SIM_DIR)"; \
+	mkdir -p "$(RV64_BUILD)" "$(dir $(RV64_RESULTS))"; \
+	passed=0; failed=0; \
+	for entry in $(RV64_TESTS); do \
+		name=$${entry%%:*}; expected=$${entry#*:}; \
+		program_file="./mem/$$name.mem"; \
+		if [ "$(TEST_PROGRAM_LIST)" = single ]; then program_file="$(PROGRAM_FILE)"; fi; \
+		echo "========================================"; \
+		echo "[TEST] $$name"; \
+		echo "[MEM ] $$program_file"; \
+		echo "[EXP ] $$expected"; \
+		echo "========================================"; \
+		if [ -z "$$expected" ]; then \
+			echo "[FAIL] $$name: EXPECTED_RESULT is required"; \
+			failed=$$((failed + 1)); \
+			continue; \
+		fi; \
+		if ! $(MAKE) -B -C ./cpp $$name ARCH=rv64im_zicsr_zifencei ABI=lp64; then \
+			echo "[FAIL] $$name: build failed; simulation not started"; \
+			failed=$$((failed + 1)); \
+			continue; \
+		fi; \
+		if $(MAKE) --silent -f "$$($(COCOTB_CONFIG) --makefiles)/Makefile.sim" \
+		 SIM=verilator TOPLEVEL=PSC_RV64_core TOPLEVEL_LANG=verilog \
+		 VERILOG_SOURCES="$(RV64_SOURCES)" \
+		 SIM_BUILD="$(RV64_BUILD)/sim_build" \
+		 COCOTB_RESULTS_FILE="$(dir $(RV64_RESULTS))$$name-$(notdir $(RV64_RESULTS))" \
+		 COCOTB_TEST_MODULES=cocotb_tb.cpu.RV64_core_test \
+		 RUN_CYCLES="$(RUN_CYCLES)" RESET_CYCLES="$(RESET_CYCLES)" \
+		 EXPECTED_RESULT="$$expected" \
+		 CLK_PERIOD_NS="$(CLK_PERIOD_NS)" PROGRAM_FILE="$$program_file" \
+		 PROGRAM_BASE="$(PROGRAM_BASE)" MEM_LATENCY="$(MEM_LATENCY)"; then \
+			passed=$$((passed + 1)); \
+		else \
+			echo "[FAIL] $$name: simulation failed"; \
+			failed=$$((failed + 1)); \
+		fi; \
+	done; \
+	printf '\a'; \
+	echo ""; \
+	echo "========================================"; \
+	if [ "$$failed" -eq 0 ]; then \
+		echo "✅ All RV64_core tests completed"; \
+	else \
+		echo "❌ RV64_core tests failed"; \
+	fi; \
+	echo "PASS=$$passed FAIL=$$failed"; \
+	echo "========================================"; \
+	test "$$failed" -eq 0
+
+# No clean target: never delete other CPU/software artifacts implicitly.
+export RUN_CYCLES RESET_CYCLES CLK_PERIOD_NS PROGRAM_FILE PROGRAM_BASE MEM_LATENCY EXPECTED_RESULT

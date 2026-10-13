@@ -10,10 +10,10 @@
 
 ### Technical Specifications (PDF)
 
-- **[PSC-ONE SoC Specification (Rev.0.9)](./docs/PSC-ONE_SpecSheet.pdf)**  
+- **[PSC-ONE SoC Specification (Rev.0.9)](./docs/specs/PSC-ONE_SpecSheet.pdf)**  
   CPU, MMU, cache, SDRAM, NPU, peripherals, and SoC architecture.
 
-- **[PSC-OS Specification (Rev.0.9)](./docs/PSC_OS_Specs.pdf)**  
+- **[PSC-OS Specification (Rev.0.9)](./docs/specs/PSC_OS_Specs.pdf)**  
   OS architecture, boot process, system calls, ELF loader, FAT32, MicroPython, and TFLite runtime.
 
 ------------------------------------------------------------------------

@@ -119,19 +119,30 @@ module PSC_ONE_Chip #(
 `endif
 `ifdef TOP_SIM
     wire top_sim_mode = 1'b1;
+    initial $display("TOP_SIM ENABLE");
+    `define SPI_BYPASS
+    initial $display("SDCard SPI_BYPASS ENABLE");
 `endif
-`ifdef OS_SIM
+`ifdef PSCOS_SIM
     wire os_sim_mode = 1'b1;
+    initial $display("PSCOS_SIM ENABLE");
+`endif
+`ifdef FPGA_BOOT_LOADER_MODE
+    initial $display("FPGA_BOOT_LOADER_MODE ENABLE");
 `endif
 `ifdef FST_UART_MODE
     wire fst_uart_mode = 1'b1;
+    initial $display("FST_UART_MODE ENABLE");
 `endif
 `ifdef FPGA_BOOT_LOADER_MODE
     wire fpga_boot_loader_mode = 1'b1;
+    initial $display("FPGA_BOOT_LOADER_MODE ENABLE");
 `endif
 `ifdef INIT_CLEAR_MEM_BANKS
     wire init_clear_mem_banks_mode = 1'b1;
+    initial $display("INIT_CLEAR_MEM_BANKS ENABLE");
 `endif
+    initial $display("========================");
 
     // --------------------------------
     // オープンドレイン

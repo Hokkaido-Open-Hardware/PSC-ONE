@@ -1,5 +1,26 @@
 #include <cstdint>
 
+// CSR values and addresses follow XLEN; PIO output remains 32-bit.
+#if __riscv_xlen == 64
+#define CSR_STORE "sd"
+#define RESULT_6 "48"
+#define RESULT_7 "56"
+#define RESULT_8 "64"
+#define RESULT_9 "72"
+#define RESULT_10 "80"
+#define RESULT_11 "88"
+#elif __riscv_xlen == 32
+#define CSR_STORE "sw"
+#define RESULT_6 "24"
+#define RESULT_7 "28"
+#define RESULT_8 "32"
+#define RESULT_9 "36"
+#define RESULT_10 "40"
+#define RESULT_11 "44"
+#else
+#error "Unsupported RISC-V XLEN"
+#endif
+
 /* ---------- PIO ---------- */
 #define PIO32 (*reinterpret_cast<volatile uint32_t*>(0x10001000u))
 
@@ -13,7 +34,7 @@ static constexpr uint32_t TEST_END_CODE      = 0xEE01u;
 
 /* ---------- 共有出力 ---------- */
 extern "C" volatile uint32_t result;
-extern "C" volatile uint32_t results[12];
+extern "C" volatile uintptr_t results[12];
 
 /* ---------- CSR番号 ---------- */
 /* Supervisor */
@@ -40,24 +61,24 @@ extern "C" volatile uint32_t results[12];
 
 /* ---------- CSRユーティリティ ---------- */
 template <uint32_t CSR>
-static inline uint32_t read_csr() {
-    uint32_t v;
+static inline uintptr_t read_csr() {
+    uintptr_t v;
     asm volatile ("csrr %0, %1" : "=r"(v) : "i"(CSR));
     return v;
 }
 
 template <uint32_t CSR>
-static inline void write_csr(uint32_t v) {
+static inline void write_csr(uintptr_t v) {
     asm volatile ("csrw %0, %1" :: "i"(CSR), "r"(v));
 }
 
 template <uint32_t CSR>
-static inline void set_csr(uint32_t mask) {
+static inline void set_csr(uintptr_t mask) {
     asm volatile ("csrs %0, %1" :: "i"(CSR), "r"(mask));
 }
 
 template <uint32_t CSR>
-static inline void clr_csr(uint32_t mask) {
+static inline void clr_csr(uintptr_t mask) {
     asm volatile ("csrc %0, %1" :: "i"(CSR), "r"(mask));
 }
 
@@ -66,7 +87,7 @@ static inline void clr_csr(uint32_t mask) {
 #define SIE_STIE          (1u << 5)
 
 #define MSTATUS_MPP_SHIFT 11u
-#define MSTATUS_MPP_MASK  (3u << MSTATUS_MPP_SHIFT)
+#define MSTATUS_MPP_MASK  (uintptr_t{3} << MSTATUS_MPP_SHIFT)
 #define MSTATUS_MPP_S     (1u << MSTATUS_MPP_SHIFT)   // 01 = S-mode
 
 /* medeleg bit for exception code 9 = ecall from S */
@@ -94,11 +115,11 @@ asm(
 "sv_trap_handler:                  \n"
 "    la    t3, results             \n"
 "    csrr  t0, scause              \n"
-"    sw    t0, 24(t3)              \n" /* results[6] = scause */
+"    " CSR_STORE "    t0, " RESULT_6 "(t3) \n" /* results[6] = scause */
 "    csrr  t1, sepc                \n"
-"    sw    t1, 28(t3)              \n" /* results[7] = sepc(before) */
+"    " CSR_STORE "    t1, " RESULT_7 "(t3) \n" /* results[7] = sepc(before) */
 "    csrr  t2, stval               \n"
-"    sw    t2, 32(t3)              \n" /* results[8] = stval */
+"    " CSR_STORE "    t2, " RESULT_8 "(t3) \n" /* results[8] = stval */
 
 "    li    t0, 0x10001000          \n"
 "    li    t2, 0xEEEE0001          \n"
@@ -123,11 +144,11 @@ asm(
 "mv_trap_handler:                  \n"
 "    la    t3, results             \n"
 "    csrr  t0, mcause              \n"
-"    sw    t0, 36(t3)              \n" /* results[9]  = mcause */
+"    " CSR_STORE "    t0, " RESULT_9 "(t3) \n" /* results[9]  = mcause */
 "    csrr  t1, mepc                \n"
-"    sw    t1, 40(t3)              \n" /* results[10] = mepc */
+"    " CSR_STORE "    t1, " RESULT_10 "(t3) \n" /* results[10] = mepc */
 "    csrr  t2, mtval               \n"
-"    sw    t2, 44(t3)              \n" /* results[11] = mtval */
+"    " CSR_STORE "    t2, " RESULT_11 "(t3) \n" /* results[11] = mtval */
 
 "    li    t0, 0x10001000          \n"
 "    li    t2, 0xEEEE0002          \n"
@@ -155,20 +176,20 @@ extern "C" void s_mode_main() {
 
     // 3) sstatus.SIE RS/RC
     set_csr<CSR_SSTATUS>(SSTATUS_SIE);
-    uint32_t sstatus1 = read_csr<CSR_SSTATUS>();
+    uintptr_t sstatus1 = read_csr<CSR_SSTATUS>();
     if ((sstatus1 & SSTATUS_SIE) == 0) note_fail(fail, 1u << 1);
 
     set_csr<CSR_SSTATUS>(0u); // RS(zero) -> no side effect
-    uint32_t sstatus2 = read_csr<CSR_SSTATUS>();
+    uintptr_t sstatus2 = read_csr<CSR_SSTATUS>();
     (void)sstatus2;
 
     clr_csr<CSR_SSTATUS>(SSTATUS_SIE);
-    uint32_t sstatus3 = read_csr<CSR_SSTATUS>();
+    uintptr_t sstatus3 = read_csr<CSR_SSTATUS>();
     if ((sstatus3 & SSTATUS_SIE) != 0) note_fail(fail, 1u << 2);
 
     // 4) sie.STIE
     set_csr<CSR_SIE>(SIE_STIE);
-    uint32_t sie1 = read_csr<CSR_SIE>();
+    uintptr_t sie1 = read_csr<CSR_SIE>();
     if ((sie1 & SIE_STIE) == 0) note_fail(fail, 1u << 3);
 
     // 5) S-mode ecall -> S trap -> sret
@@ -177,12 +198,13 @@ extern "C" void s_mode_main() {
     (void)marker_before;
 
     PIO32 = MARK_S_BEFORE_ECALL;
-    asm volatile ("ecall");
+    // The returning S-mode handler modifies t0-t3 and shared memory.
+    asm volatile ("ecall" ::: "t0", "t1", "t2", "t3", "memory");
     PIO32 = MARK_S_AFTER_SRET;
     marker_after = 0xBEEF1234u;
 
-    const uint32_t scause = results[6];
-    const uint32_t sepc_b = results[7];
+    const uintptr_t scause = results[6];
+    const uintptr_t sepc_b = results[7];
 
     if (scause != EXPECT_SCAUSE_S_ECALL) note_fail(fail, 1u << 4);
     if (marker_after != 0xBEEF1234u)     note_fail(fail, 1u << 5);
@@ -210,26 +232,28 @@ extern "C" void s_mode_main() {
 /* ---------- エントリ（M-mode 開始） ---------- */
 extern "C" void run() {
     // 0) M trap handler 設定
-    const uint32_t m_handler_addr = reinterpret_cast<uint32_t>(&mv_trap_handler);
+    const uintptr_t m_handler_addr =
+        reinterpret_cast<uintptr_t>(&mv_trap_handler);
+        
     write_csr<CSR_MTVEC>(m_handler_addr);
 
     // 1) S trap handler 設定
-    const uint32_t s_handler_addr = reinterpret_cast<uint32_t>(&sv_trap_handler);
+    const uintptr_t s_handler_addr = reinterpret_cast<uintptr_t>(&sv_trap_handler);
     write_csr<CSR_STVEC>(s_handler_addr);
 
     // 2) ecall from S を S-mode に delegation
-    uint32_t medeleg = read_csr<CSR_MEDELEG>();
+    uintptr_t medeleg = read_csr<CSR_MEDELEG>();
     medeleg |= MEDELEG_ECALL_S;
     write_csr<CSR_MEDELEG>(medeleg);
 
     // 3) mstatus.MPP = S
-    uint32_t mstatus = read_csr<CSR_MSTATUS>();
+    uintptr_t mstatus = read_csr<CSR_MSTATUS>();
     mstatus &= ~MSTATUS_MPP_MASK;
     mstatus |= MSTATUS_MPP_S;
     write_csr<CSR_MSTATUS>(mstatus);
 
     // 4) mepc = s_mode_main
-    const uint32_t s_entry = reinterpret_cast<uint32_t>(&s_mode_main);
+    const uintptr_t s_entry = reinterpret_cast<uintptr_t>(&s_mode_main);
     write_csr<CSR_MEPC>(s_entry);
 
     // 5) M->S へ降りる
@@ -244,5 +268,5 @@ extern "C" void run() {
 /* ---------- 実体 ---------- */
 extern "C" {
     volatile uint32_t result = 0;
-    volatile uint32_t results[12] = {0};
+    volatile uintptr_t results[12] = {0};
 }

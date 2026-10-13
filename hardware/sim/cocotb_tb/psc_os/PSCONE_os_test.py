@@ -73,7 +73,7 @@ UART_KEY_INTERVAL_MS = float(os.getenv("PSC_UART_KEY_INTERVAL_MS", "0.1"))
 if not 0 <= UART_KEY_INTERVAL_MS < float("inf"):
     raise ValueError("PSC_UART_KEY_INTERVAL_MS must be finite and >= 0")
 #RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "1000_0000"))   # lcd test
-RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "3_0000_0000"))
+RUN_CYCLES    = int(os.getenv("RUN_CYCLES", "30_0000_0000"))
 SDRAM_INIT_TIMEOUT = int(os.getenv("SDRAM_INIT_TIMEOUT", "50_0000"))  # cycles
 BOOT_ROM_TIMEOUT   = int(os.getenv("BOOT_ROM_TIMEOUT", "5000_0000"))  # cycles
 # ======================

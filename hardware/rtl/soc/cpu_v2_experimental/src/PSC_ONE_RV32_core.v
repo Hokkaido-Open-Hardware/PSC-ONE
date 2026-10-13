@@ -14,7 +14,7 @@
 
 module PSC_ONE_RV32_core #(
     // Mode 
-`ifdef OS_SIM
+`ifdef PSCOS_SIM
     parameter PROTECT_MODE         = 1,
     parameter PROTECT_ADDR         = 32'h0001_0000,
 `else

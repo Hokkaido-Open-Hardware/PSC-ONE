@@ -13,7 +13,7 @@ extern "C" void run()
 
 #define CHECK_S(id, exp)                  \
     do {                                  \
-        if (s != static_cast<int32_t>(exp)) { \
+        if (s != (exp)) { \
             PIO32 = 0xED000000u | (id);   \
             PIO32 = static_cast<uint32_t>(s); \
             PIO32 = TEST_END_CODE;        \
@@ -24,7 +24,7 @@ extern "C" void run()
 
 #define CHECK_U(id, exp)                  \
     do {                                  \
-        if (u != static_cast<uint32_t>(exp)) { \
+        if (u != (exp)) { \
             PIO32 = 0xED000000u | (id);   \
             PIO32 = u;                    \
             PIO32 = TEST_END_CODE;        \

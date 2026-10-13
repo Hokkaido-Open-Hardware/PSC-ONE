@@ -116,19 +116,49 @@ class Console:
         self.text = ScrolledText(
             root, background="#101820", foreground="#e6edf3",
             insertbackground="#e6edf3", font=("monospace", 12),
+            selectbackground="#3465a4", selectforeground="#ffffff",
+            exportselection=False,
             wrap="char", state="disabled", takefocus=True,
         )
         self.text.pack(fill="both", expand=True)
         tk.Label(root, text=f"UART log: {logfile}", anchor="w").pack(fill="x")
         self.text.bind("<KeyPress>", self.on_key)
+        # Physical bindings take precedence over Tk's virtual Copy shortcut.
+        self.text.bind("<Control-KeyPress-c>", self.on_key)
+        self.text.bind("<Control-KeyPress-C>", self.on_key)
+        self.text.bind("<<Copy>>", self.copy_selection)
+        self.copy_menu = tk.Menu(self.text, tearoff=False)
+        self.copy_menu.add_command(label="Copy", command=self.copy_selection)
+        self.text.bind("<Button-3>", self.show_copy_menu)
         self.text.focus_set()
         self.column = 0
         self.escape = ""
 
     def on_key(self, event):
+        if event.state & 4 and event.keysym.lower() == "c":
+            # Keep Ctrl+C as a terminal interrupt when nothing is selected.
+            # Ctrl+Shift+C is always a local copy shortcut.
+            if self.text.tag_ranges("sel") or event.state & 1:
+                return self.copy_selection()
         value = key_text(event)
         if value:
             self.send(("key", value))
+        return "break"
+
+    def copy_selection(self, event=None):
+        if self.text.tag_ranges("sel"):
+            selected = self.text.get("sel.first", "sel.last")
+            self.text.clipboard_clear()
+            self.text.clipboard_append(selected)
+        return "break"
+
+    def show_copy_menu(self, event):
+        self.copy_menu.entryconfigure(
+            0, state="normal" if self.text.tag_ranges("sel") else "disabled")
+        try:
+            self.copy_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.copy_menu.grab_release()
         return "break"
 
     def write_byte(self, value):
@@ -145,6 +175,7 @@ class Console:
             self.escape = "\x1b"
             return
         text = self.text
+        follow_output = text.yview()[1] >= 1.0 and not text.tag_ranges("sel")
         text.configure(state="normal")
         if value == 13:
             self.column = 0
@@ -165,7 +196,8 @@ class Console:
         if lines > 10000:
             text.delete("1.0", f"{lines - 10000}.0")
         text.configure(state="disabled")
-        text.see("end")
+        if follow_output:
+            text.see("end")
 
 
 def main():

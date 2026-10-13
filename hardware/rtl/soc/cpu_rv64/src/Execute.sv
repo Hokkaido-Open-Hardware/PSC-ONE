@@ -1,0 +1,199 @@
+`timescale 1ns/1ps
+// NISHIHARU
+
+import PSC_Types::*;
+
+module Execute #(
+    parameter bit ENABLE_MUL = 1'b1,
+    parameter bit ENABLE_DIV = 1'b1,
+    parameter bit ENABLE_PULP = 1'b0
+)(
+    input  logic        clock,
+    input  logic        reset_n,
+    input  logic        execute_enb,
+    input  logic [63:0] reg_data_addr1,
+    input  logic [63:0] reg_data_addr2,
+    input  dec_ctrl_t   decoder_ctrl,
+
+    output logic [63:0] alu_data,
+    output logic [63:0] r_data1,
+    output logic [63:0] r_data2,
+    output logic [63:0] out_pc,
+    output logic        busy,
+    output logic        done
+);
+
+    typedef enum logic [1:0] {
+        IDLE, DIV_WAIT, MUL_WAIT, RESULT_HOLD
+    } state_t;
+
+    state_t state;
+
+    logic [63:0] operand_1;
+    logic [63:0] operand_2;
+    logic [63:0] multi_result;
+    logic        is_div_op;
+    logic        is_mul_op;
+    logic        div_start;
+    logic        div_busy;
+    logic        div_done;
+    logic        div_signed;
+    logic        mul_start;
+    logic        mul_busy;
+    logic        mul_done;
+    logic [63:0] div_quotient;
+    logic [63:0] div_remainder;
+    logic [63:0] mul_out;
+    logic [63:0] div_operand_1, div_operand_2;
+    logic [31:0] word_result;
+
+    assign operand_1 = decoder_ctrl.op1sel
+                     ? decoder_ctrl.out_pc : reg_data_addr1;
+    assign operand_2 = decoder_ctrl.op2sel
+                     ? decoder_ctrl.imm : reg_data_addr2;
+
+    assign is_div_op = ENABLE_DIV &&
+                       (decoder_ctrl.alucon[4:2] == 3'b111);
+    assign is_mul_op = ENABLE_MUL &&
+                       ((decoder_ctrl.alucon[4:2] == 3'b110) ||
+                       (ENABLE_PULP &&
+                       ((decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTUP_H) ||
+                        (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTSP_B))));
+    assign div_signed = (decoder_ctrl.alucon == 5'b1_1100) ||
+                        (decoder_ctrl.alucon == 5'b1_1110);
+    assign div_operand_1 = !decoder_ctrl.word_op ? operand_1 :
+        div_signed ? {{32{operand_1[31]}}, operand_1[31:0]} : {32'b0, operand_1[31:0]};
+    assign div_operand_2 = !decoder_ctrl.word_op ? operand_2 :
+        div_signed ? {{32{operand_2[31]}}, operand_2[31:0]} : {32'b0, operand_2[31:0]};
+    assign div_start = execute_enb && (state == IDLE) && is_div_op;
+    assign mul_start = execute_enb && (state == IDLE) && is_mul_op;
+
+    Execute_Divider u_divider (
+        .clk         (clock),
+        .reset_n     (reset_n),
+        .start       (div_start),
+        .signed_mode (div_signed),
+        .dividend    (div_operand_1),
+        .divisor     (div_operand_2),
+        .busy        (div_busy),
+        .done        (div_done),
+        .quotient    (div_quotient),
+        .remainder   (div_remainder)
+    );
+
+    Execute_Mul #(.ENABLE_PULP(ENABLE_PULP)) u_multiplier (
+        .clk     (clock),
+        .reset_n (reset_n),
+        .start   (mul_start),
+        .alucon  (decoder_ctrl.alucon[1:0]),
+        .dotup_h (ENABLE_PULP && (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTUP_H)),
+        .dotsp_b (ENABLE_PULP && (decoder_ctrl.alucon == PSC_Types::ALU_CV_DOTSP_B)),
+        .data_1  (operand_1),
+        .data_2  (operand_2),
+        .busy    (mul_busy),
+        .done    (mul_done),
+        .mul_out (mul_out)
+    );
+
+    function automatic logic [63:0] alu_exec(
+        input logic [4:0]  control,
+        input logic [63:0] data1,
+        input logic [63:0] data2
+    );
+        case (control)
+            5'b0_0000: alu_exec = data1 + data2;
+            5'b1_0000: alu_exec = data1 - data2;
+            5'b0_0001: alu_exec = data1 << data2[5:0];
+            5'b0_0010: alu_exec = {63'd0, $signed(data1) < $signed(data2)};
+            5'b0_0011: alu_exec = {63'd0, data1 < data2};
+            5'b0_0100: alu_exec = data1 ^ data2;
+            5'b0_0101: alu_exec = data1 >> data2[5:0];
+            5'b1_0101: alu_exec = $signed(data1) >>> data2[5:0];
+            5'b0_0110: alu_exec = data1 | data2;
+            5'b0_0111: alu_exec = data1 & data2;
+            default:   alu_exec = 64'd0;
+        endcase
+    endfunction
+
+    // Single-cycle ALU operations are combinational and can complete on
+    // consecutive clocks.  MUL/DIV hold the same issue-stage record until
+    // their result is accepted by the next stage.
+    always_comb begin
+        r_data1 = reg_data_addr1;
+        r_data2 = reg_data_addr2;
+        out_pc  = decoder_ctrl.out_pc;
+        busy    = (state != IDLE);
+        done    = 1'b0;
+        alu_data = alu_exec(decoder_ctrl.alucon, operand_1, operand_2);
+
+        word_result = alu_data[31:0];
+        if (decoder_ctrl.word_op) begin
+            case (decoder_ctrl.alucon)
+                5'b0_0001: word_result = operand_1[31:0] << operand_2[4:0];
+                5'b0_0101: word_result = operand_1[31:0] >> operand_2[4:0];
+                5'b1_0101: word_result = $signed(operand_1[31:0]) >>> operand_2[4:0];
+                default: ;
+            endcase
+            alu_data = {{32{word_result[31]}}, word_result};
+        end
+
+        if (state == RESULT_HOLD) begin
+            alu_data = decoder_ctrl.word_op
+                     ? {{32{multi_result[31]}}, multi_result[31:0]} : multi_result;
+            done     = execute_enb;
+        end else if ((state == IDLE) && execute_enb &&
+                     !is_mul_op && !is_div_op) begin
+            done = 1'b1;
+        end
+    end
+
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            state        <= IDLE;
+            multi_result <= 64'd0;
+        end else begin
+            case (state)
+                IDLE: begin
+                    if (div_start)
+                        state <= DIV_WAIT;
+                    else if (mul_start)
+                        state <= MUL_WAIT;
+                end
+
+                DIV_WAIT: begin
+                    if (div_done) begin
+                        multi_result <= decoder_ctrl.alucon[1]
+                                      ? div_remainder : div_quotient;
+                        state <= RESULT_HOLD;
+                    end
+                end
+
+                MUL_WAIT: begin
+                    if (mul_done) begin
+                        multi_result <= mul_out;
+                        state <= RESULT_HOLD;
+                    end
+                end
+
+                RESULT_HOLD: begin
+                    if (execute_enb)
+                        state <= IDLE;
+                end
+
+                default: state <= IDLE;
+            endcase
+        end
+    end
+
+`ifdef PIPELINE_TRACE
+    always_ff @(posedge clock) begin
+        if (reset_n && div_start)
+            $display("DIV-START clock=%0t pc=%08x dividend=%08x divisor=%08x",
+                     $time, decoder_ctrl.out_pc, operand_1, operand_2);
+        if (reset_n && div_done)
+            $display("DIV-DONE clock=%0t quotient=%08x remainder=%08x",
+                     $time, div_quotient, div_remainder);
+    end
+`endif
+
+endmodule

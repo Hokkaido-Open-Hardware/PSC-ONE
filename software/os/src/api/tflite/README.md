@@ -144,7 +144,7 @@ and the existing SPI SD model. A test-only copy of the top increases the SD
 model's sector store to 32 so the fixture can be injected; production RTL is
 not edited. Firmware, simulator and ROM files are isolated under `--build`.
 It does not invoke `simulate_PSCOS`, whose current recipe contains clean calls.
-OS_SIM boots directly from bootrom/kernel/user ROMs; the current FAT32
+PSCOS_SIM boots directly from bootrom/kernel/user ROMs; the current FAT32
 bootloader is supplied only for the otherwise unused bootloader ROM initializer.
 
 The legacy `bootloader.c` build was found to fail on an existing undefined

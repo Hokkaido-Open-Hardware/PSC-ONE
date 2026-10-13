@@ -249,10 +249,6 @@ void bootloader_main(void)
     bl_print_hex(user_words);
     bl_print("\n");
 
-    bl_print("JUMP TO ");
-    bl_print_hex(KERNEL_LOAD_ADDR);
-    bl_print("\n");
-
     bl_print("kernel[0]=");
     bl_print_hex(*(volatile uint32_t *)0x00200000);
     bl_print("\n");
@@ -267,6 +263,10 @@ void bootloader_main(void)
 
     bl_print("user[0]=");
     bl_print_hex(*(volatile uint32_t *)0x00400000);
+    bl_print("\n");
+
+    bl_print("JUMP TO ");
+    bl_print_hex(KERNEL_LOAD_ADDR);
     bl_print("\n");
 
     jump_to_kernel(KERNEL_LOAD_ADDR);

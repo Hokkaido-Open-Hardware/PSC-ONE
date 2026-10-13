@@ -10,9 +10,9 @@
 module sdcard_spi_model #(
     parameter [7:0] INIT_R1_IDLE = 8'h01,
     parameter [7:0] R1_READY     = 8'h00,
-    parameter       DATA_HEX     = "",
-    parameter integer STORED_SECTORS = 4,
-    parameter integer ACMD41_IDLE_RESPONSES = 1
+    parameter integer ACMD41_IDLE_RESPONSES = 1,
+    parameter IMAGE_HEX = "sdcard/sdcard.hex",
+    parameter integer IMAGE_SECTORS = 131072 // 64 MByte (64 MiB): 131072 sectors x 512 bytes
 )(
     input  wire clock,
     input  wire cs,     // active low
@@ -50,16 +50,12 @@ module sdcard_spi_model #(
         cs_q1  <= cs_q0;
     end
 
-    // DATA_HEX, when supplied, describes one default 512-byte sector.
-    reg [7:0] sector_data [0:511];
-
-    // A small tagged backing store is enough for controller tests while still
-    // checking that the full 32-bit SDHC LBA is decoded.
-    reg [7:0]  stored_data  [0:STORED_SECTORS*512-1];
-    reg [31:0] stored_lba   [0:STORED_SECTORS-1];
-    reg        stored_valid [0:STORED_SECTORS-1];
-    reg [7:0]  write_buffer [0:511];
-    integer replace_slot;
+    // Whole-card byte image. Sparse readmemh addresses are byte offsets;
+    // omitted bytes are zero. Writes persist in memory for this simulation.
+    localparam integer IMAGE_BYTES = IMAGE_SECTORS * 512;
+    reg [7:0] image_data [0:IMAGE_BYTES-1];
+    integer image_fd;
+    reg [7:0] write_buffer [0:511];
 
     // Largest response: R1, delay, token, one block and CRC.
     reg [7:0] resp_mem [0:1023];
@@ -131,9 +127,6 @@ module sdcard_spi_model #(
     reg       tx_active;
 
     integer i;
-    integer slot;
-    integer match_slot;
-    integer free_slot;
     reg [15:0] read_crc;
     reg [7:0] read_data_byte;
 
@@ -175,21 +168,17 @@ module sdcard_spi_model #(
         tx_active = 1'b0;
         resp_wp = 0;
         resp_rp = 0;
-        replace_slot = 0;
 
-        for (i = 0; i < 512; i = i + 1) begin
-            sector_data[i] = i[7:0];
+        for (i = 0; i < 512; i = i + 1)
             write_buffer[i] = 8'h00;
-        end
-        if (DATA_HEX != "")
-            $readmemh(DATA_HEX, sector_data);
 
-        for (slot = 0; slot < STORED_SECTORS; slot = slot + 1) begin
-            stored_lba[slot] = 32'h0;
-            stored_valid[slot] = 1'b0;
-            for (i = 0; i < 512; i = i + 1)
-                stored_data[slot*512+i] = 8'h00;
-        end
+        image_fd = $fopen(IMAGE_HEX, "r");
+        if (image_fd == 0)
+            $fatal(1, "Cannot open SD image HEX: %s (run make -f Makefile.sdcard)", IMAGE_HEX);
+        $fclose(image_fd);
+        for (i = 0; i < IMAGE_BYTES; i = i + 1)
+            image_data[i] = 8'h00;
+        $readmemh(IMAGE_HEX, image_data);
     end
 
     always @(posedge clock) begin
@@ -241,32 +230,8 @@ module sdcard_spi_model #(
                         WRITE_CRC2: begin
                             received_crc2 = rx_byte;
 
-                            match_slot = -1;
-                            free_slot = -1;
-                            for (slot = 0; slot < STORED_SECTORS; slot = slot + 1) begin
-                                if (stored_valid[slot] &&
-                                    (stored_lba[slot] == pending_write_lba))
-                                    match_slot = slot;
-                                if (!stored_valid[slot] && (free_slot < 0))
-                                    free_slot = slot;
-                            end
-
-                            if (match_slot >= 0)
-                                slot = match_slot;
-                            else if (free_slot >= 0)
-                                slot = free_slot;
-                            else begin
-                                slot = replace_slot;
-                                if (replace_slot == (STORED_SECTORS - 1))
-                                    replace_slot = 0;
-                                else
-                                    replace_slot = replace_slot + 1;
-                            end
-
-                            stored_lba[slot] = pending_write_lba;
-                            stored_valid[slot] = 1'b1;
                             for (i = 0; i < 512; i = i + 1)
-                                stored_data[slot*512+i] = write_buffer[i];
+                                image_data[pending_write_lba*512+i] = write_buffer[i];
 
                             write_count = write_count + 1;
                             write_state = WRITE_IDLE;
@@ -358,6 +323,8 @@ module sdcard_spi_model #(
                                         8'h51: begin // CMD17: READ_SINGLE_BLOCK
                                             if (!ready) begin
                                                 resp_push(8'h05);
+                                            end else if (command_arg >= IMAGE_SECTORS) begin
+                                                resp_push(8'h20); // R1 address error
                                             end else begin
                                                 read_count = read_count + 1;
                                                 resp_push(R1_READY);
@@ -368,18 +335,9 @@ module sdcard_spi_model #(
                                                     resp_push(8'hFF);
                                                 resp_push(8'hFE);
 
-                                                match_slot = -1;
-                                                for (slot = 0; slot < STORED_SECTORS; slot = slot + 1)
-                                                    if (stored_valid[slot] &&
-                                                        (stored_lba[slot] == command_arg))
-                                                        match_slot = slot;
-
                                                 read_crc = 16'h0000;
                                                 for (i = 0; i < 512; i = i + 1) begin
-                                                    if (match_slot >= 0)
-                                                        read_data_byte = stored_data[match_slot*512+i];
-                                                    else
-                                                        read_data_byte = sector_data[i];
+                                                    read_data_byte = image_data[command_arg*512+i];
                                                     resp_push(read_data_byte);
                                                     read_crc = crc16_byte(read_crc, read_data_byte);
                                                 end
@@ -391,6 +349,8 @@ module sdcard_spi_model #(
                                         8'h58: begin // CMD24: WRITE_BLOCK
                                             if (!ready) begin
                                                 resp_push(8'h05);
+                                            end else if (command_arg >= IMAGE_SECTORS) begin
+                                                resp_push(8'h20); // R1 address error
                                             end else begin
                                                 pending_write_lba = command_arg;
                                                 write_state = WRITE_WAIT_TOKEN;

@@ -12,7 +12,7 @@
 //`define FPGA_BOOT_LOADER_MODE
 
 `ifdef FPGA_PSC_OS_MODE
-  `define OS_SIM
+  `define PSCOS_SIM
 `endif
 
 module PSC_ONE_Boot_axi #(
@@ -26,7 +26,7 @@ module PSC_ONE_Boot_axi #(
     parameter [ADDR_WIDTH-1:0] KERNEL_BASE_ADDR      = 32'h0020_0000, 
     parameter [ADDR_WIDTH-1:0] USER_BASE_ADDR        = 32'h0040_0000,  
     // ROM WORD NUMBER
-`ifdef OS_SIM
+`ifdef PSCOS_SIM
     parameter integer ROM_WORD         = 128,
     parameter integer BOOT_LOADER_WORD = 4500,
     parameter integer KERNEL_ROM_WORD  = 200000,
@@ -257,8 +257,8 @@ module PSC_ONE_Boot_axi #(
                                 max_word   <= ROM_WORD[ROMIDX_W-1:0];
                             end
                         endcase
-                    `elsif OS_SIM
-                        // OS_SIM mode.
+                    `elsif PSCOS_SIM
+                        // PSCOS_SIM mode.
                         case (write_st)
                             ERAZE_STAGE: begin
                                 rom_data_0 <= {DATA_WIDTH{1'b0}};
@@ -423,7 +423,7 @@ module PSC_ONE_Boot_axi #(
                     end else if (write_st == BOOTLOADER_STAGE) begin
                         done           <= 1'b1;
                     end
-                    `elsif OS_SIM
+                    `elsif PSCOS_SIM
                     if (write_st != USER_STAGE) begin
                         write_st <= write_st + 4'd1;
                         rom_idx  <= {ROMIDX_W{1'b0}};
@@ -462,7 +462,7 @@ module test_rom #(
 );
     reg [31:0] Test_rom [0:ROM_WORD-1];
     
-    `ifndef OS_SIM
+    `ifndef PSCOS_SIM
     initial $readmemh("../sim/mem/test_program.mem", Test_rom);
     `endif
 
@@ -506,7 +506,7 @@ module boot_loader_rom #(
 );
     localparam integer ROM_WORD = 4500;  // 固定値にしないとFPGA内でROMと認識されない.
     reg [31:0] Boot_Loader_rom [0:ROM_WORD-1];
-    initial $readmemh("mem/bootloader.mem", Boot_Loader_rom);
+    initial $readmemh("mem/bootloader_fat32.mem", Boot_Loader_rom);
 
     always @(posedge clock) begin
         if (addr > ROM_WORD)

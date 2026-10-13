@@ -3,6 +3,7 @@
 
 #define FAT32_EOC_MIN      0x0FFFFFF8u
 #define FAT32_BAD_CLUSTER  0x0FFFFFF7u
+#define MEM_PROGRESS_BYTES (512u * 32u)
 
 static uint8_t fat32_buf[512];
 static uint8_t file_buf[512];
@@ -556,6 +557,31 @@ static int hex_val(char c)
     return -1;
 }
 
+/* s_printf has no unsigned decimal format; retain the full FAT32 file size. */
+static void boot_fat32_print_u32(uint32_t value)
+{
+    char buf[11];
+    char *p = &buf[10];
+
+    *p = '\0';
+    do {
+        *--p = (char)('0' + value % 10u);
+        value /= 10u;
+    } while (value != 0u);
+
+    s_printf("%s", p);
+}
+
+static void boot_fat32_mem_progress(const char *name, uint32_t read_bytes,
+                                    uint32_t size)
+{
+    s_printf("FAT32: %s read=", name);
+    boot_fat32_print_u32(read_bytes);
+    s_printf("/");
+    boot_fat32_print_u32(size);
+    s_printf(" bytes\n");
+}
+
 int boot_fat32_load_mem_file(
     const char *name,
     uint32_t dst_addr,
@@ -569,6 +595,7 @@ int boot_fat32_load_mem_file(
     uint32_t words;
     uint32_t hex_count;
     uint32_t word;
+    uint32_t read_bytes = 0;
 
     s_printf("FAT32: load mem enter\n");
 
@@ -594,6 +621,10 @@ int boot_fat32_load_mem_file(
     words = 0;
     hex_count = 0;
     word = 0;
+
+    s_printf("FAT32: loading %s size=", name);
+    boot_fat32_print_u32(size);
+    s_printf("\n");
 
     while (remain > 0u) {
         uint32_t lba;
@@ -656,6 +687,11 @@ int boot_fat32_load_mem_file(
             }
 
             remain -= sector_bytes;
+            /* Count SD text bytes only after a successful read/conversion.
+             * Metadata reads and retries never advance this file counter. */
+            read_bytes += sector_bytes;
+            if (remain != 0u && (read_bytes % MEM_PROGRESS_BYTES) == 0u)
+                boot_fat32_mem_progress(name, read_bytes, size);
         }
 
         if (remain == 0u)
@@ -672,7 +708,10 @@ int boot_fat32_load_mem_file(
     if (loaded_words)
         *loaded_words = words;
 
-    s_printf("FAT32: load mem done\n");
+    /* Report EOF once, including a short final sector, after all stores and
+     * the partial-word check. Failed loads must not announce completion. */
+    boot_fat32_mem_progress(name, read_bytes, size);
+    s_printf("FAT32: %s load complete\n", name);
 
     return 0;
 }

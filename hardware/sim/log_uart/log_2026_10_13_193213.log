@@ -1,0 +1,73 @@
+[dbg] cycle=0, last_uart=--, pc=0x00000000, data_addr=0x00000000
+bootloader FAT32 start
+SD INIT start
+FAT32: mount enter
+FAT32: read LBA0
+FAT32: read LBA0 ok
+FAT32: part ok
+FAT32: read BPB
+FAT32: read BPB ok
+FAT32: BPB valid
+FAT32: parse 1
+FAT32: parse 2
+FAT32: parse 3
+FAT32: parse 4
+FAT32: parse 5
+FAT32: parse 6
+FAT32: validate
+FAT32: root check
+FAT32: root is 2
+FAT32: calc fat
+FAT32: calc data
+FAT32: add fat1
+FAT32: add fat2
+FAT32: mount ok
+FAT32: load mem enter
+FAT32: find enter
+FAT32: root loop
+FAT32: calc lba
+FAT32: read dir
+FAT32: dir ok
+FAT32: entry
+FAT32: found
+FAT32: find ok
+FAT32: loading KERNEL.MEM size=163224
+FAT32: KERNEL.MEM read=16384/163224 bytes
+[dbg] cycle=10000000, last_uart=0x0a, pc=0x00100758, data_addr=0x00100760
+FAT32: KERNEL.MEM read=32768/163224 bytes
+[dbg] cycle=20000000, last_uart=0x0a, pc=0x00100804, data_addr=0x00100800
+FAT32: KERNEL.MEM read=49152/163224 bytes
+[dbg] cycle=30000000, last_uart=0x0a, pc=0x00100758, data_addr=0x00100740
+FAT32: KERNEL.MEM read=65536/163224 bytes
+FAT32: KERNEL.MEM read=81920/163224 bytes
+[dbg] cycle=40000000, last_uart=0x0a, pc=0x00100768, data_addr=0x00100760
+FAT32: KERNEL.MEM read=98304/163224 bytes
+[dbg] cycle=50000000, last_uart=0x0a, pc=0x00100710, data_addr=0x00100720
+FAT32: KERNEL.MEM read=114688/163224 bytes
+FAT32: KERNEL.MEM read=131072/163224 bytes
+[dbg] cycle=60000000, last_uart=0x0a, pc=0x001007a0, data_addr=0x001007a0
+FAT32: KERNEL.MEM read=147456/163224 bytes
+[dbg] cycle=70000000, last_uart=0x0a, pc=0x00100804, data_addr=0x00100800
+FAT32: KERNEL.MEM read=163224/163224 bytes
+FAT32: KERNEL.MEM load complete
+FAT32: load mem enter
+FAT32: find enter
+FAT32: root loop
+FAT32: calc lba
+FAT32: read dir
+FAT32: dir ok
+FAT32: entry
+FAT32: entry
+FAT32: found
+FAT32: find ok
+FAT32: loading USER.MEM size=382176
+FAT32: USER.MEM read=16384/382176 bytes
+[dbg] cycle=80000000, last_uart=0x0a, pc=0x00103150, data_addr=0x00103140
+FAT32: USER.MEM read=32768/382176 bytes
+[dbg] cycle=90000000, last_uart=0x0a, pc=0x0010312c, data_addr=0x00103120
+FAT32: USER.MEM read=49152/382176 bytes
+FAT32: USER.MEM read=65536/382176 bytes
+[dbg] cycle=100000000, last_uart=0x0a, pc=0x0010076c, data_addr=0x00100780
+FAT32: USER.MEM read=81920/382176 bytes
+[dbg] cycle=110000000, last_uart=0x0a, pc=0x001007b8, data_addr=0x001007c0
+FAT32: USER.MEM read=98304/382176 bytes

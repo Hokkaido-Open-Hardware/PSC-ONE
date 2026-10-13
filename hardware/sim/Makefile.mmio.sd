@@ -59,7 +59,7 @@ SRC_SD = \
 simulate_PSC_SD:
 	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_SD_READER test)"
 	@echo EXTRA_ARGS=$(EXTRA_ARGS)
-	$(MAKE) clean
+	$(MAKE) -f Makefile.sdcard
 	@mkdir -p ./wave
 	COCOTB_TEST_MODULES=cocotb_tb.mmio.sd_test \
 	TOPLEVEL=sim_PSC_SDCard TOPLEVEL_LANG=verilog \
@@ -68,4 +68,6 @@ simulate_PSC_SD:
 	COMPILE_ARGS="-DCOCOTB_SIM $(VCD_COMPILE_ARGS)" \
 	VLOG_ARGS="$(VLOG_ARGS)" \
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
-	make -f $(COCOTB_MAKEFILE)
+	$(MAKE) -f $(COCOTB_MAKEFILE) \
+		SIM_BUILD=build/sdcard-model-$(MODE) \
+		COCOTB_RESULTS_FILE=build/sdcard-model-$(MODE).xml

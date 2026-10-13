@@ -1,0 +1,36 @@
+# Run from hardware/sim. Prefer a complete OS build, otherwise use the pair
+# retained by Makefile.pscos after it removes software/os/build.
+.DEFAULT_GOAL := all
+PYTHON ?= python3
+OS_BUILD := ../../software/os/build
+INPUT_DIR ?= $(if $(and $(wildcard $(OS_BUILD)/kernel.mem),$(wildcard $(OS_BUILD)/user.mem)),$(OS_BUILD),mem)
+KERNEL_MEM ?= $(INPUT_DIR)/kernel.mem
+USER_MEM ?= $(INPUT_DIR)/user.mem
+SDCARD_DIR := sdcard
+IMAGE := $(SDCARD_DIR)/sdcard.img
+SCRIPT := python_tool/make_sdcard.py
+LBA ?= 0
+
+.PHONY: all verify sector hex test test-model
+# Always regenerate: changing INPUT_DIR or selecting older inputs must not
+# leave an image from a different build. The script checks inputs before writing.
+all:
+	$(PYTHON) $(SCRIPT) build --image "$(IMAGE)" --kernel "$(KERNEL_MEM)" --user "$(USER_MEM)"
+
+verify:
+	$(PYTHON) $(SCRIPT) verify --image "$(IMAGE)" --kernel "$(KERNEL_MEM)" --user "$(USER_MEM)"
+
+# Export from the existing image, without silently rebuilding it.
+sector:
+	$(PYTHON) $(SCRIPT) sector --image "$(IMAGE)" --lba "$(LBA)"
+
+# Export the whole existing card for the SPI model's $readmemh.
+hex:
+	$(PYTHON) $(SCRIPT) hex --image "$(IMAGE)"
+
+test: all
+	$(PYTHON) -B python_tool/test_sdcard.py
+	build/sdcard-tests/sdcard-host-check "$(IMAGE)" "$(KERNEL_MEM)" "$(USER_MEM)"
+
+test-model:
+	$(MAKE) -f Makefile.mmio.sd simulate_PSC_SD

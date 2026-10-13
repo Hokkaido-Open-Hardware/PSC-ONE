@@ -3,6 +3,9 @@
     `define fast_sck
 `endif
 
+// シミュレーション用: 初期化はSPI、READはhexイメージを参照
+//`define SPI_BYPASS
+
 module PSC_SDCard #(
     parameter ADDR_WIDTH        = 32,
     parameter CLK_FREQ_MHz      = 80,
@@ -11,28 +14,38 @@ module PSC_SDCard #(
     parameter SD_IF_DATA        = 32'h1000_6000,  // READ: FIFO pop (byte)
     parameter SD_IF_SECTOR      = 32'h1000_6004,  // WRITE: LBA
     parameter SD_IF_CTRL        = 32'h1000_6008,  // RW: start/status
-    parameter FIFO_DEPTH        = 512             // 512推奨（将来64/128でも可）
+    parameter FIFO_DEPTH        = 512,            // 512推奨（将来64/128でも可）
+    parameter BYPASS_IMAGE_HEX  = "sdcard/sdcard.hex",
+    parameter integer BYPASS_IMAGE_SECTORS = 131072 // 64 MiB
 )(
-    input  wire        clock,
-    input  wire        reset_n,
+    input  logic        clock,
+    input  logic        reset_n,
 
     // ---------------- CPU BUS ----------------
-    input  wire        cpu_rvalid,
-    input  wire [31:0] cpu_raddr,
-    output logic  [31:0] cpu_rdata,
-    output logic         cpu_rready,
+    input  logic        cpu_rvalid,
+    input  logic [31:0] cpu_raddr,
+    output logic [31:0] cpu_rdata,
+    output logic        cpu_rready,
 
-    input  wire        cpu_wvalid,
-    input  wire [31:0] cpu_waddr,
-    input  wire [31:0] cpu_wdata,
-    output logic         cpu_wready,
+    input  logic        cpu_wvalid,
+    input  logic [31:0] cpu_waddr,
+    input  logic [31:0] cpu_wdata,
+    output logic        cpu_wready,
 
     // ---------------- SD SPI ----------------
-    output wire        sd_cs_n,
-    output wire        sd_sck,
-    output wire        sd_mosi,
-    input  wire        sd_miso
+    output logic        sd_cs_n,
+    output logic        sd_sck,
+    output logic        sd_mosi,
+    input  logic        sd_miso
 );
+
+    // Expose the compiled mode to the simulation wrapper; do not infer it
+    // from the source file or an independently configured test environment.
+`ifdef SPI_BYPASS
+    localparam SPI_BYPASS_ENABLED = 1'b1;
+`else
+    localparam SPI_BYPASS_ENABLED = 1'b0;
+`endif
 
     // ============================================================
     // SPI SCK CLK 
@@ -121,7 +134,11 @@ module PSC_SDCard #(
     logic [FIFO_CW-1:0] fifo_count; // 0..FIFO_DEPTH
 
     wire fifo_empty = (fifo_count == 0);
+`ifdef SPI_BYPASS
+    wire fifo_full  = (fifo_count >= FIFO_DEPTH);
+`else
     wire fifo_full  = (fifo_count == FIFO_DEPTH + 1);
+`endif
 
     // fifo push/pop strobes
     logic         fifo_push;
@@ -208,6 +225,12 @@ module PSC_SDCard #(
             if (state == ST_WRITE_DONE) begin
                 write_start <= 1'b0;
             end
+`ifdef SPI_BYPASS
+            if (soft_reset) begin
+                read_start  <= 1'b0;
+                write_start <= 1'b0;
+            end
+`endif
 
             // ------------ CPU Bus ----------------
             // READ: DATA FIFO
@@ -292,7 +315,11 @@ module PSC_SDCard #(
 
             // ------------ READ FIFO ----------------
             // flush
-            if (fifo_flush) begin
+            if (fifo_flush
+`ifdef SPI_BYPASS
+                || soft_reset
+`endif
+            ) begin
                 fifo_wr_ptr <= {FIFO_AW{1'b0}};
                 fifo_rd_ptr <= {FIFO_AW{1'b0}};
                 fifo_count  <= {FIFO_CW{1'b0}};
@@ -395,11 +422,48 @@ module PSC_SDCard #(
     // state error
     logic       state_error;
 
+`ifdef SPI_BYPASS
+    // Sparse hex addresses are byte offsets. Unspecified bytes read as zero,
+    // matching the SPI card model. This memory is for simulation only.
+    localparam integer BYPASS_IMAGE_BYTES = BYPASS_IMAGE_SECTORS * 512;
+    logic [7:0] bypass_image [0:BYPASS_IMAGE_BYTES-1];
+    integer bypass_image_fd;
+    integer bypass_index;
+    logic [31:0] bypass_base;
+    logic [15:0] bypass_crc;
+
+    initial begin
+        for (bypass_index = 0; bypass_index < BYPASS_IMAGE_BYTES;
+             bypass_index = bypass_index + 1)
+            bypass_image[bypass_index] = 8'h00;
+        bypass_image_fd = $fopen(BYPASS_IMAGE_HEX, "r");
+        if (bypass_image_fd == 0)
+            $fatal(1, "Cannot open SD bypass image: %s", BYPASS_IMAGE_HEX);
+        else begin
+            $fclose(bypass_image_fd);
+            $readmemh(BYPASS_IMAGE_HEX, bypass_image);
+        end
+    end
+
+    function automatic [15:0] bypass_crc16_byte;
+        input logic [15:0] crc_in;
+        input logic [7:0] data_in;
+        reg [15:0] crc;
+        integer bit_index;
+        begin
+            crc = crc_in ^ {data_in, 8'h00};
+            for (bit_index = 0; bit_index < 8; bit_index = bit_index + 1)
+                crc = crc[15] ? (crc << 1) ^ 16'h1021 : (crc << 1);
+            bypass_crc16_byte = crc;
+        end
+    endfunction
+
+`endif
     // ============================================================
     // Task
     // ============================================================
     task spi_send;
-        input [7:0] byte_in;
+        input logic [7:0] byte_in;
         begin
             spi_tx_data_valid <= 1'b1;  // 1-cycle pulse from FSM
             spi_tx_data  <= byte_in;
@@ -437,9 +501,18 @@ module PSC_SDCard #(
             fifo_wdata_pop      <= 1'b0;
 
             state_error         <= 1'b0;
+`ifdef SPI_BYPASS
+            bypass_base <= 32'd0;
+            bypass_crc  <= 16'd0;
+`endif
         end else begin
             // defaults
+`ifdef SPI_BYPASS
+            // Initialization still uses SPI; image reads keep CS inactive.
+            spi_cs_high         <= (state >= ST_READY);
+`else
             spi_cs_high         <= 1'b0;
+`endif
             spi_tx_data_valid   <= 1'b0;
             spi_tx_start        <= 1'b0;
             fifo_push           <= 1'b0;
@@ -452,7 +525,11 @@ module PSC_SDCard #(
             spi_tx_start_d      <= spi_tx_start;
             
             // 全てのステートで共通
-            if (state != ST_RESET) begin
+            if (state != ST_RESET
+`ifdef SPI_BYPASS
+                && state < ST_READY
+`endif
+            ) begin
                 if (spi_tx_start | spi_tx_start_d) begin
                     spi_tx_start    <= 1'b0;        // spi_tx_start: 1clkでLにする
                 end else if (!spi_busy) begin
@@ -665,6 +742,20 @@ module PSC_SDCard #(
                 // READY (待機: read開始待ち)
                 // state = 8
                 ST_READY: begin
+`ifdef SPI_BYPASS
+                    // Update the SPI engine's CS latch without starting SCK.
+                    spi_send(8'hFF);
+                    if (write_start || (read_start &&
+                        (!fifo_empty || sector_reg >= BYPASS_IMAGE_SECTORS))) begin
+                        state_error <= 1'b1;
+                        state <= ST_ERROR;
+                    end else if (read_start) begin
+                        bypass_base <= sector_reg << 9;
+                        byte_cnt    <= 10'd0;
+                        bypass_crc  <= 16'd0;
+                        state       <= ST_READ_DATA;
+                    end
+`else
                     spi_cs_high <= 1'b1;
                     if (spi_tx_start_d) begin
                         `ifdef fast_sck
@@ -688,6 +779,7 @@ module PSC_SDCard #(
                             end
                         end
                     end
+`endif
                 end
 
                 // -------------------------------------------------
@@ -734,6 +826,19 @@ module PSC_SDCard #(
                 // read 512 bytes -> FIFO push
                 // state = 11
                 ST_READ_DATA: begin
+`ifdef SPI_BYPASS
+                    // Space pushes so the shared FIFO never loses a pop
+                    // if software reads DATA before the sector is complete.
+                    if (!fifo_full && !fifo_push && !fifo_pop && !fifo_flush &&
+                        !(cpu_rvalid_latch && cpu_raddr == SD_IF_DATA)) begin
+                        fifo_push_data <= bypass_image[bypass_base + {22'd0, byte_cnt}];
+                        fifo_push <= 1'b1;
+                        bypass_crc <= bypass_crc16_byte(bypass_crc,
+                            bypass_image[bypass_base + {22'd0, byte_cnt}]);
+                        byte_cnt <= byte_cnt + 10'd1;
+                        if (byte_cnt == 10'd511) state <= ST_READ_CRC1;
+                    end
+`else
                     if (spi_tx_start_d) begin
                         spi_send(8'hFF);
                     end
@@ -760,12 +865,18 @@ module PSC_SDCard #(
                             end
                         end
                     end
+`endif
                 end
 
                 // -------------------------------------------------
                 // state = 12
-                // not used
+                // SPI_BYPASS: publish CRC high byte
                 ST_READ_CRC1: begin
+`ifdef SPI_BYPASS
+                    crc_rdata  <= bypass_crc[15:8];
+                    crc_write1 <= 1'b1;
+                    state      <= ST_READ_CRC2;
+`else
                     if (spi_tx_start_d) begin
                         spi_send(8'hFF);
                     end
@@ -774,12 +885,18 @@ module PSC_SDCard #(
                         crc_write1  <= 1'b1;
                         state       <= ST_READ_CRC2;                            
                     end
+`endif
                 end
 
                 // -------------------------------------------------
                 // state = 13
-                // not used
+                // SPI_BYPASS: publish CRC low byte
                 ST_READ_CRC2: begin
+`ifdef SPI_BYPASS
+                    crc_rdata  <= bypass_crc[7:0];
+                    crc_write2 <= 1'b1;
+                    state      <= ST_DONE;
+`else
                     if (spi_tx_start_d) begin
                         spi_send(8'hFF);
                     end
@@ -788,11 +905,15 @@ module PSC_SDCard #(
                         crc_write2  <= 1'b1;
                         state       <= ST_DONE;                            
                     end
+`endif
                 end
 
                 // -------------------------------------------------
                 // state = 14
                 ST_DONE: begin
+`ifdef SPI_BYPASS
+                    state <= ST_READY;
+`else
                     if (spi_tx_start_d) begin
                         spi_send(8'hFF);
                     end
@@ -802,6 +923,7 @@ module PSC_SDCard #(
                             cmd_i    <= 3'd0;
                         end
                     end
+`endif
                 end
 
                 // -------------------------------------------------
@@ -964,6 +1086,19 @@ module PSC_SDCard #(
                     state <= ST_ERROR;
                 end
             endcase
+`ifdef SPI_BYPASS
+            // Give reset priority over the case statement, including errors.
+            if (soft_reset) begin
+                state          <= ST_RESET;
+                state_error    <= 1'b0;
+                cmd_i          <= 7'd0;
+                spi_tx_start   <= 1'b0;
+                spi_tx_start_d <= 1'b0;
+                fifo_push      <= 1'b0;
+                crc_write1     <= 1'b0;
+                crc_write2     <= 1'b0;
+            end
+`endif
         end
     end
 
