@@ -45,6 +45,8 @@ module Branch #(
     logic [63:0] access_address;
     logic response_ready;
     logic last_byte;
+    logic response_misaligned;
+    logic response_last_byte;
 
     // Bare-memory misaligned accesses are serialized into byte transactions.
     // EX/MEM remains held until the final byte has completed.
@@ -59,12 +61,16 @@ module Branch #(
                           ? data_mem_write_ready : data_mem_read_ready;
     assign last_byte = {1'b0, byte_index} ==
                        ((4'd1 << decoder_ctrl.funct3[1:0]) - 4'd1);
-    assign done = pending && response_ready && (!misaligned_address || last_byte);
+    // Decode response controls at request launch, before pending can be set.
+    // EX/MEM is held for the entire access; this preserves completion timing
+    // while removing funct3/address decode from the pipeline ready feedback.
+    assign done = pending && response_ready &&
+                  (!response_misaligned || response_last_byte);
     assign data_mem_sel = misaligned_address ? 3'b000 : decoder_ctrl.funct3;
-    assign load_unaligned = misaligned_address;
+    assign load_unaligned = response_misaligned;
     assign read_lane = data_mem_read_data >> {data_mem_address[2:0], 3'b0};
     // Include the final response combinationally for MEM/WB's completion edge.
-    assign load_data = misaligned_address
+    assign load_data = response_misaligned
                     ? load_bytes | ({56'b0, read_lane[7:0]} << {byte_index, 3'b0})
                     : data_mem_read_data;
 
@@ -84,6 +90,8 @@ module Branch #(
             misaligned_fault     <= 1'b0;
             byte_index           <= 3'b0;
             load_bytes           <= 64'b0;
+            response_misaligned   <= 1'b0;
+            response_last_byte    <= 1'b0;
         end else begin
             mmu_valid            <= 1'b0;
             data_mem_read_valid  <= 1'b0;
@@ -96,7 +104,7 @@ module Branch #(
                 translated  <= 1'b0;
                 byte_index  <= 3'b0;
                 load_bytes  <= 64'b0;
-            end else if (pending && response_ready && misaligned_address) begin
+            end else if (pending && response_ready && response_misaligned) begin
                 pending <= 1'b0;
                 byte_index <= byte_index + 1'b1;
                 if (decoder_ctrl.is_load)
@@ -112,6 +120,8 @@ module Branch #(
                         translated         <= 1'b1;
                     end
                 end else if (data_mem_req_ready) begin
+                    response_misaligned   <= misaligned_address;
+                    response_last_byte    <= last_byte;
                     pending              <= 1'b1;
                     data_mem_read_valid  <= decoder_ctrl.is_load;
                     data_mem_write_valid <= decoder_ctrl.is_store;

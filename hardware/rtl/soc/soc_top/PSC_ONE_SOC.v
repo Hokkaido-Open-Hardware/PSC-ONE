@@ -359,7 +359,11 @@ module PSC_ONE_SOC #(
         .PSC_I2S_ADDR_ST     (PSC_I2S_ADDR_ST),
         .PSC_PFE_IF_DATA     (PSC_PFE_IF_DATA),
         .PSC_PFE_IF_CTRL     (PSC_PFE_IF_CTRL)
+`ifdef CPU_RV64
+    ) u_rv64_core_axi (
+`else
     ) u_rv32_core_axi (
+`endif
         .clock              (clock),
         .reset_n            (reset_n),
         .cpu_stop           (cpu_stop),

@@ -171,10 +171,22 @@ module PSC_RV64_InstructionEngine #(
     assign data_rw_double         = d_mmu_mem_valid ||
                                    (mem_access && mem_write_sel == 3'b011);
 
-    assign is_counter_load        = (memory_ctrl.funct3 == 3'b010) &&
-                                (memory_alu_data == COUNTER_MMIO_ADDR);
-    assign is_uart_flag_load      = (memory_ctrl.funct3[1:0] == 2'b00) &&
+    // Branch cannot complete a memory access before its pending register is
+    // set. Decode the two internal MMIO addresses on that request edge, while
+    // EX/MEM already holds the address, instead of in the response/writeback
+    // path. Keep sampling during translation and between misaligned bytes.
+    // This adds no request/response cycle and preserves the live counter read.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            is_counter_load   <= 1'b0;
+            is_uart_flag_load <= 1'b0;
+        end else if (mem_access && !mem_pending) begin
+            is_counter_load <= (memory_ctrl.funct3 == 3'b010) &&
+                               (memory_alu_data == COUNTER_MMIO_ADDR);
+            is_uart_flag_load <= (memory_ctrl.funct3[1:0] == 2'b00) &&
                                 (memory_alu_data == UART_MMIO_FLAG);
+        end
+    end
     assign raw_load_data          = is_counter_load   ? counter :
                            is_uart_flag_load ? 64'd1 : memory_read_data;
     assign load_read_data         = raw_load_data;
@@ -274,6 +286,7 @@ module PSC_RV64_InstructionEngine #(
     ) u_execute (
         .clock                (clock),
         .reset_n              (reset_n),
+        .cancel               (cpu_stop || d_pf),
         .execute_enb          (execute_valid),
         .decoder_ctrl         (execute_ctrl),
         .reg_data_addr1       (execute_reg_data_1),

@@ -59,13 +59,13 @@ RISCV_NM ?= riscv64-unknown-elf-nm
 # a backwards-compatible spelling when ISA is not supplied.
 ISA ?= $(or $(TEST_GROUPS),rv32ui rv32um)
 override ISA := $(strip $(ISA))
-ifneq ($(filter-out rv32ui rv32um rv64ui,$(ISA)),)
-$(error Unsupported ISA=$(ISA); use rv32ui rv32um or rv64ui)
+ifneq ($(filter-out rv32ui rv32um rv64ui rv64um,$(ISA)),)
+$(error Unsupported ISA=$(ISA); use rv32ui rv32um rv64ui or rv64um)
 endif
 ifeq ($(ISA),)
 $(error ISA must not be empty)
 endif
-ifneq ($(filter rv64ui,$(ISA)),)
+ifneq ($(filter rv64%,$(ISA)),)
 ifneq ($(filter rv32%,$(ISA)),)
 $(error Cannot mix RV32 and RV64 test groups in one build)
 endif
@@ -170,6 +170,7 @@ CPU_RV64_CORE_FILES = \
 	$(CPU_RV64_SRC_DIR)/PSC_InstructionUnit.sv \
 	$(CPU_RV64_SRC_DIR)/Decorder.sv \
 	$(CPU_RV64_SRC_DIR)/Execute.sv \
+	$(CPU_RV64_SRC_DIR)/Execute_ByteALU.sv \
 	$(CPU_RV64_SRC_DIR)/Execute_Divider.sv \
 	$(CPU_RV64_SRC_DIR)/Execute_Mul.sv \
 	$(CPU_RV64_SRC_DIR)/Branch.sv \
@@ -190,7 +191,7 @@ $(error ISA=$(ISA) requires CPU_VERSION=rv64; $(CPU_VERSION) is an RV32 core)
 endif
 else
 ifeq ($(CPU_VERSION),rv64)
-$(error CPU_VERSION=rv64 requires ISA=rv64ui; RV32 binaries use an RV32 core)
+$(error CPU_VERSION=rv64 requires ISA=rv64ui or rv64um; RV32 binaries use an RV32 core)
 endif
 endif
 
@@ -278,10 +279,14 @@ RISCV_BASIC_TEST = \
 # 非アラインアクセス試験のため除外
 #rv32ui-ma_data:RV32ISP_riscv_test:$(RISCV_OUTPUT_DIR)/rv32ui-ma_data.mem:0x00000001 \
 
-# RV64UI includes every source, including ma_data; do not hide RTL failures.
+# RV64 groups include every source, including ma_data and all M operations.
 ifeq ($(RISCV_XLEN),64)
-RISCV_BASIC_TEST := $(foreach src,$(wildcard $(RISCV_TEST_ROOT)/isa/rv64ui/*.S),rv64ui-$(basename $(notdir $(src))):RV64_riscv_test:$(RISCV_OUTPUT_DIR)/rv64ui-$(basename $(notdir $(src))).mem:0x00000001)
+RISCV_BASIC_TEST := $(foreach group,$(ISA),$(foreach src,$(wildcard $(RISCV_TEST_ROOT)/isa/$(group)/*.S),$(group)-$(basename $(notdir $(src))):RV64_riscv_test:$(RISCV_OUTPUT_DIR)/$(group)-$(basename $(notdir $(src))).mem:0x00000001))
+ifneq ($(filter rv64ui,$(ISA)),)
 RISCV_SINGLE_TEST := rv64ui-ld_st:RV64_riscv_test:$(RISCV_OUTPUT_DIR)/rv64ui-ld_st.mem:0x00000001
+else
+RISCV_SINGLE_TEST := rv64um-mul:RV64_riscv_test:$(RISCV_OUTPUT_DIR)/rv64um-mul.mem:0x00000001
+endif
 else
 RISCV_BASIC_TEST := $(filter $(addsuffix -%,$(ISA)),$(RISCV_BASIC_TEST))
 RISCV_SINGLE_TEST := $(filter $(addsuffix -%,$(ISA)),$(RISCV_SINGLE_TEST))

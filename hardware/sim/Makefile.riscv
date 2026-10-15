@@ -15,13 +15,13 @@ RISCV_LINKER_SCRIPT := riscv/link_psc.ld
 # a backwards-compatible spelling when ISA is not supplied.
 ISA ?= $(or $(TEST_GROUPS),rv32ui rv32um)
 override ISA := $(strip $(ISA))
-ifneq ($(filter-out rv32ui rv32um rv64ui,$(ISA)),)
-$(error Unsupported ISA=$(ISA); use rv32ui rv32um or rv64ui)
+ifneq ($(filter-out rv32ui rv32um rv64ui rv64um,$(ISA)),)
+$(error Unsupported ISA=$(ISA); use rv32ui rv32um rv64ui or rv64um)
 endif
 ifeq ($(ISA),)
 $(error ISA must not be empty)
 endif
-ifneq ($(filter rv64ui,$(ISA)),)
+ifneq ($(filter rv64%,$(ISA)),)
 ifneq ($(filter rv32%,$(ISA)),)
 $(error Cannot mix RV32 and RV64 test groups in one build)
 endif
@@ -45,6 +45,7 @@ RISCV_OUTPUT_DIR := $(RISCV_BUILD_DIR)/rv$(RISCV_XLEN)-$(ABI)-p
 # rv32ui : RV32I integer instructions
 # rv32um : RV32M multiply/divide instructions
 # rv64ui : RV64I integer instructions (lp64, bare-metal p environment)
+# rv64um : RV64M multiply/divide instructions (lp64, p environment)
 #
 # Example:
 #   make -f Makefile.riscv TEST_GROUPS="rv32ui"
@@ -103,6 +104,7 @@ RISCV_LDFLAGS := \
 ARCH_rv32ui := rv32i_zicsr_zifencei
 ARCH_rv32um := rv32im_zicsr_zifencei
 ARCH_rv64ui := rv64i_zicsr_zifencei
+ARCH_rv64um := rv64im_zicsr_zifencei
 
 # ============================================================
 # Targets

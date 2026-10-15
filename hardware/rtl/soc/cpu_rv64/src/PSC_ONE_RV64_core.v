@@ -2,6 +2,10 @@
 // RV64 core + 32B I/D caches + shared AXI line bridge.
 // CPU addresses/data stay 64-bit. ADDR_WIDTH/DATA_WIDTH describe the external
 // physical bus (32-bit for the existing PSC-ONE SoC, 64-bit by default).
+
+// PSC_NPU_OFF mode
+//`define PSC_NPU_OFF
+
 module PSC_ONE_RV64_core #(
     // Mode
 `ifdef PSCOS_SIM
@@ -11,6 +15,9 @@ module PSC_ONE_RV64_core #(
     parameter PROTECT_MODE         = 0,
     parameter PROTECT_ADDR         = 64'h0001_0000,
 `endif
+    // Exclusive accelerator selection (default: existing NPU).
+    parameter bit ENABLE_NPU       = 1'b1,
+    parameter bit ENABLE_LPU       = 1'b0,
     // Parameter
     parameter integer ADDR_WIDTH   = 64,
     parameter integer ID_WIDTH     = 1,
@@ -335,11 +342,11 @@ module PSC_ONE_RV64_core #(
 
     //PSC_NPU_Controller u_npu (
     PSC_NPU_Controller #(
-        .ENABLE_NPU         (1'b1),
-        .ENABLE_LPU         (1'b0)
+        .ENABLE_NPU         (ENABLE_NPU),
+        .ENABLE_LPU         (ENABLE_LPU)
     ) u_npu (
         .clock              (clock),
-        `ifdef SystolicArray_OFF
+        `ifdef PSC_NPU_OFF
         .reset_n            (1'b0),
         `else
         .reset_n            (reset_n),

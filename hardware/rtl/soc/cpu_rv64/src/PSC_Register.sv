@@ -17,31 +17,39 @@ module PSC_Register #(
     output logic [63:0] reg_data_2
 );
 
-    // 64-bit × 32 general-purpose registers
-    logic [63:0] registers [0:31];
+    // Two synchronous read ports map to replicated BSRAM banks. Do not
+    // reset the array: a small validity bitmap preserves reset-to-zero,
+    // including warm reset, without turning the storage into flip-flops.
+    (* ram_style = "block" *) logic [63:0] registers [0:31];
+    logic [31:1] initialized;
+    logic [63:0] read_1, read_2;
+    logic zero_1, zero_2, bypass_1, bypass_2;
+    logic [63:0] write_data_q;
+    wire write_enable = reset_n && register_wenb && rf_wen && (w_addr != 0);
 
-    integer i;
+    always_ff @(posedge clock) begin
+        if (write_enable)
+            registers[w_addr] <= w_data;
+        read_1 <= registers[r_addr1];
+        read_2 <= registers[r_addr2];
+        // Explicit write-first bypass; never depend on BSRAM collision mode.
+        bypass_1 <= write_enable && (w_addr == r_addr1);
+        bypass_2 <= write_enable && (w_addr == r_addr2);
+        write_data_q <= w_data;
+        zero_1 <= (r_addr1 == 0) || !initialized[r_addr1];
+        zero_2 <= (r_addr2 == 0) || !initialized[r_addr2];
+    end
 
     always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            for (i = 0; i < 32; i++)
-                registers[i] <= 64'd0;
-
-        end else begin
-            // WB
-            if (register_wenb && rf_wen && (w_addr != 5'd0))
-                registers[w_addr] <= w_data;
-        end
+        if (!reset_n)
+            initialized <= '0;
+        else if (write_enable)
+            initialized[w_addr] <= 1'b1;
     end
 
-    // Combinational read ports let the issue stage consume the current
-    // FIFO head without adding a register-read bubble.  A same-cycle commit
-    // dependency is interlocked in PSC_InstructionUnit; keeping that bypass
-    // out of the register file prevents commit write data from feeding the
-    // issue operand path combinationally.
-    always_comb begin
-        reg_data_1 = (r_addr1 == 5'd0) ? 64'd0 : registers[r_addr1];
-        reg_data_2 = (r_addr2 == 5'd0) ? 64'd0 : registers[r_addr2];
-    end
+    assign reg_data_1 = !reset_n ? 64'b0 : bypass_1 ? write_data_q :
+                        zero_1 ? 64'b0 : read_1;
+    assign reg_data_2 = !reset_n ? 64'b0 : bypass_2 ? write_data_q :
+                        zero_2 ? 64'b0 : read_2;
 
 endmodule

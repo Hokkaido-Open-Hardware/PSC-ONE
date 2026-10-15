@@ -5,21 +5,21 @@
 module Fetch #(
     parameter logic BURST_MODE = 1'b0
 )(
-    input logic clock, reset_n, fetch_enb, mode_translate,
-    input logic [63:0] fetch_address,
-    output logic mmu_valid,
-    input logic mmu_ready,
+    input  logic        clock, reset_n, fetch_enb, mode_translate,
+    input  logic [63:0] fetch_address,
+    output logic        mmu_valid,
+    input  logic        mmu_ready,
     output logic [63:0] vaddr,
-    input logic [63:0] paddr,
-    output logic program_mem_burst_mode, program_mem_read_valid,
-    input logic program_mem_read_ready,
+    input  logic [63:0] paddr,
+    output logic        program_mem_burst_mode, program_mem_read_valid,
+    input  logic        program_mem_read_ready,
     output logic [63:0] program_mem_read_address,
-    input logic [31:0] program_mem_read_data,
-    input logic program_mem_req_ready,
-    output logic fifo_read_valid,
+    input  logic [31:0] program_mem_read_data,
+    input  logic        program_mem_req_ready,
+    output logic        fifo_read_valid,
     output logic [31:0] fifo_read_data,
     output logic [63:0] fifo_read_pc,
-    output logic done, busy,
+    output logic        done, busy,
     output logic [31:0] opcode
 );
     typedef enum logic [2:0] {IDLE, TRANSLATE, REQUEST, RECEIVE, EMIT, FINISH} state_t;
@@ -33,7 +33,7 @@ module Fetch #(
     assign fifo_read_valid = state == EMIT;
     assign fifo_read_data = line_data[word_index*32 +: 32];
     assign fifo_read_pc = BURST_MODE
-        ? {vaddr[63:5], 5'b0} + {59'b0, word_index, 2'b0} : vaddr;
+        ? {vaddr[63:5], word_index, 2'b0} : vaddr;
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             state <= IDLE;

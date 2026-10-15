@@ -116,6 +116,7 @@ CPU_RV64_CORE_FILES = \
 	$(CPU_RV64_SRC_DIR)/PSC_InstructionUnit.sv \
 	$(CPU_RV64_SRC_DIR)/Decorder.sv \
 	$(CPU_RV64_SRC_DIR)/Execute.sv \
+	$(CPU_RV64_SRC_DIR)/Execute_ByteALU.sv \
 	$(CPU_RV64_SRC_DIR)/Execute_Divider.sv \
 	$(CPU_RV64_SRC_DIR)/Execute_Mul.sv \
 	$(CPU_RV64_SRC_DIR)/Branch.sv \

@@ -73,6 +73,7 @@ RV64_SOURCES         := \
 	$(RV64_SRC_DIR)/PSC_InstructionUnit.sv \
 	$(RV64_SRC_DIR)/Decorder.sv \
 	$(RV64_SRC_DIR)/Execute.sv \
+	$(RV64_SRC_DIR)/Execute_ByteALU.sv \
 	$(RV64_SRC_DIR)/Execute_Divider.sv \
 	$(RV64_SRC_DIR)/Execute_Mul.sv \
 	$(RV64_SRC_DIR)/Branch.sv \

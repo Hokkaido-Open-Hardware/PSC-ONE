@@ -154,6 +154,18 @@ module PSC_InstructionUnit (
     logic [63:0] pc_update_alu_data;
     logic pc_update_branch_taken;
     logic timer_irq_request;
+    logic regfile_read_ready;
+
+    // ID addresses reach the synchronous BSRAM on the edge after decode.
+    // A newly replaced ID record must not consume the previous read data.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n)
+            regfile_read_ready <= 1'b0;
+        else if (cpu_stop || fifo_flush || decode_fire || issue_fire)
+            regfile_read_ready <= 1'b0;
+        else
+            regfile_read_ready <= id_issue.valid;
+    end
 
     // Serialize instructions that affect control flow, privilege or ordering.
     function automatic logic serializing_instruction(input dec_ctrl_t ctrl);
@@ -348,7 +360,7 @@ module PSC_InstructionUnit (
                         !cpu_stop && !cpu_trap && !timer_irq_request;
     assign decode_fire               = decode_done && fifo_req_ready && id_issue_ready &&
                          !timer_irq_request;
-    assign issue_fire                = id_issue.valid && issue_ex_ready &&
+    assign issue_fire                = id_issue.valid && regfile_read_ready && issue_ex_ready &&
                             !raw_hazard && !backend_serial &&
                             (!issue_serial || backend_empty ||
                             issue_forwarding_consumer);
