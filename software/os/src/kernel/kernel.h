@@ -2,6 +2,17 @@
 #include "../lib/common.h"
 #include "user_memory.h"
 
+/* 0: use the image preloaded by RTL; 1: read USER.MEM from SD. */
+#ifndef KERNEL_USER_FROM_SD
+#define KERNEL_USER_FROM_SD 0
+#endif
+#if KERNEL_USER_FROM_SD != 0 && KERNEL_USER_FROM_SD != 1
+#error "KERNEL_USER_FROM_SD must be 0 or 1"
+#endif
+#if KERNEL_USER_FROM_SD && defined(USE_SBI_CONSOLE)
+#error "SD user loading is not supported with USE_SBI_CONSOLE"
+#endif
+
 #define PROCS_MAX 8
 #define PROC_UNUSED   0
 #define PROC_RUNNABLE 1
@@ -115,6 +126,9 @@ __attribute__((naked))
 void switch_context(uint32_t *prev_sp, uint32_t *next_sp);
 
 struct process *create_process(const void *image, size_t image_size);
+#if KERNEL_USER_FROM_SD
+struct process *create_process_from_sd(size_t image_size);
+#endif
 void yield(void);
 void schedule_from_machine_trap(struct machine_context *context);
 void init_process_machine_context(struct process *proc, void (*entry)(void));

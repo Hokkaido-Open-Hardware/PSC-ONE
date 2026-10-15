@@ -120,8 +120,10 @@ module PSC_ONE_Chip #(
 `ifdef TOP_SIM
     wire top_sim_mode = 1'b1;
     initial $display("TOP_SIM ENABLE");
+`ifndef PSCOS_NO_SDCARD
     `define SPI_BYPASS
     initial $display("SDCard SPI_BYPASS ENABLE");
+`endif
 `endif
 `ifdef PSCOS_SIM
     wire os_sim_mode = 1'b1;

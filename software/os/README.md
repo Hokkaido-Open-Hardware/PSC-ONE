@@ -51,7 +51,42 @@ make -C PSC-ONE/software/os MODE=psc kernel_mem build/user.mem
 
 `KERNEL.MEM`と`USER.MEM`は同じビルドから取得してください。
 `.bin`を`.mem`へ名前変更して使わないでください。
-FAT32ブートローダはテキスト形式のMEMファイルを読み込みます。
+SD起動では、FAT32ブートローダが `KERNEL.MEM` のみ読み込み、kernelへジャンプします。
+kernel起動後、シェル生成前に `USER.MEM` をSDから読み、16進テキストを
+32bitワードへ変換し、小さなバッファから `memcpy` で確保済みプロセスページへ
+コピーします。物理 `0x00400000` への一括ロードやイメージ全体の一時領域は不要です。
+`0x00400000` はシェルの仮想アドレスとして維持し、SDブート時はRTLのUSER ROM転送を行いません。
+セクタCRC、書込み上限、ビルド時のシェルサイズを確認し、キャッシュを同期して
+シェルを生成します。失敗時はPANICで停止します。warm restartでも再読込みします。
+`simulate_SD_PSCOS` は同じビルドのSDイメージを生成します。
+独自のSD起動RTLテストでも対応する `USER.MEM` をSDイメージへ収録してください。
+UARTの `KERNEL: reading USER.MEM from SD into process pages` → `KERNEL: USER.MEM copied` →
+`PSC_OS>` でkernel起動後の読込み・シェル起動を確認できます。
+
+`make -f Makefile.pscos simulate_PSCOS` は従来どおりSD不要です。
+RTLが `bootrom.mem`、`kernel.mem`、`user.mem` をSDRAMへ転送し、kernelは
+物理 `0x00400000` に配置されたuserイメージをプロセスページへコピーします。
+このターゲットはSDモデルを接続せず、`sdcard.hex` の生成・読込みも行いません。
+
+kernelの読み込み元は、OS Makefileの `KERNEL_USER_FROM_SD=0/1` で切り替えます。
+同名のCマクロが `kernel.c` と `kernel_process.c` の両方に適用されます。
+
+| 設定 | userイメージの読み込み元 | デフォルト |
+| --- | --- | --- |
+| `KERNEL_USER_FROM_SD=0` | RTLでSDRAMへ転送済みのイメージ | `MODE=sim` / `sbi` |
+| `KERNEL_USER_FROM_SD=1` | SDの `USER.MEM` | `MODE=fpga_mem` / `psc` |
+
+`simulate_PSCOS` は `0`、`simulate_SD_PSCOS` は `1` を明示指定します。
+OSを単独ビルドする場合は、例えば `make MODE=sim KERNEL_USER_FROM_SD=0 sim_mem`
+または `make MODE=fpga_mem KERNEL_USER_FROM_SD=1 fpga_mem` を使用します。
+同じBuildディレクトリでも設定変更を検知してkernelを再リンクします。
+`0` を選ぶ場合はRTLのUSER ROM転送も必要です。`MODE=sbi` は `0` のみ対応します。
+
+ROM転送先・データとSD起動経路の単体テストは、リポジトリルートから実行できます。
+
+```sh
+python3 PSC-ONE/hardware/sim/tests/psc_os_user_rom/run.py --build build/psc-os-user-rom
+```
 
 初回導入や古いMBIOSを使用している場合、現在のBootROM/FAT32ブートローダも
 既存のFPGA書込み手順に従って更新してください。必要な生成コマンドは：

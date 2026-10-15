@@ -140,6 +140,16 @@ int sd_read_sector(uint32_t sector, uint8_t *buf)
     return sd_read_once(sector, buf);
 }
 
+int sd_read_sector_checked(uint32_t sector, uint8_t *buf)
+{
+    for (unsigned retry = 0; retry < 3; retry++) {
+        if (sd_read_once(sector, buf) != 0) continue;
+        uint16_t hardware_crc = (uint16_t)(PSC_SD_IF_CTRL >> 16);
+        if (sd_crc16(buf) == hardware_crc) return 0;
+    }
+    return -4;
+}
+
 // -------------------------------------------------------
 static int sd_write_verified(uint32_t sector, const uint8_t *buf, bool quiet)
 {

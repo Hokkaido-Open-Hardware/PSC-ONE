@@ -6,7 +6,6 @@
 #define PIO32 (*(volatile uint32_t*)0x10001000)
 
 #define KERNEL_LOAD_ADDR   0x00200000u
-#define USER_LOAD_ADDR     0x00400000u
 
 // UART ベースやビット定義が common.h に無ければ保険として定義
 #ifndef UART_MMIO_BASE
@@ -34,13 +33,11 @@
  * 必要に応じて変更
  * 例:
  *   kernel.img を LBA 100 から 128 sector
- *   user.img   を LBA 300 から  18 sector
+ *   USER.MEM is read from FAT32 by the kernel after startup.
  * ------------------------------------------------------- */
 #define KERNEL_LBA_START   100u
 #define KERNEL_LBA_COUNT   128u
 
-#define USER_LBA_START     300u
-#define USER_LBA_COUNT     18u
 
 /* -------------------------------------------------------
  * デバッグ表示設定
@@ -581,21 +578,13 @@ void bootloader_main(void)
         }
     }
 
-    if (sd_load_image(USER_LBA_START, USER_LBA_COUNT, USER_LOAD_ADDR) != 0) {
-        bl_print("bootloader: user load failed\n");
-        for (;;) {
-        }
-    }
-
     bl_print("bootloader: load done\n");
 
     bl_print("kernel[0]=");
     bl_print_hex(*(volatile uint32_t *)KERNEL_LOAD_ADDR);
     bl_print("\n");
 
-    bl_print("user[0]  =");
-    bl_print_hex(*(volatile uint32_t *)USER_LOAD_ADDR);
-    bl_print("\n");
+    bl_print("USER.MEM deferred to kernel\n");
 
     sync_icache();
 

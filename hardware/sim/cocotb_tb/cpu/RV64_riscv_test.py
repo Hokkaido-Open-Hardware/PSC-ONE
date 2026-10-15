@@ -55,7 +55,7 @@ async def RV64_riscv_test(dut):
                          int(os.environ.get("EXPECTED_RESULT", "1"), 0))
     memory = core.Memory()
     memory.load_program(os.environ["PROGRAM_FILE"])
-    core.initialize_dut_inputs(dut)  # Also checks that the DUT has 64-bit ports.
+    core.initialize_dut_inputs(dut)  # Also checks instruction/data port widths.
     bus = core.MemoryBus(dut, memory, core.setting("MEM_LATENCY", 2), result)
     tasks = [cocotb.start_soon(Clock(dut.clock, period, unit="ns").start()),
              cocotb.start_soon(bus.run())]

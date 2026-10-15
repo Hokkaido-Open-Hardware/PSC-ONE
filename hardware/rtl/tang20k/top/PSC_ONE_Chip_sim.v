@@ -205,6 +205,10 @@ module PSC_ONE_Chip_sim #(
     // ------------------------------
     // SDカード モデル
     // ------------------------------
+`ifdef PSCOS_NO_SDCARD
+    // Direct ROM boot must work without an SD image or a card attached.
+    assign SDI_MISO = 1'b1;
+`else
     sdcard_spi_model #(
         .INIT_R1_IDLE (8'h01),          // CMD0/CMD8応答(Idle)
         .R1_READY     (8'h00),          // ready時
@@ -216,6 +220,7 @@ module PSC_ONE_Chip_sim #(
         .mosi       (SDI_MOSI),
         .miso       (SDI_MISO)
     );
+`endif
 
     // ------------------------------
     // LCD ILI9488モデル

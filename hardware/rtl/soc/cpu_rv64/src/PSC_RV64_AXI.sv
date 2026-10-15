@@ -1,7 +1,7 @@
 `timescale 1ns/1ps
 // Uncached RV64 memory-to-AXI bridge. Separate I/D request slots preserve
 // simultaneous request pulses. One external transaction is outstanding.
-// Program bursts are four 64-bit INCR beats; data transfers are single beats.
+// Program bursts are eight 32-bit INCR beats; data transfers are single beats.
 module PSC_RV64_AXI #(
     parameter integer ID_WIDTH = 1
 )(
@@ -9,8 +9,8 @@ module PSC_RV64_AXI #(
     input logic i_valid, i_burst,
     input logic [63:0] i_addr,
     output logic i_req_ready, i_ready,
-    output logic [63:0] i_data,
-    input logic d_rvalid, d_wvalid,
+    output logic [31:0] i_data,
+    input logic d_rvalid, d_wvalid, d_double,
     input logic [63:0] d_raddr, d_waddr, d_wdata,
     input logic [2:0] d_sel,
     input logic d_is_mmio,
@@ -53,10 +53,11 @@ module PSC_RV64_AXI #(
                              WRITE_RESPONSE, MMIO, ERROR} state_t;
     state_t state;
     logic ipending, dpending, iburst_q, dwrite_q, dmmio_q;
+    logic ddouble_q;
     logic [63:0] iaddr_q, daddr_q, ddata_q;
     logic [2:0] dsel_q;
     logic owner_i, aw_sent, w_sent;
-    logic [1:0] beats_left;
+    logic [2:0] beats_left;
     logic [8:0] byte_mask;
 
     assign i_req_ready = !ipending && !fault;
@@ -74,9 +75,10 @@ module PSC_RV64_AXI #(
     assign axi_wlast = 1'b1;
     assign axi_wvalid = state == WRITE_CHANNELS && !w_sent;
     assign axi_bready = state == WRITE_RESPONSE;
-    assign axi_araddr = owner_i ? iaddr_q : {daddr_q[63:3], 3'b0};
-    assign axi_arlen = owner_i && iburst_q ? 8'd3 : 8'd0;
-    assign axi_arsize = 3'd3;
+    assign axi_araddr = owner_i ? iaddr_q :
+                       ddouble_q ? {daddr_q[63:3], 3'b0} : {daddr_q[63:2], 2'b0};
+    assign axi_arlen = owner_i && iburst_q ? 8'd7 : 8'd0;
+    assign axi_arsize = owner_i || !ddouble_q ? 3'd2 : 3'd3;
     assign axi_arburst = 2'b01;
     assign axi_arvalid = state == READ_ADDR;
     assign axi_rready = state == READ_DATA;
@@ -89,6 +91,7 @@ module PSC_RV64_AXI #(
         if (!reset_n) begin
             state <= IDLE; ipending <= 0; dpending <= 0;
             iburst_q <= 0; dwrite_q <= 0; dmmio_q <= 0;
+            ddouble_q <= 0;
             iaddr_q <= 0; daddr_q <= 0; ddata_q <= 0; dsel_q <= 0;
             owner_i <= 0; aw_sent <= 0; w_sent <= 0; beats_left <= 0;
             i_ready <= 0; d_rready <= 0; d_wready <= 0;
@@ -105,6 +108,7 @@ module PSC_RV64_AXI #(
                 daddr_q <= d_wvalid ? d_waddr : d_raddr;
                 ddata_q <= d_wdata; dsel_q <= d_sel;
                 dwrite_q <= d_wvalid; dmmio_q <= d_is_mmio;
+                ddouble_q <= d_double;
             end
             case (state)
                 IDLE: begin
@@ -116,7 +120,7 @@ module PSC_RV64_AXI #(
                         else state <= READ_ADDR;
                     end else if (ipending) begin
                         owner_i <= 1;
-                        beats_left <= iburst_q ? 2'd3 : 2'd0;
+                        beats_left <= iburst_q ? 3'd7 : 3'd0;
                         state <= READ_ADDR;
                     end
                 end
@@ -127,7 +131,11 @@ module PSC_RV64_AXI #(
                         fault <= 1;
                         state <= ERROR;
                     end else begin
-                        if (owner_i) begin i_data <= axi_rdata; i_ready <= 1; end
+                        if (owner_i) begin
+                            i_data <= iaddr_q[2] ? axi_rdata[63:32] : axi_rdata[31:0];
+                            iaddr_q <= iaddr_q + 64'd4;
+                            i_ready <= 1;
+                        end
                         else begin d_rdata <= axi_rdata; d_rready <= 1; end
                         if (beats_left == 0) begin
                             if (owner_i) ipending <= 0;

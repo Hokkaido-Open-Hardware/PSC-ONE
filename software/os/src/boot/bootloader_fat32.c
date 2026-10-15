@@ -36,10 +36,6 @@
 #define KERNEL_LOAD_ADDR    0x00200000u
 #endif
 
-#ifndef USER_LOAD_ADDR
-#define USER_LOAD_ADDR      0x00400000u
-#endif
-
 void putchar(char ch)
 {
     while (mmio_r32(UART_MMIO_BASE + UART_ST) & ST_TX_BUSY) {
@@ -228,7 +224,6 @@ static void jump_to_kernel(uint32_t addr)
 void bootloader_main(void)
 {
     uint32_t kernel_words = 0;
-    uint32_t user_words = 0;
 
     bl_print("bootloader FAT32 start\n");
 
@@ -247,17 +242,8 @@ void bootloader_main(void)
         for (;;) {}
     }
 
-    if (boot_fat32_load_mem_file("USER.MEM", USER_LOAD_ADDR, &user_words)) {
-        bl_print("USER.MEM load failed\n");
-        for (;;) {}
-    }
-
     bl_print("kernel words=");
     bl_print_hex(kernel_words);
-    bl_print("\n");
-
-    bl_print("user words=");
-    bl_print_hex(user_words);
     bl_print("\n");
 
     bl_print("kernel[0]=");
@@ -272,9 +258,7 @@ void bootloader_main(void)
     bl_print_hex(*(volatile uint32_t *)0x00200008);
     bl_print("\n");
 
-    bl_print("user[0]=");
-    bl_print_hex(*(volatile uint32_t *)0x00400000);
-    bl_print("\n");
+    bl_print("USER.MEM deferred to kernel\n");
 
     bl_print("JUMP TO ");
     bl_print_hex(KERNEL_LOAD_ADDR);

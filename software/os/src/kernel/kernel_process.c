@@ -3,6 +3,10 @@
 #include "../api/synap_api.h"
 #include "../drivers/timer_api.h"
 #include "../boot/mbios.h"
+#if KERNEL_USER_FROM_SD
+#include "../boot/boot_fat32.h"
+#include "../drivers/sdcard_api.h"
+#endif
 
 /* Set to 0 to compare the original CPU copy with DMA during process loading. */
 #ifndef KERNEL_PROCESS_USE_DMA
@@ -45,7 +49,41 @@ static void __attribute__((unused)) idle_entry(void) {
 
 #define KERNEL_MAP_SIZE (1 * 1024 * 1024)   // 1MB
 
-struct process *create_process(const void *image, size_t image_size) {
+#if KERNEL_USER_FROM_SD
+struct sd_image_copy {
+    uint32_t *page_table;
+    paddr_t page;
+    uint32_t copied;
+};
+
+/* Copy each decoded SD chunk directly into its final process page. The
+ * kernel identity map covers these pages; USER_BASE is only a user VA. */
+static int copy_sd_image(void *ctx, uint32_t offset,
+                          const uint32_t *words, uint32_t count)
+{
+    struct sd_image_copy *copy = ctx;
+    const uint8_t *src = (const uint8_t *)words;
+    if (offset != copy->copied) return -1;
+    while (count) {
+        uint32_t in_page = copy->copied & (PAGE_SIZE - 1u);
+        if (!in_page) {
+            copy->page = alloc_pages(1);
+            map_page(copy->page_table, USER_BASE + copy->copied, copy->page,
+                     PAGE_U | PAGE_R | PAGE_W | PAGE_X);
+        }
+        uint32_t n = PAGE_SIZE - in_page;
+        if (n > count) n = count;
+        memcpy((void *)(copy->page + in_page), src, n);
+        copy->copied += n;
+        src += n;
+        count -= n;
+    }
+    return 0;
+}
+#endif
+
+static struct process *create_process_image(const void *image,
+                                            size_t image_size, int from_sd) {
     // ---- プロセススロット探索 ----
     struct process *proc = NULL;
     int i;
@@ -110,8 +148,26 @@ struct process *create_process(const void *image, size_t image_size) {
 #endif
 
     // ---- User Program Mapping (U=1) ----
-    if (image && image_size > 0) {
+    if ((image || from_sd) && image_size > 0) {
+        if (image_size > USER_STACK_TOP - USER_STACK_SIZE - USER_STACK_GUARD - USER_BASE)
+            PANIC("user image overlaps stack");
         s_printf("---- user image map start. ----\n");
+#if KERNEL_USER_FROM_SD
+        if (from_sd) {
+            uint32_t loaded_words = 0;
+            uint32_t expected_words = (image_size + 3u) / 4u;
+            struct sd_image_copy copy = {page_table, 0, 0};
+            s_printf("KERNEL: reading USER.MEM from SD into process pages\n");
+            if (boot_fat32_mount(sd_read_sector_checked) ||
+                boot_fat32_stream_mem_file("USER.MEM", expected_words,
+                                           copy_sd_image, &copy, &loaded_words))
+                PANIC("USER.MEM load failed");
+            if (loaded_words != expected_words)
+                PANIC("USER.MEM size mismatch: words=%x expected=%x",
+                      loaded_words, expected_words);
+            s_printf("KERNEL: USER.MEM copied bytes=%x\n", copy.copied);
+        } else
+#endif
         for (uint32_t off = 0; off < image_size; off += PAGE_SIZE) {
             paddr_t page = alloc_pages(1);
             size_t remaining = image_size - off;
@@ -142,6 +198,19 @@ struct process *create_process(const void *image, size_t image_size) {
     s_printf("create_process_End\n");
     return proc;
 }
+
+struct process *create_process(const void *image, size_t image_size)
+{
+    return create_process_image(image, image_size, 0);
+}
+
+#if KERNEL_USER_FROM_SD
+struct process *create_process_from_sd(size_t image_size)
+{
+    if (!image_size) PANIC("empty USER.MEM image");
+    return create_process_image(NULL, image_size, 1);
+}
+#endif
 
 void yield(void) {
     if (preemption_active != 0u) {

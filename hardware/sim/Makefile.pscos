@@ -343,11 +343,11 @@ PSCOS_LOADER_BUILD = $(PSCOS_BUILD_ROOT)/loader
 
 simulate_PSCOS: MODE = verilator
 simulate_PSCOS: SIM = verilator
-simulate_PSCOS: VDEF = -DFST_UART_MODE -DPSCOS_SIM
+simulate_PSCOS: VDEF = -DFST_UART_MODE -DPSCOS_SIM -DPSCOS_NO_SDCARD
 simulate_PSCOS: export SIM_BUILD = build/pscos-sim/direct_$(CPU_VERSION)_$(NPU_VERSION)_$(if $(SIM_FAST),$(SIM_FAST),0)
 
 simulate_PSCOS: 
-	$(MAKE) -C ../../software/os Build=$(PSCOS_DIRECT_BUILD) $(if $(SIM_USER),SIM_USER=$(SIM_USER),) sim_mem
+	$(MAKE) -C ../../software/os Build=$(PSCOS_DIRECT_BUILD) KERNEL_USER_FROM_SD=0 $(if $(SIM_USER),SIM_USER=$(SIM_USER),) sim_mem
 	mkdir -p ./mem
 	cp $(PSCOS_DIRECT_BUILD)/bootrom.mem ./mem/
 	cp $(PSCOS_DIRECT_BUILD)/kernel.mem ./mem/
@@ -397,7 +397,7 @@ simulate_SD_PSCOS: VDEF = -DFST_UART_MODE -DPSCOS_SIM -DFPGA_BOOT_LOADER_MODE
 simulate_SD_PSCOS: export SIM_BUILD = build/pscos-sim/sd_$(CPU_VERSION)_$(NPU_VERSION)_$(if $(SIM_FAST),$(SIM_FAST),0)
 
 simulate_SD_PSCOS:
-	$(MAKE) -C ../../software/os Build=$(PSCOS_SD_BUILD) $(if $(SIM_USER),SIM_USER=$(SIM_USER),) fpga_mem
+	$(MAKE) -C ../../software/os Build=$(PSCOS_SD_BUILD) KERNEL_USER_FROM_SD=1 $(if $(SIM_USER),SIM_USER=$(SIM_USER),) fpga_mem
 	$(MAKE) -C ../../software/os Build=$(PSCOS_LOADER_BUILD) fpga_fat32_boot
 	mkdir -p ./mem
 	cp $(PSCOS_LOADER_BUILD)/bootrom.mem ./mem/

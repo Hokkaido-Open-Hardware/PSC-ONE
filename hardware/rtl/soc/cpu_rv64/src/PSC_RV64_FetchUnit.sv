@@ -44,7 +44,7 @@ module PSC_RV64_FetchUnit #(
     output logic        program_mem_read_valid,
     input  logic        program_mem_read_ready,
     output logic [63:0] program_mem_read_address,
-    input  logic [63:0] program_mem_read_data,
+    input  logic [31:0] program_mem_read_data,
     input  logic        program_mem_req_ready,
 
     // MMU memory

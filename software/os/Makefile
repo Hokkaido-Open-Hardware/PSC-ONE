@@ -56,6 +56,21 @@ else
 endif
 
 # ========================
+# User image source: direct simulation uses RTL ROM; FPGA SD boot uses SD.
+# Pass KERNEL_USER_FROM_SD=0/1 to override the mode default.
+# ========================
+KERNEL_USER_FROM_SD ?= $(if $(filter $(MODE),fpga_mem psc),1,0)
+ifneq ($(KERNEL_USER_FROM_SD),0)
+ifneq ($(KERNEL_USER_FROM_SD),1)
+$(error KERNEL_USER_FROM_SD must be 0 or 1)
+endif
+ifeq ($(MODE),sbi)
+$(error KERNEL_USER_FROM_SD=1 is not supported with MODE=sbi)
+endif
+endif
+USER_LOAD_CPPFLAGS = -DKERNEL_USER_FROM_SD=$(KERNEL_USER_FROM_SD)
+
+# ========================
 # BIOS path (OpenSBI)
 # ========================
 QEMU_BIOS32 ?= $(shell \
@@ -247,6 +262,7 @@ else
 endif
 
 SRCS_KERNEL := \
+	$(Src)/boot/boot_fat32.c \
 	$(Src)/kernel/kernel.c \
 	$(Src)/kernel/kernel_process.c \
 	$(Src)/kernel/kernel_trap.c \
@@ -369,14 +385,13 @@ SRCS_BOOT_FAT32 := \
 	$(Src)/boot/bootloader_entry.S \
 	$(Src)/boot/bootloader_fat32.c \
 	$(Src)/lib/common.c \
-	$(Src)/drivers/sdcard_api.c \
 	$(Src)/boot/boot_fat32.c
 
 BOOTLOADER_FAT32_ELF := $(Build)/bootloader_fat32.elf
 BOOTLOADER_FAT32_BIN := $(Build)/bootloader_fat32.bin
 BOOTLOADER_FAT32_MEM := $(Build)/bootloader_fat32.mem
 
-$(BOOTLOADER_FAT32_ELF): $(Build) $(SRCS_BOOT_FAT32)
+$(BOOTLOADER_FAT32_ELF): $(Build) $(SRCS_BOOT_FAT32) $(Src)/boot/boot_fat32.h Makefile
 	$(CC) $(CFLAGS) \
 		-Wl,-T$(Src)/boot/bootloader.ld \
 		-Wl,-Map=$(Build)/bootloader.map \
@@ -388,6 +403,7 @@ $(BOOTLOADER_FAT32_BIN): $(BOOTLOADER_FAT32_ELF)
 	$(OBJCOPY) -O binary $< $@
 
 $(BOOTLOADER_FAT32_MEM): $(BOOTLOADER_FAT32_BIN)
+	@test "$$(stat -c%s $<)" -le 18000 || { echo "FAT32 bootloader exceeds 4500-word ROM" >&2; exit 1; }
 	hexdump -v -e '1/4 "%08x\n"' $< > $@
 	@echo "[BOOTLOADER] $@ generated."
 
@@ -486,21 +502,31 @@ endif
 # ========================
 #
 # USER image は kernel.elf へ埋め込まない。
-# user.mem は PA=USER_BASE_VAL に別ロードする。
-# kernel.c の _binary_shell_bin_start/_end は absolute symbol で与える。
+# KERNEL_USER_FROM_SD=0: RTLが転送した物理USER_BASEからコピーする。
+# KERNEL_USER_FROM_SD=1: SDのUSER.MEMからプロセスの物理ページへコピーする。
+# __shell_image_sizeはサイズのみ。_binary_shell_bin_start/_endはROM/SBI用。
 #
+.PHONY: FORCE_KERNEL_CONFIG
+FORCE_KERNEL_CONFIG:
+
+# A changed option must rebuild kernel.elf even when the sources are unchanged.
+# Preserve the timestamp on an identical configuration; no clean is needed.
+$(Build)/kernel.config: FORCE_KERNEL_CONFIG | $(Build)
+	@python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s="\n".join(sys.argv[2:])+"\n"; p.write_text(s) if not p.exists() or p.read_text()!=s else None' "$@" "$(MODE)" "$(KCPPFLAGS)" "$(USER_LOAD_CPPFLAGS)"
+
 $(KERNEL_ELF): \
 	$(Build) \
 	$(SRCS_KERNEL) \
 	$(wildcard $(Src)/*/*.h) $(Src)/api/robot/robot_control.h $(Src)/kernel/kernel_fpga.ld \
 	$(USER_BIN) \
-	$(Build)/divmodsi3.o $(KERNEL_BUILTINS) Makefile
+	$(Build)/divmodsi3.o $(KERNEL_BUILTINS) Makefile $(Build)/kernel.config
 
 	@USER_SIZE=$$(stat -c%s $(USER_BIN)); \
-	echo "[USER] external image PA=$(USER_BASE_VAL) size=$$USER_SIZE"; \
-	$(CC) $(KERNEL_CFLAGS) $(KCPPFLAGS) $(DUSERBASE) \
+	echo "[USER] KERNEL_USER_FROM_SD=$(KERNEL_USER_FROM_SD) VA=$(USER_BASE_VAL) size=$$USER_SIZE"; \
+	$(CC) $(KERNEL_CFLAGS) $(KCPPFLAGS) $(USER_LOAD_CPPFLAGS) $(DUSERBASE) $(DEFUSERBASE) \
 		-Wl,-T$(KERNEL_LD) \
 		$(LDFLAGS_KERNEL) \
+		-Wl,--defsym,__shell_image_size=$$USER_SIZE \
 		-Wl,--defsym,_binary_shell_bin_start=$(USER_BASE_VAL) \
 		-Wl,--defsym,_binary_shell_bin_end=$(USER_BASE_VAL)+$$USER_SIZE \
 		-o $@ \

@@ -333,11 +333,13 @@ __attribute__((used)) void kernel_main(uint32_t warm) {
     task1: 本物shell 
     */
     s_printf("--- create_process_2 ---\n");
-    s_printf("DBG: _binary_shell_bin_start=%x _binary_shell_bin_end=%x\n",
-             (uint32_t)_binary_shell_bin_start,
-             (uint32_t)_binary_shell_bin_end);
+#if !KERNEL_USER_FROM_SD
     size_t shell_size = _binary_shell_bin_end - _binary_shell_bin_start;
     create_process(_binary_shell_bin_start, shell_size);
+#else
+    extern char __shell_image_size[];
+    create_process_from_sd((size_t)__shell_image_size);
+#endif
     __asm__ __volatile__("fence.i" ::: "memory");
 
 // if 1 : multitask mode

@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
-// RV64 address/data bus, 32-bit instructions (no compressed extension).
-// Single request: one aligned 64-bit beat. Burst: four 64-bit beats at
+// RV64 addresses, 32-bit instructions (no compressed extension).
+// Single request: one aligned 32-bit beat. Burst: eight 32-bit beats at
 // the aligned 32-byte line. read_ready marks each response, not request acceptance.
 module Fetch #(
     parameter logic BURST_MODE = 1'b0
@@ -14,7 +14,7 @@ module Fetch #(
     output logic program_mem_burst_mode, program_mem_read_valid,
     input logic program_mem_read_ready,
     output logic [63:0] program_mem_read_address,
-    input logic [63:0] program_mem_read_data,
+    input logic [31:0] program_mem_read_data,
     input logic program_mem_req_ready,
     output logic fifo_read_valid,
     output logic [31:0] fifo_read_data,
@@ -25,7 +25,7 @@ module Fetch #(
     typedef enum logic [2:0] {IDLE, TRANSLATE, REQUEST, RECEIVE, EMIT, FINISH} state_t;
     state_t state;
     logic [255:0] line_data;
-    logic [1:0] beat;
+    logic [2:0] beat;
     logic [2:0] word_index;
     logic [63:0] physical_address;
     assign program_mem_burst_mode = BURST_MODE;
@@ -60,14 +60,14 @@ module Fetch #(
                 REQUEST: if (program_mem_req_ready) begin
                     program_mem_read_address <= BURST_MODE
                         ? {physical_address[63:5], 5'b0}
-                        : {physical_address[63:3], 3'b0};
+                        : {physical_address[63:2], 2'b0};
                     program_mem_read_valid <= 1'b1;
                     state <= RECEIVE;
                 end
                 RECEIVE: if (program_mem_read_ready) begin
-                    line_data[beat*64 +: 64] <= program_mem_read_data;
-                    if (!BURST_MODE || beat == 3) begin
-                        word_index <= BURST_MODE ? vaddr[4:2] : {2'b0, vaddr[2]};
+                    line_data[beat*32 +: 32] <= program_mem_read_data;
+                    if (!BURST_MODE || beat == 7) begin
+                        word_index <= BURST_MODE ? vaddr[4:2] : 3'b0;
                         state <= EMIT;
                     end else beat <= beat + 1'b1;
                 end

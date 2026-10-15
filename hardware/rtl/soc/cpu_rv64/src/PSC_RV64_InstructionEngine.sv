@@ -59,6 +59,7 @@ module PSC_RV64_InstructionEngine #(
     output logic [63:0] csr_old_value,
     output logic [63:0] csr_reg_data_1,
 
+    output logic        data_rw_double,
     output logic        data_mem_read_valid,
     input  logic        data_mem_read_ready,
     output logic [63:0] data_mem_read_address,
@@ -96,6 +97,8 @@ module PSC_RV64_InstructionEngine #(
     logic load_done;
     logic store_done;
     logic [63:0] load_read_data;
+    logic [63:0] memory_read_data;
+    logic load_unaligned;
 
     dec_ctrl_t   commit_ctrl;
     logic [63:0] commit_alu_data;
@@ -144,6 +147,10 @@ module PSC_RV64_InstructionEngine #(
         .d_paddr              (d_paddr),
         .data_mem_address     (mem_address),
         .data_mem_write_data  (mem_write_data),
+        .data_mem_sel         (mem_write_sel),
+        .data_mem_read_data   (data_mem_read_data),
+        .load_data            (memory_read_data),
+        .load_unaligned       (load_unaligned),
         .data_mem_read_valid  (mem_read_valid),
         .data_mem_write_valid (mem_write_valid),
         .data_mem_req_ready   (data_mem_req_ready),
@@ -159,14 +166,17 @@ module PSC_RV64_InstructionEngine #(
     assign decoder_ctrl           = commit_ctrl;
     assign alu_data               = commit_alu_data;
     assign pc_sel2                = commit_branch_taken;
-    assign mem_write_sel          = memory_ctrl.funct3;
+    // EX/MEM holds the transfer width until the response completes.
+    // Page-table reads use 64 bits; byte/halfword/word accesses use 32-bit beats.
+    assign data_rw_double         = d_mmu_mem_valid ||
+                                   (mem_access && mem_write_sel == 3'b011);
 
     assign is_counter_load        = (memory_ctrl.funct3 == 3'b010) &&
                                 (memory_alu_data == COUNTER_MMIO_ADDR);
     assign is_uart_flag_load      = (memory_ctrl.funct3[1:0] == 2'b00) &&
                                 (memory_alu_data == UART_MMIO_FLAG);
     assign raw_load_data          = is_counter_load   ? counter :
-                           is_uart_flag_load ? 64'd1 : data_mem_read_data;
+                           is_uart_flag_load ? 64'd1 : memory_read_data;
     assign load_read_data         = raw_load_data;
 
     assign vaddr                  = memory_alu_data;
@@ -225,6 +235,7 @@ module PSC_RV64_InstructionEngine #(
         .load_done            (load_done),
         .store_done           (store_done),
         .load_read_data       (load_read_data),
+        .load_unaligned       (load_unaligned),
         .csr_state            (csr_state),
         .csr_rdata            (csr_rdata),
         .csr_read_addr        (csr_read_addr),

@@ -194,11 +194,12 @@ module PSC_ONE_RV64_core #(
     wire         program_mem_read_valid;
     wire         program_mem_read_ready;
     wire [63:0]  program_mem_read_address;
-    wire [63:0]  program_mem_read_data;
+    wire [31:0]  program_mem_read_data;
     wire         program_mem_req_ready;
 
     wire         is_fence_i;
 
+    wire         data_rw_double;
     wire         data_mem_read_valid;
     wire         data_mem_read_ready;
     wire [63:0]  data_mem_read_address;
@@ -239,6 +240,7 @@ module PSC_ONE_RV64_core #(
         .program_mem_req_ready      (program_mem_req_ready),
 
         .data_mem_read_valid        (data_mem_read_valid),
+        .data_rw_double             (data_rw_double),
         .data_mem_read_ready        (data_mem_read_ready),
         .data_mem_read_address      (data_mem_read_address),
         .data_mem_read_data         (data_mem_read_data),
@@ -320,6 +322,7 @@ module PSC_ONE_RV64_core #(
         .i_addr(program_mem_read_address), .i_req_ready(program_mem_req_ready),
         .i_ready(program_mem_read_ready), .i_data(program_mem_read_data),
         .d_rvalid(data_mem_read_valid), .d_wvalid(data_mem_write_valid),
+        .d_double(data_rw_double),
         .d_raddr(data_mem_read_address), .d_waddr(data_mem_write_address),
         .d_wdata(mem_write_data), .d_sel(mem_write_sel), .d_is_mmio(access_is_mmio),
         .d_req_ready(data_mem_req_ready), .d_rready(data_mem_read_ready),

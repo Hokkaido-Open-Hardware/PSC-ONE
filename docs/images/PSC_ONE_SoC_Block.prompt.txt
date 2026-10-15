@@ -1,0 +1,111 @@
+PSC-ONE SoC diagram generation record
+Tool: built-in image_gen
+Date: 2026-10-15
+Output: PSC-ONE/docs/images/PSC_ONE_SoC_Block.jpg
+References: previous PSC_ONE_SoC_Block.jpg; PSC_RV32_V1.jpg; PSC_RV32_V2.jpg
+Source review: hardware/rtl/soc/soc_top/PSC_ONE_SOC.v;
+  hardware/rtl/soc/cpu_v1/src/PSC_ONE_RV32_core.v;
+  hardware/rtl/soc/cpu_v2_experimental/src/PSC_ONE_RV32_core.v;
+  hardware/rtl/soc/npu/src/PSC_NPU_Controller.v;
+  hardware/rtl/soc/pfe/README.md;
+  hardware/rtl/tang20k/top/PSC_ONE_Chip.v;
+  hardware/rtl/tang20k/sdram_controller/sdram_axi_controller.v.
+Generated PNG converted using ImageMagick to JPEG quality 96, 4:4:4.
+
+Initial prompt:
+Use case: infographic-diagram / style-transfer.
+Redraw the PSC-ONE SoC block diagram for a repository technical document.
+Input 1 is the old diagram being replaced. Inputs 2 and 3 are STYLE REFERENCES ONLY, the CPU v1 and CPU v2 diagrams.
+Match references 2/3 closely: pure white background, deep royal-blue rounded title badge, medium-blue clean box outlines and orthogonal arrows, bold clean sans-serif, saturated purple/red/green/orange functional boxes, pale-blue details with dark navy text, crisp flat engineering diagram. No shadows, gradients, illustrations, device photos, or decorative icons. Large landscape image, about 3:2, at least 1536 pixels wide. Excellent readable text and spacing.
+Title badge: "PSC-ONE SoC". Header at right: "Current RTL module overview | 2026-10-15".
+Use the following verified current architecture instead of blindly copying old connections. Module-level functional overview; simplify small signal detail. Every label horizontal; no vertical rotated text.
+
+COMPOSITION: Upper ~70% of page a blue-outlined large container labeled "PSC-ONE / Tang Nano 20K". Inside: left large "PSC_ONE_SOC" container occupying ~72% width; right column outside SOC but within outer container has memory subsystem. Bottom ~20% a wide peripheral panel INSIDE PSC_ONE_SOC, if needed extend SOC below upper module rows; outside board at very bottom a single row of external device boxes. Keep overall balanced.
+
+Suggested concrete arrangement: outer board frame spans x=3..97%, y=13..86%. Nested SOC spans x=5..74%, y=18..83%. Memory column x=80..94%, y=23..75%.
+Inside SOC upper area:
+- Left upper green box "PSC_RV32 CPU", sublines "cpu_v1 / cpu_v2", "RV32IM | M / S / U | Sv32".
+- To its right, two purple boxes stacked "I-Cache" and "D-Cache / I/O", each small text "Direct-mapped | 256-bit lines".
+- To right of caches orange box "Shared AXI bridge", subline "256-bit lines / 32-bit AXI".
+- Solid double-headed arrows CPU to I-Cache labeled "instruction"; CPU to D-Cache / I/O labeled "data / MMU". Both caches connect via separate solid double arrows to shared AXI bridge.
+- Beneath CPU a red box "SynapEngine", sublines "PSC_NPU_Controller", "NPU / optional LPU". Dashed blue CPU to SynapEngine arrow labeled "CSR control". Solid double-headed SynapEngine to D-Cache arrow labeled "tensor data".
+- Beneath caches two smaller boxes side by side: teal "DMA" and grey "Boot ROM loader". Dashed blue CPU to DMA line labeled "CSR control", if there is uncluttered room; otherwise put "CSR-controlled" inside DMA.
+- Shared bridge connects right to memory subsystem labeled "p_axi".
+- DMA and Boot ROM loader each have independent clean blue memory connections to the same memory subsystem, labeled "dma_axi" and "bt_axi". Route through reserved gaps, never across box text. Do not imply DMA or boot traffic traverses caches or the shared bridge.
+
+MEMORY SUBSYSTEM, right column inside outer board frame:
+Grey box "AXI4 arbitration" with subline "32-bit masters", below orange "SDRAM controller", below dark blue box white text "SDRAM" / "64 Mbit / 8 MiB". Solid double arrows sequentially connecting these three. Shared bridge/DMA/Boot ROM connect to AXI4 arbitration, not directly to SDRAM.
+Small pale blue support box at top right if room "Clock / reset". It need not have wiring.
+Small note beneath memory: "GW2AR embedded SDRAM".
+
+LOWER SOC REGION:
+A wide blue-outlined white container labeled "Memory-mapped peripherals".
+A clearly labeled solid blue link "MMIO" from D-Cache / I/O to a horizontal peripheral bus at top of this container. This MMIO path bypasses the SDRAM subsystem.
+Organize the following seven equally styled colored boxes in one row or two rows to keep text readable; each box visibly connected to the MMIO bus:
+red "UART";
+blue "SD / SPI";
+green "LCD driver";
+orange "I2S RX";
+teal "I2C / GPIO / LEDs";
+orange "Timer";
+purple "PFE" with subtext "QUBO / experimental".
+PFE is memory mapped only; no PFE-to-cache/SDRAM direct port.
+An unobtrusive dashed IRQ arrow from Timer/UART group to CPU if clear routing available, otherwise label their group "Timer / UART interrupts to CPU" without extra arrows.
+
+EXTERNAL DEVICE ROW below outer board frame:
+pale blue boxes "Host PC", "SD card", "LCD", "Microphone", "Board I/O".
+Connect UART bidirectionally to Host PC; SD / SPI bidirectionally to SD card; LCD driver to LCD; Microphone toward I2S RX; I2C / GPIO / LEDs bidirectionally to Board I/O. Keep external lines straight, evenly spaced. External box labels must not look like RTL modules.
+
+BOTTOM FOOTER:
+small legend solid blue arrow "Data / request / response", dashed blue arrow "Control".
+Note "Functional overview; auxiliary signals omitted. CPU / accelerator selection depends on build."
+Technical constraints: do not copy CPU pipeline internals from reference images. Show CPU v1/v2 as selectable alternatives, never two simultaneous CPUs. I/D caches share one bridge and p_axi. The old d_axi master is inactive and should not appear. NPU and LPU are alternatives, not simultaneous default active engines. Boot ROM loader is a memory-writing AXI master. Readability is paramount: enough whitespace for arrows, no line through labels, no cropped text, no spelling errors.
+
+Correction 1:
+Correct ONLY the wiring of this technical block diagram. Preserve all boxes, all labels in boxes, colors, dimensions, title, layout and footer exactly. Fix the following wiring mistakes carefully:
+1. Delete the solid vertical bidirectional arrow between CPU bottom near x256,y375 and SynapEngine top y453. Retain the dashed CSR control arrow at x114.
+2. Delete the solid vertical bidirectional arrow from D-Cache bottom x560,y399 to DMA top y465. Replace with a tensor data connection: SynapEngine RIGHT edge at (303,485) -> (333,485) -> (333,425) -> (560,425) -> D-Cache BOTTOM at (560,399), solid blue with arrowheads at both box endpoints. Label this horizontal segment "tensor data" above at x425,y412.
+3. Remove completely the dashed CPU-to-DMA CSR-control line starting at CPU right lower edge x352,y364 through x386 to DMA left x436,y505, AND its CSR control label near x450,y415. DMA already says CSR-controlled.
+4. Remove solid horizontal DMA-to-Boot-ROM arrow from x630,y504 to x723,y504. Remove the entire dma_axi connection from Boot ROM RIGHT edge at x973,y480 to x1183,y480 and up to AXI4 arbitration at x1245,y326. Remove old dma_axi label.
+Replace with an independent DMA memory connection: DMA TOP edge (615,465) -> (615,435) -> (1183,435) -> (1183,326) -> AXI4 arbitration LEFT edge (1245,326). Use solid blue with arrowheads at the two box endpoints. Put label "dma_axi" above the horizontal part near (1060,425). This wire must NOT connect to Boot ROM. At crossing with vertical MMIO x658 draw a tiny white gap in horizontal wire with no junction dot, maintaining MMIO line continuity.
+Keep bt_axi connection from Boot ROM RIGHT edge x973,y535 -> x1208,y535 -> AXI4 arbitration x1245,y350 unchanged.
+5. Remove the entire dashed line leading from peripheral bus at x415,y655 up y599 left x153 and into SynapEngine bottom. Remove its text "Timer / UART interrupts to CPU". No replacement IRQ line needed.
+6. External LCD connection should have arrowhead only toward LCD. Microphone connection should have arrowhead only toward I2S RX. Keep Host PC, SD card, Board I/O double arrows.
+Absolutely no extra connections. All unchanged labels must retain perfect spelling. Flat white background. This is a precise wiring repair, not a redesign.
+
+Correction 2:
+Edit this engineering diagram with surgical precision. Keep all existing boxes, text, styling, layout, all other lines. Repair ONLY the DMA memory wire, which is currently incorrectly merged with MMIO at x658.
+White-erase the short horizontal DMA-right-edge line from (631,489) to (658,489). Preserve the DMA right border. Preserve the full vertical MMIO line x658 from D-Cache bottom to peripheral bus.
+Erase the open circle at (658,431). Restore a continuous straight blue vertical MMIO line through that location.
+The dma_axi horizontal wire y431 currently starts at x658 and runs right to x1183. Extend this wire LEFT to x615. Give it a clear upward semicircular wire-jump hump over the MMIO vertical line at x658, spanning x647..669, raised to y418, no junction. White clearance around hump makes the horizontal DMA path visibly separate from the vertical MMIO line.
+Add a vertical solid blue segment at x615 from DMA TOP edge y465 UP to y431, joined to the extended horizontal dma_axi line. Add a downward-pointing arrowhead where that segment enters DMA top at (615,465). Thus DMA top goes up then right via a bridge-shaped crossing OVER MMIO, and goes all the way right to existing AXI arbitration route. MMIO remains a separate continuous straight vertical bus. NO direct DMA-to-MMIO junction. This is crucial.
+Also remove ONLY the downward arrowhead at bottom of microphone line around (582,843), retaining the upward arrowhead at I2S RX and retaining its line; microphone data flows upward.
+Do not change any labels or other connectors.
+
+Correction 3:
+Make one precise local repair to the attached block diagram, preserving everything else:
+The blue horizontal tensor data wire and blue horizontal dma_axi wire at y430 must be TWO SEPARATE WIRES with a clear WHITE GAP between x565 and x605.
+LEFT WIRE: from SynapEngine right edge (303,500), right to (348,500), up to (348,430), right to (560,430), then UP to D-Cache bottom (560,398). Put an upward arrowhead where it enters D-Cache at (560,398). Keep left-pointing arrowhead at SynapEngine. The label tensor data belongs to this left wire.
+RIGHT WIRE: from DMA top (615,464), UP to (615,430), then right along the existing dma_axi horizontal line, preserving the jump over vertical MMIO at x658 and the existing route to AXI4 arbitration. Downward arrowhead enters DMA at (615,464).
+ERASE the incorrect downward connection at x556 from y430 to DMA y464; restore plain white there.
+ERASE the horizontal blue segment between x565 and x605 at y430. The gap must remain empty white. There must be NO connection between tensor data and dma_axi.
+Keep ALL other labels boxes lines and styling absolutely unchanged. Do not add new lines.
+
+Correction 4:
+Refine this PSC-ONE diagram, preserving its beautiful visual style, titles, peripheral panel, CPU, caches, bridge and memory subsystem.
+Fix the middle row layout to make independent data connections unambiguous. You MAY reposition and resize the DMA and Boot ROM boxes within the white middle area. Do this:
+1. MOVE the green DMA box from its current position under the D-Cache to the area DIRECTLY UNDER the orange Shared AXI bridge, at the right side of PSC_ONE_SOC. Make DMA a wide short horizontal box with text "DMA | CSR-controlled". Connect its RIGHT edge horizontally to the existing dma_axi route to AXI4 arbitration. This now requires no crossing of MMIO.
+2. Place the grey Boot ROM loader immediately BELOW this relocated DMA box, as a second wide short horizontal box. Preserve its text "Boot ROM loader" and "AXI master (memory write)". Keep its independent bt_axi connection to arbitration on the right.
+3. The vacated area of the old DMA box is now WHITE SPACE. There must be NO original DMA box left there.
+4. Make the SynapEngine tensor data line end at the LEFT PART of the D-Cache BOTTOM EDGE. Route right from SynapEngine, up through the white space, right, then up into D-Cache bottom LEFT side. The tensor data wire must never touch or join the vertical MMIO line, which leaves D-Cache bottom CENTER and goes down to peripherals.
+5. MMIO remains the straight vertical connection from D-Cache center bottom to the peripheral bus.
+6. Independent routes, exactly: SynapEngine <-> D-Cache (tensor data); D-Cache <-> peripheral bus (MMIO); DMA <-> AXI arbitration (dma_axi); Boot ROM <-> AXI arbitration (bt_axi). Do not combine any of these routes. This independence is much more important than exact old coordinates.
+Everything else stays the same. Keep text crisp, all boxes neatly spaced and no overlap.
+
+Correction 5:
+Preserve this entire diagram. Make ONLY one tiny wire correction in the narrow white gap between DMA and memory subsystem:
+The dma_axi blue wire leaving DMA right edge should turn UP on the FIRST vertical track, the track nearest DMA, and enter the MIDDLE left-facing port of AXI4 arbitration. Extend that first vertical track downward to meet the horizontal DMA wire and form an L. Trim the DMA horizontal wire so it STOPS at this first vertical track. It must NOT continue farther right to touch the SECOND vertical track carrying bt_axi or the blue memory-subsystem frame.
+The Boot ROM bt_axi wire remains on its own SECOND track farther right and connects the LOWEST arbitration port.
+Thus dma_axi and bt_axi are two SEPARATE parallel blue L-shaped wires with white space between them. No shared segment and no T junction.
+Do not change anything else: all text, positions, boxes, colors, other wires, sizes and layout are frozen.
+

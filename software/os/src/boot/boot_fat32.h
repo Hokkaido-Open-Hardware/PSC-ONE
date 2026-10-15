@@ -52,4 +52,16 @@ int boot_fat32_load_mem_file(
     uint32_t *loaded_words
 );
 
+/* Decoded chunks are temporary; the sink must copy them before returning.
+ * offset/count are bytes, always word aligned. No fixed staging address. */
+typedef int (*boot_mem_sink_fn)(void *ctx, uint32_t offset,
+                                const uint32_t *words, uint32_t count);
+int boot_fat32_stream_mem_file(const char *name, uint32_t max_words,
+                               boot_mem_sink_fn sink, void *ctx,
+                               uint32_t *loaded_words);
+
+/* max_words bounds every destination store; output is set only on success. */
+int boot_fat32_load_mem_file_bounded(const char *name, uint32_t dst_addr,
+                                     uint32_t max_words, uint32_t *loaded_words);
+
 #endif

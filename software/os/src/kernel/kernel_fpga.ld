@@ -38,13 +38,13 @@ SECTIONS {
 
     . = ALIGN(4096);
     __free_ram = .;
-    /* Do not allocate over the external shell image while copying it.
-       Keep the existing kernel/user bases; cap only the page pool. */
+    /* Keep kernel identity mappings below the user virtual range.
+       SD chunks go directly to allocated process pages, with no staging image. */
     __free_ram_end = MIN(__free_ram + 1 * 1024 * 1024,
-                         _binary_shell_bin_start);
-    ASSERT(__free_ram < __free_ram_end, "kernel overlaps shell load area")
+                         USER_BASE);
+    ASSERT(__free_ram < __free_ram_end, "kernel overlaps user virtual range")
     /* Shell copy + separately mapped stack + page tables for idle/shell. */
-    ASSERT(__free_ram + ALIGN(_binary_shell_bin_end - _binary_shell_bin_start, 4096)
+    ASSERT(__free_ram + ALIGN(__shell_image_size, 4096)
            + 128 * 1024 + 8 * 4096 <= __free_ram_end,
            "insufficient page pool for shell and stack")
 }

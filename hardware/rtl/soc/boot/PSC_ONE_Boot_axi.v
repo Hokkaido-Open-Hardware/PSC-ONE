@@ -143,14 +143,19 @@ module PSC_ONE_Boot_axi #(
         u_boot_rom(.clock(clock), .addr(rom_idx), .dout(boot_rom_data_out));
     kernel_rom # (.ADDR_WIDTH(ROMIDX_W))
         u_kernel_rom(.clock(clock), .addr(rom_idx), .dout(kernel_rom_data_out));
+`ifdef FPGA_BOOT_LOADER_MODE
+    // The SD boot kernel loads USER.MEM itself; no user ROM is required.
+    assign user_rom_data_out = {DATA_WIDTH{1'b0}};
+`else
     user_rom # (.ADDR_WIDTH(ROMIDX_W))
         u_user_rom(.clock(clock), .addr(rom_idx), .dout(user_rom_data_out));
+`endif
     
     // --------- STAGE ---------
     localparam [3:0] ERAZE_STAGE        = 4'd0,
                      BOOT_STAGE         = 4'd1,
                      KERNEL_STAGE       = 4'd2, 
-                     USER_STAGE         = 4'd3, 
+                     USER_STAGE         = 4'd3,
                      BOOTLOADER_STAGE   = 4'd4;
 
     reg [3:0]        write_st;
@@ -536,7 +541,7 @@ module kernel_rom #(
     end
 endmodule
 
-// user.mem
+// user.mem: direct PSC-OS boot preloads the image into SDRAM.
 module user_rom #(
     parameter integer ADDR_WIDTH = 20
 )(
@@ -549,7 +554,7 @@ module user_rom #(
     initial $readmemh("mem/user.mem", mem);
 
     always @(posedge clock) begin
-        if (addr > ROM_WORD)
+        if (addr >= ROM_WORD)
             dout <= 32'd0;
         else
             dout <= mem[addr];

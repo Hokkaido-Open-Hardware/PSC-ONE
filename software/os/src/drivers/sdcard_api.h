@@ -29,6 +29,8 @@ typedef uint32_t vaddr_t;
 #define false 0
 
 int sd_read_sector(uint32_t sector, uint8_t *buf);
+/* CRC-verified read, up to three attempts. Used for executable images. */
+int sd_read_sector_checked(uint32_t sector, uint8_t *buf);
 int sd_write_sector(uint32_t sector, uint8_t *buf);
 int sd_write_sector_quiet(uint32_t sector, const uint8_t *buf);
 

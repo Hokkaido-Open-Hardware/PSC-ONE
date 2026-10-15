@@ -2,7 +2,7 @@
 //
 // PSC_CPU_TimingTop.sv
 //
-// nextpnr / Himbaechel timing-analysis wrapper for PSC_RV32ISP_core.
+// nextpnr / Himbaechel timing-analysis wrapper for PSC_RV32_core.
 //
 // Purpose:
 //   - Keep the CPU core as the timing target.
@@ -14,10 +14,10 @@
 // Notes:
 //   - This wrapper is for static timing comparison only.
 //   - It is NOT a functional memory model and is NOT intended for simulation.
-//   - Use exactly the same wrapper for CPU_V1 and CPU_V2 comparisons.
+//   - Use the same wrapper for legacy, CPU_V1 and CPU_V2 comparisons.
 //   - Only clock/reset_n/timing_keep are top-level I/O, so the CST can be tiny.
 //
-// The PSC_RV32ISP_core interface used here matches the project source:
+// The PSC_RV32_core interface used here matches the project source:
 // clock/reset/cpu_stop/timer_irq_ext, program/data/MMU memory ports,
 // cache/DMA/SynapEngine/monitor CSR ports, and uart_out.
 
@@ -139,7 +139,7 @@ module PSC_CPU_TimingTop (
         .clock                      (clock),
         .reset_n                    (reset_n),
         .cpu_stop                   (cpu_stop),
-        .timer_irq_ext              (timer_irq_ext),
+        .timer_irq_ext              (irq_ext),
 
         // Program memory
         .program_mem_burst_mode     (program_mem_burst_mode),

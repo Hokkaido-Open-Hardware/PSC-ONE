@@ -5,6 +5,7 @@
 #   make -f Makefile.nextpnr.cpu timing CPU_VERSION=v1
 #   make -f Makefile.nextpnr.cpu timing CPU_VERSION=v2
 #   make -f Makefile.nextpnr.cpu timing CPU_VERSION=legacy
+#   make -f Makefile.nextpnr.cpu timing CPU_VERSION=rv64
 #
 # Optional:
 #   make -f Makefile.nextpnr.cpu timing CPU_VERSION=v1 FREQ=81
@@ -16,9 +17,12 @@
 #
 # Notes:
 #   - Gowin IDE is not used.
-#   - v1/v2 SystemVerilog is converted by sv2v before Yosys.
+#   - v1/v2/rv64 SystemVerilog is converted by sv2v before Yosys.
 #   - legacy is read directly by Yosys.
 #   - PSC_CPU_TimingTop.sv is used as a timing-only wrapper.
+#   - rv64 uses PSC_CPU_RV64_TimingTop.sv with 64-bit data/address/CSR ports.
+#   - Resource counts include the core and timing wrapper, but no SoC
+#     peripherals, caches or external memory.
 # ============================================================
 
 SHELL := /bin/bash
@@ -98,6 +102,29 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/Csr.sv \
 	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
 
+CPU_RV64_SRC_DIR = ../rtl/soc/cpu_rv64/src
+
+# RV64 core only; keep the package first for sv2v.
+CPU_RV64_CORE_FILES = \
+	$(CPU_RV64_SRC_DIR)/PSC_Types.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_RV64_core.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_RV64_FetchUnit.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_FetchPredict.sv \
+	$(CPU_RV64_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_RV64_SRC_DIR)/Fetch.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_RV64_InstructionEngine.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_RV64_SRC_DIR)/Decorder.sv \
+	$(CPU_RV64_SRC_DIR)/Execute.sv \
+	$(CPU_RV64_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_RV64_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_RV64_SRC_DIR)/Branch.sv \
+	$(CPU_RV64_SRC_DIR)/MemoryStore.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_Register.sv \
+	$(CPU_RV64_SRC_DIR)/PSC_PC.sv \
+	$(CPU_RV64_SRC_DIR)/MMU.sv \
+	$(CPU_RV64_SRC_DIR)/Csr.sv
+
 CPU_VERSION ?= v1
 
 ifeq ($(CPU_VERSION),v1)
@@ -109,15 +136,21 @@ USE_SV2V := 1
 else ifeq ($(CPU_VERSION),legacy)
 SELECTED_CPU_CORE_FILES := $(CPU_CORE_FILES)
 USE_SV2V := 0
+else ifeq ($(CPU_VERSION),rv64)
+SELECTED_CPU_CORE_FILES := $(CPU_RV64_CORE_FILES)
+USE_SV2V := 1
 else
-$(error CPU_VERSION=$(CPU_VERSION) is invalid. Use v1 / v2 / legacy)
+$(error CPU_VERSION=$(CPU_VERSION) is invalid. Use v1 / v2 / legacy / rv64)
 endif
 
 TIMING_DIR     := ../rtl/tang20k/timing
-TIMING_WRAPPER := $(TIMING_DIR)/PSC_CPU_TimingTop.sv
-TIMING_CST     := $(TIMING_DIR)/PSC_CPU_TimingTop.cst
-
+ifeq ($(CPU_VERSION),rv64)
+TOP := PSC_CPU_RV64_TimingTop
+else
 TOP := PSC_CPU_TimingTop
+endif
+TIMING_WRAPPER := $(TIMING_DIR)/$(TOP).sv
+TIMING_CST     := $(TIMING_DIR)/$(TOP).cst
 
 BUILD_DIR    ?= build_nextpnr_$(CPU_VERSION)
 CONVERTED_V  := $(BUILD_DIR)/cpu_$(CPU_VERSION)_converted.v
@@ -207,6 +240,7 @@ timing: pnr
 	@echo "============================================================"
 	@echo " CPU $(CPU_VERSION) nextpnr timing summary"
 	@echo "============================================================"
+	@sed -n '/Device utilisation:/,/^$$/p' $(NEXTPNR_LOG)
 	@grep -Ei \
 		'Max frequency|MHz|critical path|slack|timing|logic utilisation|utilization|Device utilisation' \
 		$(NEXTPNR_LOG) | tail -n 200 || true
@@ -218,6 +252,7 @@ report:
 		echo "[ERROR] $(NEXTPNR_LOG) not found. Run timing first."; \
 		exit 1; \
 	fi
+	@sed -n '/Device utilisation:/,/^$$/p' $(NEXTPNR_LOG)
 	@grep -Ei \
 		'Max frequency|MHz|critical path|slack|timing|logic utilisation|utilization|Device utilisation' \
 		$(NEXTPNR_LOG) | tail -n 240 || true

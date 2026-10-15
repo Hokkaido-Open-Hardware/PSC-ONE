@@ -50,6 +50,7 @@ module PSC_InstructionUnit (
     input  logic        load_done,
     input  logic        store_done,
     input  logic [63:0] load_read_data,
+    input  logic        load_unaligned,
 
     // Commit / CSR interface
     input  csr_state_t  csr_state,
@@ -510,7 +511,7 @@ module PSC_InstructionUnit (
                     2'b00: mem_wb.w_data <= ex_mem.alu_data;
                     2'b01: mem_wb.w_data <= load_result(
                                                 load_read_data,
-                                                ex_mem.alu_data[2:0],
+                                                load_unaligned ? 3'b0 : ex_mem.alu_data[2:0],
                                                 ex_mem.ctrl.funct3);
                     2'b10: mem_wb.w_data <= ex_mem.pc + 64'd4;
                     default: mem_wb.w_data <= csr_rdata;

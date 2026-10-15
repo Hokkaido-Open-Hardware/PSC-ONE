@@ -1,8 +1,9 @@
 """RV64 bare-core C++ tests using the existing PIO32 result protocol.
 
 The bus uses request pulses issued after req_ready, and separate response
-pulses named read_ready/write_ready. Instructions remain 32 bits; memory
-responses are aligned little-endian 64-bit beats. No SoC or MMU emulation.
+pulses named read_ready/write_ready. Instruction responses are 32-bit words.
+Data responses use 64-bit little-endian lanes: data_rw_double selects an
+8-byte beat or a 4-byte beat in the addressed half. No SoC or MMU emulation.
 """
 import os
 from pathlib import Path
@@ -66,9 +67,14 @@ class Memory:
                    if instruction and self.nop_fill else 0) << (8 * i)
                    for i in range(size))
 
-    def read_beat(self, address, instruction=False):
+    def read_beat(self, address, instruction=False, double=True):
         self.check_address(address)
-        return self.read(address & ~7, instruction=instruction)
+        if instruction:
+            return self.read(address & ~3, size=4, instruction=True)
+        if double:
+            return self.read(address & ~7)
+        # Keep the addressed word in its existing 64-bit bus lanes.
+        return self.read(address & ~3, size=4) << ((address & 4) * 8)
 
     def write(self, address, data, funct3):
         if funct3 not in (0, 1, 2, 3):
@@ -91,12 +97,14 @@ def initialize_dut_inputs(dut):
         getattr(dut, name).value = 0
     dut.program_mem_req_ready.value = 1
     dut.data_mem_req_ready.value = 1
-    for name in ("program_mem_read_address", "program_mem_read_data",
+    for name in ("program_mem_read_address",
                  "data_mem_read_address", "data_mem_read_data",
                  "mem_write_address", "mem_write_data",
                  "mmu_data_mem_read_address", "mmu_data_mem_read_data"):
         assert len(getattr(dut, name)) == 64, f"Update model for changed port {name}"
     assert len(dut.mem_write_sel) == 3
+    assert len(dut.program_mem_read_data) == 32
+    assert len(dut.data_rw_double) == 1
 
 
 class PIO32Result:
@@ -143,7 +151,7 @@ class MemoryBus:
     Requests are sampled at falling-edge ReadOnly (stable across the following
     rising edge). Responses are driven 1 ps after that rising edge and consumed
     by RTL on the next rising edge. No RTL/cocotb same-edge write race.
-    A program burst returns four beats (+0,+8,+16,+24), one per cycle.
+    A program burst returns eight 32-bit beats (+0,+4,...,+28), one per cycle.
     """
     def __init__(self, dut, memory, latency, result):
         self.dut, self.memory, self.latency = dut, memory, latency
@@ -166,11 +174,19 @@ class MemoryBus:
                 if int(dut.program_mem_read_valid.value):
                     address = int(dut.program_mem_read_address.value)
                     burst = int(dut.program_mem_burst_mode.value)
-                    if address % (32 if burst else 8):
+                    if address % (32 if burst else 4):
                         raise AssertionError(f"Unaligned instruction bus request: {address:#x}")
-                    requests.append(("program", address, 4 if burst else 1, 0))
+                    requests.append(("program", address, 8 if burst else 1, 0))
+                if int(dut.data_mem_read_valid.value) or int(dut.data_mem_write_valid.value):
+                    # mem_write_sel exposes the bus access size for loads too;
+                    # misaligned instructions are split into byte requests.
+                    funct3 = int(dut.mem_write_sel.value)
+                    double = int(dut.data_rw_double.value)
+                    assert double == int(funct3 == 3), (
+                        f"data_rw_double={double} for memory funct3={funct3}"
+                    )
                 if int(dut.data_mem_read_valid.value):
-                    requests.append(("read", int(dut.data_mem_read_address.value), 1, 0))
+                    requests.append(("read", int(dut.data_mem_read_address.value), 1, double))
                 if int(dut.data_mem_write_valid.value):
                     requests.append(("write", int(dut.mem_write_address.value),
                                      int(dut.mem_write_data.value), int(dut.mem_write_sel.value)))
@@ -191,7 +207,7 @@ class MemoryBus:
                     if kind == "program":
                         for beat in range(data):
                             pending.append((cycle + self.latency - 1 + beat,
-                                            kind, address + beat * 8, 0, 0))
+                                            kind, address + beat * 4, 0, 0))
                     else:
                         pending.append((cycle + self.latency - 1, kind, address, data, sel))
                 due = [item for item in pending if item[0] == cycle]
@@ -222,7 +238,7 @@ class MemoryBus:
                     else:
                         prefix = "program" if kind == "program" else "data"
                         getattr(dut, f"{prefix}_mem_read_data").value = self.memory.read_beat(
-                            address, instruction=(kind == "program"))
+                            address, instruction=(kind == "program"), double=bool(sel))
                         getattr(dut, f"{prefix}_mem_read_ready").value = 1
             dut.csr_CPU_MON_CYCLE.value = cycle & MASK
 

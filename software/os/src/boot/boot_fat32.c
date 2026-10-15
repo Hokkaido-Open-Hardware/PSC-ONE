@@ -311,8 +311,8 @@ int boot_fat32_find(
 
         s_printf("FAT32: calc lba\n");
 
-        /* root cluster = 2 固定で検証 */
-        dir_lba = g_data_begin_lba;
+        /* Follow the actual root-directory cluster chain. */
+        dir_lba = boot_fat32_cluster_to_lba(dir_cluster);
 
         s_printf("FAT32: read dir\n");
 
@@ -582,16 +582,19 @@ static void boot_fat32_mem_progress(const char *name, uint32_t read_bytes,
     s_printf(" bytes\n");
 }
 
-int boot_fat32_load_mem_file(
+int boot_fat32_stream_mem_file(
     const char *name,
-    uint32_t dst_addr,
+    uint32_t max_words,
+    boot_mem_sink_fn sink,
+    void *ctx,
     uint32_t *loaded_words
 )
 {
     uint32_t cluster;
     uint32_t size;
     uint32_t remain;
-    volatile uint32_t *dst;
+    uint32_t decoded[64];
+    uint32_t buffered = 0;
     uint32_t words;
     uint32_t hex_count;
     uint32_t word;
@@ -616,7 +619,7 @@ int boot_fat32_load_mem_file(
         return -1;
     }
 
-    dst = (volatile uint32_t *)dst_addr;
+    if (!sink || max_words > 0x3fffffffu) return -1;
     remain = size;
     words = 0;
     hex_count = 0;
@@ -670,8 +673,17 @@ int boot_fat32_load_mem_file(
                     hex_count++;
 
                     if (hex_count == 8u) {
-                        dst[words] = word;
+                        if (words >= max_words) {
+                            s_printf("FAT32: mem image too large\n");
+                            return -1;
+                        }
+                        decoded[buffered++] = word;
                         words++;
+                        if (buffered == 64u) {
+                            if (sink(ctx, (words - buffered) * 4u,
+                                     decoded, buffered * 4u)) return -1;
+                            buffered = 0;
+                        }
 
                         word = 0;
                         hex_count = 0;
@@ -686,6 +698,11 @@ int boot_fat32_load_mem_file(
                 }
             }
 
+            if (buffered) {
+                if (sink(ctx, (words - buffered) * 4u,
+                         decoded, buffered * 4u)) return -1;
+                buffered = 0;
+            }
             remain -= sector_bytes;
             /* Count SD text bytes only after a successful read/conversion.
              * Metadata reads and retries never advance this file counter. */
@@ -714,4 +731,27 @@ int boot_fat32_load_mem_file(
     s_printf("FAT32: %s load complete\n", name);
 
     return 0;
+}
+
+static int mem_store(void *ctx, uint32_t offset,
+                     const uint32_t *words, uint32_t count)
+{
+    memcpy((uint8_t *)ctx + offset, words, count);
+    return 0;
+}
+
+int boot_fat32_load_mem_file_bounded(const char *name, uint32_t dst_addr,
+                                     uint32_t max_words, uint32_t *loaded_words)
+{
+    if (max_words > (0xffffffffu - dst_addr) / 4u) return -1;
+    return boot_fat32_stream_mem_file(name, max_words, mem_store,
+                                      (void *)dst_addr, loaded_words);
+}
+
+int boot_fat32_load_mem_file(const char *name, uint32_t dst_addr,
+                            uint32_t *loaded_words)
+{
+    return boot_fat32_load_mem_file_bounded(name, dst_addr,
+                                           (0xffffffffu - dst_addr) / 4u,
+                                           loaded_words);
 }
