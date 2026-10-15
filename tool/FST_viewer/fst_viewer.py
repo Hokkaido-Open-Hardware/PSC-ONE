@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PSC_RV32 FST CPU viewer: parser, analysis model, and local web GUI."""
+"""PSC RV32/RV64 FST CPU viewer: parser, analysis model, and local web GUI."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from cpu_profiles.base import (CPU_STATES, EXEC_STATES, DIV_STATES, MUL_STATES,
     LOAD_STATES, STORE_STATES, CTRL_FIELDS, unpack_ctrl, SignalInfo, CycleSample,
     InstructionRecord, ViewerError)
 from cpu_profiles.v1 import unpack_stage
-from cpu_profiles import select_profile
+from cpu_profiles import PROFILES, select_profile
 
 
 class TraceModel:
@@ -194,7 +194,7 @@ class TraceModel:
     def _new_record(self, pc: int, opcode: int, cycle: int) -> int:
         ident = self._next_ident
         self._next_ident += 1
-        decoded = decode(opcode, pc).to_dict()
+        decoded = decode(opcode, pc, xlen=self.profile.xlen).to_dict()
         record = InstructionRecord(ident, pc, opcode, decoded, cycle, cycle)
         self.instructions.append(record)
         self.records[ident] = record
@@ -233,7 +233,7 @@ class TraceModel:
             fetch = None
             opcode, pc_now = sample.value("opcode"), sample.value("pc_now")
             if opcode is not None and pc_now is not None and sample.value("decode_enb") == 1:
-                decoded = decode(opcode, pc_now)
+                decoded = decode(opcode, pc_now, xlen=self.profile.xlen)
                 if category == "ALL" or decoded.category == category:
                     fetch = {"pc": pc_now, "opcode": opcode, "mnemonic": decoded.mnemonic,
                              "text": decoded.text, "category": decoded.category}
@@ -267,7 +267,7 @@ class TraceModel:
             "pc": value("arch_pc"), "counter": value("counter"),
             "cpu_state": self.profile.state_name("cpu_state", value("cpu_state")),
             "fetch": None if value("opcode") is None or value("pc_now") is None else
-                     decode(value("opcode"), value("pc_now")).to_dict(),
+                     decode(value("opcode"), value("pc_now"), xlen=self.profile.xlen).to_dict(),
             "stages": stages,
             "profile_detail": self.profile.extra_detail(sample),
             "registers": self.register_detail(cycle),
@@ -364,7 +364,7 @@ class TraceModel:
             category = record.decoded["category"]
             categories[category] = categories.get(category, 0) + 1
         return {
-            "cpu": self.profile.cpu, "display_model": self.profile.model,
+            "cpu": self.profile.cpu, "xlen": self.profile.xlen, "display_model": self.profile.model,
             "stage_names": list(self.profile.stage_names),
             "source": str(self.source), "size": self.source.stat().st_size,
             "timescale": self.timescale, "cycles": len(self.samples),
@@ -373,6 +373,17 @@ class TraceModel:
             "signals": {key: {"path": info.path, "width": info.width} for key, info in self.signals.items()},
             "missing_optional": sorted(set(self.profile.specs) - set(self.signals)),
         }
+
+
+def json_safe(data):
+    """Keep integers outside JavaScript's exact range lossless on the wire."""
+    if isinstance(data, int) and not isinstance(data, bool) and abs(data) > (1 << 53) - 1:
+        return str(data)
+    if isinstance(data, dict):
+        return {key: json_safe(value) for key, value in data.items()}
+    if isinstance(data, (list, tuple)):
+        return [json_safe(value) for value in data]
+    return data
 
 
 class ViewerHandler(BaseHTTPRequestHandler):
@@ -384,7 +395,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
         super().log_message(fmt, *args)
 
     def _json(self, data, status=HTTPStatus.OK) -> None:
-        body = json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode()
+        body = json.dumps(json_safe(data), separators=(",", ":"), ensure_ascii=False).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -455,11 +466,11 @@ def find_trace(explicit: str | None) -> Path:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="PSC_RV32 CPU FST timeline viewer")
+    parser = argparse.ArgumentParser(description="PSC RV32/RV64 CPU FST timeline viewer")
     parser.add_argument("trace", nargs="?", help="FST or VCD file (default: newest under hardware/sim/wave)")
     parser.add_argument("--host", default="127.0.0.1", help="HTTP bind address (default: 127.0.0.1)")
     parser.add_argument("--port", type=int, default=8000, help="First HTTP port to try; 0 selects any free port")
-    parser.add_argument("--cpu", choices=("auto", "legacy", "v1", "v2"), default="auto")
+    parser.add_argument("--cpu", choices=("auto", *PROFILES), default="auto")
     parser.add_argument("--no-browser", action="store_true", help="do not open the default browser")
     parser.add_argument("--summary", action="store_true", help="parse, print JSON summary, and exit")
     return parser.parse_args()
@@ -483,7 +494,7 @@ def main() -> int:
     args = parse_args()
     try:
         trace = find_trace(args.trace)
-        print(f"PSC_RV32 FST Viewer\n  trace: {trace.resolve()}\n  parsing with verified CPU signals...", flush=True)
+        print(f"PSC RV32/RV64 FST Viewer\n  trace: {trace.resolve()}\n  parsing with verified CPU signals...", flush=True)
         model = TraceModel(trace, args.cpu)
         model.parse()
         meta = model.meta()

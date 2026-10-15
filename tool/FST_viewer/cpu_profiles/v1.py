@@ -115,6 +115,7 @@ def unpack_stage(raw: int | None, name: str) -> dict | None:
 
 STAGE_NAMES = ("ID / ISSUE", "EXECUTE", "MEMORY", "WRITEBACK", "COMMIT")
 class V1Profile(BaseProfile):
+    unpack_stage = staticmethod(unpack_stage)
     register_bank = ".u_inst_engine.u_inst_unit.u_regfile.registers.registers[{i}]"
     cpu = "v1"
     model = "pipeline"
@@ -133,17 +134,23 @@ class V1Profile(BaseProfile):
     optional_widths = {"execute_state":2,"divider_state":3,"multiplier_state":2,
                        "load_state":4,"store_state":3,"cpu_state":4}
 
+    def discover(self, paths):
+        # RV32 v1 and RV64 share instance names. Use the PC width to distinguish
+        # them; setup still checks every required packed payload width.
+        return [root for root in super().discover(paths)
+                if getattr(paths.get(root + self.specs["pc_now"]), "width", 32) == self.xlen]
+
     def stage_data(self, sample):
-        stages = [unpack_stage(sample.value(k), k) for k in self.stage_keys]
+        stages = [self.unpack_stage(sample.value(k), k) for k in self.stage_keys]
         if stages[1]:
             stages[1]["alu_result"] = sample.value("execute_alu_data") if sample.value("execute_done") == 1 else None
         return stages
 
     def sample(self, m, timestamp: int, pre: dict[str, int | None]) -> None:
         cycle = len(m.samples)
-        post_stages = [unpack_stage(m._current.get(key), key)
+        post_stages = [self.unpack_stage(m._current.get(key), key)
                        for key in ("id_issue", "issue_ex", "ex_mem", "mem_wb", "commit")]
-        pre_stages = [unpack_stage(pre.get(key), key)
+        pre_stages = [self.unpack_stage(pre.get(key), key)
                       for key in ("id_issue", "issue_ex", "ex_mem", "mem_wb", "commit")]
         old = m._stage_tokens
         decode_fire = pre.get("decode_fire") == 1

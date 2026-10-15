@@ -1,4 +1,4 @@
-# PSC_RV32 Trace Studio
+# PSC RV32/RV64 Trace Studio
 
 [PSC-ONE](../../README.md) · [Documentation](../../docs/README.md)
 
@@ -23,6 +23,7 @@
 | legacy | supported | FSM（pipeline_mode=0） |
 | v1 | supported | valid/ready pipeline |
 | v2 | supported | experimental OoO / scheduler（ROB=2、IQ=2、PRF=34） |
+| rv64 | supported | CPU_RV64 valid/ready pipeline（64bit PC・整数レジスタ） |
 
 `cpu_profiles/base.py` が共通契約を定義し、各profileがCPU判別用の構造、階層探索、必須／任意信号、幅検証、packed配置、状態名、命令追跡、Inspectorを提供します。本体は共通のストリーム解析・検索・HTTP APIです。命令種別の色と逆アセンブラは全CPU共通です。
 
@@ -46,6 +47,7 @@ python3 fst_viewer.py validation/v2.fst
 python3 fst_viewer.py trace.fst --cpu legacy
 python3 fst_viewer.py trace.fst --cpu v1
 python3 fst_viewer.py trace.fst --cpu v2
+python3 fst_viewer.py trace.fst --cpu rv64
 python3 fst_viewer.py trace.fst --no-browser --port 8000
 python3 fst_viewer.py trace.fst --summary
 ```
@@ -145,9 +147,13 @@ Execute状態: IDLE / DIV_WAIT / MUL_WAIT / RESULT_HOLD。DIV: IDLE / INIT / RUN
 
 配列信号がないlegacy/v1 traceや不明値は—表示します。v2も途中開始のtraceでは初期値を推測せず、リセットまたは書込みを観測するまで—です。v2のリセット復元はCPU edgeで観測できるリセットを対象とします。信号幅不一致はエラーにします。表示値は選択cycle時点の値で、命令台帳の将来の結果を使用しません。
 
+CPU_RV64はv1と共通の階層名を使うため、PC信号の幅で判別します。RV64専用profileで196bitの制御情報と261/389/453/454bitのパイプライン情報を検証し、PC・レジスタ・演算値は16桁の16進数、命令語は8桁で表示します。JavaScriptの安全な整数範囲を超える値はHTTP APIで10進文字列に変換し、ブラウザでBigIntとして扱います。RV64のメモリ制御は独立したload/store FSMではなく、pending・MMU・byte indexをInspectorに表示します。
+
 ## 対応命令
 
 共通デコーダはRV32Iの整数ALU・即値・LOAD/STORE・BRANCH・JAL/JALR・LUI/AUIPC、RV32MのMUL/MULH/MULHSU/MULHU/DIV/DIVU/REM/REMU、CSRの6種、ECALL/EBREAK/SRET/MRET/WFI/SFENCE.VMA/FENCE/FENCE.Iを表示します。ABI名とx番号を併記できます。不正encodingは.wordです。encoding表示は各CPUでその特殊命令の全動作が実装済みであるという保証ではありません。
+
+CPU_RV64ではさらにLD/LWU/SD、ADDIW/ADDW/SUBW、SLLIW/SRLIW/SRAIW/SLLW/SRLW/SRAW、MULW/DIVW/DIVUW/REMW/REMUWと6bitシフト即値を表示します。分岐・JALのターゲットもXLENに従います。RV32モードではRV64専用encodingを受理しません。
 
 ## 検証
 
@@ -155,6 +161,7 @@ Execute状態: IDLE / DIV_WAIT / MUL_WAIT / RESULT_HOLD。DIV: IDLE / INIT / RUN
 python3 -m unittest discover -s tests -v
 python3 validate_traces.py
 python3 validate_traces.py --serve
+python3 validate_traces.py --rv64-trace /path/to/CPU_RV64.fst
 ```
 
 2026-09-07のsingleシミュレーションは3 CPUともPASS（PIO 0xbeef）。ログはhardware/sim/logのtest_result_20260907_120956.log（legacy）、121500.log（v1）、121645.log（v2）。

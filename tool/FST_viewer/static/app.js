@@ -7,9 +7,9 @@ const colors = { ALU: "#27759b", MUL: "#6f55a8", DIV: "#9b4f76", LOAD: "#257c63"
   STORE: "#286e58", BRANCH: "#91662f", JUMP: "#8e612c", CSR: "#82772e",
   SYSTEM: "#59697d", OTHER: "#46566a" };
 const $ = id => document.getElementById(id);
-const hex = (v, width=8) => v == null ? "—" : `0x${Number(v).toString(16).padStart(width,"0")}`;
+const hex = (v, width=(state.meta?.xlen ?? 32)/4) => v == null ? "—" : `0x${BigInt(v).toString(16).padStart(width,"0")}`;
 const bit = v => v == null ? "—" : String(v);
-const fmt = n => Number(n).toLocaleString();
+const fmt = n => BigInt(n).toLocaleString();
 const timeNs = fs => `${(fs / 1e6).toLocaleString(undefined,{maximumFractionDigits:3})} ns`;
 
 async function api(path) {
@@ -27,7 +27,8 @@ async function initialize() {
   try {
     state.meta = await api("/api/meta");
     rows = ["FETCH / DECODE", ...state.meta.stage_names];
-    $("cpuType").textContent = `CPU: PSC_RV32 ${state.meta.cpu}`;
+    $("cpuType").textContent = `CPU: ${state.meta.xlen === 64 ? "CPU_RV64" : "PSC_RV32 " + state.meta.cpu}`;
+    document.body.classList.toggle("rv64", state.meta.xlen === 64);
     $("modelName").textContent = state.meta.display_model;
     const height = 38 + rows.length*56 + 12;
     document.querySelector(".canvas-shell").style.height = `${height}px`;
@@ -132,7 +133,7 @@ async function loadLedger() {
   if(serial !== state.ledgerSerial) return;
   $("ledgerCount").textContent=`${list.length} records`;
   $("instructionRows").innerHTML=list.map(record=>`<tr data-cycle="${record.start}" data-id="${record.id}" class="${record.id===selectedInstructionId()?"selected":""}">
-    <td>${hex(record.pc)}</td><td>${hex(record.opcode)}</td><td>${escapeHtml(record.text)}</td>
+    <td>${hex(record.pc)}</td><td>${hex(record.opcode,8)}</td><td>${escapeHtml(record.text)}</td>
     <td><span class="cat-pill">${record.category}</span></td><td>${fmt(record.start)}</td><td>${fmt(record.end)}</td><td>${fmt(record.cycles)}</td>
     <td class="${record.status==="retired"?"status-retired":"status-flushed"}">${record.status}</td></tr>`).join("");
   $("instructionRows").querySelectorAll("tr").forEach(row=>row.onclick=()=>{state.selectedStage=0;jump(Number(row.dataset.cycle),true);});
@@ -164,7 +165,7 @@ function renderDetail(d) {
   $("detailsBody").innerHTML=`
     <div class="detail-hero"><div class="datum"><span>Architectural PC</span><strong>${hex(d.pc)}</strong></div><div class="datum"><span>CPU state</span><strong>${d.cpu_state}</strong></div></div>
     <div class="detail-card"><h3>Selected instruction <em>${active?.name??"FETCH"}</em></h3>
-      <div class="instruction-title">${instruction?`${hex(instruction.pc)} : ${hex(instruction.opcode).slice(2)} : ${escapeHtml(instruction.text)}`:"No active instruction"}</div>
+      <div class="instruction-title">${instruction?`${hex(instruction.pc)} : ${hex(instruction.opcode,8).slice(2)} : ${escapeHtml(instruction.text)}`:"No active instruction"}</div>
       ${active?kvGrid([["rs1",`${active.rs1_label} = ${hex(active.rs1_value)}`],["rs2",`${active.rs2_label} = ${hex(active.rs2_value)}`],["rd",active.rd_label],["ALU result",hex(active.alu_result)],["Writeback",hex(active.writeback_value)],["Branch taken",bit(active.branch_taken)] ]):""}
     </div>
     ${Object.keys(d.profile_detail||{}).length ? `<div class="detail-card"><h3>${escapeHtml(state.meta.display_model)}</h3>${kvGrid(Object.entries(d.profile_detail))}</div>` : ""}

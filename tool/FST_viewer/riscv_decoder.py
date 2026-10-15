@@ -1,4 +1,4 @@
-"""Small, dependency-free RV32IM/Zicsr disassembler used by the viewer."""
+"""Small, dependency-free RV32IM/RV64IM/Zicsr disassembler used by the viewer."""
 
 from __future__ import annotations
 
@@ -52,14 +52,17 @@ def _signed(value: int, bits: int) -> int:
 
 def _result(word: int, pc: int, mnemonic: str, operands: str = "",
             category: str = "OTHER", **fields: int | None) -> DecodedInstruction:
-    return DecodedInstruction(word & 0xFFFF_FFFF, pc & 0xFFFF_FFFF,
+    return DecodedInstruction(word & 0xFFFF_FFFF, pc,
                               mnemonic, operands, category, **fields)
 
 
-def decode(word: int, pc: int = 0, abi: bool = True) -> DecodedInstruction:
-    """Decode instructions implemented by PSC_RV32 v1 (RV32IM + Zicsr)."""
+def decode(word: int, pc: int = 0, abi: bool = True, xlen: int = 32) -> DecodedInstruction:
+    """Decode RV32IM/RV64IM + Zicsr; instruction words remain 32 bits."""
+    if xlen not in (32, 64):
+        raise ValueError("XLEN must be 32 or 64")
+    mask = (1 << xlen) - 1
     word &= 0xFFFF_FFFF
-    pc &= 0xFFFF_FFFF
+    pc &= mask
     opcode = word & 0x7F
     rd = (word >> 7) & 0x1F
     funct3 = (word >> 12) & 7
@@ -68,10 +71,15 @@ def decode(word: int, pc: int = 0, abi: bool = True) -> DecodedInstruction:
     funct7 = (word >> 25) & 0x7F
     r = lambda n: reg_name(n, abi)
 
-    if opcode == 0x33:
+    if opcode == 0x33 or (xlen == 64 and opcode == 0x3B):
+        word_op = opcode == 0x3B
         if funct7 == 0x01:
             names = ("mul", "mulh", "mulhsu", "mulhu", "div", "divu", "rem", "remu")
             mnemonic = names[funct3]
+            if word_op:
+                if funct3 in (1, 2, 3):
+                    return _result(word, pc, ".word", f"0x{word:08x}")
+                mnemonic += "w"
             category = "MUL" if funct3 < 4 else "DIV"
             return _result(word, pc, mnemonic, f"{r(rd)}, {r(rs1)}, {r(rs2)}",
                            category, rd=rd, rs1=rs1, rs2=rs2)
@@ -81,29 +89,39 @@ def decode(word: int, pc: int = 0, abi: bool = True) -> DecodedInstruction:
             (0x00, 5): "srl", (0x20, 5): "sra", (0x00, 6): "or",
             (0x00, 7): "and",
         }
+        if word_op:
+            table = {key: name + "w" for key, name in table.items() if key[1] in (0, 1, 5)}
         if (funct7, funct3) in table:
             return _result(word, pc, table[(funct7, funct3)],
                            f"{r(rd)}, {r(rs1)}, {r(rs2)}", "ALU",
                            rd=rd, rs1=rs1, rs2=rs2)
 
-    if opcode == 0x13:
+    if opcode == 0x13 or (xlen == 64 and opcode == 0x1B):
+        word_op = opcode == 0x1B
         imm = _signed(word >> 20, 12)
         names = {0: "addi", 2: "slti", 3: "sltiu", 4: "xori", 6: "ori", 7: "andi"}
+        if word_op:
+            names = {0: "addiw"}
         if funct3 in names:
             return _result(word, pc, names[funct3], f"{r(rd)}, {r(rs1)}, {imm}",
                            "ALU", rd=rd, rs1=rs1, immediate=imm)
-        if funct3 == 1 and funct7 == 0:
-            shamt = rs2
-            return _result(word, pc, "slli", f"{r(rd)}, {r(rs1)}, {shamt}",
+        shift_bits = 6 if xlen == 64 and not word_op else 5
+        shift_top = word >> (20 + shift_bits)
+        shamt = (word >> 20) & ((1 << shift_bits) - 1)
+        if funct3 == 1 and shift_top == 0:
+            return _result(word, pc, "slliw" if word_op else "slli", f"{r(rd)}, {r(rs1)}, {shamt}",
                            "ALU", rd=rd, rs1=rs1, immediate=shamt)
-        if funct3 == 5 and funct7 in (0, 0x20):
-            shamt = rs2
-            mnemonic = "srai" if funct7 == 0x20 else "srli"
+        if funct3 == 5 and shift_top in (0, 0x400 >> shift_bits):
+            mnemonic = "srai" if shift_top else "srli"
+            if word_op:
+                mnemonic += "w"
             return _result(word, pc, mnemonic, f"{r(rd)}, {r(rs1)}, {shamt}",
                            "ALU", rd=rd, rs1=rs1, immediate=shamt)
 
     if opcode == 0x03:
         names = {0: "lb", 1: "lh", 2: "lw", 4: "lbu", 5: "lhu"}
+        if xlen == 64:
+            names.update({3: "ld", 6: "lwu"})
         if funct3 in names:
             imm = _signed(word >> 20, 12)
             return _result(word, pc, names[funct3], f"{r(rd)}, {imm}({r(rs1)})",
@@ -111,6 +129,8 @@ def decode(word: int, pc: int = 0, abi: bool = True) -> DecodedInstruction:
 
     if opcode == 0x23:
         names = {0: "sb", 1: "sh", 2: "sw"}
+        if xlen == 64:
+            names[3] = "sd"
         if funct3 in names:
             imm = _signed(((word >> 25) << 5) | rd, 12)
             return _result(word, pc, names[funct3], f"{r(rs2)}, {imm}({r(rs1)})",
@@ -121,16 +141,16 @@ def decode(word: int, pc: int = 0, abi: bool = True) -> DecodedInstruction:
         if funct3 in names:
             imm = _signed(((word >> 31) << 12) | (((word >> 7) & 1) << 11) |
                           (((word >> 25) & 0x3F) << 5) | (((word >> 8) & 0xF) << 1), 13)
-            target = (pc + imm) & 0xFFFF_FFFF
+            target = (pc + imm) & mask
             return _result(word, pc, names[funct3],
-                           f"{r(rs1)}, {r(rs2)}, 0x{target:08x}", "BRANCH",
+                           f"{r(rs1)}, {r(rs2)}, 0x{target:0{xlen // 4}x}", "BRANCH",
                            rs1=rs1, rs2=rs2, immediate=imm, target=target)
 
     if opcode == 0x6F:
         imm = _signed(((word >> 31) << 20) | (((word >> 12) & 0xFF) << 12) |
                       (((word >> 20) & 1) << 11) | (((word >> 21) & 0x3FF) << 1), 21)
-        target = (pc + imm) & 0xFFFF_FFFF
-        return _result(word, pc, "jal", f"{r(rd)}, 0x{target:08x}", "JUMP",
+        target = (pc + imm) & mask
+        return _result(word, pc, "jal", f"{r(rd)}, 0x{target:0{xlen // 4}x}", "JUMP",
                        rd=rd, immediate=imm, target=target)
 
     if opcode == 0x67 and funct3 == 0:

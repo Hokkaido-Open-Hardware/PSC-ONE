@@ -12,7 +12,7 @@ from cpu_profiles.v1 import unpack_stage
 from cpu_profiles.v2 import unpack, ROB_FIELDS
 
 
-def verify(cpu):
+def verify(cpu, source=None):
     if cpu == 'v2':
         # Independent RTL read-port observations validate reconstructed p0–p31.
         from cpu_profiles.v2 import V2Profile
@@ -20,7 +20,7 @@ def verify(cpu):
             for field in ('addr','data'):
                 V2Profile.specs[f'check_read_{field}{port}'] = (
                     '.u_inst_engine.u_inst_unit.u_physical_register_file.'+f'read_{field}{port}')
-    m=TraceModel(Path(__file__).parent/'validation'/f'{cpu}.fst')
+    m=TraceModel(Path(source) if source else Path(__file__).parent/'validation'/f'{cpu}.fst')
     m.parse()
     assert m.profile.cpu==cpu
     assert m.instructions
@@ -58,9 +58,10 @@ def verify(cpu):
                 assert bool(r['valid'])==(t is not None)
                 if t is not None: assert m.records[t].opcode==r['instruction']
     muls=[r for r in m.instructions if r.status=='retired' and r.decoded['mnemonic']=='mul']
-    assert muls
+    if cpu != 'rv64':
+        assert muls
     for r in muls:
-        assert r.alu_result==(r.rs1_value*r.rs2_value)&0xffffffff,(cpu,r.to_dict())
+        assert r.alu_result==(r.rs1_value*r.rs2_value)&((1 << m.profile.xlen)-1),(cpu,r.to_dict())
         assert r.writeback_value==r.alu_result
     if cpu=='v1':
         assert (len(m.samples),len(m.instructions),checked)==(101922,1255,14877)
@@ -76,10 +77,10 @@ def verify(cpu):
                 spans=list(r.stages.values())
                 assert len(spans)==5
                 assert all(a[1]+1==b[0] for a,b in zip(spans,spans[1:]))
-    first=muls[0]
+    first=muls[0] if muls else next(r for r in m.instructions if r.status=='retired')
     assert m.search('pc',hex(first.pc),0,1)['pc']==first.pc
-    assert m.search('mnemonic','mul',0,1)['mnemonic'].startswith('mul')
-    assert any(r['id']==first.ident for r in m.instruction_query(first.start_cycle,first.end_cycle,'MUL',''))
+    assert m.search('mnemonic',first.decoded['mnemonic'],0,1)['mnemonic']==first.decoded['mnemonic']
+    assert any(r['id']==first.ident for r in m.instruction_query(first.start_cycle,first.end_cycle,first.decoded['category'],''))
     assert len(m.cycle_range(0,9999)['cycles'])==500
     report={'cpu':cpu,'cycles':len(m.samples),'instructions':len(m.instructions),
         'retired':sum(r.status=='retired' for r in m.instructions),'stage_pc_checks':checked,
@@ -91,10 +92,11 @@ def verify(cpu):
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--serve',action='store_true')
+    parser.add_argument('--rv64-trace',type=Path,help='Also validate a CPU_RV64 FST/VCD')
     args=parser.parse_args()
     servers=[]
-    for cpu in ('legacy','v1','v2'):
-        m=verify(cpu)
+    for cpu in ('legacy','v1','v2') + (('rv64',) if args.rv64_trace else ()):
+        m=verify(cpu, args.rv64_trace if cpu == 'rv64' else None)
         if args.serve:
             handler=type(f'{cpu}Handler',(ViewerHandler,),{'model':m})
             server=bind_server('127.0.0.1',8000,handler)

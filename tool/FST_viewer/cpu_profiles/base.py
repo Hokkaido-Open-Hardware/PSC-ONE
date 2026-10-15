@@ -37,12 +37,12 @@ class ViewerError(RuntimeError):
     pass
 
 
-def unpack_ctrl(raw: int | None) -> dict[str, int | None]:
+def unpack_ctrl(raw: int | None, fields=CTRL_FIELDS) -> dict[str, int | None]:
     if raw is None:
-        return {name: None for name, _ in CTRL_FIELDS}
+        return {name: None for name, _ in fields}
     result: dict[str, int] = {}
-    pos = 130
-    for name, width in CTRL_FIELDS:
+    pos = sum(width for _, width in fields)
+    for name, width in fields:
         pos -= width
         result[name] = (raw >> pos) & ((1 << width) - 1)
     return result
@@ -114,6 +114,7 @@ class InstructionRecord:
 
 
 class BaseProfile:
+    xlen = 32
     register_bank = None
     register_source = "FST register array"
     cpu = ""
@@ -148,8 +149,8 @@ class BaseProfile:
             for i in range(32):
                 info = m._paths.get(self.root + self.register_bank.format(i=i))
                 if info:
-                    if info.width != 32:
-                        raise ViewerError(f"{self.cpu}: x{i} expected 32 bits, got {info.width}")
+                    if info.width != self.xlen:
+                        raise ViewerError(f"{self.cpu}: x{i} expected {self.xlen} bits, got {info.width}")
                     m.signals[f"x{i}"] = info
         for key, width in self.required.items():
             info = m.signals.get(key)
