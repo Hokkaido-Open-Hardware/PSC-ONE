@@ -64,6 +64,7 @@ async def reset_dut(dut):
     dut.program_mem_read_address.value  = 0
     dut.cpu_cache_clear.value           = 0
     dut.burst_mode.value                = 0
+    dut.cpu_rw_double.value             = 0
     
     dut.data_mem_read_valid.value       = 0
     dut.data_mem_read_address.value     = 0
@@ -1303,3 +1304,198 @@ async def cache_write_miss_preserve_line_test(dut):
     dut._log.info(
         "==== PASS Write Miss preserve existing line test ===="
     )
+
+
+async def cpu_width_access(dut, addr, *, double, data=None, expected=None,
+                           size=0b010, path=None, sa_read=None, timeout=2000):
+    """One CPU request, optionally queued behind a simultaneous SA read.
+
+    sa_read is (address, expected_word). Poison all live CPU request fields
+    after acceptance to check both the active and queued request registers.
+    """
+    assert not double or addr % 8 == 0, "64-bit accesses must be 8B aligned"
+    assert data is not None or expected is not None
+    for _ in range(timeout):
+        await FallingEdge(dut.clock)
+        if int(dut.data_mem_req_ready.value):
+            break
+    else:
+        raise AssertionError("CPU width-test request timeout")
+
+    dut.cpu_rw_double.value = int(double)
+    dut.data_mem_read_address.value = addr
+    dut.data_mem_write_address.value = addr
+    dut.mem_write_data.value = 0 if data is None else data
+    dut.mem_write_sel.value = size
+    dut.data_mem_read_valid.value = int(data is None)
+    dut.data_mem_write_valid.value = int(data is not None)
+    if sa_read is not None:
+        dut.sa_mem_read_address.value = sa_read[0]
+        dut.sa_mem_read_valid.value = 1
+
+    hits = misses = memory_reads = memory_writes = 0
+    cpu_done = False
+    sa_done = sa_read is None
+    context = f"double={double} addr=0x{addr:08x} write={data is not None} path={path}"
+    for clocks in range(1, timeout + 1):
+        await RisingEdge(dut.clock)
+        await ReadOnly()
+        hits += int(dut.data_cache_hit_pulse.value)
+        misses += int(dut.data_cache_miss_pulse.value)
+        if int(dut.d_mem_valid256.value):
+            if int(dut.d_mem_rw256.value):
+                memory_writes += 1
+            else:
+                memory_reads += 1
+        if int(dut.sa_mem_read_ready.value):
+            assert not sa_done, f"Unexpected/duplicate SA response: {context}"
+            assert int(dut.sa_mem_read_data.value) == sa_read[1], context
+            sa_done = True
+        if int(dut.data_mem_read_ready.value):
+            assert not cpu_done, f"Duplicate CPU response: {context}"
+            assert sa_done, f"CPU responded before higher-priority SA request: {context}"
+            cpu_done = True
+            if data is None:
+                actual = int(dut.data_mem_read_data.value)
+                assert actual == expected, (
+                    f"{context}: expected=0x{expected:016x}, got=0x{actual:016x}"
+                )
+        await FallingEdge(dut.clock)
+        dut.data_mem_read_valid.value = 0
+        dut.data_mem_write_valid.value = 0
+        dut.sa_mem_read_valid.value = 0
+        dut.cpu_rw_double.value = int(not double)
+        dut.data_mem_read_address.value = addr ^ 0x78
+        dut.data_mem_write_address.value = addr ^ 0x78
+        dut.mem_write_data.value = 0xBAD0_BAD1_BAD2_BAD3
+        dut.mem_write_sel.value = size ^ 0b111
+        if cpu_done and sa_done:
+            break
+    else:
+        raise AssertionError(f"CPU width-test response timeout: {context}")
+
+    if path is not None:
+        expected_counts = {
+            "REG hit": (1, 0, 0, 0),
+            "RAM hit": (1, 0, 0, 0),
+            "clean miss": (0, 1, 1, 0),
+            "dirty miss": (0, 1, 1, 1),
+        }[path]
+        assert (hits, misses, memory_reads, memory_writes) == expected_counts, context
+        if path == "REG hit":
+            assert clocks <= 2, f"REG response took {clocks} clocks: {context}"
+        elif path == "RAM hit":
+            assert clocks > 2, f"Expected backing-cache lookup: {context}"
+
+    await RisingEdge(dut.clock)
+    await ReadOnly()
+    assert not int(dut.data_mem_read_ready.value), f"Duplicate CPU completion: {context}"
+    assert not int(dut.sa_mem_read_ready.value), f"Duplicate SA completion: {context}"
+    await FallingEdge(dut.clock)
+    dut.cpu_rw_double.value = 0
+
+
+@cocotb.test()
+async def cache_data_double_test(dut):
+    """64-bit hits/fills, mixed widths, and queued requests on a 64-bit bus."""
+    cocotb.start_soon(gen_clock(dut))
+    await reset_dut(dut)
+    await sdram_init_fin_wait(dut)
+    base = 0x0018_0000
+    words = [0x91A2_B3C4 ^ (i * 0x0102_0304) for i in range(16)]
+    for i, word in enumerate(words):
+        await cpu_data_write(dut, base + i * 4, word)
+    await data_cache_wb_start(dut)
+    await data_cache_clear_start(dut)
+
+    def doubleword(i):
+        return words[i] | (words[i + 1] << 32)
+
+    # Fill each REG line from SDRAM, then alternate all four doublewords.
+    for i in (0, 8):
+        await cpu_width_access(dut, base + i * 4, double=True,
+                               expected=doubleword(i), path="clean miss")
+    for offset in range(0, 8, 2):
+        for line in (0, 8):
+            i = line + offset
+            await cpu_width_access(dut, base + i * 4, double=True,
+                                   expected=doubleword(i), path="REG hit")
+
+    # Distinct high/low halves at every 8-byte position, including offset 24.
+    for i in range(0, 8, 2):
+        value = 0xFEDC_BA98_7654_3210 ^ (i << 36) ^ i
+        await cpu_width_access(dut, base + i * 4, double=True, data=value, path="RAM hit")
+        words[i:i + 2] = [value & 0xFFFF_FFFF, value >> 32]
+        await cpu_width_access(dut, base + i * 4, double=True,
+                               expected=value, path="RAM hit")
+        await cpu_width_access(dut, base + i * 4, double=True,
+                               expected=value, path="REG hit")
+        for j in (i, i + 1):
+            await cpu_width_access(dut, base + j * 4, double=False,
+                                   expected=words[j], path="REG hit")
+            assert await cpu_data_read(dut, base + j * 4, mode="SA") == words[j]
+
+    # Narrow stores must ignore high input bits and preserve all other bytes.
+    for size, offsets in ((2, (0, 4)), (1, range(0, 8, 2)), (0, range(8))):
+        for offset in offsets:
+            value = 0xDEAD_BEEF_89AB_CDEF ^ offset
+            await cpu_width_access(dut, base + offset, double=False, data=value, size=size)
+            index, byte = divmod(offset, 4)
+            mask = ((1 << (8 * (1 << size))) - 1) << (byte * 8)
+            words[index] = (words[index] & ~mask) | ((value << (byte * 8)) & mask)
+            await cpu_width_access(dut, base, double=True, expected=doubleword(0))
+
+    # SA wins arbitration; the CPU slot must retain 64-bit width and data.
+    await cpu_width_access(dut, base, double=True, expected=doubleword(0),
+                           sa_read=(base + 4, words[1]))
+    value = 0xCAFE_BABE_1357_2468
+    await cpu_width_access(dut, base, double=True, data=value,
+                           sa_read=(base + 4, words[1]))
+    words[0:2] = [value & 0xFFFF_FFFF, value >> 32]
+    for i in range(0, 16, 2):
+        await cpu_width_access(dut, base + i * 4, double=True, expected=doubleword(i))
+    dut._log.info("==== PASS 64-bit hits, mixed widths and queued requests ====")
+
+
+@cocotb.test()
+async def cache_data_double_writeback_test(dut):
+    """64-bit write allocation/dirty eviction, line preservation and SDRAM reload."""
+    cocotb.start_soon(gen_clock(dut))
+    await reset_dut(dut)
+    await sdram_init_fin_wait(dut)
+    base = 0x0020_0000
+    # Same direct-mapped index for either supported cache size (TAGLSB<=14).
+    conflict = base + 0x4000
+    rng = random.Random(0x64CA_C4E)
+    words = {address + i * 4: rng.getrandbits(32)
+             for address in (base, conflict) for i in range(8)}
+    for addr, value in words.items():
+        await cpu_data_write(dut, addr, value)
+    await data_cache_wb_start(dut)
+    await data_cache_clear_start(dut)
+
+    for offset in range(0, 32, 8):
+        for address, path in ((base, "clean miss"), (conflict, "dirty miss")):
+            value = rng.getrandbits(64)
+            addr = address + offset
+            await cpu_width_access(dut, addr, double=True, data=value, path=path)
+            words[addr] = value & 0xFFFF_FFFF
+            words[addr + 4] = value >> 32
+            # Check every word, including untouched neighbours in the 32B line.
+            for i in range(8):
+                await cpu_width_access(dut, address + i * 4, double=False,
+                                       expected=words[address + i * 4])
+
+        # Read back the dirty victim from SDRAM, forcing a second eviction.
+        await cpu_width_access(dut, base + offset, double=True,
+                               expected=words[base + offset] | (words[base + offset + 4] << 32),
+                               path="dirty miss")
+        await data_cache_wb_start(dut)
+        await data_cache_clear_start(dut)
+        for address in (base, conflict):
+            for i in range(0, 32, 8):
+                await cpu_width_access(dut, address + i, double=True,
+                                       expected=words[address + i] | (words[address + i + 4] << 32),
+                                       path="clean miss" if i == 0 else "REG hit")
+        await data_cache_clear_start(dut)
+    dut._log.info("==== PASS 64-bit write allocation, dirty eviction and writeback/reload ====")

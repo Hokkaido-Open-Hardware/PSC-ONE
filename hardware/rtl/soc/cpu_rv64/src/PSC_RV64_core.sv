@@ -242,7 +242,21 @@ module PSC_RV64_core #(
 
     logic [63:0] csr_reg_data_1;
 
-    Csr u_csr (
+    localparam integer PERIPHERAL_CSR_WIDTH = 32;
+    // Existing SoC buses stay 64-bit; peripheral CSR outputs are zero-extended.
+    assign csr_DCACHE_CTRL[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_DMA_CTRL[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_DMA_WORDS[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_DMA_SRC[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_DMA_DST[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_SA_CTRL[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_SA_SIZE[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_SA_ADDR_A[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_SA_ADDR_B[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_SA_ADDR_C[63:PERIPHERAL_CSR_WIDTH] = '0;
+    assign csr_CPU_MON_CTRL[63:PERIPHERAL_CSR_WIDTH] = '0;
+
+    Csr #(.PERIPHERAL_CSR_WIDTH(PERIPHERAL_CSR_WIDTH)) u_csr (
         .clock              (clock),
         .reset_n            (reset_n),
         .csr_enb            (csr_enb),
@@ -297,25 +311,25 @@ module PSC_RV64_core #(
         .out_satp           (csr_state.satp),
 
         // DATA Cache
-        .out_DCACHE_CTRL    (csr_DCACHE_CTRL),
+        .out_DCACHE_CTRL    (csr_DCACHE_CTRL[PERIPHERAL_CSR_WIDTH-1:0]),
 
         // DMA
-        .out_DMA_CTRL       (csr_DMA_CTRL),
-        .out_DMA_WORDS      (csr_DMA_WORDS),
-        .out_DMA_SRC        (csr_DMA_SRC),
-        .out_DMA_DST        (csr_DMA_DST),
+        .out_DMA_CTRL       (csr_DMA_CTRL[PERIPHERAL_CSR_WIDTH-1:0]),
+        .out_DMA_WORDS      (csr_DMA_WORDS[PERIPHERAL_CSR_WIDTH-1:0]),
+        .out_DMA_SRC        (csr_DMA_SRC[PERIPHERAL_CSR_WIDTH-1:0]),
+        .out_DMA_DST        (csr_DMA_DST[PERIPHERAL_CSR_WIDTH-1:0]),
         .in_DMA_STATUS      (csr_DMA_STATUS),
 
         // SynapEngine
-        .out_SA_CTRL        (csr_SA_CTRL),
-        .out_SA_SIZE        (csr_SA_SIZE),
+        .out_SA_CTRL        (csr_SA_CTRL[PERIPHERAL_CSR_WIDTH-1:0]),
+        .out_SA_SIZE        (csr_SA_SIZE[PERIPHERAL_CSR_WIDTH-1:0]),
         .in_SA_STATUS       (csr_SA_STATUS),
-        .out_SA_ADDR_A      (csr_SA_ADDR_A),
-        .out_SA_ADDR_B      (csr_SA_ADDR_B),
-        .out_SA_ADDR_C      (csr_SA_ADDR_C),
+        .out_SA_ADDR_A      (csr_SA_ADDR_A[PERIPHERAL_CSR_WIDTH-1:0]),
+        .out_SA_ADDR_B      (csr_SA_ADDR_B[PERIPHERAL_CSR_WIDTH-1:0]),
+        .out_SA_ADDR_C      (csr_SA_ADDR_C[PERIPHERAL_CSR_WIDTH-1:0]),
 
         // CPU MONITOR
-        .out_CPU_MON_CTRL   (csr_CPU_MON_CTRL),
+        .out_CPU_MON_CTRL   (csr_CPU_MON_CTRL[PERIPHERAL_CSR_WIDTH-1:0]),
         .in_CPU_MON_CYCLE   (csr_CPU_MON_CYCLE)
     );
 

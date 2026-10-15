@@ -85,8 +85,13 @@ RV64_SOURCES         := \
 # The SoC-facing wrapper is not part of the standalone simulation.
 RV64_WRAPPER_SOURCES := $(RV64_SOURCES) \
 	$(RV64_SRC_DIR)/PSC_RV64_Monitor.v \
-	$(RV64_SRC_DIR)/PSC_RV64_AXI.sv \
-	$(RV64_SRC_DIR)/PSC_ONE_RV64_core.v
+	$(RV64_SRC_DIR)/PSC_RV64_CacheAXI.sv \
+	$(RV64_SRC_DIR)/PSC_ONE_RV64_core.v \
+	$(RV64_SRC_DIR)/../../cache/src/cache_dma_controller.sv \
+	$(RV64_SRC_DIR)/../../cache/src/cache_dma_controller_io.sv \
+	$(RV64_SRC_DIR)/../../cache/src/dm_cache_data.v \
+	$(RV64_SRC_DIR)/../../cache/src/dm_cache_tag.v \
+	$(wildcard $(RV64_SRC_DIR)/../../npu/src/*.v $(RV64_SRC_DIR)/../../npu/src/*.sv)
 
 .PHONY: simulate_RV64_CORE lint_RV64_CORE lint_RV64_ALL
 lint_RV64_CORE:

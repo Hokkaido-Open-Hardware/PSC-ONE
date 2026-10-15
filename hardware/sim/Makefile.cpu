@@ -147,6 +147,30 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/Csr.sv \
 	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
 
+RV64_SRC_DIR = ../rtl/soc/cpu_rv64/src
+CPU_RV64_CORE_FILES = \
+	$(RV64_SRC_DIR)/PSC_Types.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_core.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_FetchUnit.sv \
+	$(RV64_SRC_DIR)/PSC_FetchPredict.sv \
+	$(RV64_SRC_DIR)/Fetch_Fifo.sv \
+	$(RV64_SRC_DIR)/Fetch.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_InstructionEngine.sv \
+	$(RV64_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(RV64_SRC_DIR)/Decorder.sv \
+	$(RV64_SRC_DIR)/Execute.sv \
+	$(RV64_SRC_DIR)/Execute_Divider.sv \
+	$(RV64_SRC_DIR)/Execute_Mul.sv \
+	$(RV64_SRC_DIR)/Branch.sv \
+	$(RV64_SRC_DIR)/MemoryStore.sv \
+	$(RV64_SRC_DIR)/PSC_Register.sv \
+	$(RV64_SRC_DIR)/PSC_PC.sv \
+	$(RV64_SRC_DIR)/MMU.sv \
+	$(RV64_SRC_DIR)/Csr.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_Monitor.v \
+	$(RV64_SRC_DIR)/PSC_RV64_CacheAXI.sv \
+	$(RV64_SRC_DIR)/PSC_ONE_RV64_core.v
+
 MMIO_DIR	= ../rtl/soc/mmio/MMIO
 UART_DIR	= ../rtl/soc/mmio/UART
 I2C_DIR		= ../rtl/soc/mmio/I2C
@@ -162,10 +186,14 @@ ifeq ($(CPU_VERSION),v1)
 SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)
 else ifeq ($(CPU_VERSION),v2)
 SELECTED_CPU_CORE_FILES = $(CPU_V2_CORE_FILES)
+else ifeq ($(CPU_VERSION),rv64)
+SELECTED_CPU_CORE_FILES = $(CPU_RV64_CORE_FILES)
+CPU_CPP_FLAGS = ARCH=rv64im_zicsr_zifencei ABI=lp64
+TOP_COMPILE_ARGS += -DCPU_RV64
 else ifeq ($(CPU_VERSION),legacy)
 SELECTED_CPU_CORE_FILES = $(CPU_CORE_FILES)
 else
-$(error CPU_VERSION=$(CPU_VERSION) は不正です。v1 または legacy を指定してください)
+$(error CPU_VERSION=$(CPU_VERSION) は不正です。v1 / v2 / rv64 / legacy を指定してください)
 endif
 
 # CPU core + Cache
@@ -465,6 +493,7 @@ simulate_PSC_ONE_TESTS:
 	mkdir -p log; \
 	run_log=log/test_result_$$(date +%Y%m%d_%H%M%S).log; \
 	echo "[INFO] LOG FILE = $$run_log"; \
+	passed=0; failed=0; failed_tests=""; \
 	for t in $(PSCONE_TESTS); do \
 		name=$$(echo $$t | cut -d: -f1); \
 		cocotb_file=$$(echo $$t | cut -d: -f2); \
@@ -477,9 +506,17 @@ simulate_PSC_ONE_TESTS:
 		echo "[EXP ] $$expected"; \
 		echo "[LOG ] $$run_log"; \
 		echo "========================================"; \
-		$(MAKE) -B -C ./cpp $$name; \
-		head -n 4096 "$$mem_file" > ./mem/test_program.mem; \
-		SIM_BUILD=$$build_dir/sim_build \
+		if ! $(MAKE) -B -C ./cpp $$name $(CPU_CPP_FLAGS); then \
+			echo "[FAIL] $$name (program build)" | tee -a "$$run_log"; \
+			failed=$$((failed + 1)); failed_tests="$$failed_tests $$name"; \
+			continue; \
+		fi; \
+		if ! head -n 4096 "$$mem_file" > ./mem/test_program.mem; then \
+			echo "[FAIL] $$name (program image)" | tee -a "$$run_log"; \
+			failed=$$((failed + 1)); failed_tests="$$failed_tests $$name"; \
+			continue; \
+		fi; \
+		if SIM_BUILD=$$build_dir/sim_build \
 		COCOTB_RESULTS_FILE=$$build_dir/$$name-results.xml \
 		COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
 		TEST_NAME=$$name \
@@ -492,14 +529,23 @@ simulate_PSC_ONE_TESTS:
 		VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
 		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
 		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
-		make --silent -f $(COCOTB_MAKEFILE); \
+		make --silent -f $(COCOTB_MAKEFILE); then \
+			passed=$$((passed + 1)); \
+		else \
+			echo "[FAIL] $$name (simulation)" | tee -a "$$run_log"; \
+			failed=$$((failed + 1)); failed_tests="$$failed_tests $$name"; \
+		fi; \
 	done; \
 	printf '\a'; \
 	echo ""; \
 	echo "========================================"; \
-	echo "✅ All PSC-ONE tests completed"; \
+	echo "[SUMMARY] PASS=$$passed FAIL=$$failed" | tee -a "$$run_log"; \
+	if [ "$$failed" -ne 0 ]; then \
+		echo "[FAILED TESTS]$$failed_tests" | tee -a "$$run_log"; \
+	fi; \
 	echo "📄 Log : $$run_log"; \
-	echo "========================================"
+	echo "========================================"; \
+	test "$$failed" -eq 0
 
 
 

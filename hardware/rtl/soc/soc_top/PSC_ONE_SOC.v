@@ -6,6 +6,9 @@
 // Yosys mode
 //`define YOSYS
 
+// CPU_RV64 mode
+//`define CPU_RV64
+
 module PSC_ONE_SOC #(
     parameter integer CLK_FREQ     = 80,
     parameter integer ADDR_WIDTH   = 32,
@@ -324,7 +327,12 @@ module PSC_ONE_SOC #(
     wire        irq_tx;
     wire        irq_uart_cpu;
 
+`ifdef CPU_RV64
+    PSC_ONE_RV64_core #(
+        .CPU_DATA_WIDTH      (32), // Existing MMIO/DMA peripherals are 32-bit.
+`else
     PSC_ONE_RV32_core #(
+`endif
         .ADDR_WIDTH          (ADDR_WIDTH),
         .ID_WIDTH            (ID_WIDTH),
         .DATA_WIDTH          (DATA_WIDTH),

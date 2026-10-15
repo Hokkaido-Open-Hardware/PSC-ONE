@@ -204,7 +204,7 @@ module PSC_ONE_RV32_core #(
     wire         data_mem_read_valid;
     wire         data_mem_read_ready;
     wire [31:0]  data_mem_read_address;
-    wire [31:0]  data_mem_read_data;
+    wire [63:0]  data_mem_read_data;
 
     wire         data_mem_write_valid;
     wire         data_mem_write_ready;
@@ -243,7 +243,7 @@ module PSC_ONE_RV32_core #(
         .data_mem_read_valid        (data_mem_read_valid),
         .data_mem_read_ready        (data_mem_read_ready),
         .data_mem_read_address      (data_mem_read_address),
-        .data_mem_read_data         (data_mem_read_data),
+        .data_mem_read_data         (data_mem_read_data[31:0]),
         .data_mem_req_ready         (data_mem_req_ready),
 
         .data_mem_write_ready       (data_mem_write_ready),
@@ -494,10 +494,11 @@ module PSC_ONE_RV32_core #(
         .cpu_rvalid         (data_mem_read_valid),
         .cpu_wvalid         (data_mem_write_valid),
         .cpu_rw             (data_mem_write_valid),
+        .cpu_rw_double      (1'b0),
         .cpu_write_sel      (mem_write_sel),
         .cpu_raddr          (data_mem_read_address),
         .cpu_waddr          (data_mem_write_address),
-        .cpu_data           (mem_write_data),
+        .cpu_data           ({32'h0, mem_write_data}),
         .cpu_ready          (dcache_ready),
         .cpu_data_out       (data_mem_read_data),
         .cpu_req_ready      (data_mem_req_ready),

@@ -7,12 +7,13 @@ module cache_io_regression;
     reg cpu_rvalid = 0;
     reg cpu_wvalid = 0;
     reg cpu_rw = 0;
+    reg cpu_rw_double = 1'b0;
     reg [2:0] cpu_write_sel = 0;
     reg [31:0] cpu_raddr = 0;
     reg [31:0] cpu_waddr = 0;
-    reg [31:0] cpu_data = 0;
+    reg [63:0] cpu_data = 0;
     wire cpu_ready;
-    wire [31:0] cpu_data_out;
+    wire [63:0] cpu_data_out;
     wire cpu_req_ready;
     reg cpu_cache_clear = 0;
     reg cpu_cache_wb = 0;
@@ -112,6 +113,7 @@ module cache_io_regression;
                 if (n > 2000) $fatal(1,"idle timeout");
             end
             @(negedge clock);
+            cpu_rw_double=0; // All accepted CPU transactions are 32-bit.
         end
     endtask
     integer latency;
@@ -125,7 +127,8 @@ module cache_io_regression;
                 0: begin
                     cpu_rvalid=!wr; cpu_wvalid=wr; cpu_rw=wr;
                     cpu_raddr=addr; cpu_waddr=addr;
-                    cpu_write_sel=size; cpu_data=data;
+                    // Nonzero high word must never overwrite an adjacent word.
+                    cpu_write_sel=size; cpu_data={32'hdeadbeef, data};
                 end
                 1: begin sa_valid=1; sa_rw=wr; sa_addr=addr; sa_data=data; end
                 2: begin mmu_valid=1; mmu_addr=addr; end
@@ -137,12 +140,15 @@ module cache_io_regression;
             // must come from the request registers, including REG hits.
             cpu_raddr=~addr; cpu_waddr=~addr; sa_addr=~addr; mmu_addr=~addr;
             cpu_data=~data; sa_data=~data;
+            cpu_rw_double=1; // Width must also come from the accepted request.
             n=0;
             while (!(port_id==0 ? cpu_ready : port_id==1 ? sa_ready : mmu_ready)) begin
                 tick(); n=n+1;
                 if(n>2000) $fatal(1,"response timeout %s",label_text);
             end
             latency=cycle-start_cycle;
+            if (port_id==0 && !wr && cpu_data_out[63:32] !== 32'b0)
+                $fatal(1,"32-bit read high word is nonzero %s",label_text);
             returned=port_id==0 ? cpu_data_out : port_id==1 ? sa_data_out : mmu_data_out;
             if (!wr && addr!=32'h10000001 && returned !== expected[addr[15:2]])
                 $fatal(1,"read mismatch %s port=%0d addr=%h got=%h expected=%h",
@@ -300,6 +306,7 @@ module cache_io_regression;
         sa_valid=1; sa_rw=0; sa_addr='h3010;
         mmu_valid=1; mmu_addr='h3020;
         tick(); @(negedge clock); cpu_rvalid=0; sa_valid=0; mmu_valid=0;
+        cpu_rw_double=1; // Queued CPU request must retain its original width.
         seen=0; k=0;
         while(seen<3) begin
             tick(); k=k+1;

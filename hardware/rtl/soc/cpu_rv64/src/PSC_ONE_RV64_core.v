@@ -1,8 +1,7 @@
 `timescale 1ns/1ps
-// RV64 uncached integration wrapper. The legacy external signal names are kept.
-// Core simulation instantiates PSC_RV64_core directly, not this wrapper.
-// No RV32 cache/NPU modules are included. Cache control CSRs have no effect.
-// TODO: SoC/MMIO integration verification, cache/NPU integration and bus-fault traps.
+// RV64 core + 32B I/D caches + shared AXI line bridge.
+// CPU addresses/data stay 64-bit. ADDR_WIDTH/DATA_WIDTH describe the external
+// physical bus (32-bit for the existing PSC-ONE SoC, 64-bit by default).
 module PSC_ONE_RV64_core #(
     // Mode
 `ifdef PSCOS_SIM
@@ -15,7 +14,7 @@ module PSC_ONE_RV64_core #(
     // Parameter
     parameter integer ADDR_WIDTH   = 64,
     parameter integer ID_WIDTH     = 1,
-    parameter integer DATA_WIDTH   = 64,    // AXI bus. fixed 64
+    parameter integer DATA_WIDTH   = 64,    // AXI bus: 32 or 64
     parameter integer CPU_DATA_WIDTH  = 64,
 
     // MMIO MASK BITS
@@ -46,6 +45,8 @@ module PSC_ONE_RV64_core #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT         = 64'h1000_9008,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL        = 64'h1000_900C,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 64'h1000_9010,
+    parameter ICACHE_TAGLSB = 12,
+    parameter DCACHE_TAGLSB = 10,
     parameter ENABLE_PULP = 1'b0
 )(
     // CLK, RESET
@@ -160,10 +161,12 @@ module PSC_ONE_RV64_core #(
 );
 
     initial begin
-        if (ADDR_WIDTH != 64 || DATA_WIDTH != 64 || CPU_DATA_WIDTH != 64)
-            $fatal(1, "RV64 wrapper requires 64-bit address/data buses");
-        if (PROTECT_MODE != 0 || ENABLE_PULP != 0)
-            $fatal(1, "RV64 uncached wrapper does not implement protection or PULP");
+        if ((ADDR_WIDTH != 32 && ADDR_WIDTH != 64) ||
+            (DATA_WIDTH != 32 && DATA_WIDTH != 64) ||
+            (CPU_DATA_WIDTH != 32 && CPU_DATA_WIDTH != 64))
+            $fatal(1, "RV64 wrapper requires 32/64-bit external buses");
+        if (ENABLE_PULP != 0)
+            $fatal(1, "RV64 core does not implement PULP instructions");
     end
     wire bus_fault;
     // --------------------------------
@@ -282,108 +285,372 @@ module PSC_ONE_RV64_core #(
     );
 
 
-    // No cache/NPU/MMU side effects in this Bare-only wrapper.
-    assign csr_SA_STATUS = 64'b0;
-    assign mmu_mem_read_ready = 1'b0;
-    assign mmu_mem_read_data = 64'b0;
-    assign mmu_data_req_ready = 1'b0;
-    wire [63:0] access_address = data_mem_write_valid
-                              ? data_mem_write_address : data_mem_read_address;
-    wire access_is_mmio =
-        ((UART_ADDRESS_TX != 0) && (access_address == UART_ADDRESS_TX)) ||
-        ((UART_ADDRESS_RX != 0) && (access_address == UART_ADDRESS_RX)) ||
-        ((UART_ADDRESS_ST != 0) && (access_address == UART_ADDRESS_ST)) ||
-        ((UART_ADDRESS_CT != 0) && (access_address == UART_ADDRESS_CT)) ||
-        ((PIO_ADDRESS != 0) && (access_address == PIO_ADDRESS)) ||
-        ((TIMER_WRITE_ADDR != 0) && (access_address == TIMER_WRITE_ADDR)) ||
-        ((TIMER_READ_ADDR != 0) && (access_address == TIMER_READ_ADDR)) ||
-        ((TIMER_ST_ADDR != 0) && (access_address == TIMER_ST_ADDR)) ||
-        ((LCD_PIXS_DATA != 0) && (access_address == LCD_PIXS_DATA)) ||
-        ((LCD_PIXS_ST != 0) && (access_address == LCD_PIXS_ST)) ||
-        ((LED_ADDRESS != 0) && (access_address == LED_ADDRESS)) ||
-        ((PSC_SA_CTRL != 0) && (access_address == PSC_SA_CTRL)) ||
-        ((PSC_SA_STATUS != 0) && (access_address == PSC_SA_STATUS)) ||
-        ((PSC_SD_IF_READ_DATA != 0) && (access_address == PSC_SD_IF_READ_DATA)) ||
-        ((PSC_SD_IF_SECTOR != 0) && (access_address == PSC_SD_IF_SECTOR)) ||
-        ((PSC_SD_IF_CTRL != 0) && (access_address == PSC_SD_IF_CTRL)) ||
-        ((PSC_I2S_ADDR_RX != 0) && (access_address == PSC_I2S_ADDR_RX)) ||
-        ((PSC_I2S_ADDR_ST != 0) && (access_address == PSC_I2S_ADDR_ST)) ||
-        ((PSC_PFE_IF_DATA != 0) && (access_address == PSC_PFE_IF_DATA)) ||
-        ((PSC_PFE_IF_CTRL != 0) && (access_address == PSC_PFE_IF_CTRL)) ||
-        ((I2C_ADDR_INPUT != 0) && (access_address == I2C_ADDR_INPUT)) ||
-        ((I2C_ADDR_STATUS != 0) && (access_address == I2C_ADDR_STATUS)) ||
-        ((I2C_ADDR_OUTPUT != 0) && (access_address == I2C_ADDR_OUTPUT)) ||
-        ((I2C_ADDR_CONTROL != 0) && (access_address == I2C_ADDR_CONTROL)) ||
-        ((I2C_ADDR_SEQ != 0) && (access_address == I2C_ADDR_SEQ));
+    // ============================================================
+    //  SynapEngine 4x4 or 2x2
+    // ============================================================
+    wire sa_read_valid;
+    wire sa_read_ready;
+    wire sa_write_valid;
+    wire sa_write_ready;
+    wire [31:0] sa_read_addr;
+    wire [31:0] sa_read_data;
+    wire [31:0] sa_write_addr;
+    wire [31:0] sa_write_data;
 
-    PSC_RV64_AXI #(.ID_WIDTH(ID_WIDTH)) u_axi (
-        .clock(clock), .reset_n(reset_n),
-        .i_valid(program_mem_read_valid), .i_burst(program_mem_burst_mode),
-        .i_addr(program_mem_read_address), .i_req_ready(program_mem_req_ready),
-        .i_ready(program_mem_read_ready), .i_data(program_mem_read_data),
-        .d_rvalid(data_mem_read_valid), .d_wvalid(data_mem_write_valid),
-        .d_double(data_rw_double),
-        .d_raddr(data_mem_read_address), .d_waddr(data_mem_write_address),
-        .d_wdata(mem_write_data), .d_sel(mem_write_sel), .d_is_mmio(access_is_mmio),
-        .d_req_ready(data_mem_req_ready), .d_rready(data_mem_read_ready),
-        .d_wready(data_mem_write_ready), .d_rdata(data_mem_read_data),
-        .mmio_valid(mmio_valid), .mmio_rw(mmio_rw), .mmio_addr(mmio_addr),
-        .mmio_wdata(mmio_wdata), .mmio_rdata(mmio_rdata), .mmio_ready(mmio_ready),
-        .fault(bus_fault),
-        .axi_awid(p_axi_awid),
-        .axi_awaddr(p_axi_awaddr),
-        .axi_awlen(p_axi_awlen),
-        .axi_awsize(p_axi_awsize),
-        .axi_awburst(p_axi_awburst),
-        .axi_awvalid(p_axi_awvalid),
-        .axi_awready(p_axi_awready),
-        .axi_wdata(p_axi_wdata),
-        .axi_wstrb(p_axi_wstrb),
-        .axi_wlast(p_axi_wlast),
-        .axi_wvalid(p_axi_wvalid),
-        .axi_wready(p_axi_wready),
-        .axi_bid(p_axi_bid),
-        .axi_bresp(p_axi_bresp),
-        .axi_bvalid(p_axi_bvalid),
-        .axi_bready(p_axi_bready),
-        .axi_arid(p_axi_arid),
-        .axi_araddr(p_axi_araddr),
-        .axi_arlen(p_axi_arlen),
-        .axi_arsize(p_axi_arsize),
-        .axi_arburst(p_axi_arburst),
-        .axi_arvalid(p_axi_arvalid),
-        .axi_arready(p_axi_arready),
-        .axi_rid(p_axi_rid),
-        .axi_rdata(p_axi_rdata),
-        .axi_rresp(p_axi_rresp),
-        .axi_rlast(p_axi_rlast),
-        .axi_rvalid(p_axi_rvalid),
-        .axi_rready(p_axi_rready)
+    // sa controll.
+    wire sa_busy;
+    wire sa_done;
+    assign csr_SA_STATUS = {62'b0, sa_busy, sa_done};
+    wire sa_start         = csr_SA_CTRL[0];
+    wire sa_state_reset   = csr_SA_CTRL[1];
+    wire sa_clear         = csr_SA_CTRL[2];
+    wire signed_mode      = csr_SA_CTRL[3];
+    wire sa_os_mode       = csr_SA_CTRL[4];
+    wire [3:0] sa_os_instruction
+                          = csr_SA_CTRL[11:8];
+    wire [7:0] sa_matrix_size_x
+                          = csr_SA_SIZE[7:0];
+    wire [7:0] sa_matrix_size_y
+                          = csr_SA_SIZE[15:8];
+    wire [7:0] sa_matrix_size_m
+                          = csr_SA_SIZE[23:16];
+
+    // addr, data, valid
+    wire sa_valid = sa_read_valid | sa_write_valid;
+    wire [31:0] sa_addr =   sa_read_valid  ? sa_read_addr  :
+                            sa_write_valid ? sa_write_addr : 32'h0;
+    wire [31:0] sa_data =   sa_write_data;
+
+    // sa_ready
+    wire sa_ready;
+    assign sa_read_ready    = sa_ready;
+    assign sa_write_ready   = sa_ready;
+
+    // sa_data_out
+    wire [CPU_DATA_WIDTH-1:0] sa_data_out;
+    assign sa_read_data = sa_data_out[31:0];
+
+    wire sa_rw = sa_write_valid;
+    wire sa_req_ready;
+
+    //PSC_NPU_Controller u_npu (
+    PSC_NPU_Controller #(
+        .ENABLE_NPU         (1'b1),
+        .ENABLE_LPU         (1'b0)
+    ) u_npu (
+        .clock              (clock),
+        `ifdef SystolicArray_OFF
+        .reset_n            (1'b0),
+        `else
+        .reset_n            (reset_n),
+        `endif
+
+        // SA Control
+        .signed_mode        (signed_mode),
+        .start              (sa_start),
+        .sa_state_reset     (sa_state_reset),
+        .sa_os_instruction  (sa_os_instruction),
+        .sa_clear           (sa_clear),
+
+        .matrix_size_x      (sa_matrix_size_x),
+        .matrix_size_y      (sa_matrix_size_y),
+        .matrix_size_m      (sa_matrix_size_m),
+
+        // SDRAM base address
+        .BASE_ADDR_A        (csr_SA_ADDR_A[31:0]),
+        .BASE_ADDR_B        (csr_SA_ADDR_B[31:0]),
+        .BASE_ADDR_C        (csr_SA_ADDR_C[31:0]),
+
+        // cache_io ready
+        .sa_req_ready       (sa_req_ready),
+
+        // READ port
+        .rd_read_addr       (sa_read_addr),
+        .rd_read_valid      (sa_read_valid),
+        .rd_read_ready      (sa_read_ready),
+        .rd_read_data       (sa_read_data),
+
+        // WRITE port
+        .c_write_valid      (sa_write_valid),
+        .c_write_addr       (sa_write_addr),
+        .c_write_wdata      (sa_write_data),
+        .c_write_ready      (sa_write_ready),
+
+        // status
+        .busy               (sa_busy),
+        .done               (sa_done)
     );
-    assign d_axi_awid = '0;
-    assign d_axi_awaddr = '0;
-    assign d_axi_awlen = '0;
-    assign d_axi_awsize = '0;
+
+    // ===========================================================
+    //  Program キャッシュ（I-Cache 相当）
+    // ===========================================================
+    // cache <-> bridge（256bit ライン側）
+    wire         p_mem_valid256;
+    wire         p_mem_rw256;
+    wire         p_mem_ready256;
+    wire [255:0] p_mem_rdata256;
+    wire [63:0]  p_mem_addr256;
+    wire [255:0] p_mem_wdata256;
+
+    wire         program_cache_hit_pulse;
+    wire         program_cache_miss_pulse;
+
+    cache_dma_controller #(
+        .ADDR_WIDTH          (64),
+        .CPU_DATA_WIDTH      (32),
+        .CACHE_DATA_WIDTH    (256),
+        .MAIN_MEM_DATA_WIDTH (256),
+        .TAGMSB              (63),
+        .TAGLSB              (ICACHE_TAGLSB)
+    ) u_program_dma_ctrl (
+        .clock              (clock),
+        .reset_n            (reset_n),
+        .cpu_valid          (program_mem_read_valid),
+        .cpu_rw             (1'b0),
+        .cpu_addr           (program_mem_read_address),
+        .cpu_data           (32'd0),            // 未使用
+        .burst_mode         (program_mem_burst_mode),
+        .cpu_ready          (program_mem_read_ready),
+        .cpu_data_out       (program_mem_read_data),
+        .cpu_req_ready      (program_mem_req_ready),
+        .cpu_cache_clear    (is_fence_i),
+        // 256b 側
+        .mem_req_ready      (1'b1),             // 1'b1 fix
+        .mem_valid          (p_mem_valid256),
+        .mem_rw             (p_mem_rw256),
+        .mem_ready          (p_mem_ready256),
+        .mem_data_in        (p_mem_rdata256),
+        .mem_addr           (p_mem_addr256),
+        .mem_data_out       (p_mem_wdata256),
+        // CACHE MONITOR
+        .cache_hit_pulse    (program_cache_hit_pulse),
+        .cache_miss_pulse   (program_cache_miss_pulse)
+    );
+
+    // ===========================================================
+    //  Data キャッシュ（D-Cache 相当）
+    // ===========================================================
+    wire         d_mem_valid256;
+    wire         d_mem_rw256;
+    wire         d_mem_ready256;
+    wire [255:0] d_mem_rdata256;
+    wire [63:0]  d_mem_addr256;
+    wire [255:0] d_mem_wdata256;
+
+    wire dcache_ready;
+    wire [63:0] cache_read_data;
+    reg read_upper_lane;
+    // The core's subword formatter expects address[2] to select the 32-bit
+    // lane; the cache returns narrow accesses in its low 32 bits.
+    always @(posedge clock or negedge reset_n) begin
+        if (!reset_n) read_upper_lane <= 1'b0;
+        else if (data_mem_read_valid)
+            read_upper_lane <= !data_rw_double && data_mem_read_address[2];
+    end
+    assign data_mem_read_data = read_upper_lane
+        ? {cache_read_data[31:0], 32'b0} : cache_read_data;
+
+
+    // コアへ返す ready（READ/WRITE 共通）
+    assign data_mem_read_ready  = dcache_ready;
+    assign data_mem_write_ready = dcache_ready;
+
+    // clear, WB
+    wire    cpu_cache_clear = csr_DCACHE_CTRL[0];
+    wire    cpu_cache_wb    = csr_DCACHE_CTRL[1];
+
+    cache_dma_controller_io #(
+        .PROTECT_MODE        (PROTECT_MODE),
+        .PROTECT_ADDR        (PROTECT_ADDR),
+        .ADDR_WIDTH          (64),
+        .CPU_DATA_WIDTH      (CPU_DATA_WIDTH),
+        .CACHE_DATA_WIDTH    (256),
+        .MAIN_MEM_DATA_WIDTH (256),
+        .TAGMSB              (63),
+        .TAGLSB              (DCACHE_TAGLSB),
+        // MMIO MASK BITS
+        .MMMIO_BASK_BITS     (MMMIO_BASK_BITS),
+        // MMIO ADDR
+        .UART_ADDRESS_TX     (UART_ADDRESS_TX),
+        .UART_ADDRESS_RX     (UART_ADDRESS_RX),
+        .UART_ADDRESS_ST     (UART_ADDRESS_ST),
+        .UART_ADDRESS_CT     (UART_ADDRESS_CT),
+        .PIO_ADDRESS         (PIO_ADDRESS),
+        .TIMER_WRITE_ADDR    (TIMER_WRITE_ADDR),
+        .TIMER_READ_ADDR     (TIMER_READ_ADDR),
+        .TIMER_ST_ADDR       (TIMER_ST_ADDR),
+        .LCD_PIXS_DATA       (LCD_PIXS_DATA),
+        .LCD_PIXS_ST         (LCD_PIXS_ST),
+        .LED_ADDRESS         (LED_ADDRESS),
+        .PSC_SA_CTRL         (PSC_SA_CTRL),
+        .PSC_SA_STATUS       (PSC_SA_STATUS),
+        .PSC_SD_IF_READ_DATA (PSC_SD_IF_READ_DATA),
+        .PSC_SD_IF_SECTOR    (PSC_SD_IF_SECTOR),
+        .PSC_SD_IF_CTRL      (PSC_SD_IF_CTRL),
+        .PSC_I2S_ADDR_RX     (PSC_I2S_ADDR_RX),
+        .PSC_I2S_ADDR_ST     (PSC_I2S_ADDR_ST),
+        .PSC_PFE_IF_DATA     (PSC_PFE_IF_DATA),
+        .PSC_PFE_IF_CTRL     (PSC_PFE_IF_CTRL),
+        .I2C_ADDR_INPUT      (I2C_ADDR_INPUT),
+        .I2C_ADDR_STATUS     (I2C_ADDR_STATUS),
+        .I2C_ADDR_OUTPUT     (I2C_ADDR_OUTPUT),
+        .I2C_ADDR_CONTROL    (I2C_ADDR_CONTROL),
+        .I2C_ADDR_SEQ        (I2C_ADDR_SEQ)
+    ) u_data_dma_ctrl (
+        .clock              (clock),
+        .reset_n            (reset_n),
+        // CPU Data
+        .cpu_rvalid         (data_mem_read_valid),
+        .cpu_wvalid         (data_mem_write_valid),
+        .cpu_rw             (data_mem_write_valid),
+        .cpu_write_sel      (mem_write_sel),
+        .cpu_rw_double      (data_rw_double),
+        .cpu_raddr          (data_mem_read_address),
+        .cpu_waddr          (data_mem_write_address),
+        .cpu_data           (mem_write_data),
+        .cpu_ready          (dcache_ready),
+        .cpu_data_out       (cache_read_data),
+        .cpu_req_ready      (data_mem_req_ready),
+        .cpu_cache_clear    (cpu_cache_clear),
+        .cpu_cache_wb       (cpu_cache_wb),
+        // SynapEngine
+        .sa_valid           (sa_valid),
+        .sa_rw              (sa_rw),
+        .sa_addr            (sa_addr),
+        .sa_data            (sa_data),
+        .sa_ready           (sa_ready),
+        .sa_data_out        (sa_data_out),
+        .sa_req_ready       (sa_req_ready),
+        // MMU
+        .mmu_valid          (mmu_mem_read_valid),
+        .mmu_addr           (mmu_mem_read_address),
+        .mmu_ready          (mmu_mem_read_ready),
+        .mmu_data_out       (mmu_mem_read_data),
+        .mmu_req_ready      (mmu_data_req_ready),
+        // MMIO
+        .mmio_valid         (mmio_valid),
+        .mmio_rw            (mmio_rw),
+        .mmio_addr          (mmio_addr),
+        .mmio_rdata         (mmio_rdata),
+        .mmio_ready         (mmio_ready),
+        .mmio_wdata         (mmio_wdata),
+        // 256b 側
+        .mem_req_ready      (1'b1),             // 1'b1 fix
+        .mem_valid          (d_mem_valid256),
+        .mem_rw             (d_mem_rw256),
+        .mem_ready          (d_mem_ready256),
+        .mem_data_in        (d_mem_rdata256),
+        .mem_addr           (d_mem_addr256),
+        .mem_data_out       (d_mem_wdata256),
+        // CACHE MONITOR
+        .cache_hit_pulse    (data_cache_hit_pulse),
+        .cache_miss_pulse   (data_cache_miss_pulse)
+    );
+
+    // ============================================================
+    // D-Cache completion and unused AXI tie-offs
+    // ============================================================
+
+    wire d_cache_rd_ready;
+    wire d_cache_wr_ready;
+    assign d_mem_ready256 = d_cache_rd_ready | d_cache_wr_ready;
+
+    // Compatibility only: the former D-Cache AXI master is inactive.
+    // No d_axi_* input participates in the shared bridge's control.
+    assign d_axi_awid    = '0;
+    assign d_axi_awaddr  = '0;
+    assign d_axi_awlen   = '0;
+    assign d_axi_awsize  = '0;
     assign d_axi_awburst = '0;
     assign d_axi_awvalid = '0;
-    assign d_axi_wdata = '0;
-    assign d_axi_wstrb = '0;
-    assign d_axi_wlast = '0;
-    assign d_axi_wvalid = '0;
-    assign d_axi_bready = '0;
-    assign d_axi_arid = '0;
-    assign d_axi_araddr = '0;
-    assign d_axi_arlen = '0;
-    assign d_axi_arsize = '0;
+    assign d_axi_wdata   = '0;
+    assign d_axi_wstrb   = '0;
+    assign d_axi_wlast   = '0;
+    assign d_axi_wvalid  = '0;
+    assign d_axi_bready  = '0;
+    assign d_axi_arid    = '0;
+    assign d_axi_araddr  = '0;
+    assign d_axi_arlen   = '0;
+    assign d_axi_arsize  = '0;
     assign d_axi_arburst = '0;
     assign d_axi_arvalid = '0;
-    assign d_axi_rready = '0;
+    assign d_axi_rready  = '0;
+
+    // ============================================================
+    // Bridge (256b ⇄ AXI4-M(32b)) と AXI配線
+    // ============================================================
+    localparam integer SYS_ADDR_WIDTH = ADDR_WIDTH;
+    localparam integer AXI_ID_WIDTH   = ID_WIDTH;
+    localparam integer AXI_DATA_WIDTH = DATA_WIDTH;
+
+    wire         data_cache_hit_pulse;
+    wire         data_cache_miss_pulse;
+
+    // ---------------- Bridge (AXI Master, 32-bit) ----------------
+    PSC_RV64_CacheAXI #(
+        .ADDR_WIDTH         (SYS_ADDR_WIDTH),
+        .ID_WIDTH           (AXI_ID_WIDTH),
+        .DATA_WIDTH         (AXI_DATA_WIDTH)
+    ) shared_axi_bridge (
+        .clock              (clock),
+        .reset_n            (reset_n),
+        .fault              (bus_fault),
+
+        // Independent cache line ports; all transactions use p_axi_*.
+        .i_read_valid       (p_mem_valid256 & ~p_mem_rw256),
+        .i_read_ready       (p_mem_ready256),
+        .i_read_addr        (p_mem_addr256[ADDR_WIDTH-1:0]),
+        .i_read_data        (p_mem_rdata256),
+        .d_read_valid       (d_mem_valid256 & ~d_mem_rw256),
+        .d_read_ready       (d_cache_rd_ready),
+        .d_read_addr        (d_mem_addr256[ADDR_WIDTH-1:0]),
+        .d_read_data        (d_mem_rdata256),
+        .d_write_valid      (d_mem_valid256 & d_mem_rw256),
+        .d_write_ready      (d_cache_wr_ready),
+        .d_write_addr       (d_mem_addr256[ADDR_WIDTH-1:0]),
+        .d_write_data       (d_mem_wdata256),
+
+        // AXI4 Master (to SDRAM AXI-S)
+        .m_axi_awid         (p_axi_awid),
+        .m_axi_awaddr       (p_axi_awaddr),
+        .m_axi_awlen        (p_axi_awlen),
+        .m_axi_awsize       (p_axi_awsize),
+        .m_axi_awburst      (p_axi_awburst),
+        .m_axi_awvalid      (p_axi_awvalid),
+        .m_axi_awready      (p_axi_awready),
+
+        .m_axi_wdata        (p_axi_wdata),
+        .m_axi_wstrb        (p_axi_wstrb),
+        .m_axi_wlast        (p_axi_wlast),
+        .m_axi_wvalid       (p_axi_wvalid),
+        .m_axi_wready       (p_axi_wready),
+
+        .m_axi_bid          (p_axi_bid),
+        .m_axi_bresp        (p_axi_bresp),
+        .m_axi_bvalid       (p_axi_bvalid),
+        .m_axi_bready       (p_axi_bready),
+
+        .m_axi_arid         (p_axi_arid),
+        .m_axi_araddr       (p_axi_araddr),
+        .m_axi_arlen        (p_axi_arlen),
+        .m_axi_arsize       (p_axi_arsize),
+        .m_axi_arburst      (p_axi_arburst),
+        .m_axi_arvalid      (p_axi_arvalid),
+        .m_axi_arready      (p_axi_arready),
+
+        .m_axi_rid          (p_axi_rid),
+        .m_axi_rdata        (p_axi_rdata),
+        .m_axi_rresp        (p_axi_rresp),
+        .m_axi_rlast        (p_axi_rlast),
+        .m_axi_rvalid       (p_axi_rvalid),
+        .m_axi_rready       (p_axi_rready)
+    );
 
     PSC_RV64_Monitor u_cpu_monitor (
         .clock(clock), .reset_n(reset_n),
         .PSC_CPU_MON_CTRL(csr_CPU_MON_CTRL), .PSC_CPU_MON_CYCLE(csr_CPU_MON_CYCLE),
-        .program_cache_hit_pulse(1'b0), .program_cache_miss_pulse(program_mem_read_valid),
-        .data_cache_hit_pulse(1'b0),
-        .data_cache_miss_pulse(data_mem_read_valid || data_mem_write_valid)
+        .program_cache_hit_pulse(program_cache_hit_pulse), .program_cache_miss_pulse(program_cache_miss_pulse),
+        .data_cache_hit_pulse(data_cache_hit_pulse),
+        .data_cache_miss_pulse(data_cache_miss_pulse)
     );
 endmodule

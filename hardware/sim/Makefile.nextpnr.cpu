@@ -258,4 +258,4 @@ report:
 		$(NEXTPNR_LOG) | tail -n 240 || true
 
 clean:
-	rm -rf build_nextpnr_v1 build_nextpnr_v2 build_nextpnr_legacy
+	rm -rf build_nextpnr_v1 build_nextpnr_v2 build_nextpnr_legacy build_nextpnr_rv64

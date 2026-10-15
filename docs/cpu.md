@@ -107,6 +107,26 @@ and [reproduction guide](../hardware/sim/coremark_psc/README.md). The original v
 iteration count conflicts with its score/time pair; the overview preserves the
 values and explains the unresolved discrepancy.
 
+## CPU_RV64 architecture
+
+CPU_RV64 is an experimental 64-bit extension of the PSC_RV32 design.
+
+targets RV64IM with Zicsr and Zifencei, extending the integer registers and
+datapath to 64 bits while retaining 32-bit instruction encodings.
+
+RV64 adds 64-bit load/store operations and word operations that produce
+32-bit results sign-extended to 64 bits. The port also requires RV64-specific
+handling of shift amounts, arithmetic, multiplication and division.
+
+Initial development focuses on bare-metal execution and adapting the existing
+C/C++ test programs using `-march=rv64im_zicsr_zifencei -mabi=lp64`.
+Sv39 virtual memory and PSC-OS support are separate development steps;
+64-bit execution alone does not establish Linux compatibility.
+
+The core remains experimental. RV32 regression results and CoreMark scores
+do not establish RV64 correctness or performance; RV64 validation results
+will be documented separately.
+
 ## PSC_RV32 vs PicoRV32 (Yosys Analysis)
 
 ### Resource comparison: CPU v1

@@ -59,12 +59,13 @@ module cache_dma_controller_io #(
     input  wire                             cpu_rvalid,
     input  wire                             cpu_wvalid,
     input  wire                             cpu_rw,          // 1:W, 0:R
+    input  wire                             cpu_rw_double,   // 1:64bit (8B aligned), 0:32bit
     input  wire [2:0]                       cpu_write_sel,
     input  wire [ADDR_WIDTH-1:0]            cpu_raddr,       // byte address
     input  wire [ADDR_WIDTH-1:0]            cpu_waddr,       // byte address
-    input  wire [CPU_DATA_WIDTH-1:0]        cpu_data,
+    input  wire [63:0]                      cpu_data,
     output logic                            cpu_ready,
-    output logic  [CPU_DATA_WIDTH-1:0]      cpu_data_out,
+    output logic [63:0]                     cpu_data_out,
     output wire                             cpu_req_ready,
 
     // --------- Cache 制御信号 ---------
@@ -113,7 +114,8 @@ module cache_dma_controller_io #(
 );
     // ---------------- 定数/ローカル ----------------
     localparam integer LINE_BYTES = CACHE_DATA_WIDTH / 8;
-    localparam integer LINE_WORDS = CACHE_DATA_WIDTH / CPU_DATA_WIDTH;
+    // Word addresses remain 32-bit based regardless of the CPU transfer size.
+    localparam integer LINE_WORDS = CACHE_DATA_WIDTH / 32;
     localparam integer OFFSET_BITS = $clog2(LINE_BYTES);
     localparam integer WORD_BITS = $clog2(LINE_WORDS);
 
@@ -173,9 +175,10 @@ module cache_dma_controller_io #(
     logic                       req_from_mmu;
     logic                       req_from_sa;
     logic                       req_is_write;
+    logic                       req_rw_double;
     logic  [ADDR_WIDTH-1:0]     req_addr_w;        // word address
     logic  [ADDR_WIDTH-1:0]     req_addr_b;        // byte address
-    logic  [CPU_DATA_WIDTH-1:0] req_wdata;
+    logic  [63:0]               req_wdata;
     logic  [WORD_BITS-1:0]                req_word_sel_r;    // ライン内 word 選択（0..7）
     logic  [2:0]                req_write_sel_r;
 
@@ -188,13 +191,13 @@ module cache_dma_controller_io #(
     logic                       cpu_cache_wb_latch;
 
     // アドレス
-    wire [ADDR_WIDTH-1:0] cpu_byte_raddr = cpu_raddr[31:0];
-    wire [ADDR_WIDTH-1:0] cpu_word_raddr = cpu_raddr[31:2];   // cpu_add[1:0]を削除
-    wire [ADDR_WIDTH-1:0] cpu_byte_waddr = cpu_waddr[31:0];
-    wire [ADDR_WIDTH-1:0] cpu_word_waddr = cpu_waddr[31:2];   // cpu_add[1:0]を削除
+    wire [ADDR_WIDTH-1:0] cpu_byte_raddr = cpu_raddr;
+    wire [ADDR_WIDTH-1:0] cpu_word_raddr = cpu_raddr >> 2;
+    wire [ADDR_WIDTH-1:0] cpu_byte_waddr = cpu_waddr;
+    wire [ADDR_WIDTH-1:0] cpu_word_waddr = cpu_waddr >> 2;
 
-    wire [ADDR_WIDTH-1:0] sa_byte_addr = sa_addr[31:0];
-    wire [ADDR_WIDTH-1:0] sa_word_addr = sa_addr[31:2];   // cpu_add[1:0]を削除
+    wire [ADDR_WIDTH-1:0] sa_byte_addr = sa_addr;
+    wire [ADDR_WIDTH-1:0] sa_word_addr = sa_addr >> 2;
 
     // ルックアップ（次拍でBRAM出力）
     logic  [INDEX_WIDTH_BA-1:0] cur_index_r;      // RAM アドレス
@@ -225,7 +228,8 @@ module cache_dma_controller_io #(
     logic [ADDR_WIDTH-1:0]          cpu_word_addr_slot;
     logic [ADDR_WIDTH-1:0]          cpu_byte_addr_slot;
     logic                           cpu_rw_latch;
-    logic [CPU_DATA_WIDTH-1:0]      cpu_data_latch;
+    logic                           cpu_rw_double_latch;
+    logic [63:0]                    cpu_data_latch;
     logic [2:0]                     cpu_write_sel_latch;
 
     logic [ADDR_WIDTH-1:0]          sa_word_addr_slot;
@@ -238,9 +242,13 @@ module cache_dma_controller_io #(
     logic [INDEX_WIDTH_BA-1:0]      cache_wb_index;
 
     // ---------------- ヘルパ関数 ----------------
-    function [31:0] pick_word(input [CACHE_DATA_WIDTH-1:0] line, input [WORD_BITS-1:0] sel);
+    function [63:0] pick_word(input [CACHE_DATA_WIDTH-1:0] line,
+                              input [WORD_BITS-1:0] sel, input rw_double);
         begin
-            pick_word = line[sel*CPU_DATA_WIDTH +: CPU_DATA_WIDTH];
+            if (rw_double)
+                pick_word = line[(sel / 2)*64 +: 64];
+            else
+                pick_word = {32'b0, line[sel*32 +: 32]};
         end
     endfunction
 
@@ -261,14 +269,18 @@ module cache_dma_controller_io #(
                 store_byte_en = half_sel ? 4'b1100 : 4'b0011;
             end
             default: begin
-                store_data = req_wdata;
+                store_data = req_wdata[31:0];
                 store_byte_en = 4'b1111;
             end
         endcase
         for (lane = 0; lane < LINE_BYTES; lane = lane + 1) begin
-            new_line[lane*8 +: 8] =
-                ((req_word_sel_r == (lane / 4)) && store_byte_en[lane % 4])
-                ? store_data[(lane % 4)*8 +: 8] : store_base[lane*8 +: 8];
+            if (req_rw_double)
+                new_line[lane*8 +: 8] = ((req_word_sel_r / 2) == (lane / 8))
+                    ? req_wdata[(lane % 8)*8 +: 8] : store_base[lane*8 +: 8];
+            else
+                new_line[lane*8 +: 8] =
+                    ((req_word_sel_r == (lane / 4)) && store_byte_en[lane % 4])
+                    ? store_data[(lane % 4)*8 +: 8] : store_base[lane*8 +: 8];
         end
     end
 
@@ -285,7 +297,7 @@ module cache_dma_controller_io #(
 
     // MMIO（一致かつ0以外で有効）
     function mmio_hit(input [ADDR_WIDTH-1:0] addr_mmio);
-        reg [31:0]  addr_mmio_masked;
+        reg [ADDR_WIDTH-1:0] addr_mmio_masked;
         begin
             addr_mmio_masked = addr_mmio & MMMIO_BASK_BITS;
             mmio_hit =
@@ -332,7 +344,9 @@ module cache_dma_controller_io #(
     wire selected_write = !select_mmu && (select_sa
         ? (sa_req_slot_valid ? sa_rw_latch : sa_rw)
         : (cpu_req_slot_valid ? cpu_rw_latch : cpu_rw));
-    wire [CPU_DATA_WIDTH-1:0] selected_wdata = select_sa
+    wire selected_rw_double = !select_mmu && !select_sa &&
+        (cpu_req_slot_valid ? cpu_rw_double_latch : cpu_rw_double);
+    wire [63:0] selected_wdata = select_sa
         ? (sa_req_slot_valid ? sa_data_latch : sa_data)
         : (cpu_req_slot_valid ? cpu_data_latch : cpu_data);
     wire [2:0] selected_write_sel = select_sa ? 3'b010
@@ -348,10 +362,10 @@ module cache_dma_controller_io #(
     };
     wire line_cache_hit = (state == S_CASHE_START) &&
         !req_is_write && !req_mmio && !line_cache_maintenance && (|line_cache_match);
-    // Select a word from each line first, then mux only CPU_DATA_WIDTH bits.
-    wire [CPU_DATA_WIDTH-1:0] line_cache_word = line_cache_match[0]
-        ? pick_word(line_cache_data[0], req_word_sel_r)
-        : pick_word(line_cache_data[1], req_word_sel_r);
+    // Select the requested word/doubleword before muxing the two REG lines.
+    wire [63:0] line_cache_word = line_cache_match[0]
+        ? pick_word(line_cache_data[0], req_word_sel_r, req_rw_double)
+        : pick_word(line_cache_data[1], req_word_sel_r, req_rw_double);
 
     // Response enables are disjoint by state. Keep the tag comparison out
     // of the nested write/miss/arbitration mux tree feeding output FF enables.
@@ -366,17 +380,20 @@ module cache_dma_controller_io #(
         PROTECT_MODE && req_is_write && (req_addr_b < PROTECT_ADDR);
     // State-disjoint data sources form one shared word mux. Output enables
     // depend only on the registered owner and the matching response condition.
-    wire [CPU_DATA_WIDTH-1:0] response_word =
-        ({CPU_DATA_WIDTH{state == S_CASHE_START}} & line_cache_word) |
-        ({CPU_DATA_WIDTH{state == S_COMPARE}} & pick_word(data_read, req_word_sel_r)) |
-        ({CPU_DATA_WIDTH{state == S_ALLOC_WAIT}} & pick_word(mem_data_in, req_word_sel_r));
-    wire [CPU_DATA_WIDTH-1:0] cpu_response_data =
-        ({CPU_DATA_WIDTH{!protected_response}} & response_word) |
-        ({CPU_DATA_WIDTH{state == S_MMIO_WAIT}} & mmio_rdata);
+    wire [63:0] response_word =
+        ({64{state == S_CASHE_START}} & line_cache_word) |
+        ({64{state == S_COMPARE}} & pick_word(data_read, req_word_sel_r, req_rw_double)) |
+        ({64{state == S_ALLOC_WAIT}} & pick_word(mem_data_in, req_word_sel_r, req_rw_double));
+    // Peripheral bus width is unchanged; narrow reads always zero the high word.
+    wire [63:0] mmio_response_data = mmio_rdata;
+    wire [63:0] cpu_response_data =
+        ({64{!protected_response}} & response_word) |
+        ({64{state == S_MMIO_WAIT}} &
+            (req_rw_double ? mmio_response_data : {32'b0, mmio_response_data[31:0]}));
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
-            cpu_data_out <= {CPU_DATA_WIDTH{1'b0}};
+            cpu_data_out <= 64'b0;
             sa_data_out  <= {CPU_DATA_WIDTH{1'b0}};
             mmu_data_out <= {CPU_DATA_WIDTH{1'b0}};
         end else begin
@@ -510,7 +527,8 @@ module cache_dma_controller_io #(
             byte_sel            <= 2'b00;
             half_sel            <= 1'b0;
             cpu_rw_latch        <= 1'b0;
-            cpu_data_latch      <= 32'h0;
+            cpu_rw_double_latch <= 1'b0;
+            cpu_data_latch      <= 64'h0;
             cpu_write_sel_latch <= 3'b000;
             sa_req_slot_valid   <= 1'b0;    // SA
             sa_word_addr_slot   <= 32'h0;
@@ -544,9 +562,10 @@ module cache_dma_controller_io #(
             req_from_mmu  <= 1'b0;
             req_from_sa   <= 1'b0;
             req_is_write  <= 1'b0;
+            req_rw_double <= 1'b0;
             req_addr_w    <= {ADDR_WIDTH{1'b0}};
             req_addr_b    <= {ADDR_WIDTH{1'b0}};
-            req_wdata     <= {CPU_DATA_WIDTH{1'b0}};
+            req_wdata     <= 64'b0;
             req_write_sel_r <= 3'b000;
             req_word_sel_r<= '0;
 
@@ -589,6 +608,7 @@ module cache_dma_controller_io #(
                 cpu_word_addr_slot  <= cpu_word_raddr;
                 cpu_byte_addr_slot  <= cpu_byte_raddr;
                 cpu_rw_latch        <= cpu_rw;
+                cpu_rw_double_latch <= cpu_rw_double;
                 cpu_data_latch      <= cpu_data;
                 cpu_write_sel_latch <= cpu_write_sel;
             end
@@ -597,6 +617,7 @@ module cache_dma_controller_io #(
                 cpu_word_addr_slot  <= cpu_word_waddr;
                 cpu_byte_addr_slot  <= cpu_byte_waddr;
                 cpu_rw_latch        <= cpu_rw;
+                cpu_rw_double_latch <= cpu_rw_double;
                 cpu_data_latch      <= cpu_data;
                 cpu_write_sel_latch <= cpu_write_sel;
             end
@@ -638,6 +659,7 @@ module cache_dma_controller_io #(
                         req_from_mmu    <= select_mmu;
                         req_from_sa     <= select_sa;
                         req_is_write    <= selected_write;
+                        req_rw_double   <= selected_rw_double;
                         req_addr_b      <= selected_addr;
                         req_addr_w      <= selected_addr >> 2;
                         req_word_sel_r  <= selected_addr[OFFSET_BITS-1:2];
@@ -675,7 +697,7 @@ module cache_dma_controller_io #(
                         mmio_valid <= 1'b1;
                         mmio_rw <= req_is_write;
                         mmio_addr <= req_addr_b;
-                        mmio_wdata <= req_wdata;
+                        mmio_wdata <= req_rw_double ? req_wdata : {32'b0, req_wdata[31:0]};
                         state <= S_MMIO_WAIT;
                     end else begin
                         cur_index_r <= req_addr_b[TAGLSB-1:OFFSET_BITS];

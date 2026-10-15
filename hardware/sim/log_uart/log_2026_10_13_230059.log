@@ -1,0 +1,34 @@
+[dbg] cycle=0, last_uart=--, pc=0x00000000, data_addr=0x00000000
+bootloader FAT32 start
+SD INIT start
+FAT32: mount enter
+FAT32: read LBA0
+FAT32: read LBA0 ok
+FAT32: part ok
+FAT32: read BPB
+FAT32: read BPB ok
+FAT32: BPB valid
+FAT32: parse 1
+FAT32: parse 2
+FAT32: parse 3
+FAT32: parse 4
+FAT32: parse 5
+FAT32: parse 6
+FAT32: validate
+FAT32: root check
+FAT32: root is 2
+FAT32: calc fat
+FAT32: calc data
+FAT32: add fat1
+FAT32: add fat2
+FAT32: mount ok
+FAT32: load mem enter
+FAT32: find enter
+FAT32: root loop
+FAT32: calc lba
+FAT32: read dir
+FAT32: dir ok
+FAT32: entry
+FAT32: found
+FAT32: find ok
+FAT32: loading KERNEL.MEM size=163224

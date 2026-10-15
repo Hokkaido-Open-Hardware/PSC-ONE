@@ -1,5 +1,9 @@
 `timescale 1ns / 1ps
-module Csr (
+module Csr #(
+    // Peripheral observation ports expose the low bits of 64-bit CSRs.
+    // Architectural CSR state/readback and status inputs remain XLEN=64.
+    parameter integer PERIPHERAL_CSR_WIDTH = 32
+) (
     input  logic        clock,
     input  logic        reset_n,
     input  logic        csr_enb,
@@ -57,25 +61,25 @@ module Csr (
     output logic [63:0] out_satp,
 
     // to Data-Cache
-    output logic [63:0] out_DCACHE_CTRL,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_DCACHE_CTRL,
 
     // to DMA
-    output logic [63:0] out_DMA_CTRL,
-    output logic [63:0] out_DMA_WORDS,
-    output logic [63:0] out_DMA_SRC,
-    output logic [63:0] out_DMA_DST,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_DMA_CTRL,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_DMA_WORDS,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_DMA_SRC,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_DMA_DST,
     input  logic [63:0] in_DMA_STATUS,
 
     // to SynapEngine
-    output logic [63:0] out_SA_CTRL,
-    output logic [63:0] out_SA_SIZE,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_SA_CTRL,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_SA_SIZE,
     input  logic [63:0] in_SA_STATUS,
-    output logic [63:0] out_SA_ADDR_A,
-    output logic [63:0] out_SA_ADDR_B,
-    output logic [63:0] out_SA_ADDR_C,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_SA_ADDR_A,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_SA_ADDR_B,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_SA_ADDR_C,
 
     // to CPU Monitor
-    output logic [63:0] out_CPU_MON_CTRL,
+    output logic [PERIPHERAL_CSR_WIDTH-1:0] out_CPU_MON_CTRL,
     input  logic [63:0] in_CPU_MON_CYCLE
 );
     // SA ADDRESS (TBD)
@@ -230,17 +234,17 @@ module Csr (
         out_satp    = csr_satp;
         priv_mode   = csr_priv_mode;
 
-        out_DCACHE_CTRL = csr_DCACHE_CTRL;
-        out_DMA_CTRL    = csr_DMA_CTRL;
-        out_DMA_WORDS   = csr_DMA_WORDS;
-        out_DMA_SRC     = csr_DMA_SRC;
-        out_DMA_DST     = csr_DMA_DST;
-        out_SA_CTRL     = csr_SA_CTRL;
-        out_SA_SIZE     = csr_SA_SIZE;
-        out_SA_ADDR_A   = csr_SA_ADDR_A;
-        out_SA_ADDR_B   = csr_SA_ADDR_B;
-        out_SA_ADDR_C   = csr_SA_ADDR_C;
-        out_CPU_MON_CTRL = csr_CPU_MON_CTRL;
+        out_DCACHE_CTRL = PERIPHERAL_CSR_WIDTH'(csr_DCACHE_CTRL);
+        out_DMA_CTRL    = PERIPHERAL_CSR_WIDTH'(csr_DMA_CTRL);
+        out_DMA_WORDS   = PERIPHERAL_CSR_WIDTH'(csr_DMA_WORDS);
+        out_DMA_SRC     = PERIPHERAL_CSR_WIDTH'(csr_DMA_SRC);
+        out_DMA_DST     = PERIPHERAL_CSR_WIDTH'(csr_DMA_DST);
+        out_SA_CTRL     = PERIPHERAL_CSR_WIDTH'(csr_SA_CTRL);
+        out_SA_SIZE     = PERIPHERAL_CSR_WIDTH'(csr_SA_SIZE);
+        out_SA_ADDR_A   = PERIPHERAL_CSR_WIDTH'(csr_SA_ADDR_A);
+        out_SA_ADDR_B   = PERIPHERAL_CSR_WIDTH'(csr_SA_ADDR_B);
+        out_SA_ADDR_C   = PERIPHERAL_CSR_WIDTH'(csr_SA_ADDR_C);
+        out_CPU_MON_CTRL = PERIPHERAL_CSR_WIDTH'(csr_CPU_MON_CTRL);
     end
 
     always_ff @(posedge clock or negedge reset_n) begin

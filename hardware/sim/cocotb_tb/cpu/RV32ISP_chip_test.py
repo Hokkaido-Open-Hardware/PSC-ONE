@@ -13,7 +13,7 @@ from cocotb.types import LogicArray
 # ------------------------------------------------
 # 設定
 # ------------------------------------------------
-Assert = 0
+Assert = 1
 
 # ---------- ★ ログ書き込み（append） ----------
 logfile = os.getenv("PSC_LOGFILE", "./log/test_result_default.log")
