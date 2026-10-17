@@ -88,7 +88,7 @@ SRC_CASHE = \
 	../rtl/soc/cache/src/dm_cache_data.v \
 	../rtl/soc/cache/src/dm_cache_tag.v
 SRC_BRIDGE = \
-	../rtl/soc/axi/sdram_32bit_to_256bit_axi_bridge.v
+	../rtl/soc/axi/PSC_RV32_CacheAXI.v
 SRC_AXI_SDRAM_CNT = \
 	../rtl/tang20k/sdram_controller/sdram_axi_controller.v \
 	../rtl/tang20k/sdram_controller/sdram_controller.sv
