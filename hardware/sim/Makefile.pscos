@@ -215,7 +215,7 @@ BOOT_SRC_DIR	= ../rtl/soc/boot
 DMA_SRC_DIR		= ../rtl/soc/dma
 
 SDRAM_32bit_AXI_FILES = \
-	$(AXI_DIR)/sdram_32bit_to_256bit_axi_bridge.v \
+	$(AXI_DIR)/PSC_RV32_CacheAXI.v \
 	$(SDRAM_CNT_DIR)/sdram_axi_controller.v \
 	$(SDRAM_CNT_DIR)/sdram_controller.sv \
 	$(GW2AR_SDRAM_MODEL)

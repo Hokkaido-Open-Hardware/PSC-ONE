@@ -145,61 +145,61 @@ SIM_BUILD        ?= sim_build
 # ============================================================
 # PSC-ONE CPU CORE単体テスト
 # tang 20k 
-RV32ISP_SINGLE_TEST = \
-	add_test1:RV32ISP_core_test:./mem/add_test1.mem:0xff00ff0b \
+RV32_SINGLE_TEST = \
+	add_test1:RV32_core_test:./mem/add_test1.mem:0xff00ff0b \
 
 # ============================================================
 # Basic Test List
 # ============================================================
-RV32ISP_BASIC_TEST = \
-	add_test1:RV32ISP_core_test:./mem/add_test1.mem:0xff00ff0b \
-	add_test2:RV32ISP_core_test:./mem/add_test2.mem:0x00000000 \
-	forwarding_timing_test1:RV32ISP_core_test:./mem/forwarding_timing_test1.mem:0x00008000 \
-	sbwrite_test1:RV32ISP_core_test:./mem/sbwrite_test1.mem:0xE500000F \
-	jal_test1:RV32ISP_core_test:./mem/jal_test1.mem:0x12345678 \
-	jalr_test1:RV32ISP_core_test:./mem/jalr_test1.mem:0x00005AA5 \
-	mul_test1:RV32ISP_core_test:./mem/mul_test1.mem:0x00000063 \
-	mul_test2:RV32ISP_core_test:./mem/mul_test2.mem:0x00000033 \
-	nn_test1:RV32ISP_core_test:./mem/nn_test1.mem:0x00000170 \
-	montepi_test1:RV32ISP_core_test:./mem/montepi_test1.mem:0x0000beef \
-	rem_test1:RV32ISP_core_test:./mem/rem_test1.mem:0x00000001 \
-	matrix_test1:RV32ISP_core_test:./mem/matrix_test1.mem:0x0000ABCD \
-	shift_test1:RV32ISP_core_test:./mem/shift_test1.mem:0x00001234 \
-	jump_test1:RV32ISP_core_test:./mem/jump_test1.mem:0x12345678 \
-	lui_test1:RV32ISP_core_test:./mem/lui_test1.mem:0x12345000 \
-	divmod_test1:RV32ISP_core_test:./mem/divmod_test1.mem:0x00000e02 \
-	csr_test1:RV32ISP_core_test:./mem/csr_test1.mem:0x00000022 \
-	sp_test1:RV32ISP_core_test:./mem/sp_test1.mem:0x00005AA5 \
-	ecall_test1:RV32ISP_core_test:./mem/ecall_test1.mem:0x00000321 \
-	ret_test1:RV32ISP_core_test:./mem/ret_test1.mem:0x12345678 \
-	prime_test1:RV32ISP_core_test:./mem/prime_test1.mem:0x00000061 \
-	audipc_test1:RV32ISP_core_test:./mem/audipc_test1.mem:0xFFFFFFF8 \
-	alu_mul_test1:RV32ISP_core_test:./mem/alu_mul_test1.mem:0x00000000 \
-	fft_test1:RV32ISP_core_test:./mem/fft_test1.mem:0x0000beef \
-	q15_fft_test1:RV32ISP_core_test:./mem/q15_fft_test1.mem:0x0000beef \
-	fft_N8_test1:RV32ISP_core_test:./mem/fft_N8_test1.mem:0x0000beef \
-	sret_test1:RV32ISP_core_test:./mem/sret_test1.mem:0x0000DC12 \
-	memcpy_test1:RV32ISP_core_test:./mem/memcpy_test1.mem:0x00002521 \
-	mmu_test1:RV32ISP_core_test:./mem/mmu_test1.mem:0x00000033 \
+RV32_BASIC_TEST = \
+	add_test1:RV32_core_test:./mem/add_test1.mem:0xff00ff0b \
+	add_test2:RV32_core_test:./mem/add_test2.mem:0x00000000 \
+	forwarding_timing_test1:RV32_core_test:./mem/forwarding_timing_test1.mem:0x00008000 \
+	sbwrite_test1:RV32_core_test:./mem/sbwrite_test1.mem:0xE500000F \
+	jal_test1:RV32_core_test:./mem/jal_test1.mem:0x12345678 \
+	jalr_test1:RV32_core_test:./mem/jalr_test1.mem:0x00005AA5 \
+	mul_test1:RV32_core_test:./mem/mul_test1.mem:0x00000063 \
+	mul_test2:RV32_core_test:./mem/mul_test2.mem:0x00000033 \
+	nn_test1:RV32_core_test:./mem/nn_test1.mem:0x00000170 \
+	montepi_test1:RV32_core_test:./mem/montepi_test1.mem:0x0000beef \
+	rem_test1:RV32_core_test:./mem/rem_test1.mem:0x00000001 \
+	matrix_test1:RV32_core_test:./mem/matrix_test1.mem:0x0000ABCD \
+	shift_test1:RV32_core_test:./mem/shift_test1.mem:0x00001234 \
+	jump_test1:RV32_core_test:./mem/jump_test1.mem:0x12345678 \
+	lui_test1:RV32_core_test:./mem/lui_test1.mem:0x12345000 \
+	divmod_test1:RV32_core_test:./mem/divmod_test1.mem:0x00000e02 \
+	csr_test1:RV32_core_test:./mem/csr_test1.mem:0x00000022 \
+	sp_test1:RV32_core_test:./mem/sp_test1.mem:0x00005AA5 \
+	ecall_test1:RV32_core_test:./mem/ecall_test1.mem:0x00000321 \
+	ret_test1:RV32_core_test:./mem/ret_test1.mem:0x12345678 \
+	prime_test1:RV32_core_test:./mem/prime_test1.mem:0x00000061 \
+	audipc_test1:RV32_core_test:./mem/audipc_test1.mem:0xFFFFFFF8 \
+	alu_mul_test1:RV32_core_test:./mem/alu_mul_test1.mem:0x00000000 \
+	fft_test1:RV32_core_test:./mem/fft_test1.mem:0x0000beef \
+	q15_fft_test1:RV32_core_test:./mem/q15_fft_test1.mem:0x0000beef \
+	fft_N8_test1:RV32_core_test:./mem/fft_N8_test1.mem:0x0000beef \
+	sret_test1:RV32_core_test:./mem/sret_test1.mem:0x0000DC12 \
+	memcpy_test1:RV32_core_test:./mem/memcpy_test1.mem:0x00002521 \
+	mmu_test1:RV32_core_test:./mem/mmu_test1.mem:0x00000033 \
 
 # ============================================================
 # PULP Test List (CPU_VERSION=v1)
 # ============================================================
 
-RV32ISP_PULP_TEST = \
-	cv_pulp_test1:RV32ISP_core_test:./mem/cv_pulp_test1.mem:0x600D600D \
-	cv_pulp_test2:RV32ISP_core_test:./mem/cv_pulp_test2.mem:0x600D600D
+RV32_PULP_TEST = \
+	cv_pulp_test1:RV32_core_test:./mem/cv_pulp_test1.mem:0x600D600D \
+	cv_pulp_test2:RV32_core_test:./mem/cv_pulp_test2.mem:0x600D600D
 
 # ============================================================
 # Voice Test List
 # ============================================================
 
-RV32ISP_VOICE_TEST = \
-	audio_feature_test1:RV32ISP_core_test:./mem/audio_feature_test1.mem:0x00001212 \
-	audio_nn_test1:RV32ISP_core_test:./mem/audio_nn_test1.mem:0x00001213 \
-	voice_test1:RV32ISP_core_test:./mem/voice_test1.mem:0x00001214 \
-	voice_test2:RV32ISP_core_test:./mem/voice_test2.mem:0x00001215 \
-	voice_test3:RV32ISP_core_test:./mem/voice_test3.mem:0x00001216 \
+RV32_VOICE_TEST = \
+	audio_feature_test1:RV32_core_test:./mem/audio_feature_test1.mem:0x00001212 \
+	audio_nn_test1:RV32_core_test:./mem/audio_nn_test1.mem:0x00001213 \
+	voice_test1:RV32_core_test:./mem/voice_test1.mem:0x00001214 \
+	voice_test2:RV32_core_test:./mem/voice_test2.mem:0x00001215 \
+	voice_test3:RV32_core_test:./mem/voice_test3.mem:0x00001216 \
 
 # ============================================================
 # テストプログラムの切り替え（basic / pulp / voice / single）
@@ -208,13 +208,13 @@ RV32ISP_VOICE_TEST = \
 TEST_PROGRAM_LIST ?= basic
 
 ifeq ($(TEST_PROGRAM_LIST),basic)
-RV32ISP_TEST = $(RV32ISP_BASIC_TEST)
+RV32_TEST = $(RV32_BASIC_TEST)
 else ifeq ($(TEST_PROGRAM_LIST),pulp)
-RV32ISP_TEST = $(RV32ISP_PULP_TEST)
+RV32_TEST = $(RV32_PULP_TEST)
 else ifeq ($(TEST_PROGRAM_LIST),single)
-RV32ISP_TEST = $(RV32ISP_SINGLE_TEST)
+RV32_TEST = $(RV32_SINGLE_TEST)
 else ifeq ($(TEST_PROGRAM_LIST),voice)
-RV32ISP_TEST = $(RV32ISP_VOICE_TEST)
+RV32_TEST = $(RV32_VOICE_TEST)
 else
 $(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic, pulp, voice, single を指定してください)
 endif
@@ -234,7 +234,7 @@ simulate_CPU_CORE:
 	@set -e; \
 	mkdir -p "$(TEST_BUILD_ROOT)"; \
 	build_dir=$$(mktemp -d "$(TEST_BUILD_ROOT)/psc-core-test-XXXXXX"); \
-	for t in $(RV32ISP_TEST); do \
+	for t in $(RV32_TEST); do \
 		name=$$(echo $$t | cut -d: -f1); \
 		cocotb_file=$$(echo $$t | cut -d: -f2); \
 		mem_file=$$(echo $$t | cut -d: -f3); \
@@ -261,5 +261,5 @@ simulate_CPU_CORE:
 	printf '\a'; \
 	echo ""; \
 	echo "========================================"; \
-	echo "✅ All RV32ISP_core tests completed"; \
+	echo "✅ All RV32_core tests completed"; \
 	echo "========================================"

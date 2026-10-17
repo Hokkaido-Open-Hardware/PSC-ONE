@@ -19,7 +19,7 @@ MEM_LATENCY          ?= 2
 TEST_PROGRAM_LIST    ?= basic
 TEST_PROGRAM         ?= divmod_test1
 
-# Same programs and order as RV32ISP_BASIC_TEST in Makefile.cpu.core.
+# Same programs and order as RV32_BASIC_TEST in Makefile.cpu.core.
 # Each entry is program:expected_PIO32_result (after the 0xEE01 marker).
 RV64_BASIC_TESTS     := \
 	add_test1:0xff00ff0b \

@@ -12,7 +12,7 @@ from cocotb.triggers import RisingEdge, ReadOnly
 class BootDiagnostics:
     def __init__(self, dut):
         self.dut = dut
-        self.cpu = dut.u_chip.u_soc.u_rv32_core_axi
+        self.cpu = dut.u_chip.u_soc.u_rv_core_axi
         self.core = self.cpu.u_core
         self.cache = self.cpu.u_data_dma_ctrl
         self.mmu = self.core.u_fetch_unit.u_mmu_i

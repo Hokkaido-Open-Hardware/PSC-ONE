@@ -169,7 +169,6 @@ CPU_RV64_CORE_FILES = \
 	$(RV64_SRC_DIR)/MMU.sv \
 	$(RV64_SRC_DIR)/Csr.sv \
 	$(RV64_SRC_DIR)/PSC_RV64_Monitor.v \
-	$(RV64_SRC_DIR)/PSC_RV64_CacheAXI.sv \
 	$(RV64_SRC_DIR)/PSC_ONE_RV64_core.v
 
 MMIO_DIR	= ../rtl/soc/mmio/MMIO
@@ -216,7 +215,8 @@ BOOT_SRC_DIR	= ../rtl/soc/boot
 DMA_SRC_DIR		= ../rtl/soc/dma
 
 SDRAM_32bit_AXI_FILES = \
-	$(AXI_DIR)/sdram_32bit_to_256bit_axi_bridge.v \
+	$(AXI_DIR)/PSC_RV32_CacheAXI.v \
+	$(AXI_DIR)/PSC_RV64_CacheAXI.sv \
 	$(SDRAM_CNT_DIR)/sdram_axi_controller.v \
 	$(SDRAM_CNT_DIR)/sdram_controller.sv \
 	$(GW2AR_SDRAM_MODEL)

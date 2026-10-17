@@ -234,8 +234,8 @@ async def RV32IS_chip_test1(dut):
     while waited < timeout_cycles:
         await RisingEdge(dut.clock)
 
-        page_fault_i = dut.u_chip.u_soc.u_rv32_core_axi.u_core.i_pf.value
-        page_fault_d = dut.u_chip.u_soc.u_rv32_core_axi.u_core.d_pf.value
+        page_fault_i = dut.u_chip.u_soc.u_rv_core_axi.u_core.i_pf.value
+        page_fault_d = dut.u_chip.u_soc.u_rv_core_axi.u_core.d_pf.value
 
         # PageFaultでbreak
         if page_fault_i or page_fault_d:

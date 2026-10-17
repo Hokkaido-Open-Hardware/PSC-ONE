@@ -360,9 +360,9 @@ module PSC_ONE_SOC #(
         .PSC_PFE_IF_DATA     (PSC_PFE_IF_DATA),
         .PSC_PFE_IF_CTRL     (PSC_PFE_IF_CTRL)
 `ifdef CPU_RV64
-    ) u_rv64_core_axi (
+    ) u_rv_core_axi (
 `else
-    ) u_rv32_core_axi (
+    ) u_rv_core_axi (
 `endif
         .clock              (clock),
         .reset_n            (reset_n),

@@ -60,11 +60,11 @@ SIM_BUILD        ?= sim_build
 #  Cocotb simulation targets
 # ============================================================
 simulate_MMU:
-	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_RV32ISP MMU test)"
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_RV32 MMU test)"
 	@echo EXTRA_ARGS=$(EXTRA_ARGS)
 	$(MAKE) clean
 	@mkdir -p ./wave
-	COCOTB_TEST_MODULES=cocotb_tb.cpu.RV32ISP_mmu_test \
+	COCOTB_TEST_MODULES=cocotb_tb.cpu.RV32_mmu_test \
 	TOPLEVEL=$(MMU_TOP) TOPLEVEL_LANG=verilog \
 	SIM=$(SIM) \
 	VERILOG_SOURCES="$(MMU_FILES)" \

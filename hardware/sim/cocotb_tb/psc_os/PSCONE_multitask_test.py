@@ -96,7 +96,7 @@ async def two_busy_processes_are_preempted_by_1ms_timer_irq(dut):
             break
 
     if markers != expected:
-        core = dut.u_chip.u_soc.u_rv32_core_axi.u_core
+        core = dut.u_chip.u_soc.u_rv_core_axi.u_core
         csr = core.u_csr
         debug = {
             "boot_done": resolved(dut.u_chip.Boot_rom_done),

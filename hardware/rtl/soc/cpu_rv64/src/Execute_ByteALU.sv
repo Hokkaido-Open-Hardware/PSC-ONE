@@ -1,5 +1,6 @@
 `timescale 1ns/1ps
-// Eight-bit arithmetic/logic datapath and fixed 1/8-bit iterative shifter.
+// 32-bit arithmetic/logic datapath and fixed 1/8-bit iterative shifter.
+// Non-shift RV64 operations take two datapath cycles; W operations take one.
 // All input context is captured on start; DONE is a one-cycle completion.
 module Execute_ByteALU (
     input logic clk, reset_n, cancel, start,
@@ -9,33 +10,33 @@ module Execute_ByteALU (
     output logic done,
     output logic [63:0] result
 );
-    typedef enum logic [1:0] {IDLE, BYTES, SHIFT, FINISH} state_t;
+    typedef enum logic [1:0] {IDLE, WORDS, SHIFT, FINISH} state_t;
     state_t state;
     logic [63:0] a, b, value;
     logic [4:0] op;
     logic word_q, carry, sign_a, sign_b;
-    logic [2:0] index;
+    logic index;
     logic [5:0] shift_count;
     logic subtract, compare_op, shift_op;
-    logic [8:0] sum;
-    logic [7:0] byte_value;
+    logic [32:0] sum;
+    logic [31:0] word_value;
     logic less;
 
     assign subtract = (op == 5'b10000) || (op == 5'b00010) || (op == 5'b00011);
     assign compare_op = (op == 5'b00010) || (op == 5'b00011);
     assign shift_op = (op == 5'b00001) || (op == 5'b00101) || (op == 5'b10101);
-    assign sum = {1'b0, a[7:0]} + {1'b0, (b[7:0] ^ {8{subtract}})} + {8'b0, carry};
+    assign sum = {1'b0, a[31:0]} + {1'b0, (b[31:0] ^ {32{subtract}})} + {32'b0, carry};
     assign less = (op == 5'b00010 && sign_a != sign_b) ? sign_a : !carry;
     assign done = state == FINISH;
 
-    // Datapath: one byte adder; operand rotation uses fixed wiring.
+    // Datapath: one 32-bit adder; operand rotation uses fixed wiring.
     always_comb begin
         case (op)
-            5'b00000, 5'b10000, 5'b00010, 5'b00011: byte_value = sum[7:0];
-            5'b00100: byte_value = a[7:0] ^ b[7:0];
-            5'b00110: byte_value = a[7:0] | b[7:0];
-            5'b00111: byte_value = a[7:0] & b[7:0];
-            default: byte_value = 8'b0;
+            5'b00000, 5'b10000, 5'b00010, 5'b00011: word_value = sum[31:0];
+            5'b00100: word_value = a[31:0] ^ b[31:0];
+            5'b00110: word_value = a[31:0] | b[31:0];
+            5'b00111: word_value = a[31:0] & b[31:0];
+            default: word_value = 32'b0;
         endcase
         if (compare_op)
             result = {63'b0, less};
@@ -71,16 +72,16 @@ module Execute_ByteALU (
                     state <= SHIFT;
                 end else begin
                     value <= 0;
-                    state <= BYTES;
+                    state <= WORDS;
                 end
             end
-            BYTES: begin
-                a <= {a[7:0], a[63:8]};
-                b <= {b[7:0], b[63:8]};
-                value <= {byte_value, value[63:8]};
-                carry <= sum[8];
+            WORDS: begin
+                a <= {a[31:0], a[63:32]};
+                b <= {b[31:0], b[63:32]};
+                value <= {word_value, value[63:32]};
+                carry <= sum[32];
                 index <= index + 1'b1;
-                if (index == (word_q ? 3'd3 : 3'd7)) state <= FINISH;
+                if (word_q || index) state <= FINISH;
             end
             SHIFT: begin
                 if (shift_count == 0)

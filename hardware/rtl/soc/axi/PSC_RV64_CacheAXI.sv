@@ -1,19 +1,20 @@
 /*
-NISHIHARU — 32bit × 8 beat ⇄ 256bit line bridge
+NISHIHARU — 32/64bit × 8/4 beat ⇄ 256bit line bridge
  - Cache side : 256-bit read/write
- - AXI side   : 32-bit AXI4 master, INCR, SIZE=2(4B), LEN=7(=8beat)
- - Order      : beat0->LSB ... beat7->MSB
+ - AXI side   : 32/64-bit AXI4 master, INCR; 256 bits per cache line
+ - Order      : beat0->LSB ... beat3->MSB
 */
 `timescale 1ns/1ps
 
-module sdram_32bit_to_256bit_axi_bridge #(
-    parameter integer ADDR_WIDTH   = 32,
+module PSC_RV64_CacheAXI #(
+    parameter integer ADDR_WIDTH   = 64,
     parameter integer ID_WIDTH     = 1,
-    parameter integer DATA_WIDTH   = 32,
+    parameter integer DATA_WIDTH   = 64,
     parameter integer FENCE_CYCLES = 2
 )(
     input  wire                     clock,
     input  wire                     reset_n,
+    output reg                      fault,
 
     // Cache requests are one-cycle pulses, with at most one outstanding
     // request per cache. Address/data remain stable until completion, as in
@@ -67,6 +68,12 @@ module sdram_32bit_to_256bit_axi_bridge #(
     output reg                      m_axi_rready
 );
 
+    localparam integer BEATS = 256 / DATA_WIDTH;
+    localparam integer BEAT_BITS = $clog2(BEATS);
+    localparam [7:0] AXI_LEN = 8'(BEATS - 1);
+    localparam [2:0] AXI_SIZE = 3'($clog2(DATA_WIDTH / 8));
+    localparam [BEAT_BITS-1:0] LAST_BEAT = BEAT_BITS'(BEATS - 1);
+
     localparam integer FENCE_CNT_WIDTH =
         (FENCE_CYCLES <= 1) ? 1 : $clog2(FENCE_CYCLES + 1);
 
@@ -74,8 +81,8 @@ module sdram_32bit_to_256bit_axi_bridge #(
         align32 = {ba[ADDR_WIDTH-1:5], 5'b00000};
     endfunction
 
-    function automatic [31:0] slc32(input [255:0] v, input [2:0] idx);
-        slc32 = v[idx*32 +: 32];
+    function automatic [DATA_WIDTH-1:0] slc_word(input [255:0] v, input [BEAT_BITS-1:0] idx);
+        slc_word = v[idx*DATA_WIDTH +: DATA_WIDTH];
     endfunction
 
     localparam [3:0] ST_IDLE  = 4'd0,
@@ -86,12 +93,13 @@ module sdram_32bit_to_256bit_axi_bridge #(
                      ST_FENCE = 4'd5,
                      ST_R_AR  = 4'd6,
                      ST_R_R0  = 4'd7,
-                     ST_R_R   = 4'd8;
+                     ST_R_R   = 4'd8,
+                     ST_ERROR = 4'd9;
 
     reg [3:0]                    st;
     reg [255:0]                  rbuf;
     reg [255:0]                  wbuf;
-    reg [2:0]                    beat;
+    reg [BEAT_BITS-1:0]           beat;
     reg [FENCE_CNT_WIDTH-1:0]    fence_cnt;
 
     // owner also records the last grant for round-robin arbitration.
@@ -123,6 +131,7 @@ module sdram_32bit_to_256bit_axi_bridge #(
 
     always @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
+            fault         <= 1'b0;
             owner         <= 1'b1; // First simultaneous request favors I.
             i_pending     <= 1'b0;
             d_pending     <= 1'b0;
@@ -130,7 +139,7 @@ module sdram_32bit_to_256bit_axi_bridge #(
             st            <= ST_IDLE;
             rbuf          <= 256'h0;
             wbuf          <= 256'h0;
-            beat          <= 3'd0;
+            beat          <= '0;
             fence_cnt     <= {FENCE_CNT_WIDTH{1'b0}};
 
             read_done    <= 1'b0;
@@ -138,8 +147,8 @@ module sdram_32bit_to_256bit_axi_bridge #(
 
             m_axi_awid    <= {ID_WIDTH{1'b0}};
             m_axi_awaddr  <= {ADDR_WIDTH{1'b0}};
-            m_axi_awlen   <= 8'd7;     // 8 beat
-            m_axi_awsize  <= 3'd2;     // 4 byte
+            m_axi_awlen   <= AXI_LEN;     // one line
+            m_axi_awsize  <= AXI_SIZE;     // bytes per beat
             m_axi_awburst <= 2'b01;
             m_axi_awvalid <= 1'b0;
 
@@ -151,8 +160,8 @@ module sdram_32bit_to_256bit_axi_bridge #(
 
             m_axi_arid    <= {ID_WIDTH{1'b0}};
             m_axi_araddr  <= {ADDR_WIDTH{1'b0}};
-            m_axi_arlen   <= 8'd7;     // 8 beat
-            m_axi_arsize  <= 3'd2;     // 4 byte
+            m_axi_arlen   <= AXI_LEN;     // one line
+            m_axi_arsize  <= AXI_SIZE;     // bytes per beat
             m_axi_arburst <= 2'b01;
             m_axi_arvalid <= 1'b0;
 
@@ -182,7 +191,7 @@ module sdram_32bit_to_256bit_axi_bridge #(
                     m_axi_bready  <= 1'b0;
                     m_axi_arvalid <= 1'b0;
                     m_axi_rready  <= 1'b0;
-                    beat          <= 3'd0;
+                    beat          <= '0;
 
                     if (fence_cnt != 0) begin
                         st <= ST_FENCE;
@@ -193,8 +202,8 @@ module sdram_32bit_to_256bit_axi_bridge #(
 
                         m_axi_awid    <= {ID_WIDTH{1'b0}};
                         m_axi_awaddr  <= align32(d_write_addr);
-                        m_axi_awlen   <= 8'd7;
-                        m_axi_awsize  <= 3'd2;
+                        m_axi_awlen   <= AXI_LEN;
+                        m_axi_awsize  <= AXI_SIZE;
                         m_axi_awburst <= 2'b01;
                         m_axi_awvalid <= 1'b1;
 
@@ -206,8 +215,8 @@ module sdram_32bit_to_256bit_axi_bridge #(
                         else          i_pending <= 1'b0;
                         m_axi_arid    <= {ID_WIDTH{1'b0}};
                         m_axi_araddr  <= align32(selected_read_addr);
-                        m_axi_arlen   <= 8'd7;
-                        m_axi_arsize  <= 3'd2;
+                        m_axi_arlen   <= AXI_LEN;
+                        m_axi_arsize  <= AXI_SIZE;
                         m_axi_arburst <= 2'b01;
                         m_axi_arvalid <= 1'b1;
 
@@ -227,13 +236,13 @@ module sdram_32bit_to_256bit_axi_bridge #(
                 ST_W_AW: begin
                     if (aw_fire) begin
                         m_axi_awvalid <= 1'b0;
-                        beat          <= 3'd0;
+                        beat          <= '0;
                         st            <= ST_W_W0;
                     end
                 end
 
                 ST_W_W0: begin
-                    m_axi_wdata  <= slc32(wbuf, 3'd0);
+                    m_axi_wdata  <= slc_word(wbuf, '0);
                     m_axi_wlast  <= 1'b0;
                     m_axi_wvalid <= 1'b1;
                     st           <= ST_W_W;
@@ -241,21 +250,25 @@ module sdram_32bit_to_256bit_axi_bridge #(
 
                 ST_W_W: begin
                     if (w_fire) begin
-                        if (beat == 3'd7) begin
+                        if (beat == LAST_BEAT) begin
                             m_axi_wvalid <= 1'b0;
                             m_axi_wlast  <= 1'b0;
                             m_axi_bready <= 1'b1;
                             st           <= ST_W_B;
                         end else begin
-                            beat        <= beat + 3'd1;
-                            m_axi_wdata <= slc32(wbuf, beat + 3'd1);
-                            m_axi_wlast <= (beat + 3'd1 == 3'd7);
+                            beat        <= beat + 1'b1;
+                            m_axi_wdata <= slc_word(wbuf, beat + 1'b1);
+                            m_axi_wlast <= (beat + 1'b1 == LAST_BEAT);
                         end
                     end
                 end
 
                 ST_W_B: begin
-                    if (b_fire) begin
+                    if (b_fire && (m_axi_bresp != 0 || m_axi_bid != 0)) begin
+                        fault <= 1'b1;
+                        m_axi_bready <= 1'b0;
+                        st <= ST_ERROR;
+                    end else if (b_fire) begin
                         m_axi_bready <= 1'b0;
                         d_write_ready <= 1'b1;
 
@@ -270,7 +283,7 @@ module sdram_32bit_to_256bit_axi_bridge #(
                 ST_R_AR: begin
                     if (ar_fire) begin
                         m_axi_arvalid <= 1'b0;
-                        beat          <= 3'd0;
+                        beat          <= '0;
                         st            <= ST_R_R0;
                     end
                 end
@@ -281,17 +294,31 @@ module sdram_32bit_to_256bit_axi_bridge #(
                 end
 
                 ST_R_R: begin
-                    if (r_fire) begin
-                        rbuf[beat*32 +: 32] <= m_axi_rdata;
+                    if (r_fire && (m_axi_rresp != 0 || m_axi_rid != 0 ||
+                                   m_axi_rlast != (beat == LAST_BEAT))) begin
+                        fault <= 1'b1;
+                        m_axi_rready <= 1'b0;
+                        st <= ST_ERROR;
+                    end else if (r_fire) begin
+                        rbuf[beat*DATA_WIDTH +: DATA_WIDTH] <= m_axi_rdata;
 
-                        if (m_axi_rlast && (beat == 3'd7)) begin
+                        if (m_axi_rlast && (beat == LAST_BEAT)) begin
                             m_axi_rready <= 1'b0;
                             read_done   <= 1'b1;
                             st           <= ST_IDLE;
                         end else begin
-                            beat <= beat + 3'd1;
+                            beat <= beat + 1'b1;
                         end
                     end
+                end
+
+                ST_ERROR: begin
+                    // Sticky halt, matching the previous uncached RV64 bridge.
+                    m_axi_awvalid <= 1'b0;
+                    m_axi_wvalid <= 1'b0;
+                    m_axi_bready <= 1'b0;
+                    m_axi_arvalid <= 1'b0;
+                    m_axi_rready <= 1'b0;
                 end
 
                 default: begin

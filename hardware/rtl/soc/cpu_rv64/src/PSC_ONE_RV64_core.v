@@ -52,8 +52,8 @@ module PSC_ONE_RV64_core #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT         = 64'h1000_9008,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL        = 64'h1000_900C,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 64'h1000_9010,
-    parameter ICACHE_TAGLSB = 12,
-    parameter DCACHE_TAGLSB = 10,
+    parameter ICACHE_TAGLSB = 11, // 2 KiB (64 x 32-byte lines)
+    parameter DCACHE_TAGLSB = 9,  // 512 B (16 x 32-byte lines)
     parameter ENABLE_PULP = 1'b0
 )(
     // CLK, RESET

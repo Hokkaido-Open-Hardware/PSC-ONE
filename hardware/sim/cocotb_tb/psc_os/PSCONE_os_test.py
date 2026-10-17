@@ -553,7 +553,7 @@ async def run_psc_os_test(dut, send_queue, prompt_ready, gui=None, auto_prompt=F
 
     # Resolve hierarchy once, rather than repeating VPI lookups every cycle.
     clock = dut.clock
-    core = dut.u_chip.u_soc.u_rv32_core_axi.u_core
+    core = dut.u_chip.u_soc.u_rv_core_axi.u_core
     fault_i, fault_d = core.i_pf, core.d_pf
     io = dut.u_chip.u_soc.u_mmap_io
     pio_output, io_write_ready = io.PIO_out_reg, io.cpu_wready
@@ -570,7 +570,7 @@ async def run_psc_os_test(dut, send_queue, prompt_ready, gui=None, auto_prompt=F
     #dump_sdram_mem(dut, "GW2AR", 0x0020_1400, 84)
     #dump_sdram_mem(dut, "GW2AR", 0x0040_0000, 24)
     #dump_page_table(dut, 0x024)
-    #satp_val = int(dut.u_chip.u_soc.u_rv32_core_axi.u_core.u_csr.csr_satp.value)
+    #satp_val = int(dut.u_chip.u_soc.u_rv_core_axi.u_core.u_csr.csr_satp.value)
 
     while waited < timeout_cycles:
         await RisingEdge(clock)
@@ -677,8 +677,8 @@ async def run_psc_os_test(dut, send_queue, prompt_ready, gui=None, auto_prompt=F
 
         # ↓デバッグログ
         if ((waited % 10000000) == 0):
-            pc_val  = safe_peek(dut.u_chip.u_soc.u_rv32_core_axi.u_core.pc, 0)
-            adr_val = safe_peek(dut.u_chip.u_soc.u_rv32_core_axi.program_mem_read_address, 0)
+            pc_val  = safe_peek(dut.u_chip.u_soc.u_rv_core_axi.u_core.pc, 0)
+            adr_val = safe_peek(dut.u_chip.u_soc.u_rv_core_axi.program_mem_read_address, 0)
             uart_dbg = (
                 f"0x{last_uart_byte:02x}"
                 if last_uart_byte is not None

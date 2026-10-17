@@ -1,0 +1,47 @@
+# Standalone RV64 Sv39 MMU tests (cocotb 2.x).
+# Usage: make -f Makefile.cpu.rv64.mmu simulate_MMU [MODE=icarus] [SIM_FAST=1]
+.DEFAULT_GOAL := simulate_MMU
+MMU_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
+MMU_SIM_DIR := $(dir $(MMU_MAKEFILE))
+MMU_SRC_DIR := $(abspath $(MMU_SIM_DIR)/../rtl/soc/cpu_rv64/src)
+MMU_TOP := MMU
+MMU_FILES := $(MMU_SRC_DIR)/MMU.sv
+MODE ?= verilator
+SIM_FAST ?= 0
+COCOTB_CONFIG ?= cocotb-config
+# Separate simulator/trace variants; never clean another suite's artifacts.
+MMU_BUILD ?= $(abspath $(MMU_SIM_DIR)/../../..)/build/rv64-mmu/$(MODE)-fast$(SIM_FAST)
+SIM_BUILD ?= $(MMU_BUILD)/sim_build
+MMU_RESULTS ?= $(MMU_BUILD)/results.xml
+export CCACHE_DIR ?= $(MMU_BUILD)/ccache
+TOP_COMPILE_ARGS := -DCPU_MMU_SIM -DCOCOTB_SIM
+
+ifeq ($(MODE),verilator)
+EXTRA_ARGS := -O3 --Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+              --Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT
+ifeq ($(SIM_FAST),1)
+EXTRA_ARGS += --bbox-sys --x-assign fast --x-initial fast
+else
+EXTRA_ARGS += --trace --trace-fst
+MMU_SIM_ARGS := --trace --trace-file $(MMU_BUILD)/dump.fst
+endif
+else ifeq ($(MODE),icarus)
+EXTRA_ARGS :=
+else
+$(error Unsupported MODE=$(MODE); use verilator or icarus)
+endif
+
+.PHONY: simulate_MMU
+simulate_MMU:
+	@echo "[SIM] MODE=$(MODE) (PSC_RV64 Sv39 MMU test)"
+	@command -v $(COCOTB_CONFIG) >/dev/null || { echo 'Activate a Python environment with cocotb 2.x first'; exit 1; }
+	@mkdir -p "$(MMU_BUILD)" "$(dir $(MMU_RESULTS))"
+	+COMPILE_ARGS="$(TOP_COMPILE_ARGS)" \
+	$(MAKE) -C "$(MMU_SIM_DIR)" -f "$$($(COCOTB_CONFIG) --makefiles)/Makefile.sim" \
+		SIM=$(MODE) TOPLEVEL=$(MMU_TOP) TOPLEVEL_LANG=verilog \
+		COCOTB_TEST_MODULES=cocotb_tb.cpu.RV64_mmu_test \
+		VERILOG_SOURCES="$(MMU_FILES)" SIM_BUILD="$(SIM_BUILD)" \
+		CUSTOM_COMPILE_DEPS="$(MMU_MAKEFILE)" \
+		COCOTB_RESULTS_FILE="$(MMU_RESULTS)" \
+		EXTRA_ARGS="$(EXTRA_ARGS)" \
+		SIM_ARGS="$(MMU_SIM_ARGS)"

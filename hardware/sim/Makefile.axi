@@ -54,7 +54,7 @@ COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
 # ============================================================
 SRC_BRIDGE = \
 	../rtl/soc/axi/sdram_32bit_to_128bit_axi_bridge.v \
-	../rtl/soc/axi/sdram_32bit_to_256bit_axi_bridge.v
+	../rtl/soc/axi/PSC_RV32_CacheAXI.v
 
 # ============================================================
 #  Cocotb simulation targets
@@ -71,12 +71,12 @@ simulate_32bit_to_128bit_axi_bridge:
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
 	make -f $(COCOTB_MAKEFILE)
 
-# sdram_32bit_to_256bit_axi_bridge test
-simulate_32bit_to_256bit_axi_bridge:
-	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (sdram_32bit_to_256bit_axi_bridge test)"
+# PSC_RV32_CacheAXI test
+simulate_PSC_RV32_CacheAXI:
+	@echo "[SIM] MODE=$(MODE), SIM=$(SIM) (PSC_RV32_CacheAXI test)"
 	$(MAKE) clean
-	COCOTB_TEST_MODULES=cocotb_tb.axi.bridge_test_32bit_to_256bit \
-	TOPLEVEL=sdram_32bit_to_256bit_axi_bridge TOPLEVEL_LANG=verilog \
+	COCOTB_TEST_MODULES=cocotb_tb.axi.PSC_RV32_CacheAXI_test \
+	TOPLEVEL=PSC_RV32_CacheAXI TOPLEVEL_LANG=verilog \
 	SIM=$(SIM) \
 	VERILOG_SOURCES="$(SRC_BRIDGE)" \
 	VLOG_ARGS="$(VLOG_ARGS)" \

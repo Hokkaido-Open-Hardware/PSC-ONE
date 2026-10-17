@@ -125,7 +125,7 @@ yosys_check:
 # yosys：PSC_RV32 ロジック規模見積もり
 # ============================================================
 
-# PSC_RV32ISP_coreファイル
+# PSC_RV32_coreファイル
 CPU_YOSYS_INPUT := $(YOSYS_INPUT)
 
 CPU_YOSYS_TOP := PSC_RV32_core
