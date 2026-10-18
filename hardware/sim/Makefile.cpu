@@ -4,10 +4,19 @@
 
 #make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=basic
 #make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=pulp
+#make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=rv64 TEST_PROGRAM_LIST=basic
 #or
 #make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=legacy TEST_PROGRAM_LIST=basic
 #or
 #make -f Makefile.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=basic RUN_CYCLES=30000
+
+#Rust
+#make -f simulate_PSC_ONE_RUST
+
+#make -f Makefile.cpu simulate_PSC_ONE_RUST \
+#  RUST_TESTS="add_test1 mmu_test1" \
+#  RUST_EXPECTED_add_test1=0x12345678 \
+#  RUST_EXPECTED_mmu_test1=0x33
 
 # ============================================================
 #  MODE で一括切り替え（verilator / icarus）
@@ -100,7 +109,7 @@ CPU_CORE_FILES = \
 
 CPU_V1_SRC_DIR  = ../rtl/soc/cpu_v1/src
 
-# RV32_core
+# RV32_core(v1)
 CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32_core.v \
 	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
@@ -125,7 +134,7 @@ CPU_V1_CORE_FILES = \
 
 CPU_V2_SRC_DIR  = ../rtl/soc/cpu_v2_experimental/src
 
-# RV32_core(V2)
+# RV32_core(v2)
 CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32_core.v \
 	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
@@ -148,6 +157,8 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
 
 RV64_SRC_DIR = ../rtl/soc/cpu_rv64/src
+
+# RV64_core
 CPU_RV64_CORE_FILES = \
 	$(RV64_SRC_DIR)/PSC_Types.sv \
 	$(RV64_SRC_DIR)/PSC_RV64_core.sv \
@@ -201,6 +212,7 @@ CPU_FILES = \
 	$(SELECTED_CPU_CORE_FILES) \
 	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
 	$(UART_DIR)/PSC_RV32IS_UART.v \
+	$(I2C_DIR)/PSC_I2C_capture.sv \
 	$(I2C_DIR)/PSC_RV32_I2C.sv \
 	$(LED_DIR)/PSC_RV32IS_LED.v \
 	$(CACHE_DIR)/cache_dma_controller.sv \
@@ -456,7 +468,15 @@ RUST_DIR            ?= ./rust
 RUST_MAKEFILE       ?= Makefile.rust
 RUST_TESTS          ?= $(basename $(notdir $(wildcard $(RUST_DIR)/*.rs)))
 RUST_COCOTB_MODULE  ?= RV32_chip_test
+# 個別指定がないテストの共通期待値。
 RUST_EXPECTED       ?= 0x12345678
+# 個別期待値（共通値より優先）。コマンドラインからも上書き可能。
+RUST_EXPECTED_add_test1    ?= $(RUST_EXPECTED)
+RUST_EXPECTED_rv32im_test1 ?= $(RUST_EXPECTED)
+RUST_EXPECTED_mmu_test1    ?= 0x00000033
+# 新しいテストは RUST_EXPECTED_<テスト名> を追加すれば設定可能。
+rust_expected = $(if $(strip $(RUST_EXPECTED_$(1))),$(strip $(RUST_EXPECTED_$(1))),$(RUST_EXPECTED))
+
 
 # ============================================================
 # テストプログラムの切り替え（basic / pulp / long / voice / single）
@@ -550,7 +570,6 @@ simulate_PSC_ONE_TESTS:
 
 
 
-
 # ============================================================
 # Rust tests
 #
@@ -565,9 +584,14 @@ simulate_PSC_ONE_TESTS:
 #   make -f Makefile.cpu simulate_PSC_ONE_RUST \
 #       CPU_VERSION=v2 RUST_TESTS=add_test1
 #
-# 期待値を変更:
+# 共通期待値を変更（個別指定がないテストに適用）:
 #   make -f Makefile.cpu simulate_PSC_ONE_RUST \
 #       CPU_VERSION=v2 RUST_TESTS=add_test1 RUST_EXPECTED=0x12345678
+#
+# テストごとに期待値を指定:
+#   make -f Makefile.cpu simulate_PSC_ONE_RUST \
+#       RUST_TESTS="add_test1 mmu_test1" \
+#       RUST_EXPECTED_add_test1=0x12345678 RUST_EXPECTED_mmu_test1=0x33
 # ============================================================
 .PHONY: simulate_PSC_ONE_RUST
 simulate_PSC_ONE_RUST:
@@ -583,21 +607,23 @@ simulate_PSC_ONE_RUST:
 	fi; \
 	run_log=log/rust_test_result_$$(date +%Y%m%d_%H%M%S).log; \
 	echo "[INFO] LOG FILE = $$run_log"; \
-	for name in $(RUST_TESTS); do \
+	for spec in $(foreach name,$(RUST_TESTS),$(name):$(call rust_expected,$(name))); do \
+		name=$${spec%%:*}; \
+		expected=$${spec#*:}; \
 		echo ""; \
 		echo "========================================"; \
 		echo "[RUST TEST] $$name"; \
 		echo "[SRC ] $(RUST_DIR)/$$name.rs"; \
 		echo "[MEM ] ./mem/$$name.mem"; \
-		echo "[EXP ] $(RUST_EXPECTED)"; \
+		echo "[EXP ] $$expected"; \
 		echo "[LOG ] $$run_log"; \
 		echo "========================================"; \
 		if [ ! -f "$(RUST_DIR)/$$name.rs" ]; then \
 			echo "[ERROR] Rust source not found: $(RUST_DIR)/$$name.rs"; \
 			exit 1; \
 		fi; \
-		if [ ! -f "$(RUST_DIR)/$$name.x" ]; then \
-			echo "[ERROR] Linker script not found: $(RUST_DIR)/$$name.x"; \
+		if [ ! -f "$(RUST_DIR)/rust_tests.x" ]; then \
+			echo "[ERROR] Linker script not found: $(RUST_DIR)/rust_tests.x"; \
 			exit 1; \
 		fi; \
 		$(MAKE) -C $(RUST_DIR) -f $(RUST_MAKEFILE) clean TARGET=$$name; \
@@ -616,7 +642,7 @@ simulate_PSC_ONE_RUST:
 		TEST_NAME=$$name \
 		PSC_LOGFILE=$$run_log \
 		PROGRAM_FILE=$$mem_file \
-		EXPECTED_RESULT=$(RUST_EXPECTED) \
+		EXPECTED_RESULT="$$expected" \
 		TOPLEVEL=$(PSCONE_TOP) \
 		TOPLEVEL_LANG=verilog \
 		SIM=$(SIM) \

@@ -17,23 +17,24 @@ def main():
     parser.add_argument('--unit-only', action='store_true')
     args = parser.parse_args()
     rtl = Path(__file__).resolve().parents[2]
-    sim = rtl.parent / 'sim'
+    sim = rtl.parents[1] / 'sim'
     build = (args.build or Path(tempfile.mkdtemp(prefix='shared-bridge-'))).resolve()
     build.mkdir(parents=True, exist_ok=True)
     makefiles = subprocess.check_output(['cocotb-config', '--makefiles'], text=True).strip()
     env = os.environ.copy()
     env['PYTHONPATH'] = str(sim) + os.pathsep + env.get('PYTHONPATH', '')
-    bridge = rtl / 'axi/sdram_32bit_to_256bit_axi_bridge.v'
-    cases = [(f'bridge-fence{fence}', 'sdram_32bit_to_256bit_axi_bridge',
+    bridge = rtl / 'axi/PSC_RV32_CacheAXI.v'
+    cases = [(f'bridge-fence{fence}', 'PSC_RV32_CacheAXI',
               'cocotb_tb.axi.bridge_test', [bridge],
-              f'-Psdram_32bit_to_256bit_axi_bridge.FENCE_CYCLES={fence} '
-              '-Psdram_32bit_to_256bit_axi_bridge.ID_WIDTH=3') for fence in (0, 1, 2, 5)]
+              f'-PPSC_RV32_CacheAXI.FENCE_CYCLES={fence} '
+              '-PPSC_RV32_CacheAXI.ID_WIDTH=3') for fence in (0, 1, 2, 5)]
     if not args.unit_only:
         sources = [rtl / 'cache/src' / n for n in (
             'sim_cache_dma_controller.v', 'cache_dma_controller.sv',
             'cache_dma_controller_io.sv', 'dm_cache_data.v', 'dm_cache_tag.v')]
-        sources += [bridge, rtl / 'axi/sdram_axi_controller.v',
-                    rtl / 'sdram_controller/sdram_controller.sv', rtl / 'SDRAM_model/GW2AR_sdram.v']
+        sources += [bridge, rtl.parent / 'tang20k/sdram_controller/sdram_axi_controller.v',
+                    rtl.parent / 'tang20k/sdram_controller/sdram_controller.sv',
+                    rtl.parent / 'model/SDRAM_model/GW2AR_sdram.v']
         cases += [(name, 'sim_cache_dma_controller', 'cocotb_tb.cache.' + name, sources, '')
                   for name in ('dm_cache_test', 'I_cache_test', 'shared_cache_test')]
     for name, top, module, sources, extra in cases:

@@ -268,6 +268,9 @@ module PSC_ONE_SOC #(
             I2C_ADDR_OUTPUT:     mmio_rdata = mmio_i2c_rdata;
             I2C_ADDR_CONTROL:    mmio_rdata = mmio_i2c_rdata;
             I2C_ADDR_SEQ:        mmio_rdata = mmio_i2c_rdata;
+            I2C_ADDR_SEQ + 4:    mmio_rdata = mmio_i2c_rdata;
+            I2C_ADDR_SEQ + 8:    mmio_rdata = mmio_i2c_rdata;
+            I2C_ADDR_SEQ + 12:   mmio_rdata = mmio_i2c_rdata;
             default: mmio_rdata = 32'd0;
         endcase
     end

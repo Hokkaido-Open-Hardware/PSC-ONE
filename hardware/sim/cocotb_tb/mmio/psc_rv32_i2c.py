@@ -243,3 +243,172 @@ async def test_cpu_output_to_i2c_master(dut):
     await mmio_write(dut, REG_STATUS, 0b010)
     assert (await mmio_read(dut, REG_STATUS) & 0b010) == 0
     dut._log.info("PASS: CPU output / repeated START / NACK / W1C")
+
+# Capture is passive: emulate the resolved external 0x68 slave data/ACK on
+# master_sda_low. Assert that PSC-ONE never drives this foreign transaction.
+CAP_CTRL = BASE + 0x14
+CAP_COUNT = BASE + 0x18
+CAP_DATA = BASE + 0x1C
+
+
+async def observed_byte(master, byte, nack=False):
+    for bit in range(7, -1, -1):
+        await master.write_bit((byte >> bit) & 1)
+        assert int(master.dut.slave_sda_low.value) == 0
+    await master.write_bit(int(nack))
+    assert int(master.dut.slave_sda_low.value) == 0
+
+
+async def capture_events(dut):
+    count = await mmio_read(dut, CAP_COUNT)
+    result = [await mmio_read(dut, CAP_DATA) for _ in range(count)]
+    assert await mmio_read(dut, CAP_DATA) == 0
+    return result
+
+
+@cocotb.test()
+async def test_capture_0x68_repeated_start(dut):
+    await initialize(dut)
+    master = I2CMaster(dut)
+    assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 0
+    assert await mmio_read(dut, CAP_COUNT) == 0
+    assert await mmio_read(dut, CAP_DATA) == 0
+    await mmio_write(dut, REG_CONTROL, 1)
+    await mmio_write(dut, REG_OUTPUT, 0xA5)
+    await mmio_write(dut, CAP_CTRL, 1)
+    await master.start()
+    await observed_byte(master, 0xD0)
+    await observed_byte(master, 0x3B)
+    await master.start()
+    await observed_byte(master, 0xD1)
+    await observed_byte(master, 0x12)
+    await observed_byte(master, 0x34, nack=True)
+    await master.stop()
+    assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 1
+    # STOP releases active state, but keeps listening for a normal START.
+    await master.start()
+    await observed_byte(master, 0xD0, nack=True)
+    await master.stop()
+    assert await capture_events(dut) == [
+        0x200, 0x800 | 0xD0, 0xA00 | 0x3B, 0x400,
+        0x800 | 0xD1, 0xA00 | 0x12, 0xB00 | 0x34, 0x600,
+        0x200, 0x9D0, 0x600]
+    assert await mmio_read(dut, REG_INPUT) == 0
+    assert await mmio_read(dut, REG_SEQ) == 0
+    assert await mmio_read(dut, REG_CONTROL) == 1
+    assert await mmio_read(dut, REG_OUTPUT) == 0xA5
+    assert await mmio_read(dut, REG_STATUS) == 2
+
+
+@cocotb.test()
+async def test_capture_abort_overflow_rearm_and_slave(dut):
+    await initialize(dut)
+    master = I2CMaster(dut)
+    await mmio_write(dut, CAP_CTRL, 1)
+    await mmio_write(dut, CAP_CTRL, 2)
+    assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 20
+    assert await capture_events(dut) == []
+    await mmio_write(dut, CAP_CTRL, 1)
+    await master.start()
+    await observed_byte(master, 0xD0, nack=True)
+    # Abort while the bus is stuck: retain only completed events.
+    await master.write_bit(1)
+    await mmio_write(dut, CAP_CTRL, 2)
+    assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 20
+    assert await capture_events(dut) == [0x200, 0x9D0]
+    await master.stop()
+    await mmio_write(dut, CAP_CTRL, 1)
+    await master.start()
+    await observed_byte(master, 0xD0)
+    for byte in range(62):
+        await observed_byte(master, byte)
+    # Exactly 64 events: completion must not need event 65 or STOP.
+    assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 12
+    assert await mmio_read(dut, CAP_COUNT) == 64
+    for byte in (62, 63):
+        await observed_byte(master, byte)
+    await master.stop()
+    assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 12
+    assert await capture_events(dut) == [0x200, 0x8D0] + [0xA00 | n for n in range(62)]
+    # Capture also suppresses ACK at our own address.
+    await mmio_write(dut, CAP_CTRL, 1)
+    await master.start()
+    assert not await master.write_byte(I2C_ADDR << 1)
+    await master.stop()
+    await mmio_write(dut, CAP_CTRL, 2)
+    assert await capture_events(dut) == [0x200, 0x984, 0x600]
+    # The ordinary slave resumes after capture, including register writes/ACKs.
+    await master.write_registers(0, [1, 2, 3, 4])
+    assert await mmio_read(dut, REG_INPUT) == 0x04030201
+    assert await mmio_read(dut, REG_SEQ) == 1
+    assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 20
+
+
+@cocotb.test()
+async def test_capture_stop_start_read14(dut):
+    await initialize(dut)
+    master = I2CMaster(dut)
+    await mmio_write(dut, CAP_CTRL, 1)
+    await master.start()
+    await observed_byte(master, 0xD0)
+    await observed_byte(master, 0x3B)
+    await master.stop()
+    assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 1
+    assert await mmio_read(dut, CAP_CTRL) == 0x181  # armed, 1 STOP, no DONE
+    await Timer(2, unit="ms")  # substantial STOP-to-START idle gap
+    assert await mmio_read(dut, CAP_CTRL) == 0x181
+    assert await mmio_read(dut, CAP_COUNT) == 4
+    assert await mmio_read(dut, CAP_DATA) == 0  # no early pop
+    await master.start()
+    await observed_byte(master, 0xD1)
+    values = [0x12, 0x34, 0x00, 0xFF, 0x80, 0x01, 0x55,
+              0xAA, 0xFE, 0x7F, 0x42, 0x68, 0x9A, 0x56]
+    for i, value in enumerate(values):
+        await observed_byte(master, value, nack=(i == 13))
+    await master.stop()
+    assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 4
+    assert await mmio_read(dut, CAP_CTRL) == 0x2C4  # 2 STOPs, limit, DONE
+    # Later traffic cannot overwrite a completed capture.
+    await master.start()
+    await observed_byte(master, 0xD0, nack=True)
+    await master.stop()
+    expected = [0x200, 0x8D0, 0xA3B, 0x600, 0x200, 0x8D1]
+    expected += [(0xB00 if i == 13 else 0xA00) | v for i, v in enumerate(values)]
+    assert await capture_events(dut) == expected + [0x600]
+
+
+@cocotb.test()
+async def test_capture_timeout_idle_and_partial(dut):
+    await initialize(dut)
+    master = I2CMaster(dut)
+    for partial in (False, True):
+        await mmio_write(dut, CAP_CTRL, 1)
+        if partial:
+            await master.start()
+            await observed_byte(master, 0xD1)
+            await master.write_bit(1)  # stuck bus in an unfinished byte
+        await Timer(11, unit="ms")
+        assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 36
+        assert await capture_events(dut) == ([0x200, 0x8D1] if partial else [])
+        assert int(dut.slave_sda_low.value) == 0
+
+
+@cocotb.test()
+async def test_capture_repeated_start_then_idle(dut):
+    """A combined WRITE/READ is one STOP; idle deadline preserves the read."""
+    await initialize(dut)
+    master = I2CMaster(dut)
+    await mmio_write(dut, CAP_CTRL, 1)
+    await master.start()
+    await observed_byte(master, 0xD0)
+    await observed_byte(master, 0x3B)
+    await master.start()
+    await observed_byte(master, 0xD1)
+    await observed_byte(master, 0x12)
+    await observed_byte(master, 0x34, nack=True)
+    await master.stop()
+    assert await mmio_read(dut, CAP_CTRL) == 0x181
+    await Timer(11, unit="ms")
+    assert await mmio_read(dut, CAP_CTRL) == 0x1A4  # timeout, not STOP limit
+    assert await capture_events(dut) == [
+        0x200, 0x8D0, 0xA3B, 0x400, 0x8D1, 0xA12, 0xB34, 0x600]

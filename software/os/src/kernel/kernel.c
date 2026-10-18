@@ -15,7 +15,7 @@
 #define MULTITASK_MODE 0 
 
 #define NPU_TESTMODE 1
-#define PSC_LOGOMODE 0
+#define PSC_LOGOMODE 1
 
 extern uint8_t _binary_shell_bin_start[];
 extern uint8_t _binary_shell_bin_end[];

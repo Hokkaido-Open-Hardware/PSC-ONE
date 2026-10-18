@@ -18,10 +18,21 @@
 //   BASE+0x08 OUTPUT   [7:0] CPU write sets output_ready
 //   BASE+0x0C CONTROL  [0] interrupt enable
 //   BASE+0x10 SEQ      [7:0] last input sequence number
+//   SEQ+0x04 CAP_CTRL read: [0]armed [1]active [2]done [3]overflow [4]aborted [5]timeout
+//                     [6]transaction limit [7]multi-capture diagnostics supported
+//                     [15:8]completed STOP count
+//                     write: [0]arm/clear capture [1]abort (arm takes priority)
+//   SEQ+0x08 CAP_COUNT number of stored events (0..64), remains fixed after done
+//   SEQ+0x0C CAP_DATA  pop one event after done, zero when empty/not done
+//                     [11:9]kind [8]NACK [7:0]byte; see PSC_I2C_capture.sv
+// While armed the slave releases SDA and ignores bus traffic; MMIO remains usable.
+// Normal slave operation resumes at the next START after capture completes.
 // Warning: SPI or I2S electrical conventions are NOT compatible with this port.
 
 module PSC_RV32_I2C #(
     parameter integer ADDR_WIDTH = 32,
+    parameter integer CAPTURE_TRANSACTIONS = 2,
+    parameter integer CAPTURE_TIMEOUT_CYCLES = 100000000,
     parameter [6:0] SLAVE_ADDRESS = 7'h42,
     parameter [ADDR_WIDTH-1:0] I2C_BASE = 32'h1000_2000,
     // CPU MMIO addresses; individually overridable from the parent module.
@@ -92,6 +103,24 @@ module PSC_RV32_I2C #(
     wire wr_control = cpu_wr && (cpu_waddr == I2C_ADDR_CONTROL);
     assign irq_rx = irq_en && input_ready;
 
+    // New capture registers are relative to SEQ so existing SoC overrides work.
+    localparam [ADDR_WIDTH-1:0] CAP_CTRL = I2C_ADDR_SEQ + 4;
+    localparam [ADDR_WIDTH-1:0] CAP_COUNT = I2C_ADDR_SEQ + 8;
+    localparam [ADDR_WIDTH-1:0] CAP_DATA = I2C_ADDR_SEQ + 12;
+    wire [31:0] cap_status, cap_count, cap_data;
+    wire cap_write = cpu_wr && cpu_waddr == CAP_CTRL;
+    PSC_I2C_capture #(
+        .TRANSACTION_LIMIT(CAPTURE_TRANSACTIONS),
+        .TIMEOUT_CYCLES(CAPTURE_TIMEOUT_CYCLES)
+    ) capture (
+        .clock(clock), .reset_n(reset_n), .scl_rise(scl_rise), .sda(sda_sync),
+        .start_event(i2c_start), .stop_event(i2c_stop),
+        .arm(cap_write && cpu_wdata[0]),
+        .abort_capture(cap_write && cpu_wdata[1]),
+        .pop(cpu_rd && cpu_raddr == CAP_DATA),
+        .status(cap_status), .count(cap_count), .data(cap_data)
+    );
+
     // Combinational source for I2C master reads. Low byte is the data lane.
     function automatic [7:0] selected_byte(input [7:0] idx);
         begin
@@ -139,6 +168,7 @@ module PSC_RV32_I2C #(
 
             if (cpu_wr) begin
                 case (cpu_waddr)
+                    CAP_CTRL: cpu_wready <= 1'b1;
                     I2C_ADDR_STATUS: begin
                         if (cpu_wdata[0]) input_ready <= 1'b0;
                         if (cpu_wdata[1]) output_ready <= 1'b0;
@@ -159,6 +189,9 @@ module PSC_RV32_I2C #(
             end
             if (cpu_rd) begin
                 case (cpu_raddr)
+                    CAP_CTRL: begin cpu_rdata <= cap_status; cpu_rready <= 1'b1; end
+                    CAP_COUNT: begin cpu_rdata <= cap_count; cpu_rready <= 1'b1; end
+                    CAP_DATA: begin cpu_rdata <= cap_data; cpu_rready <= 1'b1; end
                     I2C_ADDR_INPUT: begin
                         cpu_rdata <= {in3,in2,in1,in0};
                         cpu_rready <= 1'b1;
@@ -183,7 +216,15 @@ module PSC_RV32_I2C #(
                 endcase
             end
 
-            if (i2c_start) begin
+            // Include the ARM write cycle so the slave cannot ACK as we arm.
+            // Clear partial slave state; after completion wait for a fresh START.
+            if (cap_status[0] || (cap_write && cpu_wdata[0])) begin
+                state <= ST_IDLE;
+                sda_drive_low <= 1'b0;
+                ptr_valid <= 1'b0;
+                received_mask <= 4'd0;
+                ack_seen_high <= 1'b0;
+            end else if (i2c_start) begin
                 state <= ST_ADDR;
                 bit_count <= 3'd0;
                 shift_rx <= 8'd0;

@@ -149,7 +149,7 @@ module sim_cache_dma_controller #(
 
 
     // ---------------- Bridge (AXI Master, 32-bit) ----------------
-    sdram_32bit_to_256bit_axi_bridge #(
+    PSC_RV32_CacheAXI #(
         .ADDR_WIDTH         (SYS_ADDR_WIDTH),
         .ID_WIDTH           (AXI_ID_WIDTH),
         .DATA_WIDTH         (AXI_DATA_WIDTH)

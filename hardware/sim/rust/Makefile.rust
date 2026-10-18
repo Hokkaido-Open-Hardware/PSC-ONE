@@ -11,9 +11,9 @@
 TARGET          ?= add_test1
 
 RUST_SRC        := $(TARGET).rs
-LINKER_SCRIPT   := $(TARGET).x
+LINKER_SCRIPT   := rust_tests.x
 
-RUST_TARGET     := riscv32i-unknown-none-elf
+RUST_TARGET     := riscv32im-unknown-none-elf
 
 RUSTC           := rustc
 OBJDUMP         := llvm-objdump
@@ -120,11 +120,7 @@ info:
 # ============================================================
 
 clean:
-	rm -f \
-		$(ELF) \
-		$(BIN) \
-		$(DUMP) \
-		$(MEM)
-
+	rm -f -- *.elf *.bin *.dump *.mem $(CLEAN_PSC_MEM)
+	
 clean-all: clean
 	rm -f $(PSC_MEM)

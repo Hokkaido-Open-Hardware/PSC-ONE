@@ -10,9 +10,91 @@
 #define PSC_OS_DEBUG_WITHOUT_MICROPYTHON 1
 
 // JPEG LCD表示なしの場合のオプション
-#define PSC_OS_DEBUG_WITHOUT_JPEGLCD 1
+//#define PSC_OS_DEBUG_WITHOUT_JPEGLCD 1
 
 extern int psc_micropython_run(void);
+
+static void i2c_capture_hex(uint32_t byte)
+{
+    putchar("0123456789ABCDEF"[(byte >> 4) & 15u]);
+    putchar("0123456789ABCDEF"[byte & 15u]);
+}
+
+static void cmd_i2c_capture(void)
+{
+    uint32_t status = 0, polls = 0, before_abort = 0;
+    int bytes = 0, elapsed_us = -1, cpu_timeout = 0, timed_watchdog = 0;
+    /* Hardware normally finishes after 100M I2C peripheral clocks (1.25 s
+     * at 80 MHz). CPU watchdog allows 10 s, independent of polling speed.
+     * When the shared timer is busy, retain an explicitly uncalibrated guard. */
+    const uint32_t fallback_polls = 10000000u;
+    int timing = call_timer_measure_begin();
+    call_i2c_capture(I2C_CAPTURE_ARM);
+    printf("I2C capture armed...\nWaiting for START...\n");
+    for (;;) {
+        status = call_i2c_capture(I2C_CAPTURE_STATUS);
+        ++polls;
+        if (status & I2C_CAPTURE_DONE) break;
+        if (timing == 0) {
+            elapsed_us = call_timer_measure_read_us();
+            if (elapsed_us >= 10000000) { timed_watchdog = 1; break; }
+            if (elapsed_us < 0 && polls >= fallback_polls) break;
+        } else if (polls >= fallback_polls) break;
+    }
+    if (!(status & I2C_CAPTURE_DONE)) {
+        /* Recheck before ABORT: RTL may have finished at the CPU deadline. */
+        before_abort = call_i2c_capture(I2C_CAPTURE_STATUS);
+        if (!(before_abort & I2C_CAPTURE_DONE)) {
+            cpu_timeout = 1;
+            call_i2c_capture(I2C_CAPTURE_ABORT);
+        }
+        status = call_i2c_capture(I2C_CAPTURE_STATUS);
+    }
+    if (timing == 0) elapsed_us = call_timer_measure_end_us();
+    /* All diagnostics and event printing below occur after capture freezes. */
+    printf("Capture status=%x, polls=%d, elapsed_us=%d\n",
+           (unsigned)status, (unsigned)polls, elapsed_us);
+    if (!(status & I2C_CAPTURE_MULTI))
+        printf("RTL diagnostics unavailable: older FPGA image; single-STOP RTL may be installed. Rebuild/program FPGA.\n");
+    else
+        printf("RTL completed transactions (STOPs): %u\n",
+               (unsigned)I2C_CAPTURE_STOPS(status));
+    if (cpu_timeout)
+        printf("CPU watchdog expired (%s); ABORT requested, status before ABORT=%x\n",
+               timed_watchdog ? "10 seconds" : "10000000 polls; timer unavailable",
+               (unsigned)before_abort);
+    uint32_t count = call_i2c_capture(I2C_CAPTURE_COUNT);
+    if (count > 64u) {
+        printf("I2C capture: invalid event count\n");
+        return;
+    }
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t event = call_i2c_capture(I2C_CAPTURE_POP);
+        uint32_t kind = (event >> 9) & 7u;
+        uint32_t byte = event & 255u;
+        if (kind == 1u) printf("\nSTART\n");
+        else if (kind == 2u) printf("\nREPEATED START\n");
+        else if (kind == 3u) printf("STOP\n");
+        else if (kind == 4u || kind == 5u) {
+            printf(kind == 4u ? "ADDR : 0x" : "DATA : 0x");
+            i2c_capture_hex(kind == 4u ? byte >> 1 : byte);
+            if (kind == 4u) printf(byte & 1u ? " READ" : " WRITE");
+            printf(event & 256u ? " NACK\n" : " ACK\n");
+            ++bytes;
+        }
+    }
+    printf("\nCaptured: %d bytes\n", bytes);
+    if (status & I2C_CAPTURE_OVERFLOW)
+        printf("RTL DONE: OVERFLOW (64-event buffer full); partial capture shown.\n");
+    else if (status & I2C_CAPTURE_TIMEOUT)
+        printf("RTL DONE: capture clock limit (includes idle timeout); partial capture shown.\n");
+    else if (status & I2C_CAPTURE_ABORTED)
+        printf("Capture aborted by CPU; partial capture shown.\n");
+    else if (status & I2C_CAPTURE_LIMIT)
+        printf("RTL DONE: transaction limit reached. Capture complete.\n");
+    else
+        printf("RTL DONE: unspecified reason (older RTL). Capture complete.\n");
+}
 
 void main(void) {
 
@@ -390,10 +472,15 @@ prompt:
             int mp_ret = psc_micropython_run();
             printf("\n--- return to PSC-OS shell (ret=%d) ---\n", mp_ret);
 #endif
+        // ---- PSC_Robot I2C ----
+        } else if (strcmp(argv[0], "i2c_capture") == 0) {
+            if (argc != 1) printf("usage: i2c_capture\n");
+            else cmd_i2c_capture();
 
         // ---- Helps出力 ----
         } else if (strcmp(argv[0], "help") == 0) {
             printf("commands:\n");
+            printf("  i2c_capture (one bus transaction; bounded wait)\n");
             printf("  microPython | micropython\n");
             printf("  jpeg TEST.JPG\n");
             printf("  run FILE.ELF\n");

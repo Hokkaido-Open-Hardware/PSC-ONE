@@ -199,6 +199,7 @@ CPU_FILES = \
 	$(SELECTED_CPU_CORE_FILES) \
 	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
 	$(UART_DIR)/PSC_RV32IS_UART.v \
+	$(I2C_DIR)/PSC_I2C_capture.sv \
 	$(I2C_DIR)/PSC_RV32_I2C.sv \
 	$(LED_DIR)/PSC_RV32IS_LED.v \
 	$(CACHE_DIR)/cache_dma_controller.sv \

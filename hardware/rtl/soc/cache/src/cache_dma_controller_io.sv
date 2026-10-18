@@ -325,7 +325,10 @@ module cache_dma_controller_io #(
                  ((I2C_ADDR_STATUS      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == I2C_ADDR_STATUS      )) |
                  ((I2C_ADDR_OUTPUT      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == I2C_ADDR_OUTPUT      )) |
                  ((I2C_ADDR_CONTROL     != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == I2C_ADDR_CONTROL     )) |
-                 ((I2C_ADDR_SEQ         != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == I2C_ADDR_SEQ         )));
+                 ((I2C_ADDR_SEQ         != {ADDR_WIDTH{1'b0}}) && ((addr_mmio_masked == I2C_ADDR_SEQ) ||
+                    (addr_mmio_masked == I2C_ADDR_SEQ + 4) ||
+                    (addr_mmio_masked == I2C_ADDR_SEQ + 8) ||
+                    (addr_mmio_masked == I2C_ADDR_SEQ + 12))));
         end
     endfunction
 

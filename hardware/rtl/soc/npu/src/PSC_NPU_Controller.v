@@ -2,8 +2,8 @@
 
 module PSC_NPU_Controller #(
     // Exclusive accelerator selection (default: existing NPU).
-    parameter bit ENABLE_NPU = 1'b0,
-    parameter bit ENABLE_LPU = 1'b1,
+    parameter bit ENABLE_NPU = 1'b1,
+    parameter bit ENABLE_LPU = 1'b0,
     // Param
     parameter integer PE_N     = 4,     // Physical SA size: 4x4 fixed
     parameter integer MATRIX_N = 4,     // Default matrix size

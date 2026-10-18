@@ -17,6 +17,7 @@
 // --- SA ---
 #define SYS_SA_RUN          10
 #define SYS_ROBOT_CONTROL   11
+#define SYS_I2C_CAPTURE     12 /* a0: I2C_CAPTURE_* operation */
 
 // --- MIC ---
 #define I2S_MIC_READ        20

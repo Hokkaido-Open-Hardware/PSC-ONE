@@ -7,6 +7,14 @@
 #include <stdint.h>
 #include "robot/robot_control.h"
 
+uint32_t call_i2c_capture(uint32_t reg)
+{
+    register uint32_t a0 __asm__("a0") = reg;
+    register uint32_t a3 __asm__("a3") = SYS_I2C_CAPTURE;
+    __asm__ __volatile__("ecall" : "+r"(a0) : "r"(a3) : "memory");
+    return a0;
+}
+
 void call_robot_control(void)
 {
     register uint32_t a0 __asm__("a0") = 0;

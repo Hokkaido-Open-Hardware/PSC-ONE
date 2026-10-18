@@ -28,6 +28,7 @@ module sim_PSC_RV32_I2C (
 
     PSC_RV32_I2C #(
         .ADDR_WIDTH       (32),
+        .CAPTURE_TIMEOUT_CYCLES (1000000), // 10 ms at the test clock
         .SLAVE_ADDRESS    (7'h42),
         .I2C_BASE         (32'h1000_2000),
         .I2C_ADDR_INPUT   (32'h1000_2000),

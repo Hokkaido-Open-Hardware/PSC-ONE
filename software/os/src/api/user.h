@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "i2c_capture.h"
+
 #include "../kernel/user_memory.h"
 
 #ifdef USE_SBI_CONSOLE

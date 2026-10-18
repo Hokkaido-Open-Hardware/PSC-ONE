@@ -49,6 +49,7 @@ I2C_DIR		= ../rtl/soc/mmio/I2C
 
 I2C_FILES = \
 	$(I2C_DIR)/sim_PSC_RV32_I2C.sv \
+	$(I2C_DIR)/PSC_I2C_capture.sv \
 	$(I2C_DIR)/PSC_RV32_I2C.sv
 
 COCOTB_CFG       := $(shell which cocotb-config)

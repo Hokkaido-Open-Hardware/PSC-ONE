@@ -14,6 +14,7 @@ clean:
 
 log_clean:
 	$(RM) ./log/test*.log
+	$(RM) ./log/rust*.log
 	$(RM) ./log_uart/log*.log
 	$(RM) ./log_uart/coremark*.log
 
