@@ -5,6 +5,8 @@
 #include "../api/jpeg/jpeg_view.h"
 #include "../api/tflite/tflite_api.h"
 #include "../api/robot/robot_control.h"
+#include "../elego_robot/imu.h"
+#include "../elego_robot/pwm_test.h"
 
 // micropythonを含めるとSIM時間が長すぎる場合のオプション
 #define PSC_OS_DEBUG_WITHOUT_MICROPYTHON 1
@@ -20,7 +22,7 @@ static void i2c_capture_hex(uint32_t byte)
     putchar("0123456789ABCDEF"[byte & 15u]);
 }
 
-static void cmd_i2c_capture(void)
+static void cmd_i2c_capture(int self_only)
 {
     uint32_t status = 0, polls = 0, before_abort = 0;
     int bytes = 0, elapsed_us = -1, cpu_timeout = 0, timed_watchdog = 0;
@@ -28,8 +30,18 @@ static void cmd_i2c_capture(void)
      * at 80 MHz). CPU watchdog allows 10 s, independent of polling speed.
      * When the shared timer is busy, retain an explicitly uncalibrated guard. */
     const uint32_t fallback_polls = 10000000u;
+    if (self_only && !(call_i2c_capture(I2C_CAPTURE_STATUS) & I2C_CAPTURE_SELF_SUPPORTED)) {
+        printf("I2C self capture unsupported; rebuild/program FPGA.\n");
+        return;
+    }
     int timing = call_timer_measure_begin();
-    call_i2c_capture(I2C_CAPTURE_ARM);
+    uint32_t armed = call_i2c_capture(self_only ? I2C_CAPTURE_ARM_SELF : I2C_CAPTURE_ARM);
+    if (armed == (uint32_t)-1) {
+        if (timing == 0) call_timer_measure_end_us();
+        printf("I2C capture ARM failed.\n");
+        return;
+    }
+    if (self_only) printf("Capture filter: PSC-ONE slave address (slave remains active).\n");
     printf("I2C capture armed...\nWaiting for START...\n");
     for (;;) {
         status = call_i2c_capture(I2C_CAPTURE_STATUS);
@@ -474,13 +486,22 @@ prompt:
 #endif
         // ---- PSC_Robot I2C ----
         } else if (strcmp(argv[0], "i2c_capture") == 0) {
-            if (argc != 1) printf("usage: i2c_capture\n");
-            else cmd_i2c_capture();
+            if (argc == 1) cmd_i2c_capture(0);
+            else if (argc == 2 && strcmp(argv[1], "self") == 0) cmd_i2c_capture(1);
+            else if (argc == 2 && strcmp(argv[1], "imu_read") == 0) cmd_i2c_imu(0);
+            else if (argc == 2 && strcmp(argv[1], "imu_test") == 0) cmd_i2c_imu(1);
+            else if (argc == 2 && strcmp(argv[1], "imu_monitor") == 0) cmd_i2c_imu(2);
+            else if (argc == 2 && strcmp(argv[1], "pwm_test") == 0) cmd_i2c_pwm_test();
+            else printf("usage: i2c_capture [self|imu_read|imu_test|imu_monitor|pwm_test]\n");
 
         // ---- Helps出力 ----
         } else if (strcmp(argv[0], "help") == 0) {
             printf("commands:\n");
-            printf("  i2c_capture (one bus transaction; bounded wait)\n");
+            printf("  i2c_capture [self] (two transactions; bounded wait)\n");
+            printf("  i2c_capture pwm_test (PWM transport round trip; no motor control)\n");
+            printf("  i2c_capture imu_read (passive MPU6050 raw sample)\n");
+            printf("  i2c_capture imu_test (math self-test + snapshot estimate)\n");
+            printf("  i2c_capture imu_monitor (snapshots, reset per sample; q exits)\n");
             printf("  microPython | micropython\n");
             printf("  jpeg TEST.JPG\n");
             printf("  run FILE.ELF\n");

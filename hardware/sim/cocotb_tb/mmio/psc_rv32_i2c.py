@@ -354,9 +354,9 @@ async def test_capture_stop_start_read14(dut):
     await observed_byte(master, 0x3B)
     await master.stop()
     assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 1
-    assert await mmio_read(dut, CAP_CTRL) == 0x181  # armed, 1 STOP, no DONE
+    assert await mmio_read(dut, CAP_CTRL) == (0x50000 | 0x181)  # armed, 1 STOP, no DONE
     await Timer(2, unit="ms")  # substantial STOP-to-START idle gap
-    assert await mmio_read(dut, CAP_CTRL) == 0x181
+    assert await mmio_read(dut, CAP_CTRL) == (0x50000 | 0x181)
     assert await mmio_read(dut, CAP_COUNT) == 4
     assert await mmio_read(dut, CAP_DATA) == 0  # no early pop
     await master.start()
@@ -367,7 +367,7 @@ async def test_capture_stop_start_read14(dut):
         await observed_byte(master, value, nack=(i == 13))
     await master.stop()
     assert (await mmio_read(dut, CAP_CTRL) & 0x3F) == 4
-    assert await mmio_read(dut, CAP_CTRL) == 0x2C4  # 2 STOPs, limit, DONE
+    assert await mmio_read(dut, CAP_CTRL) == (0x50000 | 0x2C4)  # 2 STOPs, limit, DONE
     # Later traffic cannot overwrite a completed capture.
     await master.start()
     await observed_byte(master, 0xD0, nack=True)
@@ -407,8 +407,173 @@ async def test_capture_repeated_start_then_idle(dut):
     await observed_byte(master, 0x12)
     await observed_byte(master, 0x34, nack=True)
     await master.stop()
-    assert await mmio_read(dut, CAP_CTRL) == 0x181
+    assert await mmio_read(dut, CAP_CTRL) == (0x50000 | 0x181)
     await Timer(11, unit="ms")
-    assert await mmio_read(dut, CAP_CTRL) == 0x1A4  # timeout, not STOP limit
+    assert await mmio_read(dut, CAP_CTRL) == (0x50000 | 0x1A4)  # timeout, not STOP limit
     assert await capture_events(dut) == [
         0x200, 0x8D0, 0xA3B, 0x400, 0x8D1, 0xA12, 0xB34, 0x600]
+
+
+@cocotb.test()
+async def test_capture_self_filter_and_live_slave(dut):
+    await initialize(dut)
+    master = I2CMaster(dut)
+    assert await mmio_read(dut, CAP_CTRL) & 0x10000
+    await mmio_write(dut, REG_OUTPUT, 0xA5)
+    await mmio_write(dut, CAP_CTRL, 5)
+    # Foreign traffic consumes neither event storage nor STOP budget.
+    for _ in range(3):
+        await master.start()
+        await observed_byte(master, 0xD0)
+        await observed_byte(master, 0x77)
+        await master.stop()
+    assert await mmio_read(dut, CAP_COUNT) == 0
+    assert await mmio_read(dut, CAP_CTRL) == 0x70081
+    await master.write_registers(0, [1, 2, 3, 4])
+    assert await mmio_read(dut, REG_INPUT) == 0x04030201
+    assert await mmio_read(dut, REG_SEQ) == 1
+    assert await mmio_read(dut, CAP_CTRL) == 0x70181
+    assert await master.read_registers(8, 1) == [0xA5]
+    assert await mmio_read(dut, CAP_CTRL) == 0x702C4
+    assert await capture_events(dut) == [
+        0x200, 0x884, 0xA00, 0xA01, 0xA02, 0xA03, 0xA04, 0x600,
+        0x200, 0x884, 0xA08, 0x400, 0x885, 0xBA5, 0x600]
+    # Rearming in full-bus mode clears self mode and preserves old behavior.
+    await mmio_write(dut, CAP_CTRL, 1)
+    await master.start()
+    assert not await master.write_byte(0x84)
+    await master.stop()
+    await mmio_write(dut, CAP_CTRL, 2)
+    assert await capture_events(dut) == [0x200, 0x984, 0x600]
+
+
+@cocotb.test()
+async def test_capture_self_mixed_restarts_and_abort(dut):
+    await initialize(dut)
+    master = I2CMaster(dut)
+    await mmio_write(dut, CAP_CTRL, 5)
+    await master.start()
+    await observed_byte(master, 0xD0)
+    await master.start()
+    assert await master.write_byte(0x84)
+    assert await master.write_byte(0x08)
+    await master.start()
+    await observed_byte(master, 0xD0)
+    await observed_byte(master, 0x77)
+    await master.stop()
+    assert await mmio_read(dut, CAP_CTRL) == 0x70181
+    await mmio_write(dut, CAP_CTRL, 2)
+    assert await capture_events(dut) == [0x400, 0x884, 0xA08, 0x600]
+    # Foreign-only traffic still ends by the absolute hardware timeout.
+    await mmio_write(dut, CAP_CTRL, 5)
+    await master.start()
+    await observed_byte(master, 0xD0)
+    await master.stop()
+    await Timer(11, unit="ms")
+    assert await mmio_read(dut, CAP_CTRL) == 0x700A4
+    assert await capture_events(dut) == []
+
+
+@cocotb.test()
+async def test_capture_self_overflow_keeps_slave_running(dut):
+    await initialize(dut)
+    master = I2CMaster(dut)
+    await mmio_write(dut, CAP_CTRL, 5)
+    await master.start()
+    assert await master.write_byte(0x84)
+    # The pointer plus 61 data bytes fill the 64-event buffer.
+    assert await master.write_byte(0)
+    for value in range(61):
+        assert await master.write_byte(value)
+    assert await mmio_read(dut, CAP_CTRL) == 0x7008C
+    # Overflow must freeze only the monitor, not the responding slave.
+    assert await master.write_byte(0xEE)
+    await master.stop()
+    assert await capture_events(dut) == [0x200, 0x884, 0xA00] + [0xA00 | n for n in range(61)]
+    await master.write_registers(0, [9, 8, 7, 6])
+    assert await mmio_read(dut, REG_INPUT) == 0x06070809
+
+
+async def pwm_write(master, data):
+    await master.start()
+    assert await master.write_byte(0x84)
+    for byte in data:
+        assert await master.write_byte(byte)
+    await master.stop()
+
+
+async def pwm_read(master, size=4):
+    await master.start()
+    assert await master.write_byte(0x85)
+    values = [await master.read_byte(i < size - 1) for i in range(size)]
+    await master.stop()
+    return values
+
+
+@cocotb.test()
+async def test_pwm_round_trip_and_register_isolation(dut):
+    """Actual Arduino v1 report, raw signed PWMs, MPU traffic, frozen events."""
+    await initialize(dut)
+    m = I2CMaster(dut)
+    await m.write_registers(0, [1, 2, 3, 4])
+    await mmio_write(dut, REG_OUTPUT, 0x7f)
+    before = [await mmio_read(dut, a) for a in
+              (REG_INPUT, REG_STATUS, REG_OUTPUT, REG_SEQ)]
+    assert await mmio_read(dut, REG_SEQ + 4) & (1 << 18)
+    await mmio_write(dut, REG_SEQ + 4, 13)
+    expected = []
+    for raw in ([0xf5, 0xff, 0xf7, 0xff], [0, 0x80, 0xff, 0x7f]):
+        # Another slave is never ACKed or driven by PSC-ONE.
+        await m.start()
+        assert not await m.write_byte(0xd0)
+        await m.stop()
+        await pwm_write(m, raw)
+        expected += [0x200, 0x884] + [0xa00 | b for b in raw] + [0x600]
+        response = await pwm_read(m)
+        assert response == [20, 0, 20, 0]
+        expected += [0x200, 0x885, 0xa14, 0xa00, 0xa14, 0xb00, 0x600]
+        report = [0xa5, 1, 0x80, 4, 4] + response
+        await pwm_write(m, report)
+        expected += [0x200, 0x884] + [0xa00 | b for b in report] + [0x600]
+    status = await mmio_read(dut, REG_SEQ + 4)
+    assert status & 4 and status & 64 and not status & 0x39
+    assert (status >> 8) & 255 == 6
+    captured = await capture_events(dut)
+    assert captured == expected
+    # Optional artifact consumed by the production C decoder host test.
+    import os
+    from pathlib import Path
+    if os.environ.get("PWM_TRACE_FILE"):
+        Path(os.environ["PWM_TRACE_FILE"]).write_text(
+            "\n".join(f"{event:x}" for event in captured) + "\n")
+    assert [await mmio_read(dut, a) for a in
+            (REG_INPUT, REG_STATUS, REG_OUTPUT, REG_SEQ)] == before
+    assert await m.read_registers(8, 1) == [0x7f]
+    # Frozen capture survives later legacy traffic.
+    assert await mmio_read(dut, REG_SEQ + 8) == 52
+    await mmio_write(dut, REG_SEQ + 4, 5)
+    await m.write_registers(0, [5, 6, 7, 8])
+    assert await mmio_read(dut, REG_INPUT) == 0x08070605
+    await mmio_write(dut, REG_SEQ + 4, 2)
+
+
+@cocotb.test()
+async def test_pwm_timeout_abort_and_read_latch(dut):
+    await initialize(dut)
+    m = I2CMaster(dut)
+    await mmio_write(dut, REG_OUTPUT, 0x37)
+    await mmio_write(dut, REG_SEQ + 4, 13)
+    await m.start()
+    assert await m.write_byte(0x85)
+    assert await m.read_byte(True) == 20
+    # Aborting capture must not switch an in-flight READ to legacy registers.
+    await mmio_write(dut, REG_SEQ + 4, 2)
+    assert [await m.read_byte(i < 2) for i in range(3)] == [0, 20, 0]
+    await m.stop()
+    assert await m.read_registers(8, 1) == [0x37]
+    await mmio_write(dut, REG_SEQ + 4, 13)
+    assert await pwm_read(m, 6) == [20, 0, 20, 0, 0, 0]
+    await Timer(11, unit="ms")
+    status = await mmio_read(dut, REG_SEQ + 4)
+    assert status & 0x24 == 0x24 and not status & 1
+    assert await m.read_registers(8, 1) == [0x37]

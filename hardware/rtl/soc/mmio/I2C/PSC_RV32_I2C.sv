@@ -20,13 +20,17 @@
 //   BASE+0x10 SEQ      [7:0] last input sequence number
 //   SEQ+0x04 CAP_CTRL read: [0]armed [1]active [2]done [3]overflow [4]aborted [5]timeout
 //                     [6]transaction limit [7]multi-capture diagnostics supported
-//                     [15:8]completed STOP count
-//                     write: [0]arm/clear capture [1]abort (arm takes priority)
+//                     [15:8]completed STOP count [16]self supported [17]self mode
+//                     write: [0]arm/clear capture [1]abort [2]self mode on ARM
+//                     [18]PWM test supported [19]PWM test mode
+//                     write [3]PWM test on ARM: self filter, 6 STOPs, raw PWM
+//                     READ returns 14 00 14 00, then zero; writes only captured.
+//                     ARM takes priority over abort.
 //   SEQ+0x08 CAP_COUNT number of stored events (0..64), remains fixed after done
 //   SEQ+0x0C CAP_DATA  pop one event after done, zero when empty/not done
 //                     [11:9]kind [8]NACK [7:0]byte; see PSC_I2C_capture.sv
-// While armed the slave releases SDA and ignores bus traffic; MMIO remains usable.
-// Normal slave operation resumes at the next START after capture completes.
+// Full-bus capture releases SDA; self capture keeps normal slave operation.
+// After full-bus capture, normal slave operation resumes at the next START.
 // Warning: SPI or I2S electrical conventions are NOT compatible with this port.
 
 module PSC_RV32_I2C #(
@@ -87,6 +91,9 @@ module PSC_RV32_I2C #(
     reg       addr_matches, addr_read;
     reg       ack_seen_high;
     reg       master_ack;
+    reg pwm_transaction;
+    reg [7:0] pwm_index;
+    wire pwm_active = cap_status[0] && cap_status[19];
 
     reg [7:0] in0, in1, in2, in3;
     reg [7:0] out_value;
@@ -110,12 +117,13 @@ module PSC_RV32_I2C #(
     wire [31:0] cap_status, cap_count, cap_data;
     wire cap_write = cpu_wr && cpu_waddr == CAP_CTRL;
     PSC_I2C_capture #(
+        .SLAVE_ADDRESS(SLAVE_ADDRESS),
         .TRANSACTION_LIMIT(CAPTURE_TRANSACTIONS),
         .TIMEOUT_CYCLES(CAPTURE_TIMEOUT_CYCLES)
     ) capture (
         .clock(clock), .reset_n(reset_n), .scl_rise(scl_rise), .sda(sda_sync),
         .start_event(i2c_start), .stop_event(i2c_stop),
-        .arm(cap_write && cpu_wdata[0]),
+        .arm(cap_write && cpu_wdata[0]), .self_only(cpu_wdata[2]), .pwm_test(cpu_wdata[3]),
         .abort_capture(cap_write && cpu_wdata[1]),
         .pop(cpu_rd && cpu_raddr == CAP_DATA),
         .status(cap_status), .count(cap_count), .data(cap_data)
@@ -137,6 +145,12 @@ module PSC_RV32_I2C #(
         end
     endfunction
 
+    function automatic [7:0] pwm_byte(input [7:0] idx);
+        begin
+            pwm_byte = (idx == 0 || idx == 2) ? 8'd20 : 8'd0;
+        end
+    endfunction
+
     // All I2C state/buffers and CPU-visible registers use a single driver.
     // If CPU and I2C update same status in one cycle, incoming I2C wins.
     always @(posedge clock or negedge reset_n) begin
@@ -151,6 +165,7 @@ module PSC_RV32_I2C #(
             addr_read <= 1'b0;
             ack_seen_high <= 1'b0;
             master_ack <= 1'b0;
+            pwm_transaction <= 1'b0; pwm_index <= 0;
             sda_drive_low <= 1'b0;
             in0 <= 8'd0; in1 <= 8'd0; in2 <= 8'd0; in3 <= 8'd0;
             out_value <= 8'd0; seq <= 8'd0;
@@ -216,9 +231,10 @@ module PSC_RV32_I2C #(
                 endcase
             end
 
-            // Include the ARM write cycle so the slave cannot ACK as we arm.
-            // Clear partial slave state; after completion wait for a fresh START.
-            if (cap_status[0] || (cap_write && cpu_wdata[0])) begin
+            // Full-bus mode releases SDA, including its ARM write cycle.
+            // Self mode leaves the slave FSM running, even on ARM/ABORT/DONE.
+            if ((cap_write && cpu_wdata[0]) ? !(cpu_wdata[2] || cpu_wdata[3]) :
+                (cap_status[0] && !cap_status[17])) begin
                 state <= ST_IDLE;
                 sda_drive_low <= 1'b0;
                 ptr_valid <= 1'b0;
@@ -260,10 +276,13 @@ module PSC_RV32_I2C #(
                             if (!addr_matches) state <= ST_IGNORE;
                             else if (addr_read) begin
                                 state <= ST_TX;
-                                shift_tx <= selected_byte(reg_ptr);
-                                sda_drive_low <= ~(selected_byte(reg_ptr) >> 7);
+                                pwm_transaction <= pwm_active;
+                                pwm_index <= 0;
+                                shift_tx <= pwm_active ? pwm_byte(0) : selected_byte(reg_ptr);
+                                sda_drive_low <= pwm_active ? 1'b1 : ~(selected_byte(reg_ptr) >> 7);
                             end else begin
                                 state <= ST_RX;
+                                pwm_transaction <= pwm_active;
                                 shift_rx <= 8'd0;
                                 ptr_valid <= 1'b0;
                                 received_mask <= 4'd0;
@@ -276,7 +295,10 @@ module PSC_RV32_I2C #(
                             if (bit_count == 3'd7) begin
                                 state <= ST_RX_ACK;
                                 ack_seen_high <= 1'b0;
-                                if (!ptr_valid) begin
+                                if (pwm_transaction) begin
+                                    // Raw legacy PWM and tagged report are in capture RAM.
+                                    // Do not interpret either as register writes.
+                                end else if (!ptr_valid) begin
                                     reg_ptr <= {shift_rx[6:0],sda_sync};
                                     ptr_valid <= 1'b1;
                                 end else begin
@@ -334,9 +356,16 @@ module PSC_RV32_I2C #(
                             if (master_ack) begin
                                 state <= ST_TX;
                                 bit_count <= 3'd0;
-                                reg_ptr <= reg_ptr + 8'd1;
-                                shift_tx <= selected_byte(reg_ptr + 8'd1);
-                                sda_drive_low <= ~(selected_byte(reg_ptr + 8'd1) >> 7);
+                                if (pwm_transaction) begin
+                                    // Saturate, so an overlong read never wraps to test PWM.
+                                    if (pwm_index != 8'hff) pwm_index <= pwm_index + 8'd1;
+                                    shift_tx <= pwm_byte(pwm_index == 8'hff ? 8'hff : pwm_index + 8'd1);
+                                    sda_drive_low <= 1'b1; // PWM byte MSB is always zero
+                                end else begin
+                                    reg_ptr <= reg_ptr + 8'd1;
+                                    shift_tx <= selected_byte(reg_ptr + 8'd1);
+                                    sda_drive_low <= ~(selected_byte(reg_ptr + 8'd1) >> 7);
+                                end
                             end else begin
                                 state <= ST_IGNORE;
                                 sda_drive_low <= 1'b0;

@@ -240,6 +240,8 @@ $(TJPGD_BUILD)/tjpgd.c $(TJPGD_BUILD)/tjpgd.h $(TJPGD_BUILD)/tjpgdcnf.h: $(TJPGD
 
 SRCS_USER := \
 	$(Src)/shell/shell.c \
+	$(Src)/elego_robot/imu.c $(Src)/elego_robot/imu_command.c \
+	$(Src)/elego_robot/pwm_test.c $(Src)/elego_robot/pwm_test_command.c \
 	$(Src)/api/user.c \
 	$(Src)/fs/fat32.c \
 	$(Src)/shell/elf_command.c $(Src)/kernel/elf_loader.c \
@@ -254,7 +256,7 @@ ifeq ($(SIM_USER),minimal)
   USER_OBJCOPY_FLAGS =
 else ifeq ($(SIM_USER),full)
   USER_SRCS = $(SRCS_USER)
-  USER_DEPS = $(SRCS_USER) $(MICROPY_LIB) $(JPEG_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/shell/user.ld $(Src)/api/user.h $(Src)/api/i2c_capture.h $(Src)/api/robot/robot_control.h $(Src)/kernel/syscall.h $(Src)/kernel/elf_loader.h $(Src)/kernel/user_memory.h
+  USER_DEPS = $(SRCS_USER) $(Src)/elego_robot/pwm_test.h $(Src)/elego_robot/imu.h $(MICROPY_LIB) $(JPEG_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/shell/user.ld $(Src)/api/user.h $(Src)/api/i2c_capture.h $(Src)/api/robot/robot_control.h $(Src)/kernel/syscall.h $(Src)/kernel/elf_loader.h $(Src)/kernel/user_memory.h
   USER_LIBS = $(TFLITE_OBJ) $(MICROPY_LIB) $(LIBM) $(LIBC)
   USER_OBJCOPY_FLAGS = --set-section-flags .bss=alloc,contents
 else

@@ -2,16 +2,19 @@
 // Passive multi-transaction bus monitor. Inputs are already synchronized by the slave.
 // 64 events, each {kind[2:0], nack, byte[7:0]}:
 // 1 START, 2 repeated START, 3 STOP, 4 address byte, 5 data byte.
+// self_only retains only matching address segments; STOP counts if any segment matched.
+// START is deferred until address match; repeated START retains its bus meaning.
 // arm clears the previous capture; abort freezes a partial capture.
 // STOP count terminates capture; repeated START does not count as a STOP.
 // Absolute clock budget also bounds idle/stuck buses. Both parameters must be >0.
 module PSC_I2C_capture #(
+    parameter [6:0] SLAVE_ADDRESS = 7'h42,
     parameter integer TRANSACTION_LIMIT = 2,
     parameter integer TIMEOUT_CYCLES = 100000000
 ) (
     input wire clock, reset_n,
     input wire scl_rise, sda, start_event, stop_event,
-    input wire arm, abort_capture, pop,
+    input wire arm, abort_capture, pop, self_only, pwm_test,
     output wire [31:0] status, count, data
 );
     reg armed, active, done, overflow, aborted, timed_out, limit_reached;
@@ -21,10 +24,16 @@ module PSC_I2C_capture #(
     reg [3:0] bits;
     reg [7:0] shift;
     reg address_byte;
+    reg pwm_mode;
+    reg self_mode, selected, transaction_selected, pending_restart;
+    // At the eighth address bit, shift[6:0] already holds the 7-bit address.
+    // Save the deferred START now; the address/ACK event follows on bit nine.
+    wire matched_address = active && scl_rise && address_byte &&
+                           bits == 4'd7 && shift[6:0] == SLAVE_ADDRESS;
     reg event_valid;
     reg [11:0] event_value;
 
-    assign status = {16'd0, transactions[7:0], 1'b1, limit_reached,
+    assign status = {12'd0, pwm_mode, 1'b1, self_mode, 1'b1, transactions[7:0], 1'b1, limit_reached,
                      timed_out, aborted, overflow, done, active, armed};
     assign count = {25'd0, used};
     assign data = (done && rd_index < used) ?
@@ -35,13 +44,16 @@ module PSC_I2C_capture #(
         event_value = 12'd0;
         if (armed) begin
             if (start_event) begin
-                event_valid = 1'b1;
+                event_valid = !self_mode;
                 event_value = active ? 12'h400 : 12'h200;
             end else if (active && stop_event) begin
-                event_valid = 1'b1;
+                event_valid = !self_mode || transaction_selected;
                 event_value = 12'h600;
-            end else if (active && scl_rise && bits == 4'd8) begin
+            end else if (self_mode && matched_address) begin
                 event_valid = 1'b1;
+                event_value = pending_restart ? 12'h400 : 12'h200;
+            end else if (active && scl_rise && bits == 4'd8) begin
+                event_valid = !self_mode || selected;
                 event_value = {address_byte ? 3'd4 : 3'd5, sda, shift};
             end
         end
@@ -60,12 +72,14 @@ module PSC_I2C_capture #(
             elapsed <= 0; transactions <= 0;
             used <= 0; rd_index <= 0; bits <= 0; shift <= 0;
             address_byte <= 0;
+            pwm_mode <= 0; self_mode <= 0; selected <= 0; transaction_selected <= 0; pending_restart <= 0;
         end else if (arm) begin
             armed <= 1; active <= 0; done <= 0;
             overflow <= 0; aborted <= 0; timed_out <= 0; limit_reached <= 0;
             elapsed <= 0; transactions <= 0;
             used <= 0; rd_index <= 0; bits <= 0; shift <= 0;
             address_byte <= 0;
+            pwm_mode <= pwm_test; self_mode <= self_only | pwm_test; selected <= 0; transaction_selected <= 0; pending_restart <= 0;
         end else if (abort_capture && armed) begin
             armed <= 0; active <= 0; done <= 1; aborted <= 1;
         end else begin
@@ -74,13 +88,21 @@ module PSC_I2C_capture #(
                 elapsed <= elapsed + 32'd1;
                 if (start_event) begin
                     active <= 1; bits <= 0; shift <= 0; address_byte <= 1;
+                    selected <= 0; pending_restart <= active;
                 end else if (active && stop_event) begin
                     active <= 0; bits <= 0;
-                    transactions <= transactions + 32'd1;
-                    if (transactions >= TRANSACTION_LIMIT - 1) begin
-                        armed <= 0; done <= 1; limit_reached <= 1;
+                    transaction_selected <= 0; selected <= 0;
+                    if (!self_mode || transaction_selected) begin
+                        transactions <= transactions + 32'd1;
+                        if (transactions >= (pwm_mode ? 5 : TRANSACTION_LIMIT - 1)) begin
+                            armed <= 0; done <= 1; limit_reached <= 1;
+                        end
                     end
                 end else if (active && scl_rise) begin
+                    if (address_byte && bits == 4'd7) begin
+                        selected <= shift[6:0] == SLAVE_ADDRESS;
+                        if (shift[6:0] == SLAVE_ADDRESS) transaction_selected <= 1;
+                    end
                     if (bits == 4'd8) begin
                         bits <= 0; address_byte <= 0;
                     end else begin

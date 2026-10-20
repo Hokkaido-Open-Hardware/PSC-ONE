@@ -47,9 +47,26 @@ void handle_syscall(struct trap_frame *f) {
     case SYS_I2C_CAPTURE:
         /* Dedicated capture registers; never change slave control/status. */
         switch (f->a0) {
+        case I2C_CAPTURE_ARM_PWM:
+            if (!(*(volatile uint32_t *)(uintptr_t)(PSC_I2C_ADDR_SEQ + 4u) &
+                  I2C_CAPTURE_PWM_SUPPORTED)) {
+                f->a0 = (uint32_t)-1;
+                break;
+            }
+            *(volatile uint32_t *)(uintptr_t)(PSC_I2C_ADDR_SEQ + 4u) = 13u;
+            f->a0 = 0;
+            break;
+        case I2C_CAPTURE_ARM_SELF:
+            if (!(*(volatile uint32_t *)(uintptr_t)(PSC_I2C_ADDR_SEQ + 4u) &
+                  I2C_CAPTURE_SELF_SUPPORTED)) {
+                f->a0 = (uint32_t)-1;
+                break;
+            }
+            /* fall through */
         case I2C_CAPTURE_ARM:
         case I2C_CAPTURE_ABORT:
             *(volatile uint32_t *)(uintptr_t)(PSC_I2C_ADDR_SEQ + 4u) =
+                f->a0 == I2C_CAPTURE_ARM_SELF ? 5u :
                 f->a0 == I2C_CAPTURE_ARM ? 1u : 2u;
             f->a0 = 0;
             break;
