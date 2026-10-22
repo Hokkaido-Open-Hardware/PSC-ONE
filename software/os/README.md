@@ -4,10 +4,10 @@
 
 PSC-ONE向けのOS、シェル、デバイスAPI、ユーザーアプリケーションを収めています。
 
-- [ソフトウェア全体](../README.md)
+- [ソフトウェア全体](OVERVIEW.md)
 - [ELFアプリケーション](elf_apps/README.md)と[ローダの仕様・制限](tests/elf/README.md)
 - [TFLite API](src/api/tflite/README.md)
-- [MicroPython PSCポート](../micropython/ports/psc/README.md)
+- [MicroPython PSCポート](micropython/ports/psc/README.md)
 - [FAT32回帰](tests/fat32/README.md)
 - [外部依存ライブラリ](third_party/README.md)
 

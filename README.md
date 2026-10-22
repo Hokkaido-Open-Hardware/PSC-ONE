@@ -105,7 +105,7 @@ PSC_RV32 CPU, memory subsystem, peripherals, PSC-OS, and PSC-ONE AI.
 | Directory | Contents |
 | --- | --- |
 | [hardware](hardware/README.md) | CPU/SoC RTL, bootloader and simulation |
-| [software](software/README.md) | PSC-OS, MicroPython and applications |
+| [software](software/os/OVERVIEW.md) | PSC-OS, MicroPython and applications |
 | [board](board/README.md) | Board designs and prototype setup |
 | [docs](docs/README.md) | Specifications, guides and validation records |
 | [FST Viewer](tool/FST_viewer/README.md) | CPU waveform viewer |
@@ -798,7 +798,7 @@ make -f Makefile.cpu.core simulate_CPU_CORE CPU_VERSION=v1
 make -f Makefile.pscos simulate_PSCOS CPU_VERSION=v1
 ```
 
-OS simulation can take a long time. See the [software guide](software/README.md)
+OS simulation can take a long time. See the [software guide](software/os/OVERVIEW.md)
 and [board setup](board/PSC-ONE/README.md) for the next steps.
 
 At a high level, the workflow is as follows:

@@ -6,7 +6,7 @@
 
 # PSC-ONE API
 
-[ドキュメント一覧](README.md) · [OS](psc_os.md) · [MMU](cpu_mmu.md) · [ソフトウェア](../software/README.md)
+[ドキュメント一覧](README.md) · [OS](psc_os.md) · [MMU](cpu_mmu.md) · [ソフトウェア](../software/os/OVERVIEW.md)
 
 PSC-OSの組込みアプリケーション、ロードしたELF、MicroPythonでは利用できるAPIが異なります。
 本書は公開ヘッダと実際のdispatchに基づく案内です。POSIXやLinuxのシステムコールABIではありません。
@@ -30,7 +30,7 @@ PSC-OSの組込みアプリケーション、ロードしたELF、MicroPythonで
 | FAT32 | [fat32.h](../software/os/src/fs/fat32.h) | rootディレクトリ、ファイル読出し |
 | JPEG | [jpeg_view.h](../software/os/src/api/jpeg/jpeg_view.h) | FAT32のJPEGをLCDへ表示 |
 | TFLite | [tflite_api.h](../software/os/src/api/tflite/tflite_api.h) | モデル準備・推論・backend選択 |
-| MicroPython | [modpsc.c](../software/micropython/ports/psc/modpsc.c) | `import psc` |
+| MicroPython | [modpsc.c](../software/os/micropython/ports/psc/modpsc.c) | `import psc` |
 | 外部ELF | [ELFアプリケーション](../software/os/elf_apps/README.md) | 限定されたコンソール／終了ABI |
 
 ドライバ内の `timer_*` や `led_*` と、ユーザー用ECALLラッパーは実行層が異なります。
@@ -247,7 +247,7 @@ print(psc.sa_run(A, B, True))  # identity × B
 TFLiteは読出し可能なbyte bufferを受け取り、入力長の完全一致が必要です。
 INT8の−1はbyte値255で表します。型の不正は `TypeError`、長さなどの不正は `ValueError`、
 C側失敗は `OSError`。shellとPythonはモデルを共有し、REPL終了ではresetしません。
-詳細とテストスクリプトは[PSCポート](../software/micropython/ports/psc/README.md)を参照してください。
+詳細とテストスクリプトは[PSCポート](../software/os/micropython/ports/psc/README.md)を参照してください。
 
 ## 戻り値と実行上の注意
 

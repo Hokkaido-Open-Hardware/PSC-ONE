@@ -17,6 +17,7 @@ Makefiles. CPU and NPU selections are independent.
 - [Legacy architecture](#legacy-architecture)
 - [CPU v1 architecture](#cpu-v1-architecture)
 - [CPU v2 architecture](#cpu-v2-architecture)
+- [CPU RV64 architecture](#cpu-rv64-architecture)
 - [Verification and performance](#verification-and-performance)
 - [PSC_RV32 vs PicoRV32 (Yosys Analysis)](#psc_rv32-vs-picorv32-yosys-analysis)
 <!-- /contents -->
@@ -25,9 +26,10 @@ Makefiles. CPU and NPU selections are independent.
 
 | Selection | Design | Source |
 | --- | --- | --- |
-| `legacy` | Original state-controlled CPU with optional overlap | [cpu](../hardware/rtl/soc/cpu/src/) |
-| `v1` | Stable valid/ready pipeline with branch prediction | [cpu_v1](../hardware/rtl/soc/cpu_v1/src/) |
-| `v2` | Small experimental out-of-order backend | [cpu_v2_experimental](../hardware/rtl/soc/cpu_v2_experimental/src/) |
+| `legacy` | Original state-controlled CPU with optional overlap     | [cpu](../hardware/rtl/soc/cpu/src/) |
+| `v1`     | Stable valid/ready pipeline with branch prediction      | [cpu_v1](../hardware/rtl/soc/cpu_v1/src/) |
+| `v2`     | Small experimental out-of-order backend                 | [cpu_v2_experimental](../hardware/rtl/soc/cpu_v2_experimental/src/) |
+| `rv64`   | Small experimental RV64                                 | [cpu_rv64](../hardware/rtl/soc/cpu_rv64/src/) |
 
 The SoC adds caches, SDRAM, MMIO peripherals and accelerators around these
 cores. NPU commands use custom CPU CSRs; matrix data uses the shared memory
@@ -107,9 +109,11 @@ and [reproduction guide](../hardware/sim/coremark_psc/README.md). The original v
 iteration count conflicts with its score/time pair; the overview preserves the
 values and explains the unresolved discrepancy.
 
-## CPU_RV64 architecture
+## CPU RV64 architecture
 
-CPU_RV64 is an experimental 64-bit extension of the PSC_RV32 design.
+PSC_RV64 is an experimental 64-bit extension of the PSC_RV32 design.
+
+<img src="images/PSC_RV64.jpg" width="800" alt="PSC-RV64">
 
 targets RV64IM with Zicsr and Zifencei, extending the integer registers and
 datapath to 64 bits while retaining 32-bit instruction encodings.

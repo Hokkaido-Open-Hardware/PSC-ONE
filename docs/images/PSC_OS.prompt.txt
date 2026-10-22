@@ -1,7 +1,7 @@
 PSC-OS diagram generation record
 Tool: built-in image_gen (no CLI/API fallback)
 Date: 2026-10-03
-Outputs: PSC-ONE/docs/images/PSC_OS.jpg; PSC-ONE/software/docs/PSC_OS.jpg
+Outputs: PSC-ONE/docs/images/PSC_OS.jpg; PSC-ONE/software/os/docs/PSC_OS.jpg
 References: previous PSC_OS.jpg, PSC_RV32_V1.jpg, PSC_RV32_V2.jpg
 Source review: software/os/Makefile; src/kernel/kernel.c, kernel_syscall.c,
   kernel_process.c; src/shell/shell.c; src/boot/psc_mbios.S;

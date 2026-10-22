@@ -124,8 +124,8 @@ RTL、testbench、生成物の名称・配置、clean targetの内容は変更�
 - `PSC-ONE/hardware/rtl/soc/npu_v2/README.md`
 - `PSC-ONE/hardware/rtl/soc/npu_v2/reference/evaluate_model.py`
 - `PSC-ONE/hardware/sim/Makefile.coremark`
-- `PSC-ONE/software/micropython/ports/psc/modpsc.c`
-- `PSC-ONE/software/micropython/ports/psc/mphalport.c`
+- `PSC-ONE/software/os/micropython/ports/psc/modpsc.c`
+- `PSC-ONE/software/os/micropython/ports/psc/mphalport.c`
 - `PSC-ONE/software/os/Makefile`
 - `PSC-ONE/software/os/README.md`
 - `PSC-ONE/software/os/src/run.sh`

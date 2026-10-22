@@ -1,8 +1,8 @@
 # MicroPython PSC port
 
-[PSC-ONE](../../../../README.md) · [Documentation](../../../../docs/README.md)
+[PSC-ONE](../../../../../README.md) · [Documentation](../../../../../docs/README.md)
 
-This port targets RV32IM with Zicsr/Zifencei. The standalone [Makefile](Makefile) uses Clang/LLVM and picolibc; the embedded PSC-OS build is managed by the [OS Makefile](../../../os/Makefile).
+This port targets RV32IM with Zicsr/Zifencei. The standalone [Makefile](Makefile) uses Clang/LLVM and picolibc; the embedded PSC-OS build is managed by the [OS Makefile](../../../Makefile).
 
 ## Thonny / UART REPL
 
@@ -254,5 +254,5 @@ make -C PSC-ONE/software/os MODE=psc kernel_mem
 ```
 
 For the standalone port, inspect the compiler and picolibc paths in the local
-Makefile, then run `make -C PSC-ONE/software/micropython/ports/psc`.
+Makefile, then run `make -C PSC-ONE/software/os/micropython/ports/psc`.
 The standalone image does not include the PSC-OS TFLite runtime.

@@ -6,7 +6,7 @@
 
 # PSC-OS
 
-[ドキュメント一覧](README.md) · [MMU](cpu_mmu.md) · [API](psc_os_api.md) · [ソフトウェア](../software/README.md)
+[ドキュメント一覧](README.md) · [MMU](cpu_mmu.md) · [API](psc_os_api.md) · [ソフトウェア](../software/os/OVERVIEW.md)
 
 PSC-OSはPSC-ONEのRISC-V CPU、メモリ、周辺回路を検証・利用するための独自OSです。
 BootROM、M-modeの低レベル処理、S-modeカーネル、U-modeシェル／アプリケーションを組み合わせます。
@@ -177,7 +177,7 @@ EXITまたは処理可能なユーザーfaultでシェルへ復帰します。�
 
 MicroPythonはシェルと同じユーザーイメージへ組み込まれ、REPLと `psc` モジュールから
 LED、timer、FAT32、SynapEngine、TFLiteを呼び出します。
-独立した汎用Pythonプロセス環境ではありません。[PSCポート](../software/micropython/ports/psc/README.md)を参照してください。
+独立した汎用Pythonプロセス環境ではありません。[PSCポート](../software/os/micropython/ports/psc/README.md)を参照してください。
 
 JPEGはTJpgDecで順次デコードし、小さいRGB888矩形をsyscall経由でILI9488へ転送します。
 全画面framebufferの確保を前提としません。対応形式とlandscape表示は[OS README](../software/os/README.md)にあります。

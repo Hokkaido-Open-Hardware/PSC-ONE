@@ -5,7 +5,7 @@
 #include "py/runtime.h"
 #include "py/stream.h"
 #include "mphalport.h"
-#include "../../../os/src/kernel/syscall.h"
+#include "../../../src/kernel/syscall.h"
 
 
 /* ------------------------------------------------------------

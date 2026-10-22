@@ -179,9 +179,9 @@ else:
         # Exercise both actual entry points with missing build dependencies:
         # only the patch diagnostic should appear, before upstream includes,
         # tool discovery or source generation can run.
-        for relative in ("micropython/ports/psc/Makefile", "os/Makefile"):
+        for relative in ("micropython/ports/psc/Makefile", "Makefile"):
             makefile = self.root / relative
-            makefile.parent.mkdir(parents=True)
+            makefile.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(HERE.parent.parent / relative, makefile)
             for missing in (False, True):
                 with self.subTest(makefile=relative, missing=missing):

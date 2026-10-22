@@ -1,5 +1,5 @@
 PSC_BUILD_MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
-include $(dir $(PSC_BUILD_MAKEFILE))../micropython/patches/build.mk
+include $(dir $(PSC_BUILD_MAKEFILE))micropython/patches/build.mk
 ifeq ($(PSC_PATCH_BUILD_BODY),1)
 
 # ========================
@@ -162,7 +162,7 @@ JPEG_DIR := $(Src)/api/jpeg
 JPEG_SRCS := $(Src)/fs/fat32_stream.c $(JPEG_DIR)/jpeg_view.c \
              $(JPEG_DIR)/jpeg_headers.c $(JPEG_DIR)/tjpgd_port.c $(TJPGD_BUILD)/tjpgd.c
 JPEG_HEADERS := $(wildcard $(JPEG_DIR)/*.h) $(Src)/fs/fat32.h $(Src)/api/jpeg_display.h
-JPEG_CPPFLAGS := -I$(Src) -I$(TJPGD_BUILD) -I../micropython/ports/psc/libc
+JPEG_CPPFLAGS := -I$(Src) -I$(TJPGD_BUILD) -Imicropython/ports/psc/libc
 
 # Header-only official FlatBuffers reader, isolated from C-only user.h/libc.
 # No C++ runtime linkage: the inspection path uses neither heap nor exceptions.
@@ -428,7 +428,7 @@ USER_ELF := $(Build)/shell.elf
 # ------------------------------------------------------------
 # MicroPython embedded library
 # ------------------------------------------------------------
-MICROPY_DIR := ../micropython/ports/psc
+MICROPY_DIR := micropython/ports/psc
 MICROPY_BUILD ?= $(abspath $(MICROPY_DIR)/build)
 MICROPY_LIB := $(MICROPY_BUILD)/libmicropython_psc.a
 

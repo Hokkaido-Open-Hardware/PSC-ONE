@@ -8,7 +8,7 @@
 #include "mphalport.h"
 #include "psc_vfs.h"
 #include <string.h>
-#include "../../../os/src/api/tflite/tflite_api.h"
+#include "../../../src/api/tflite/tflite_api.h"
 
 
 // Return to the calling PSC-OS shell, without redefining Ctrl+D semantics.

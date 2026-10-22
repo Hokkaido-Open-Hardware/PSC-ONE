@@ -69,7 +69,7 @@ PSC-ONEは、AIを学び、理解し、自ら作るためのオープンプラ�
 ## 開発を始める
 
 - [ハードウェア](hardware/README.md)：CPUの各版、SoC、検証環境。
-- [ソフトウェア](software/README.md)：PSC-OS、MicroPython、ELF、JPEG、TFLite。
+- [ソフトウェア](software/os/OVERVIEW.md)：PSC-OS、MicroPython、ELF、JPEG、TFLite。
 - [ボード](board/README.md)：試作基板と起動手順。
 - [波形ビューア](tool/FST_viewer/README.md)：FST/VCDの命令単位の解析。
 

@@ -5,13 +5,13 @@
 
 ## 通常のビルド
 
-`software/micropython/ports/psc/Makefile` と `software/os/Makefile` は、
+`software/os/micropython/ports/psc/Makefile` と `software/os/Makefile` は、
 共通の `build.mk` / `apply.py` でビルド前にパッチを確認・適用します。
 通常のビルドでは手動適用は不要です。以下は `PSC-ONE` ディレクトリからの例です。
 
 ```bash
 git submodule update --init --recursive
-make -C software/micropython/ports/psc -j8 embedded
+make -C software/os/micropython/ports/psc -j8 embedded
 make -C software/os -j8 MODE=psc all
 ```
 
@@ -42,7 +42,7 @@ GNU makeのjobserverとコマンドライン変数は引き継ぎます。
 ## 適用済みか確認
 
 ```bash
-git -C software/micropython/micropython apply --reverse --check ../patches/0001-psc-micropython.patch
+git -C software/os/micropython/micropython apply --reverse --check ../patches/0001-psc-micropython.patch
 ```
 
 成功すれば適用済みです。再適用は不要です。
@@ -52,13 +52,13 @@ git -C software/micropython/micropython apply --reverse --check ../patches/0001-
 ビルドせず確認・適用する場合は、次を実行します。
 
 ```bash
-python3 software/micropython/patches/apply.py
+python3 software/os/micropython/patches/apply.py
 ```
 
 ## 自動テスト
 
 ```bash
-python3 software/micropython/patches/test_apply.py
+python3 software/os/micropython/patches/test_apply.py
 ```
 
 隔離した一時ディレクトリで未適用・適用済み・競合、未取得、clean、
