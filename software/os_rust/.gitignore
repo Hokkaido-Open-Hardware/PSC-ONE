@@ -1,0 +1,4 @@
+/target/
+/build/
+/kernel.mem
+/user.mem

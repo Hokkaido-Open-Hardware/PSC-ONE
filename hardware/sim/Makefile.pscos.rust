@@ -1,0 +1,82 @@
+# Rust PSC-OS simulation. Both spellings Makefile.pscos.rust / Makefile.pscpos.rust work.
+#   make -f Makefile.pscos.rust simulate_PSCOS CPU_VERSION=v1
+#   make -f Makefile.pscos.rust smoke CPU_VERSION=v1
+#   make -f Makefile.pscos.rust simulate_SD_PSCOS CPU_VERSION=v1
+# Run files stay under build/pscos-rust; the C simulation's mem/ is not overwritten.
+.DEFAULT_GOAL := simulate_PSCOS
+RUST_SIM_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+PSCOS_CONFIG_ONLY := 1
+SIM_FAST ?= $(if $(filter 1,$(DUMP_FST)),0,1)
+include $(RUST_SIM_DIR)/Makefile.pscos
+ifneq ($(MODE),verilator)
+$(error Rust PSC-OS simulation currently supports MODE=verilator)
+endif
+
+RUST_OS_DIR := $(abspath $(RUST_SIM_DIR)/../../software/os_rust)
+C_OS_DIR := $(abspath $(RUST_SIM_DIR)/../../software/os)
+# Keep SD loader ROMs and Verilator defines separate from direct boot artifacts.
+RUST_BOOT ?= rtl
+ifeq ($(filter $(RUST_BOOT),rtl sd),)
+$(error RUST_BOOT must be rtl or sd)
+endif
+RUST_RUN_DIR ?= $(RUST_SIM_DIR)/build/pscos-rust/$(if $(filter sd,$(RUST_BOOT)),sd_)$(CPU_VERSION)_$(NPU_VERSION)_$(SIM_FAST)
+RUST_BIOS_DIR := $(RUST_RUN_DIR)/bios
+RUST_SIM_BUILD := $(RUST_RUN_DIR)/sim_build
+RUST_RTL_SOURCES := $(abspath $(addprefix $(RUST_SIM_DIR)/,$(INPUT_FILE_PSCONE)))
+RUST_VDEF := -DFST_UART_MODE -DPSCOS_SIM $(if $(filter sd,$(RUST_BOOT)),-DFPGA_BOOT_LOADER_MODE,-DPSCOS_NO_SDCARD)
+
+# The interactive target retains the existing UART UI settings.
+# smoke is bounded and succeeds only after the testbench observes PSC_OS>.
+.PHONY: simulate_PSCOS simulate_PSCOS_RUST smoke prepare_rust
+simulate_PSCOS simulate_PSCOS_RUST: prepare_rust
+	$(MAKE) -f $(RUST_SIM_DIR)/Makefile.pscos.rust run_rust
+
+# Recursive selection propagates SD mode through preparation and simulation.
+.PHONY: simulate_SD_PSCOS smoke_sd
+simulate_SD_PSCOS:
+	$(MAKE) -f $(RUST_SIM_DIR)/Makefile.pscos.rust RUST_BOOT=sd simulate_PSCOS
+
+smoke_sd:
+	$(MAKE) -f $(RUST_SIM_DIR)/Makefile.pscos.rust RUST_BOOT=sd smoke
+
+smoke: export PSC_UART_GUI = 0
+smoke: export PSC_UART_INTERACTIVE = 0
+smoke: export PSC_UART_AUTO_PROMPT = 0
+smoke: export PSC_OS_STOP_AFTER_BOOT = 1
+smoke: export RUN_CYCLES = 30000000
+smoke: simulate_PSCOS
+
+prepare_rust:
+	# Explicitly select the user-image source after switching boot modes.
+	$(MAKE) -C $(RUST_OS_DIR) USER_SOURCE=$(RUST_BOOT) all
+ifeq ($(RUST_BOOT),sd)
+	# Build only the established SBI ROM and FAT32 loader, not the C OS.
+	$(MAKE) -C $(C_OS_DIR) Build=$(RUST_BIOS_DIR) fpga_fat32_boot
+	python3 $(RUST_SIM_DIR)/python_tool/prepare_pscos_rust.py --os $(RUST_OS_DIR) --bootrom $(RUST_BIOS_DIR)/bootrom.mem --bootloader $(RUST_BIOS_DIR)/bootloader_fat32.mem --run $(RUST_RUN_DIR)
+	# This builder verifies both FAT32 files and exports the SPI model's hex image.
+	$(MAKE) -C $(RUST_SIM_DIR) -f Makefile.sdcard INPUT_DIR=$(RUST_RUN_DIR)/mem SDCARD_DIR=$(RUST_RUN_DIR)/sdcard all
+else
+	# Reuse only the existing minimal SBI boot ROM; do not rebuild the C kernel/shell.
+	$(MAKE) -C $(C_OS_DIR) Build=$(RUST_BIOS_DIR) BOOT_FLOW=direct MODE=sim $(RUST_BIOS_DIR)/bootrom.mem
+	python3 $(RUST_SIM_DIR)/python_tool/prepare_pscos_rust.py --os $(RUST_OS_DIR) --bootrom $(RUST_BIOS_DIR)/bootrom.mem --run $(RUST_RUN_DIR)
+endif
+	# Preserve the matching symbols if another boot mode is built afterwards.
+	cp $(RUST_OS_DIR)/build/kernel.elf $(RUST_RUN_DIR)/kernel.elf
+
+.PHONY: run_rust
+run_rust:
+	@echo "[Rust PSC-OS] CPU=$(CPU_VERSION) NPU=$(NPU_VERSION) run=$(RUST_RUN_DIR)"
+	cd $(RUST_RUN_DIR) && \
+	PYTHONPATH=$(RUST_SIM_DIR):$(PYTHONPATH) \
+	MODULE=cocotb_tb.psc_os.PSCONE_os_test \
+	PSC_OS_KERNEL_ELF=$(RUST_RUN_DIR)/kernel.elf \
+	PSC_OS_BOOT_MARKER='PSC_OS>' \
+	COCOTB_RESULTS_FILE=$(RUST_SIM_BUILD)/results.xml \
+	PSC_UART_LOGFILE=$(RUST_RUN_DIR)/log_uart/uart.log \
+	EXPECTED_RESULT=0xff00ff1b \
+	TOPLEVEL=$(PSCONE_TOP) TOPLEVEL_LANG=verilog \
+	SIM=verilator SIM_BUILD=$(RUST_SIM_BUILD) \
+	VERILOG_SOURCES="$(RUST_RTL_SOURCES)" \
+	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS) $(RUST_VDEF)" \
+	EXTRA_ARGS="$(EXTRA_ARGS)" \
+	$(MAKE) --silent -f $(COCOTB_MAKEFILE)

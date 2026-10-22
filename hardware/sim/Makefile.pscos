@@ -342,6 +342,9 @@ PSCOS_DIRECT_BUILD = $(PSCOS_BUILD_ROOT)/direct
 PSCOS_SD_BUILD = $(PSCOS_BUILD_ROOT)/sd
 PSCOS_LOADER_BUILD = $(PSCOS_BUILD_ROOT)/loader
 
+# Allow Rust firmware builds to reuse source/tool configuration without C targets.
+ifndef PSCOS_CONFIG_ONLY
+
 simulate_PSCOS: MODE = verilator
 simulate_PSCOS: SIM = verilator
 simulate_PSCOS: VDEF = -DFST_UART_MODE -DPSCOS_SIM -DPSCOS_NO_SDCARD
@@ -498,3 +501,5 @@ simulate_PSCOS_MULTITASK_LOG:
 	EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
 	make --silent -f $(COCOTB_MAKEFILE); \
 	printf '\a'
+
+endif # PSCOS_CONFIG_ONLY

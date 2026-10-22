@@ -1,0 +1,32 @@
+[package]
+name = "psc-os"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+overflow-checks = false
+
+[features]
+firmware = []
+user = []
+sd-user = []
+
+[[bin]]
+name = "user"
+path = "src/bin/user.rs"
+required-features = ["firmware", "user"]
+
+[[bin]]
+name = "kernel"
+path = "src/bin/kernel.rs"
+required-features = ["firmware"]

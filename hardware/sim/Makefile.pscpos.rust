@@ -1,0 +1,2 @@
+# Compatibility spelling requested alongside Makefile.pscos.rust.
+include $(dir $(abspath $(lastword $(MAKEFILE_LIST))))Makefile.pscos.rust
