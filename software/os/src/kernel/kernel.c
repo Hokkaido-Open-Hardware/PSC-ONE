@@ -15,7 +15,7 @@
 #define MULTITASK_MODE 0 
 
 #define NPU_TESTMODE 1
-#define PSC_LOGOMODE 1
+//#define PSC_LOGOMODE 1
 
 extern uint8_t _binary_shell_bin_start[];
 extern uint8_t _binary_shell_bin_end[];
@@ -284,6 +284,10 @@ __attribute__((used)) void kernel_main(uint32_t warm) {
 #if PSC_LOGOMODE
     s_printf("Draw PSC Logo\n");
     lcd_draw_boot_logo();
+#else
+    // tft_init
+    s_printf("tft init\n");
+    tft_init_seq(AFTER_WAIT);
 #endif
     s_printf("PSC_OS Boot Start.........\n");
     s_printf("--- memset done ---\n");

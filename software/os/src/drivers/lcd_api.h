@@ -8,6 +8,8 @@
 #define LCD_PIXS_DATA     0x10003000u
 #define LCD_PIXS_ST       0x10003004u
 
+#define AFTER_WAIT  50000
+
 typedef int bool;
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
@@ -27,6 +29,8 @@ void lcd_draw_text(void);
 // ============================================================
 // LCD TEXT API
 // ============================================================
+
+void tft_init_seq(uint32_t after_wait);
 
 void lcd_clear(void);
 

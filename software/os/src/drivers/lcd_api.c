@@ -8,8 +8,6 @@
 
 #define IPS_MODE 1
 
-#define AFTER_WAIT  50000
-
 static inline void tiny_delay(unsigned n){
     while (n--) {
         __asm__ __volatile__("nop");

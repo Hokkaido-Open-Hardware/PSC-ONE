@@ -2,6 +2,8 @@
 use super::types::*;
 use crate::common::*;
 use core::arch::asm;
+// Match kernel.c: initialize the LCD without drawing the boot logo by default.
+const PSC_LOGOMODE: bool = false;
 extern "C" {
     pub static __free_ram: u8;
     pub static __free_ram_end: u8;
@@ -123,6 +125,43 @@ pub unsafe extern "C" fn kernel_main(warm: u32) -> ! {
     }
     crate::s_print!("PSC-ONE / PSC-OS Rust\n");
     asm!("csrw stvec, {}",in(reg) super::kernel_trap::kernel_entry as *const () as u32);
+    if PSC_LOGOMODE {
+        crate::s_print!("Draw PSC Logo\n");
+        crate::drivers::lcd_api::lcd_draw_boot_logo();
+    } else {
+        crate::s_print!("tft init\n");
+        crate::drivers::lcd_api::tft_init_seq(crate::drivers::lcd_api::AFTER_WAIT);
+    }
+    crate::s_print!(
+        concat!(
+            "PSC_OS Boot Start.........\n",
+            "--- memset done ---\n",
+            "Test Ver: test_1.8.0\n",
+            "\n",
+            "  PSC-ONE / PSC-OS\n",
+            "  RISC-V Operating System\n",
+            "  --------------------------------------------------\n",
+            "  Build     PSC-OS Rust {}\n",
+            "  CPU       PSC_RV32 / Sv32 MMU\n",
+            "  Console   SBI or MMIO UART\n",
+            "\n",
+            "  SYSTEM    hello, primes, dump\n",
+            "  COMPUTE   sa_start, speech\n",
+            "  ROBOT     robot_control\n",
+            "  STORAGE   sd_read, sd_write\n",
+            "  AUDIO     mic_read, mic_write\n",
+            "  FILES     fat32_info, fat32_ls, fat32_cat,\n",
+            "            fat32_touch\n",
+            "  RUNTIME   microPython, run (.ELF)\n",
+            "\n",
+            "  MicroPython reset: Ctrl+D\n",
+            "  Return to shell  : import psc; psc.exit()\n",
+            "  QEMU exit        : Ctrl+A, C -> q\n",
+            "  --------------------------------------------------\n",
+            "\n",
+        ),
+        env!("CARGO_PKG_VERSION")
+    );
     // The idle page table provides the supervisor-only template for foreground ELFs.
     let idle = super::kernel_process::create_process(&[]);
     (*idle).pid = 0;

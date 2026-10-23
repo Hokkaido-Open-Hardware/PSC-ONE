@@ -4,11 +4,6 @@
 // ===============================================================
 `timescale 1ns/1ps
 
-// default cache word = 1024
-`define ICache_256WORD
-//`define DCache_256WORD
-`define DCache_64WORD
-
 // SystolicArray_OFF mode
 //`define SystolicArray_OFF
 
@@ -54,7 +49,9 @@ module PSC_ONE_RV32_core #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_STATUS         = 32'h1000_9004,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT         = 32'h1000_9008,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL        = 32'h1000_900C,
-    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 32'h1000_9010
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 32'h1000_9010,
+    parameter ICACHE_TAGLSB                             = 12,
+    parameter DCACHE_TAGLSB                             = 10
 )(
     // CLK, RESET
     input  wire                         clock,
@@ -392,11 +389,7 @@ module PSC_ONE_RV32_core #(
         .CACHE_DATA_WIDTH    (256),
         .MAIN_MEM_DATA_WIDTH (256),
         .TAGMSB              (31),
-        `ifdef ICache_256WORD
-        .TAGLSB              (12)
-        `else
-        .TAGLSB              (14)
-        `endif
+        .TAGLSB              (ICACHE_TAGLSB)
     ) u_program_dma_ctrl (
         .clock              (clock),
         .reset_n            (reset_n),
@@ -450,13 +443,7 @@ module PSC_ONE_RV32_core #(
         .CACHE_DATA_WIDTH    (256),
         .MAIN_MEM_DATA_WIDTH (256),
         .TAGMSB              (31),
-        `ifdef DCache_256WORD
-        .TAGLSB              (12),
-        `elsif DCache_64WORD
-        .TAGLSB              (10),
-        `else
-        .TAGLSB              (14),
-        `endif
+        .TAGLSB              (DCACHE_TAGLSB),
         // MMIO MASK BITS
         .MMMIO_BASK_BITS     (MMMIO_BASK_BITS),
         // MMIO ADDR

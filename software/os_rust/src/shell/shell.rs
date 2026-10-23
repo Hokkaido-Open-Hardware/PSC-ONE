@@ -341,7 +341,11 @@ fn dispatch(args: &[&str]) -> Result<(), i32> {
             crate::api::tflite::tflite_demo::bench(args[1], args.len() == 3)?
         }
         // Finish the timer before propagating decode errors back to the prompt.
-        "jpeg" if args.len() == 2 => {
+        "jpeg" => {
+            if args.len() != 2 {
+                out!("usage: jpeg FILE.JPG\n");
+                return Ok(());
+            }
             // The timer is shared; never end a measurement that this command did not acquire.
             let timing = call_timer_measure_begin() == 0;
             let result = crate::api::jpeg::jpeg_view::view(args[1]);

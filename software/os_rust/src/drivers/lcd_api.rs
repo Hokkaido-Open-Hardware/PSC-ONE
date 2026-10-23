@@ -1,5 +1,7 @@
 //! drivers/lcd_api.c/.h. ILI9488 RGB666, inverted IPS colours.
 use crate::common::{delay, mmio_r32, mmio_w32};
+/// Shared post-initialization delay, matching lcd_api.h.
+pub const AFTER_WAIT: u32 = 50000;
 const DATA: u32 = 0x10003000;
 const STATUS: u32 = 0x10003004;
 static mut X: u32 = 0;
@@ -95,7 +97,7 @@ unsafe fn rgb(r: u8, g: u8, b: u8) {
 
 /// Decode RGB111 runs while streaming pixels; no framebuffer is allocated.
 pub unsafe fn lcd_draw_boot_logo() {
-    tft_init_seq(50000);
+    tft_init_seq(AFTER_WAIT);
     scroll_init();
     tft_wire_pix_setting(0, 0);
     for (n, c) in crate::boot::boot_logo::runs() {
@@ -245,7 +247,7 @@ pub unsafe fn lcd_clear() {
 
 /// Initialize the portrait console and render the original startup banner.
 pub unsafe fn lcd_draw_text() {
-    tft_init_seq(50000);
+    tft_init_seq(AFTER_WAIT);
     tft_write(0x36, 100);
     tft_write(0x188, 100);
     scroll_init();
