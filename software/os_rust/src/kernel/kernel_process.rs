@@ -12,6 +12,40 @@ static mut PREEMPTION_ACTIVE: bool = false;
 #[repr(align(16))]
 pub struct InterruptStack(pub [u8; 4096]);
 pub static mut MACHINE_STACK: InterruptStack = InterruptStack([0; 4096]);
+// Only the shell receives these user pages. Foreground ELF roots inherit idle
+// supervisor mappings, so extending syscall span checks grants no new ELF access.
+#[repr(align(4096))]
+struct Leaf([u32; 1024]);
+static mut MODEL_LEAF: Leaf = Leaf([0; 1024]);
+static mut ARENA_LEAF: Leaf = Leaf([0; 1024]);
+unsafe fn map_inference(root: *mut u32) {
+    extern "C" {
+        static __model_low: u8;
+        static __model_low_end: u8;
+        static __model_high: u8;
+        static __arena_start: u8;
+    }
+    let low = addr_of!(__model_low) as u32;
+    let low_size = addr_of!(__model_low_end) as u32 - low;
+    let model = addr_of_mut!(MODEL_LEAF.0).cast::<u32>();
+    let arena = addr_of_mut!(ARENA_LEAF.0).cast::<u32>();
+    let flags = PAGE_V | PAGE_U | PAGE_R | PAGE_W | (1 << 6) | (1 << 7);
+    for offset in (0..USER_MODEL_SIZE).step_by(4096) {
+        let pa = if offset < low_size {
+            low + offset
+        } else {
+            addr_of!(__model_high) as u32 + offset - low_size
+        };
+        *model.add((offset / 4096) as usize) = ((pa / 4096) << 10) | flags;
+    }
+    for offset in (0..USER_ARENA_SIZE).step_by(4096) {
+        let pa = addr_of!(__arena_start) as u32 + offset;
+        *arena.add((offset / 4096) as usize) = ((pa / 4096) << 10) | flags;
+    }
+    *root.add((USER_MODEL_BASE >> 22) as usize) = ((model as u32 / 4096) << 10) | PAGE_V;
+    *root.add((USER_ARENA_BASE >> 22) as usize) = ((arena as u32 / 4096) << 10) | PAGE_V;
+}
+
 /// Find a previously unused process slot; exhausted slots are a kernel invariant failure.
 unsafe fn slot() -> (*mut Process, usize) {
     let base = addr_of_mut!(PROCS).cast::<Process>();
@@ -81,6 +115,7 @@ pub unsafe fn create_process(image: &[u8]) -> *mut Process {
             let page = alloc_pages(1);
             map_page(root, va, page, PAGE_U | PAGE_R | PAGE_W);
         }
+        map_inference(root);
         sync_user_code();
     }
     (*p).pid = (i + 1) as i32;

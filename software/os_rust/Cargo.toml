@@ -20,6 +20,7 @@ overflow-checks = false
 firmware = []
 user = []
 sd-user = []
+pulp = []
 
 [[bin]]
 name = "user"

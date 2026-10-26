@@ -311,12 +311,8 @@ fn dispatch(args: &[&str]) -> Result<(), i32> {
         },
         // Resident model replacement invalidates pointers obtained from a previous load.
         "tflite_info" if args.len() == 2 => {
-            tflite_file::load(args[1])?;
-            unsafe {
-                tflite_file::with_runtime(|rt| {
-                    out!("TFLite {:?}\n", rt.model.info);
-                    Ok(())
-                })?;
+            if let Err(e) = tflite_file::info(args[1]) {
+                out!("TFLite error {e}: {}\n", tflite_file::error_string(e));
             }
         }
         "tflite_diag" if args.len() == 2 && matches!(args[1], "on" | "off") => {
@@ -334,12 +330,20 @@ fn dispatch(args: &[&str]) -> Result<(), i32> {
                     return Ok(());
                 }
             };
-            crate::api::tflite::tflite_demo::run(args[1], backend)?;
+            if let Err(e) = crate::api::tflite::tflite_demo::run(args[1], backend) {
+                out!("TFLite run error {e}: {}\n", tflite_file::error_string(e));
+            }
         }
         // The benchmark compares identical input across CPU/NPU/PULP/AUTO paths.
         "tflite_bench" if args.len() == 2 || (args.len() == 3 && args[2] == "quick") => {
-            crate::api::tflite::tflite_demo::bench(args[1], args.len() == 3)?
+            if let Err(e) = crate::api::tflite::tflite_demo::bench(args[1], args.len() == 3) {
+                out!("TFLite bench error {e}: {}\n", tflite_file::error_string(e));
+            }
         }
+        "tflite_info" => out!("usage: tflite_info MODEL.TFL\n"),
+        "tflite_run" => out!("usage: tflite_run MODEL.TFL [cpu|npu|pulp|auto]\n"),
+        "tflite_bench" => out!("usage: tflite_bench MODEL.TFL [quick]\n"),
+        "tflite_diag" => out!("usage: tflite_diag [on|off]\n"),
         // Finish the timer before propagating decode errors back to the prompt.
         "jpeg" => {
             if args.len() != 2 {

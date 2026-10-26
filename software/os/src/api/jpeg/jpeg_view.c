@@ -30,10 +30,25 @@ static int decoder_error(JRESULT result)
     if (result == JDR_MEM1) return JPEG_ERR_WORK;
     return JPEG_ERR_FORMAT;
 }
-int jpeg_view(const char *filename)
+int jpeg_probe(const char *filename, uint32_t *width, uint32_t *height)
+{
+    if (width) *width = 0;
+    if (height) *height = 0;
+    if (busy || !filename || !width || !height) return FAT32_ERR_STATE;
+    busy = 1;
+    int rc = fat32_open(&session.file, filename);
+    if (!rc) rc = jpeg_check_headers(&session);
+    if (!rc) { *width = session.width; *height = session.height; }
+    fat32_close(&session.file);
+    busy = 0;
+    return rc;
+}
+int jpeg_decode_rgb(const char *filename, const jpeg_rgb_sink_t *sink)
 {
     if (busy) return FAT32_ERR_STATE;
+    if (!filename || !sink || !sink->begin || !sink->rect) return FAT32_ERR_STATE;
     busy = 1;
+    session.sink = *sink;
     session.error = 0; session.entropy_ff = session.eoi = 0;
     int rc = fat32_open(&session.file, filename);
     if (rc) goto done;
@@ -49,12 +64,31 @@ int jpeg_view(const char *filename)
     if (session.decoder.width != session.width || session.decoder.height != session.height) {
         rc = JPEG_ERR_FORMAT; goto done;
     }
-    printf("JPEG %dx%d\n", (int)session.width, (int)session.height);
-    if (call_lcd_rgb888_begin()) { rc = JPEG_ERR_LCD; goto done; }
+    rc = session.sink.begin(session.sink.user, session.width, session.height);
+    if (rc) { if (rc > 0) rc = JPEG_ERR_FORMAT; goto done; }
     rc = decoder_error(jd_decomp(&session.decoder, jpeg_output, 0));
     if (!rc) rc = jpeg_finish_input(&session);
 done:
     fat32_close(&session.file);
+    session.sink = (jpeg_rgb_sink_t){0};
     busy = 0;
     return rc;
+}
+
+static int lcd_begin(void *user, uint32_t width, uint32_t height)
+{
+    (void)user;
+    printf("JPEG %dx%d\n", (int)width, (int)height);
+    return call_lcd_rgb888_begin() ? JPEG_ERR_LCD : 0;
+}
+static int lcd_rect(void *user, uint32_t x, uint32_t y, uint32_t width,
+                    uint32_t height, const uint8_t *rgb)
+{
+    (void)user;
+    return call_lcd_rgb888_rect(x, y, width, height, rgb) ? JPEG_ERR_LCD : 0;
+}
+int jpeg_view(const char *filename)
+{
+    const jpeg_rgb_sink_t sink = {lcd_begin, lcd_rect, 0};
+    return jpeg_decode_rgb(filename, &sink);
 }

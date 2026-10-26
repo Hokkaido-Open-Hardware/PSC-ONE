@@ -1,9 +1,16 @@
 #include "tflite_api.h"
+#include "tflite_graph.h"
 #include "tflite_demo.h"
 #include "../../fs/fat32.h"
 #include <string.h>
 
+#ifdef __riscv
+#include "../../kernel/user_memory.h"
+_Static_assert(PSC_TFLITE_MODEL_CAPACITY == USER_MODEL_SIZE, "model mapping capacity");
+#define model_buffer ((uint8_t *)(uintptr_t)USER_MODEL_BASE)
+#else
 static _Alignas(16) uint8_t model_buffer[PSC_TFLITE_MODEL_CAPACITY];
+#endif
 static int busy;
 static int debug_load;
 static int run_diagnostics = 1;
@@ -16,14 +23,27 @@ static int read_model(const char *name, uint32_t *size) {
     fat32_file_t file = {0};
     if (debug_load) printf("FAT32 sector_buffer=%x model_buffer=%x capacity=%d\n",
         (unsigned)(uintptr_t)file.sector_buf, (unsigned)(uintptr_t)model_buffer,
-        (int)sizeof(model_buffer));
+        (int)PSC_TFLITE_MODEL_CAPACITY);
     int rc = fat32_open(&file, name);
     *size = 0;
     if (!rc) {
-        if (file.file_size < 8 || file.file_size > sizeof(model_buffer)) rc = PSC_TFLITE_ERR_SIZE;
+        if (file.file_size < 8 || file.file_size > PSC_TFLITE_MODEL_CAPACITY) rc = PSC_TFLITE_ERR_SIZE;
         else {
-            rc = fat32_stream_read(&file, model_buffer, file.file_size, size);
-            if (!rc && *size != file.file_size) rc = PSC_TFLITE_ERR_TRUNCATED;
+            const uint32_t expected = file.file_size;
+            while (!rc && *size < expected) {
+                uint32_t n = expected - *size, actual = 0;
+                if (n > 4096u) n = 4096u;
+                if (*size > PSC_TFLITE_MODEL_CAPACITY ||
+                    n > PSC_TFLITE_MODEL_CAPACITY - *size) {
+                    rc = PSC_TFLITE_ERR_SIZE; break;
+                }
+                rc = fat32_stream_read(&file, model_buffer + *size, n, &actual);
+                if (actual > n) { rc = PSC_TFLITE_ERR_TRUNCATED; break; }
+                *size += actual;
+                if (!rc && actual != n) rc = PSC_TFLITE_ERR_TRUNCATED;
+                if (debug_load && !rc && ((*size % (512u*1024u)) == 0 || *size == expected))
+                    printf("Model read: %d / %d bytes\n",(int)*size,(int)expected);
+            }
         }
     }
     fat32_close(&file);
@@ -58,6 +78,12 @@ int psc_tflite_load(const char *name) {
         timing = call_timer_measure_begin();
         rc = psc_tflite_prepare(model_buffer, size);
         prepare_us = timing == 0 ? call_timer_measure_end_us() : -1;
+        printf("Model: %d / %d bytes; Arena required: %d / %d bytes%s\n",
+               (int)size, (int)PSC_TFLITE_MODEL_CAPACITY,
+               (int)psc_tflite_arena_required(), (int)psc_tflite_arena_capacity(),
+               psc_tflite_arena_required() ? "" : " (unknown for unsupported/invalid graph)");
+        if (rc == PSC_TFLITE_ERR_UNSUPPORTED)
+            psc_tflite_inspect(model_buffer, size, shell_log, 0, 0);
     }
     busy = 0;
     return rc;
@@ -70,20 +96,51 @@ static void shell_log(void *user, const char *text) {
 
 void cmd_tflite_info(const char *name) {
     psc_tflite_info_t info;
-    int rc = psc_tflite_inspect_file(name, shell_log, 0, &info);
-    if (rc) printf("TFLite error %d: %s\n", rc, psc_tflite_error_string(rc));
+    if (busy || psc_tflite_reset()) { printf("TFLite API busy\n"); return; }
+    busy=1;
+    uint32_t size;
+    int timing=call_timer_measure_begin();
+    int rc=read_model(name,&size);
+    int us=timing==0?call_timer_measure_end_us():-1;
+    if(!rc) rc=psc_tflite_analyze(model_buffer,size,run_diagnostics?shell_log:0,0,&info);
+    printf("Model buffer range: %x..%x (exclusive); model size: %d bytes\n",
+           (unsigned)(uintptr_t)model_buffer,(unsigned)((uintptr_t)model_buffer+PSC_TFLITE_MODEL_CAPACITY),(int)size);
+    size_t capacity=!rc&&psc_tflite_graph_is_fc(model_buffer)?PSC_TFLITE_ARENA_CAPACITY:PSC_TFLITE_GRAPH_ARENA_CAPACITY;
+    printf("Model load time: %d us; Arena capacity: %d bytes\n",us,(int)capacity);
+    if(!rc) {
+        printf("FlatBuffer validation: OK; tensors=%d operators=%d opcodes=%d\n",
+               (int)info.tensors,(int)info.operators,(int)info.operator_codes);
+        printf("Out-of-line buffers: %d; Largest tensor: %d bytes\n",
+               (int)info.out_of_line_buffers,(int)info.max_tensor_bytes);
+        printf("Tensor arena lifetime lower bound: %d; available: %d bytes%s\n",
+               (int)info.arena_estimate,(int)capacity,
+               info.arena_estimate>capacity?" (insufficient; parameters/scratch also needed)":"");
+        printf("Supported operator kernels: %d; unsupported operators: %d\n",
+               (int)info.supported_operators,(int)info.unsupported_operators);
+        /* Structural information remains available even for non-executable graphs. */
+        int profile=psc_tflite_inspect(model_buffer,size,run_diagnostics?shell_log:0,0,0);
+        if(profile)printf("Execution unavailable %d: %s\n",profile,psc_tflite_error_string(profile));
+        else {
+            profile=psc_tflite_prepare(model_buffer,size);
+            printf("Arena required (with reuse/parameters): %d bytes\n",(int)psc_tflite_arena_required());
+            if(profile)printf("Execution unavailable %d: %s\n",profile,psc_tflite_error_string(profile));
+            psc_tflite_reset();
+        }
+    } else printf("TFLite error %d: %s\n",rc,psc_tflite_error_string(rc));
+    busy=0;
 }
 
 const char *psc_tflite_error_string(int rc) {
     switch (rc) {
     case 0: return "OK";
-    case PSC_TFLITE_ERR_SIZE: return "model or arena capacity exceeded (model 8..8192 bytes)";
+    case PSC_TFLITE_ERR_SIZE: return "model capacity exceeded (model 8..4194304 bytes)";
+    case PSC_TFLITE_ERR_ARENA: return "Tensor Arena insufficient (see required/available capacity)";
     case PSC_TFLITE_ERR_SYNAP: return "SynapEngine syscall failure";
     case PSC_TFLITE_ERR_SYNAP_TIMEOUT: return "SynapEngine timeout";
     case PSC_TFLITE_ERR_SYNAP_ARGUMENT: return "SynapEngine size/buffer error";
     case PSC_TFLITE_ERR_SYNAP_BUSY: return "SynapEngine busy";
     case PSC_TFLITE_ERR_FORMAT: return "invalid/alignment/unsupported FlatBuffer encoding";
-    case PSC_TFLITE_ERR_UNSUPPORTED: return "outside initial INT8 FC profile";
+    case PSC_TFLITE_ERR_UNSUPPORTED: return "unsupported CPU operator or execution condition";
     case PSC_TFLITE_ERR_GRAPH: return "invalid tensor/operator/quantization relationship";
     case PSC_TFLITE_ERR_TRUNCATED: return "short model read";
     case PSC_TFLITE_ERR_BUSY: return "TFLite API busy";
@@ -121,6 +178,96 @@ static void demo_layer(void *user, unsigned layer, int begin) {
         if (layer < 2) r->fc_us[layer] = us;
     }
 }
+static void print_float(float v) {
+    uint32_t bits;memcpy(&bits,&v,4);
+    if((bits&0x7f800000u)==0x7f800000u){printf("float32(0x%x)",bits);return;}
+    if(v==0){printf("0");return;}
+    if(v<0){printf("-");v=-v;}
+    int e=0;while(v>=10){v/=10;e++;}while(v<1){v*=10;e--;}
+    for(int i=0;i<6;i++){int digit=(int)v;if(digit>9)digit=9;printf("%d",digit);if(i==0)printf(".");v=(v-digit)*10;}
+    printf("e%d",e);
+}
+static void print_tensor(const char *label,const psc_tflite_tensor_info_t *t){
+    printf("%s tensor=%d type=%s shape=[",label,t->tensor,t->type==0?"FLOAT32":t->type==9?"INT8":"INT32");
+    for(int i=0;i<t->rank;i++)printf("%s%d",i?",":"",t->dims[i]);
+    printf("] bytes=%d scale=",(int)t->bytes);print_float(t->scale);printf(" zero_point=%d\n",t->zero_point);
+}
+static void graph_progress(void *user,unsigned op,int begin){
+    unsigned count=*(unsigned *)user;
+    if(run_diagnostics&&begin&&(op==0||(op+1)%25==0||op+1==count))printf("TFLite: operator %d/%d\n",op+1,count);
+}
+/* Observe before Arena reuse. Zero-based operator ids match LiteRT diagnostics.
+   No allocation or file access in this callback. Hash all outputs; only print
+   values at the requested checkpoints to keep UART traffic bounded. */
+static int graph_tensor_trace(void *user,unsigned op,int tensor,const void *data,size_t bytes,int type){
+    (void)user;
+    const uint8_t *p=(const uint8_t *)data;uint32_t hash=2166136261u;
+    for(size_t i=0;i<bytes;i++)hash=(hash^p[i])*16777619u;
+    printf("TensorTrace op=%d tensor=%d type=%d bytes=%d fnv1a32=%x\n",op,tensor,type,(int)bytes,hash);
+    if(op==0||op==3||op==4||op==5||op==288){
+        size_t n=bytes/(type==9?1:4);if(n>16)n=16;
+        printf("TensorValues op=%d first16=[",op);
+        for(size_t i=0;i<n;i++){
+            if(i)printf(",");
+            if(type==9)printf("%d",((const int8_t *)p)[i]);
+            else if(type==0){float v;memcpy(&v,p+4*i,4);print_float(v);}
+            else{int32_t v;memcpy(&v,p+4*i,4);printf("%d",v);}
+        }
+        printf("]\n");
+    }
+    return 0;
+}
+static void backend_summary(enum psc_tflite_fc_backend requested,int wall_us) {
+    const psc_tflite_execution_t *e=psc_tflite_get_execution();
+    const psc_tflite_profile_t *p=psc_tflite_get_profile();
+    int total=0,conv[3]={0};
+    for(unsigned b=0;b<3;++b){if(total<0||e->invoke_us[b]<0||e->invoke_us[b]>2147483647-total)total=-1;else total+=e->invoke_us[b];}
+    printf("TFLite backend summary:\n  CPU operators  = %d\n  PULP operators = %d\n  NPU operators  = %d\n  Fallbacks      = %d\n",
+        e->operators[0],e->operators[2],e->operators[1],e->fallbacks);
+    if(e->completed!=psc_tflite_operator_count())printf("Invocation incomplete: counts include completed operators only.\n");
+    else if(requested!=PSC_TFLITE_FC_CPU&&!e->operators[1]&&!e->operators[2])printf("No accelerator used: all operators ran on CPU.\n");
+    printf("Timing (-1 = unavailable):\n  Model load     = %d us\n  Prepare        = %d us\n  CPU invoke     = %d us\n  PULP invoke    = %d us\n  NPU invoke     = %d us\n  Total invoke   = %d us (operator sum; excludes observer/UART)\n  Wall invoke    = %d us\n",
+        load_us,prepare_us,e->invoke_us[0],e->invoke_us[2],e->invoke_us[1],total,wall_us);
+    for(unsigned i=0;i<psc_tflite_operator_count();++i){const psc_tflite_operator_profile_t *r=psc_tflite_get_operator_profile(i);
+        if(!r)continue;
+        if(!r->status&&r->kind==3){int *v=&conv[r->backend];if(*v<0||r->us<0||r->us>2147483647-*v)*v=-1;else *v+=r->us;}
+        if(run_diagnostics)printf("OperatorTiming op=%d code=%d backend=%s us=%d npu_tiles=%d status=%d\n",i,r->kind,psc_tflite_backend_name(r->backend),r->us,r->npu_tiles,r->status);
+    }
+    printf("CONV_2D us: cpu=%d pulp=%d npu=%d\n",conv[0],conv[2],conv[1]);
+    printf("NPU successful tiles=%d profile_valid=%d status=%d\n",p->tiles,p->valid,p->device_status);
+    if(p->tiles&&p->valid)printf("NPU us: packing=%d syscall=%d copy_in=%d execute=%d copy_out=%d partial=%d post=%d\n",
+        p->packing_us,p->syscall_us,p->copy_in_us,p->execute_us,p->copy_out_us,p->partial_us,p->post_us);
+}
+static void run_cpu_graph(enum psc_tflite_fc_backend backend){
+    printf("TFLite: model loaded; FlatBuffer PASS\n");
+    psc_tflite_tensor_info_t in,out;
+    int rc=psc_tflite_set_fc_backend(backend);if(rc){printf("TFLite backend error %d\n",rc);return;}
+    psc_tflite_set_profiling(1);
+    if(run_diagnostics)psc_tflite_debug_selection(shell_log,0);
+    if(psc_tflite_get_io_info(0,&in)||psc_tflite_get_io_info(1,&out)){printf("TFLite IO unavailable\n");return;}
+    print_tensor("Input",&in);print_tensor("Output",&out);
+    size_t n;int8_t *x=psc_tflite_get_input(&n);
+    if(in.type==9){for(size_t i=0;i<n;i++)x[i]=demo_input[i%sizeof(demo_input)];printf("Input: repeated INT8 demo vector (not image detection)\n");}
+    else {memset(x,0,n);printf("Input: zero tensor (not image detection)\n");}
+    unsigned count=psc_tflite_operator_count();
+    printf("TFLite: prepare %d operators PASS; arena required=%d allocated=%d\n",count,(int)psc_tflite_arena_required(),(int)psc_tflite_arena_capacity());
+    if(run_diagnostics)printf("TFLite: invoke start\n");
+    rc=psc_tflite_set_tensor_trace(run_diagnostics?graph_tensor_trace:0,0);
+    if(rc){printf("TFLite trace setup error %d\n",rc);return;}
+    int timing=call_timer_measure_begin();rc=psc_tflite_invoke_traced(0,graph_progress,&count);
+    int us=timing==0?call_timer_measure_end_us():-1;
+    psc_tflite_set_tensor_trace(0,0);
+    backend_summary(backend,us);
+    if(rc){printf("TFLite invoke error %d: %s\n",rc,psc_tflite_error_string(rc));return;}
+    const uint8_t *y=(const uint8_t *)psc_tflite_get_output(&n);
+    if(!y){printf("TFLite output unavailable\n");return;}
+    printf("TFLite: invoke complete; output tensor ready\nOutput: [");
+    size_t elements=n/(out.type==9?1:4),shown=elements<16?elements:16;
+    for(size_t i=0;i<shown;i++){if(i)printf(",");if(out.type==9)printf("%d",((const int8_t *)y)[i]);else if(out.type==0){float v;memcpy(&v,y+4*i,4);print_float(v);}else{int32_t v;memcpy(&v,y+4*i,4);printf("%d",v);}}
+    printf("]%s\n",shown<elements?" (first 16)":"");uint32_t checksum=2166136261u;for(size_t i=0;i<n;i++)checksum=(checksum^y[i])*16777619u;
+    printf("Output FNV1a32: %x; inference time=%d us%s\n",checksum,us,run_diagnostics?" (includes tensor diagnostics/progress UART)":"");
+    printf("Arena: %d / %d bytes\n",(int)psc_tflite_arena_used(),(int)psc_tflite_arena_capacity());
+}
 void cmd_tflite_run_backend(const char *name, enum psc_tflite_fc_backend backend) {
     debug_load = run_diagnostics;
     int rc = psc_tflite_load(name);
@@ -135,8 +282,10 @@ void cmd_tflite_run_backend(const char *name, enum psc_tflite_fc_backend backend
         printf("TFLite run error %d: %s\n", rc, rc ? psc_tflite_error_string(rc) : "input unavailable");
         return;
     }
+    if(!psc_tflite_graph_is_fc(model_buffer)){run_cpu_graph(backend);return;}
     rc = psc_tflite_set_fc_backend(backend);
     if (rc) { printf("TFLite backend error %d\n", rc); return; }
+    psc_tflite_set_profiling(1);
     if (run_diagnostics) psc_tflite_debug_selection(shell_log, 0);
     size_t input_bytes = bytes;
     for (size_t i=0; i<input_bytes; ++i) input[i]=demo_input[i % sizeof(demo_input)];
@@ -154,6 +303,9 @@ void cmd_tflite_run_backend(const char *name, enum psc_tflite_fc_backend backend
     if (!rc) rc = psc_tflite_invoke_traced(0, demo_layer, &result);
     const int8_t *output = psc_tflite_get_output(&bytes);
     if (rc || !output) { printf("TFLite invoke error %d\n", rc); return; }
+    backend_summary(backend,invoke_us);
+    uint32_t checksum=2166136261u;for(size_t i=0;i<bytes;++i)checksum=(checksum^(uint8_t)output[i])*16777619u;
+    printf("Output FNV1a32: %x\n",checksum);
     printf("TFLite inference (%s INT8)\nInput : [", psc_tflite_backend_name(backend));
     for (unsigned i=0; i<input_bytes; ++i) printf("%s%d", i ? "," : "", input[i]);
     printf("]\n");

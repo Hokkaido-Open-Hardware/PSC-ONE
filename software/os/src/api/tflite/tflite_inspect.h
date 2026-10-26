@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define PSC_TFLITE_MODEL_CAPACITY 8192u
+#define PSC_TFLITE_MODEL_CAPACITY (4u * 1024u * 1024u)
 #define PSC_TFLITE_MAX_TENSORS 32u
 #define PSC_TFLITE_MAX_OPERATORS 8u
 
@@ -27,13 +27,15 @@ typedef void (*psc_tflite_log_fn)(void *user, const char *text);
    Compatibility here does not include prepare arena/accumulator range checks. */
 typedef struct {
     uint32_t version, tensors, operators, constant_bytes, tensor_bytes;
+    uint32_t operator_codes, arena_estimate, max_tensor_bytes;
+    uint32_t supported_operators, unsupported_operators, dynamic_tensors, out_of_line_buffers;
 } psc_tflite_info_t;
 
 /* data must be 16-byte aligned and remain immutable for this call. */
 int psc_tflite_inspect(const void *data, size_t size,
                       psc_tflite_log_fn log, void *user,
                       psc_tflite_info_t *info);
-/* Root directory uppercase 8.3 FAT32 filename; shared 8 KiB buffer, no heap. */
+/* Root directory uppercase 8.3 FAT32 filename; shared 4 MiB buffer, no heap. */
 int psc_tflite_inspect_file(const char *name, psc_tflite_log_fn log, void *user,
                            psc_tflite_info_t *info);
 const char *psc_tflite_error_string(int error);

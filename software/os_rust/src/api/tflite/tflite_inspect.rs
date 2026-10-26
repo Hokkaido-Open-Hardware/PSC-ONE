@@ -1,6 +1,6 @@
 //! tflite_inspect.cc: bounds-checked reader for PSC's INT8 FC FlatBuffer profile.
 //! All model accesses are bytewise. No generated C++ schema or heap is required.
-pub const MODEL_CAPACITY: usize = 8192;
+pub const MODEL_CAPACITY: usize = 4 * 1024 * 1024;
 pub const SIZE: i32 = -200;
 pub const FORMAT: i32 = -201;
 pub const UNSUPPORTED: i32 = -202;
@@ -40,25 +40,25 @@ pub struct Model<'a> {
     pub info: Info,
 }
 #[derive(Clone, Copy)]
-struct Reader<'a>(&'a [u8]);
+pub(super) struct Reader<'a>(pub(super) &'a [u8]);
 impl<'a> Reader<'a> {
-    fn bytes(self, p: usize, n: usize) -> Result<&'a [u8], i32> {
+    pub(super) fn bytes(self, p: usize, n: usize) -> Result<&'a [u8], i32> {
         self.0.get(p..p.checked_add(n).ok_or(FORMAT)?).ok_or(FORMAT)
     }
 
-    fn u16(self, p: usize) -> Result<usize, i32> {
+    pub(super) fn u16(self, p: usize) -> Result<usize, i32> {
         Ok(u16::from_le_bytes(self.bytes(p, 2)?.try_into().unwrap()) as usize)
     }
 
-    fn u32(self, p: usize) -> Result<u32, i32> {
+    pub(super) fn u32(self, p: usize) -> Result<u32, i32> {
         Ok(u32::from_le_bytes(self.bytes(p, 4)?.try_into().unwrap()))
     }
 
-    fn i64(self, p: usize) -> Result<i64, i32> {
+    pub(super) fn i64(self, p: usize) -> Result<i64, i32> {
         Ok(i64::from_le_bytes(self.bytes(p, 8)?.try_into().unwrap()))
     }
 
-    fn offset(self, p: usize) -> Result<usize, i32> {
+    pub(super) fn offset(self, p: usize) -> Result<usize, i32> {
         let off = self.u32(p)? as usize;
         if off == 0 {
             return Err(FORMAT);
@@ -69,7 +69,7 @@ impl<'a> Reader<'a> {
     }
 
     /// Vtable displacements are signed: deduplicated vtables may follow a table.
-    fn field(self, table: usize, id: usize, width: usize) -> Result<Option<usize>, i32> {
+    pub(super) fn field(self, table: usize, id: usize, width: usize) -> Result<Option<usize>, i32> {
         let displacement = self.u32(table)? as i32 as i64;
         let v = table as i64 - displacement;
         if v < 0 {
@@ -96,25 +96,25 @@ impl<'a> Reader<'a> {
         Ok(Some(table + off))
     }
 
-    fn scalar(self, t: usize, id: usize, default: u32) -> Result<u32, i32> {
+    pub(super) fn scalar(self, t: usize, id: usize, default: u32) -> Result<u32, i32> {
         match self.field(t, id, 4)? {
             Some(p) => self.u32(p),
             None => Ok(default),
         }
     }
 
-    fn byte(self, t: usize, id: usize) -> Result<u8, i32> {
+    pub(super) fn byte(self, t: usize, id: usize) -> Result<u8, i32> {
         Ok(match self.field(t, id, 1)? {
             Some(p) => self.bytes(p, 1)?[0],
             None => 0,
         })
     }
 
-    fn indirect(self, t: usize, id: usize) -> Result<Option<usize>, i32> {
+    pub(super) fn indirect(self, t: usize, id: usize) -> Result<Option<usize>, i32> {
         self.field(t, id, 4)?.map(|p| self.offset(p)).transpose()
     }
 
-    fn vector(self, t: usize, id: usize, width: usize) -> Result<(usize, usize), i32> {
+    pub(super) fn vector(self, t: usize, id: usize, width: usize) -> Result<(usize, usize), i32> {
         let Some(p) = self.indirect(t, id)? else {
             return Ok((0, 0));
         };
@@ -123,7 +123,7 @@ impl<'a> Reader<'a> {
         Ok((p + 4, n))
     }
 
-    fn index(self, p: usize, n: usize, i: usize) -> Result<usize, i32> {
+    pub(super) fn index(self, p: usize, n: usize, i: usize) -> Result<usize, i32> {
         let id = self.u32(p + i * 4)? as i32;
         if id < 0 || id as usize >= n {
             return Err(GRAPH);
@@ -132,12 +132,12 @@ impl<'a> Reader<'a> {
     }
 }
 
-fn scale_ok(value: f32) -> bool {
+pub(super) fn scale_ok(value: f32) -> bool {
     let bits = value.to_bits();
     bits >> 31 == 0 && bits >> 23 != 0 && bits >> 23 < 255
 }
 
-fn bias_scale_matches(a: f32, b: f32, c: f32) -> bool {
+pub(super) fn bias_scale_matches(a: f32, b: f32, c: f32) -> bool {
     let (a, b, c) = (a.to_bits(), b.to_bits(), c.to_bits());
     let product = ((a & 0x7fffff) | 0x800000) as u64 * ((b & 0x7fffff) | 0x800000) as u64;
     let mut exponent = (a >> 23) as i32 + (b >> 23) as i32 - 127;
@@ -167,6 +167,7 @@ pub fn inspect(bytes: &[u8]) -> Result<Model<'_>, i32> {
     if &bytes[4..8] != b"TFL3" {
         return Err(FORMAT);
     }
+    super::tflite_verify::verify(bytes)?;
     let r = Reader(bytes);
     let root = r.offset(0)?;
     if r.scalar(root, 4, 0)? != 3 {
@@ -258,7 +259,7 @@ pub fn inspect(bytes: &[u8]) -> Result<Model<'_>, i32> {
                 return Err(UNSUPPORTED);
             }
             let v = v as usize;
-            if v > 8192 / elements {
+            if v > MODEL_CAPACITY / elements {
                 return Err(UNSUPPORTED);
             }
             elements *= v;

@@ -1,5 +1,16 @@
 /* Resident FPGA kernel: identity mappings must stay below the user VA region. */
 ENTRY(boot)
+/* Same split physical backing as os/src/kernel/kernel_fpga.ld. */
+__arena_start = 0x00040000;
+__arena_end = 0x00100000;
+__model_low = 0x00140000;
+__model_low_end = 0x00200000;
+__model_high = 0x004c0000;
+__model_high_end = 0x00800000;
+ASSERT(__shell_image_size <= 0x000c0000, "USER.MEM overlaps model backing")
+ASSERT(__model_low_end - __model_low + __model_high_end - __model_high == 0x00400000,
+       "model backing size mismatch")
+ASSERT(__arena_end - __arena_start == 768 * 1024, "arena backing size mismatch")
 SECTIONS {
     . = 0x00200000;
     __kernel_base = .;

@@ -1,5 +1,8 @@
 # PSC-ONE TFLite Phase 3 — CPU INT8 FullyConnected
 
+> 以下はPhase 3当時の記録。2026-10-25にモデル容量を4MiBへ拡張した。
+> 現在の配置・容量不足エラーはREADME.mdとreport/の大容量モデル対応レポートを参照。
+
 ## 実装と対象範囲
 
 CPUだけで `INT8 [1,16] → FC 16→16 + ReLU → FC 16→4 → INT8 [1,4]`

@@ -4,6 +4,7 @@
 #include "../kernel/elf_loader.h"
 #include "../api/jpeg/jpeg_view.h"
 #include "../api/tflite/tflite_api.h"
+#include "../api/yolo/yolo.h"
 #include "../api/robot/robot_control.h"
 #include "../elego_robot/imu.h"
 #include "../elego_robot/pwm_test.h"
@@ -430,6 +431,17 @@ prompt:
                 printf("fat32_touch failed\n");
             } 
 
+        } else if (strcmp(argv[0], "yolo_backend") == 0) {
+            if (argc <= 2) cmd_yolo_backend(argc == 2 ? argv[1] : 0);
+            else printf("usage: yolo_backend cpu|pulp|npu|auto\n");
+        } else if (strcmp(argv[0], "yolo_diag") == 0) {
+            if (argc == 2 && strcmp(argv[1], "on") == 0) cmd_yolo_diagnostics(1);
+            else if (argc == 2 && strcmp(argv[1], "off") == 0) cmd_yolo_diagnostics(0);
+            else printf("usage: yolo_diag on|off\n");
+        } else if (strcmp(argv[0], "yolo") == 0) {
+            if (argc == 3) cmd_yolo(argv[1], argv[2]);
+            else printf("usage: yolo MODEL.TFL IMAGE.JPG\n");
+
         // ---- tf run ----
         } else if (strcmp(argv[0], "tflite_diag") == 0) {
             if(argc==2 && strcmp(argv[1],"on")==0) cmd_tflite_diagnostics(1);
@@ -504,10 +516,13 @@ prompt:
             printf("  i2c_capture imu_monitor (snapshots, reset per sample; q exits)\n");
             printf("  microPython | micropython\n");
             printf("  jpeg TEST.JPG\n");
+            printf("  yolo YOLO.TFL TEST.JPG (detection to UART + LCD)\n");
+            printf("  yolo_backend cpu|pulp|npu|auto (default cpu)\n");
+            printf("  yolo_diag on|off (tensor hashes; default off)\n");
             printf("  run FILE.ELF\n");
             printf("  tflite_info MODEL.TFL (inspect only)\n");
             printf("  tflite_run MODEL.TFL [cpu|npu|pulp|auto]\n");
-            printf("  tflite_diag [on|off] (outside inference; default on)\n");
+            printf("  tflite_diag [on|off] (includes operator trace during inference; default on)\n");
             printf("  tflite_bench MODEL.TFL [quick] (CPU/NPU/PULP/auto comparison)\n");
             printf("  hello\n");
             printf("  dump [addr] [len]\n");

@@ -34,7 +34,7 @@ The mathematical B[K,N] is W transposed. `[1,16]` FC input means **M=1**, wherea
 Batch FC support extends the existing scalar FC and reuses its row sums,
 zero-point correction, bias, upstream double-rounding requantization, and
 INT8/RELU clamp. No new quantization implementation is introduced. Model/arena
-limits remain 8192/4096 bytes. NPU scratch is fixed size: 40 KiB total in the adapter/runtime for two INT8
+limits are now 4194304/4096 bytes (the 2026-10-25 model-buffer expansion does not change AUTO selection). NPU scratch is fixed size: 40 KiB total in the adapter/runtime for two INT8
 64x64 tiles and two INT32 64x64 tiles. These buffers are static, protected by
 the existing invoke guard, and do not enlarge the invoke stack by 16 KiB.
 Kernel transfer buffers are separate. There is no inference-time heap use.

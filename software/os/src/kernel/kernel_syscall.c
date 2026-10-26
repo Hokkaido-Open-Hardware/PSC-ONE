@@ -22,8 +22,13 @@
    Current OS uses level-0 4KiB user mappings only. */
 int user_accessible(uint32_t address, uint32_t bytes, uint32_t access)
 {
-    if (!current_proc || !bytes || address < USER_BASE ||
-        address >= USER_STACK_TOP || bytes > USER_STACK_TOP - address) return 0;
+    int shell_range = address >= USER_BASE && address < USER_STACK_TOP &&
+                      bytes <= USER_STACK_TOP - address;
+    int model_range = address >= USER_MODEL_BASE && address < USER_MODEL_BASE + USER_MODEL_SIZE &&
+                      bytes <= USER_MODEL_BASE + USER_MODEL_SIZE - address;
+    int arena_range = address >= USER_ARENA_BASE && address < USER_ARENA_BASE + USER_ARENA_SIZE &&
+                      bytes <= USER_ARENA_BASE + USER_ARENA_SIZE - address;
+    if (!current_proc || !bytes || (!shell_range && !model_range && !arena_range)) return 0;
     uint32_t end = address + bytes - 1;
     for (uint32_t va = address & ~(PAGE_SIZE - 1); ; va += PAGE_SIZE) {
         uint32_t pte = current_proc->page_table[va >> 22];

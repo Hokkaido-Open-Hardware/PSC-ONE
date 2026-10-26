@@ -27,4 +27,5 @@ SECTIONS
 
     . = ALIGN(4);
     . += 4000 * 4;
+    ASSERT(. <= 0x00140000, "bootloader/stack overlaps reserved model backing")
 }

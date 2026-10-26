@@ -13,6 +13,32 @@
 #define KERNEL_PROCESS_USE_DMA 1
 #endif
 
+/* Only the shell receives this mapping; idle/foreground ELF tables do not.
+   Static leaf avoids allocation failure/panic when loading a large model. */
+_Static_assert(PSC_SA_ADDR_C + SA_MAT_MAX * SA_MAT_MAX * 4 <= 0x00040000u, "NPU result overlaps Arena");
+_Static_assert(USER_ARENA_SIZE == 768 * 1024, "Arena mapping size");
+static uint32_t arena_leaf[1024] __attribute__((aligned(PAGE_SIZE)));
+static uint32_t model_leaf[1024] __attribute__((aligned(PAGE_SIZE)));
+_Static_assert(USER_MODEL_SIZE == 1024 * PAGE_SIZE, "model leaf size");
+_Static_assert((USER_MODEL_BASE & (USER_MODEL_SIZE - 1)) == 0, "model VA alignment");
+static void map_model(uint32_t *root)
+{
+    extern char __model_low[], __model_low_end[], __model_high[];
+    uint32_t low_size = (uint32_t)__model_low_end - (uint32_t)__model_low;
+    for (uint32_t off = 0; off < USER_MODEL_SIZE; off += PAGE_SIZE) {
+        uint32_t pa = off < low_size ? (uint32_t)__model_low + off
+                                    : (uint32_t)__model_high + off - low_size;
+        model_leaf[off / PAGE_SIZE] = ((pa / PAGE_SIZE) << 10)
+            | PAGE_V | PAGE_U | PAGE_R | PAGE_W | (1u << 6) | (1u << 7);
+    }
+    root[USER_MODEL_BASE >> 22] = (((uint32_t)model_leaf / PAGE_SIZE) << 10) | PAGE_V;
+    extern char __arena_start[], __arena_end[];
+    for (uint32_t off=0; off<USER_ARENA_SIZE; off+=PAGE_SIZE)
+        arena_leaf[off/PAGE_SIZE]=((((uint32_t)__arena_start+off)/PAGE_SIZE)<<10)
+            | PAGE_V | PAGE_U | PAGE_R | PAGE_W | (1u<<6) | (1u<<7);
+    root[USER_ARENA_BASE >> 22]=(((uint32_t)arena_leaf/PAGE_SIZE)<<10)|PAGE_V;
+}
+
 struct process procs[PROCS_MAX];
 struct process *current_proc;
 struct process *idle_proc;
@@ -187,6 +213,7 @@ static struct process *create_process_image(const void *image,
             paddr_t page = alloc_pages(1);
             map_page(page_table, va, page, PAGE_U | PAGE_R | PAGE_W);
         }
+        map_model(page_table);
         sync_user_code();
     }
 

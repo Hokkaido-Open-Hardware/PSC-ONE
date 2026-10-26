@@ -20,7 +20,13 @@
       "tensorflow/lite/kernels/internal/types.h",
       "tensorflow/lite/kernels/op_macros.h",
       "tensorflow/lite/micro/micro_log.h",
-      "tensorflow/lite/types/half.h"
+      "tensorflow/lite/types/half.h",
+      "tensorflow/lite/kernels/internal/reference/integer_ops/pooling.h",
+      "tensorflow/lite/kernels/internal/reference/integer_ops/logistic.h",
+      "tensorflow/lite/kernels/internal/reference/integer_ops/mul.h",
+      "tensorflow/lite/kernels/internal/reference/broadcast_loop.h",
+      "tensorflow/lite/kernels/internal/reference/integer_ops/add.h",
+      "tensorflow/lite/kernels/internal/reference/integer_ops/conv.h"
     ],
     "archive_sha256": "67dce92a87864eb52639838e4436b4d424447412e08b265d5d60e27a58160844",
     "archive_url": "https://codeload.github.com/tensorflow/tflite-micro/tar.gz/d0318206cf438df7d60708b49559777225ebacda"
@@ -95,12 +101,20 @@
     "tensorflow/lite/kernels/internal/reference/integer_ops/fully_connected.h": "88beede059cee0eba102c5a108c0750b33fe823af25393053e618dd29781abd6",
     "psc/host_test.cc": "c2852a734bf86b6ec413a12fd69a1a1a5aabc248d51f238e27b355da8668966e",
     "psc/pulp_fc.h": "28dccf9749c3e38079ce3a38d312c361fff83d7cab43f009d152c939e4a13bdb",
-    "psc/run_host.py": "ae8f9fd59413df9ab0b4fa36ef4e33c6b63231f2b889e487ec5f3a29bd882e31",
+    "psc/run_host.py": "98adc85d831d7392ed9201d4da3f8015a2d72691b14d86d83357f40d42f26773",
     "psc/runtime-integration.patch": "6b655046ce30e98021b7d6ce587eb8a2d9e649ba09e1fd04c013b859a8c37689",
-    "psc/run_target.py": "c4f0b5b45213287be001ad85802ab7b385e0791a838d4d49c79f597a7a9ce97e",
+    "psc/run_target.py": "3e488ebebbe6fce729e17b9bbce734765958ba73b0d997c31d9310e0a22f9dd4",
     "psc/target_cocotb.py": "984f9f78b8ffb33046571f63fc5b577485b696898d3f2502ff4b10cf18259234",
-    "psc/target_test.cc": "5617a1c363fb53a328e7fd0904a0be54809aa9b3befecd2d3230dcd6dd7d8f92",
-    "psc/validation.json": "9a1ca23cb7e2e6d348800cbf15c546a43758aa434267aa5ae821512277f2e63c"
+    "psc/target_test.cc": "eb5dfd4ce4bbd84b737af8a8d5fd173ba01ab0a3b482f024d3e71c8da31530f9",
+    "psc/validation.json": "9a1ca23cb7e2e6d348800cbf15c546a43758aa434267aa5ae821512277f2e63c",
+    "tensorflow/lite/kernels/internal/reference/integer_ops/pooling.h": "4b09724e3d628ffa579efeb88624a7962ffd895d7d8ce16a4e1f65f18ac74bca",
+    "tensorflow/lite/kernels/internal/reference/integer_ops/logistic.h": "e30dacc18e0a5dfa880bf5dc2581916df07f18735c5c9f766b7ead5ce0434365",
+    "tensorflow/lite/kernels/internal/reference/integer_ops/mul.h": "9dda7405e8c935a7e9f83427dda1c06859b6e2a79b3fcd4578b44b6fb9ba7440",
+    "tensorflow/lite/kernels/internal/reference/broadcast_loop.h": "7cf6852f37a79708a40941d170f64de76861c9dd21961454e0f5288171bb0cde",
+    "tensorflow/lite/kernels/internal/reference/integer_ops/add.h": "42f62cedd15d4f092b379fc2d9d5a3e628ab7aa5e3b8e4bf0e7574fb2d853a53",
+    "tensorflow/lite/kernels/internal/reference/integer_ops/conv.h": "370f80020b9aa44e61bb3a0a0d081c035432f99aaf1cb66c6c3d072700a4bec8",
+    "ruy/profiler/instrumentation.h": "6c5b1469b1ee43ad6de59899b3f022f459d01a0840e531a54fb363980152de59",
+    "ruy/LICENSE": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
   },
   "gemmlowp": {
     "commit": "719139ce755a0f31cbf1c37f7f98adcc7fc9f425",
@@ -123,6 +137,14 @@
       "psc/target_cocotb.py",
       "psc/target_test.cc",
       "psc/validation.json"
+    ]
+  },
+  "ruy": {
+    "commit": "d37128311b445e758136b8602d1bbd2a755e115d",
+    "source": "TFLM pinned third_party_downloads.inc",
+    "files": [
+      "ruy/profiler/instrumentation.h",
+      "ruy/LICENSE"
     ]
   }
 }

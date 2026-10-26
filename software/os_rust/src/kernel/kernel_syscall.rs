@@ -6,12 +6,7 @@ use crate::drivers::{
 /// Check the complete user span and require valid user leaf permissions on every page.
 pub unsafe fn user_accessible(address: u32, bytes: u32, access: u32) -> bool {
     // Validate every leaf before touching user memory, including cross-page spans.
-    if CURRENT.is_null()
-        || bytes == 0
-        || address < USER_BASE
-        || address >= USER_STACK_TOP
-        || bytes > USER_STACK_TOP - address
-    {
+    if CURRENT.is_null() || !user_span(address, bytes) {
         return false;
     }
     let last = (address + bytes - 1) & !4095;

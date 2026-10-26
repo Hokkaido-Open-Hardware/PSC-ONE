@@ -25,6 +25,8 @@ on the host.
 
 This is a mixed Rust/C firmware build. It reuses the TJpgDec C decoder,
 MicroPython, and runtime libraries from the existing [C implementation](../os/).
+TFLite parsing, verification, quantization, CPU kernels and accelerator dispatch
+are implemented independently in Rust; no C/C++ TFLite runtime is linked.
 The simulation flow also builds the existing SBI boot ROM and, for SD boot,
 the FAT32 bootloader. These dependencies must be available in the checkout.
 
@@ -84,7 +86,7 @@ simulation environment. To build a kernel that reads `USER.MEM` from FAT32
 on cold boot, use:
 
 ```sh
-make -C PSC-ONE/software/os_rust USER_SOURCE=sd
+make -C PSC-ONE/software/os_rust USER_SOURCE=sd CPU_VERSION=v1
 ```
 
 ## RTL simulation
@@ -144,3 +146,85 @@ binary-to-memory-image conversion, required integration symbols, and the
 TJpgDec C/Rust ABI layout. Host tests and image checks complement the RTL
 boot tests; they do not establish that every peripheral command works on
 physical hardware.
+
+## TFLite compatibility with the C OS
+
+The shell accepts the same four commands and backends:
+
+```text
+tflite_info MODEL.TFL
+tflite_run MODEL.TFL [cpu|npu|pulp|auto]
+tflite_diag [on|off]
+tflite_bench MODEL.TFL [quick]
+```
+
+Missing or invalid arguments print usage. Files must use root-directory,
+uppercase 8.3 names. `tflite_info` analyzes a structurally valid model even
+when execution is unsupported or the Arena is too small. It invalidates any
+previous resident model, just like load/reset. Diagnostics default to on.
+
+Model capacity is 4 MiB. The model is mapped at VA `0x00800000`, separately
+from the shell and stack. Mixed graphs have a 768 KiB Arena at VA `0x00c00000`;
+the existing FC-only profile retains its separate 4 KiB Arena. The kernel uses
+the same split physical model backing as C, preserving the bootloader,
+USER.MEM source and warm restart. Linker/image checks enforce these reservations.
+
+The independent Rust graph implementation supports the current 16 operators:
+CONV_2D, FULLY_CONNECTED, ADD, SUB, MUL, LOGISTIC, MAX_POOL_2D, TRANSPOSE, PAD,
+SLICE, CONCATENATION, RESIZE_NEAREST_NEIGHBOR, RESHAPE, SOFTMAX, QUANTIZE and
+DEQUANTIZE. Analysis is bounded to 1024 tensors/operators/buffers; execution
+supports 512 operators, one input/output, static shapes and up to rank 4.
+INT8, FLOAT32 and INT32 are supported under the same per-operator conditions
+as the C runtime. Unsupported shapes/types/options are rejected explicitly.
+Out-of-line constants are bounds checked within the same model file.
+
+INT8 results use the double-rounding reference contract, including integer
+Logistic/Softmax. CPU is the default. NPU uses bounded im2col tiles for Conv/FC;
+started device failures invalidate output without CPU retry. PULP uses signed
+`cv.dotsp.b` only when built with `CPU_VERSION=v1`; other builds fall back to
+CPU. AUTO keeps the measured square FC NPU selection and otherwise chooses
+PULP where enabled. Operator records report the backend actually used.
+Rust currently recompiles validated operator descriptors during invocation
+from immutable model bytes, saving resident descriptor storage; wall time
+includes this work, while operator timings cover execution only.
+
+The shell's demo inputs are repeated INT8 values or zero FLOAT32/INT32 values,
+not image preprocessing. Graph diagnostics include tensor hashes before Arena
+reuse. The graph benchmark compares every output byte using the same bounded 4 KiB
+reference buffer as C, across three warm samples (five configurations in quick
+mode). Larger outputs are rejected explicitly by the benchmark; inference
+retains the 768 KiB Arena limit.
+
+FC firmware initialization occurs in its resident workspace. Returning the
+large runtime by value previously exhausted the 128 KiB user stack. The host
+convenience constructor remains available; image verification rejects its
+presence in firmware.
+
+### Independent reference checks
+
+The first suite requires a host C++ compiler but no Python ML packages. It
+exports inputs/outputs from the pinned upstream reference kernels and compares
+the separate Rust executable in CPU/PULP/NPU-mock/AUTO modes. The C++ exporter
+is test-only and is never linked into firmware.
+
+```sh
+python3 PSC-ONE/software/os_rust/tests/tflite/reference.py --build build/rust-tflite-reference
+```
+
+For the additional 111 transform/negative/integration fixtures, use Python with
+`ai-edge-litert==2.3.0`, NumPy and FlatBuffers:
+
+```sh
+cargo build --offline --release --features pulp --manifest-path PSC-ONE/software/os_rust/Cargo.toml --example graph_reference
+python PSC-ONE/software/os/tests/tflite/phase2_ops.py --build build/rust-tflite-phase2 --runtime "$PWD/PSC-ONE/software/os_rust/target/release/examples/graph_reference"
+```
+
+`examples/graph_reference.rs` also checks a model against a directory containing
+`tensor-<id>.bin` for every operator output. Supply model, output file, input
+file, and reference directory as positional arguments; `PSC_RUST_BACKEND`
+selects `cpu`, `pulp`, `npu` or `auto`. Host NPU calls perform mock matrix
+multiplication and do not establish hardware timing.
+
+The checked-in Rust schema descriptors are regenerated with
+`tools/generate_tflite_schema.py` from the pinned schema declaration. Normal
+Rust builds do not read, compile or link that C++ header.

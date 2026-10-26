@@ -38,3 +38,24 @@ _Static_assert(sizeof(JRECT) == 8, "JRECT size");
 ''')
 subprocess.run(["clang", "--target=riscv32-unknown-elf", "-march=rv32im_zicsr_zifencei", "-mabi=ilp32", "-ffreestanding", "--sysroot=/usr/lib/picolibc/riscv64-unknown-elf", "-I" + str(build / "tjpgd"), "-fsyntax-only", str(source)], check=True)
 print("PASS MicroPython symbols and TJpgDec C/Rust ABI")
+
+# The independent Rust runtime must fit the same physical reservations as C.
+kernel_symbols = subprocess.check_output(["riscv64-unknown-elf-nm", str(build / "kernel.elf")], text=True)
+def address(name):
+    match = re.search(rf"^([0-9a-fA-F]+) \w {name}$", kernel_symbols, re.M)
+    assert match, name
+    return int(match[1], 16)
+assert address("__arena_start") == 0x40000
+assert address("__arena_end") == 0x100000
+assert address("__model_low") == 0x140000
+assert address("__model_low_end") == 0x200000
+assert address("__model_high") == 0x4c0000
+assert address("__model_high_end") == 0x800000
+assert (build / "shell.bin").stat().st_size <= 0xc0000
+# Returning Runtime by value caused >128KiB nested firmware stack frames.
+# Only the in-place initialization entry may be reachable from the shell.
+assert not re.search(r"7Runtime7prepare$", symbols, re.M), "large FC runtime returned on firmware stack"
+assert "prepare_into" in symbols, "missing resident FC initialization"
+user_map = (build / "user.map").read_text()
+assert not re.search(r"tflite_\w+\.o\b", user_map), "C TFLite object linked into Rust firmware"
+print("PASS Rust-only TFLite, in-place FC initialization and model/Arena reservations")

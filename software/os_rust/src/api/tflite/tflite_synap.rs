@@ -20,13 +20,19 @@ pub struct Scratch {
     b: [i8; 4096],
     c: [i32; 4096],
 }
-impl Default for Scratch {
-    fn default() -> Self {
+impl Scratch {
+    pub const fn new() -> Self {
         Self {
             a: [0; 4096],
             b: [0; 4096],
             c: [0; 4096],
         }
+    }
+}
+
+impl Default for Scratch {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

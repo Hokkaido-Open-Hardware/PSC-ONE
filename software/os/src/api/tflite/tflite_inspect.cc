@@ -80,7 +80,7 @@ int inspect(const void *data, size_t size, const Log &out, psc_tflite_info_t &in
         return out.fail(PSC_TFLITE_ERR_FORMAT, "TFL3 identifier");
     flatbuffers::Verifier::Options options;
     options.max_depth = 16;
-    options.max_tables = 512;
+    options.max_tables = 65536; // bounded verification also covers multi-MiB detection models
     flatbuffers::Verifier verifier(bytes, size, options);
     if (!tflite::VerifyModelBuffer(verifier))
         return out.fail(PSC_TFLITE_ERR_FORMAT, "FlatBuffers bounds/table verification");
@@ -89,6 +89,19 @@ int inspect(const void *data, size_t size, const Log &out, psc_tflite_info_t &in
     out.text(" schema="); out.number(m->version()); out.text("\n");
     if (m->version() != 3)
         return out.fail(PSC_TFLITE_ERR_UNSUPPORTED, "schema version (requires 3)");
+    out.text("FlatBuffer verified; subgraphs="); out.number(count(m->subgraphs()));
+    out.text(" buffers="); out.number(count(m->buffers()));
+    out.text(" opcodes="); out.number(count(m->operator_codes())); out.text("\n");
+    // Report unsupported operators before the small execution-profile limits.
+    for (unsigned i = 0; i < count(m->operator_codes()) && i < 64; ++i) {
+        int code = opcode(m->operator_codes()->Get(i));
+        out.text("Opcode "); out.number(i); out.text(": ");
+        out.text(tflite::EnumNameBuiltinOperator(static_cast<tflite::BuiltinOperator>(code)));
+        out.text(" ("); out.number(code); out.text(")");
+        if (code != tflite::BuiltinOperator_FULLY_CONNECTED)
+            out.text(" unsupported by CPU runtime");
+        out.text("\n");
+    }
     if (count(m->subgraphs()) != 1 || count(m->buffers()) == 0 ||
         count(m->buffers()) > 64 || count(m->operator_codes()) > 8)
         return out.fail(PSC_TFLITE_ERR_UNSUPPORTED, "subgraph/buffer/opcode count");
@@ -269,7 +282,7 @@ int inspect(const void *data, size_t size, const Log &out, psc_tflite_info_t &in
 }
 } // namespace
 
-extern "C" int psc_tflite_inspect(const void *data, size_t size,
+extern "C" int psc_tflite_inspect_fc(const void *data, size_t size,
                                   psc_tflite_log_fn log, void *user,
                                   psc_tflite_info_t *info) {
     if (info) *info = {};

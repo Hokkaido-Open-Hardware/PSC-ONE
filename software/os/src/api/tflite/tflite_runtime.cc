@@ -1,10 +1,15 @@
 #include "tflite_api.h"
+#include "tflite_graph.h"
 #include "tflite_quant.h"
 #include "tflite_synap.h"
 #include "schema_generated.h"
 #include <limits.h>
 #include "psc/pulp_fc.h"
 
+#ifndef PSC_TFLITE_HAS_SYNAP
+#define PSC_TFLITE_HAS_SYNAP 0
+#endif
+extern "C" __attribute__((weak)) int psc_tflite_synap_available(void){return PSC_TFLITE_HAS_SYNAP;}
 namespace {
 struct FC {
     const int8_t *x, *w;
@@ -16,15 +21,20 @@ struct FC {
 struct Runtime {
     alignas(16) uint8_t arena[PSC_TFLITE_ARENA_CAPACITY];
     FC fc[PSC_TFLITE_MAX_OPERATORS];
+    const void *model;
     int8_t *input, *output;
     size_t input_bytes, output_bytes, used;
     unsigned count, tile;
     psc_tflite_fc_backend backend;
     bool profiling;
     psc_tflite_profile_t profile;
-    bool prepared, output_valid, invoking;
+    psc_tflite_execution_t execution;
+    psc_tflite_operator_profile_t records[512];
+    bool prepared, output_valid, invoking, generic;
 };
 Runtime rt;
+size_t arena_required;
+size_t arena_available=PSC_TFLITE_ARENA_CAPACITY;
 // Shared synchronous scratch, protected by rt.invoking; never put a 64x64 tile on the stack.
 alignas(16) int32_t dots[SA_MAT_MAX*SA_MAT_MAX];
 void *allocate(size_t bytes) {
@@ -41,9 +51,12 @@ int32_t bias_at(const FC &f, int c) {
 psc_tflite_fc_backend select(const FC &f, const char **reason, unsigned *tile) {
     *tile=rt.tile;
     if (rt.backend==PSC_TFLITE_FC_CPU || rt.backend==PSC_TFLITE_FC_SYNAP) {
+        if(rt.backend==PSC_TFLITE_FC_SYNAP&&!psc_tflite_synap_available()) {
+            *reason="NPU unavailable; CPU fallback";return PSC_TFLITE_FC_CPU;
+        }
         *reason="explicit backend"; return rt.backend;
     }
-    if(rt.backend==PSC_TFLITE_FC_AUTO && (f.m==16 || f.m==32) && f.k==f.m && f.n==f.m) {
+    if(psc_tflite_synap_available() && rt.backend==PSC_TFLITE_FC_AUTO && (f.m==16 || f.m==32) && f.k==f.m && f.n==f.m) {
         *tile=f.m; *reason="measured OS FC advantage including packing/copies/start/wait; one unpadded tile";
         return PSC_TFLITE_FC_SYNAP;
     }
@@ -61,8 +74,30 @@ psc_tflite_fc_backend select(const FC &f, const char **reason, unsigned *tile) {
 int prepare(const void *data, size_t size) {
     int rc = psc_tflite_inspect(data, size, nullptr, nullptr, nullptr);
     if (rc) return rc;
+    rt.model=data;
+    if(!psc_tflite_graph_is_fc(data)) {
+        rt.generic=true;rt.tile=32;
+        size_t capacity;uint8_t *arena=psc_tflite_graph_arena(&capacity);arena_available=capacity;
+        rc=psc_tflite_graph_prepare(data,size,arena,capacity,&arena_required,
+            &rt.input,&rt.input_bytes,&rt.output,&rt.output_bytes);
+        if(!rc){rt.used=arena_required;rt.prepared=true;}
+        return rc;
+    }
     const auto *m = tflite::GetModel(data);
     const auto *g = m->subgraphs()->Get(0);
+    // Plan independently of allocation, so failure reports the full requirement.
+    for (const auto *t : *g->tensors()) {
+        const auto *b = m->buffers()->Get(t->buffer())->data();
+        if (b && b->size()) continue;
+        size_t bytes = t->type() == tflite::TensorType_INT32 ? 4 : 1;
+        for (auto d : *t->shape()) bytes *= d;
+        arena_required = ((arena_required + 3) & ~size_t(3)) + bytes;
+    }
+    for (const auto *op : *g->operators()) {
+        const auto *w = g->tensors()->Get(op->inputs()->Get(1));
+        arena_required = ((arena_required + 3) & ~size_t(3)) + w->shape()->Get(0) * sizeof(int32_t);
+    }
+    if (arena_required > sizeof(rt.arena)) return PSC_TFLITE_ERR_ARENA;
     int8_t *tensors[PSC_TFLITE_MAX_TENSORS] = {};
     size_t lengths[PSC_TFLITE_MAX_TENSORS] = {};
     for (unsigned i = 0; i < g->tensors()->size(); ++i) {
@@ -72,7 +107,7 @@ int prepare(const void *data, size_t size) {
         size_t bytes = t->type() == tflite::TensorType_INT32 ? 4 : 1;
         for (auto d : *t->shape()) bytes *= d;
         tensors[i] = static_cast<int8_t *>(allocate(bytes));
-        if (!tensors[i]) return PSC_TFLITE_ERR_SIZE;
+        if (!tensors[i]) return PSC_TFLITE_ERR_ARENA;
         lengths[i] = bytes;
     }
     rt.count = g->operators()->size();
@@ -98,7 +133,7 @@ int prepare(const void *data, size_t size) {
         f.minimum=op->builtin_options_as_FullyConnectedOptions()->fused_activation_function() ==
                   tflite::ActivationFunctionType_RELU ? f.output_zero : -128;
         f.row_sum=static_cast<int32_t *>(allocate(f.n * sizeof(int32_t)));
-        if (!f.row_sum) return PSC_TFLITE_ERR_SIZE;
+        if (!f.row_sum) return PSC_TFLITE_ERR_ARENA;
         for (int c=0; c<f.n; ++c) {
             int64_t low=bias_at(f,c), high=low;
             int32_t sum=0;
@@ -125,13 +160,13 @@ int prepare(const void *data, size_t size) {
 } // namespace
 extern "C" int psc_tflite_reset(void) {
     if (rt.invoking) return PSC_TFLITE_ERR_BUSY;
-    rt={}; rt.tile=4; return 0;
+    rt={}; psc_tflite_graph_reset(); arena_required=0; arena_available=PSC_TFLITE_ARENA_CAPACITY;rt.tile=4; return 0;
 }
 extern "C" int psc_tflite_prepare(const void *data, size_t size) {
     if (rt.invoking) return PSC_TFLITE_ERR_BUSY;
     psc_tflite_reset();
     int rc=prepare(data,size);
-    if (rc) psc_tflite_reset();
+    if (rc) { size_t required=arena_required,available=arena_available; psc_tflite_reset(); arena_required=required;arena_available=available; }
     return rc;
 }
 extern "C" int8_t *psc_tflite_get_input(size_t *bytes) {
@@ -142,6 +177,7 @@ extern "C" const int8_t *psc_tflite_get_output(size_t *bytes) {
     if (bytes) *bytes=rt.output_valid ? rt.output_bytes : 0;
     return rt.output_valid && !rt.invoking ? rt.output : nullptr;
 }
+extern "C" size_t psc_tflite_arena_required(void) { return arena_required; }
 extern "C" size_t psc_tflite_arena_used(void) { return rt.used; }
 extern "C" int psc_tflite_set_fc_backend(psc_tflite_fc_backend backend) {
     if(rt.invoking) return PSC_TFLITE_ERR_BUSY;
@@ -158,15 +194,44 @@ extern "C" int psc_tflite_set_profiling(int enabled) {
     rt.profiling=enabled!=0;return 0;
 }
 extern "C" const psc_tflite_profile_t *psc_tflite_get_profile(void) { return &rt.profile; }
+static void summarize() {
+    rt.execution={};
+    unsigned count=rt.generic?psc_tflite_graph_count():rt.count;
+    for(unsigned i=0;i<count;++i){const auto &r=rt.records[i];if(r.status)continue;
+        ++rt.execution.completed;++rt.execution.operators[r.backend];
+        if(rt.backend!=PSC_TFLITE_FC_CPU && r.backend==PSC_TFLITE_FC_CPU)++rt.execution.fallbacks;
+        int &us=rt.execution.invoke_us[r.backend];
+        if(us<0||r.us<0||r.us>INT_MAX-us)us=-1;else us+=r.us;
+    }
+}
+extern "C" const psc_tflite_execution_t *psc_tflite_get_execution(void){return &rt.execution;}
+extern "C" const psc_tflite_operator_profile_t *psc_tflite_get_operator_profile(unsigned i){
+    return i<(rt.generic?psc_tflite_graph_count():rt.count)?&rt.records[i]:nullptr;
+}
+extern "C" const char *psc_tflite_get_operator_reason(unsigned i){
+    if(!rt.prepared||rt.invoking||i>=rt.execution.completed)return nullptr;
+    if(rt.generic)return psc_tflite_graph_reason(i,rt.backend,rt.records[i].backend);
+    const char *reason;unsigned tile;select(rt.fc[i],&reason,&tile);return reason;
+}
 static int invoke(psc_tflite_trace_fn trace,psc_tflite_trace_ex_fn detail,psc_tflite_layer_fn layer,void *user) {
     if (rt.invoking) return PSC_TFLITE_ERR_BUSY;
     if (!rt.prepared) return PSC_TFLITE_ERR_GRAPH;
     rt.invoking=true; rt.output_valid=false;rt.profile={};rt.profile.valid=rt.profiling;
+    rt.execution={};
+    for(auto &r:rt.records)r={0,0,-1,-205,0};
+    if(rt.generic) {
+        int rc=psc_tflite_graph_invoke(layer,user,rt.backend,rt.tile,dots,rt.records,rt.profiling?&rt.profile:nullptr);
+        summarize();
+        if(rc)rt.profile.valid=0;
+        rt.invoking=false;rt.output_valid=rc==0;return rc;
+    }
     for (unsigned i=0; i<rt.count; ++i) {
         const FC &f=rt.fc[i];
         if (layer) layer(user,i,1);
         const char *reason; unsigned tile;
         const auto backend=select(f,&reason,&tile);
+        auto &record=rt.records[i];record={9,int(backend),-1,-205,0};
+        int op_start=psc_tflite_clock_us();uint32_t old_tiles=rt.profile.tiles;
         unsigned block=backend==PSC_TFLITE_FC_SYNAP ? tile : 1;
         for(unsigned row=0;row<unsigned(f.m);row+=block) {
           unsigned m=unsigned(f.m)-row<block ? unsigned(f.m)-row : block;
@@ -177,7 +242,7 @@ static int invoke(psc_tflite_trace_fn trace,psc_tflite_trace_ex_fn detail,psc_tf
                 int rc=psc_tflite_synap_batch(x,f.w+first*f.k,m,f.k,n,tile,dots,rt.profiling?&rt.profile:nullptr);
                 if(rc) {
                     if(layer) layer(user,i,0);
-                    rt.profile.valid=0;rt.invoking=false;return rc;
+                    record.status=rc;rt.profile.valid=0;summarize();rt.invoking=false;return rc;
                 }
             } else if(backend==PSC_TFLITE_FC_PULP &&
                       psc_tflite_pulp::try_dot(x,f.w+first*f.k,f.k,0,true,&dots[0])) {
@@ -205,8 +270,11 @@ static int invoke(psc_tflite_trace_fn trace,psc_tflite_trace_ex_fn detail,psc_tf
             }
           }
         }
+        int op_end=psc_tflite_clock_us();record.us=op_start>=0&&op_end>=op_start?op_end-op_start:-1;record.status=0;
+        record.npu_tiles=rt.profile.tiles-old_tiles;
         if (layer) layer(user,i,0);
     }
+    summarize();
     rt.invoking=false; rt.output_valid=true;
     return 0;
 }
@@ -281,6 +349,7 @@ extern "C" int psc_tflite_debug_model(const void *data,size_t size,psc_tflite_lo
 extern "C" int psc_tflite_debug_fc(psc_tflite_log_fn log,void *user) {
     if(rt.invoking)return PSC_TFLITE_ERR_BUSY;
     if(!rt.prepared)return PSC_TFLITE_ERR_GRAPH;
+    if(rt.generic){psc_tflite_graph_debug(log,user,rt.backend);return 0;}
     DebugLog out{log,user};out.pointer("Runtime=",&rt);out.pointer(" arena=",rt.arena);out.text("\n");
     for(unsigned i=0;i<rt.count;++i) {
         const FC &f=rt.fc[i];out.value("FC=",i+1);out.value(" k=",f.k);out.value(" n=",f.n);
@@ -310,6 +379,7 @@ extern "C" const char *psc_tflite_backend_name(psc_tflite_fc_backend backend) {
 extern "C" int psc_tflite_debug_selection(psc_tflite_log_fn log,void *user) {
     if(rt.invoking)return PSC_TFLITE_ERR_BUSY;
     if(!rt.prepared)return PSC_TFLITE_ERR_GRAPH;
+    if(rt.generic){psc_tflite_graph_debug(log,user,rt.backend);return 0;}
     DebugLog out{log,user};
     for(unsigned i=0;i<rt.count;++i) {
         const FC &f=rt.fc[i]; const char *reason; unsigned tile;
@@ -323,3 +393,15 @@ extern "C" int psc_tflite_debug_selection(psc_tflite_log_fn log,void *user) {
     }
     return 0;
 }
+
+extern "C" size_t psc_tflite_arena_capacity(void){return arena_available;}
+extern "C" int psc_tflite_set_tensor_trace(psc_tflite_tensor_trace_fn fn,void *user){if(rt.invoking)return -205;if(!rt.prepared||!rt.generic)return -202;psc_tflite_graph_trace(fn,user);return 0;}
+extern "C" int psc_tflite_get_io_info(int output,psc_tflite_tensor_info_t *info){
+    if(!info)return -203;*info={};if(!rt.prepared||rt.invoking)return -203;
+    const auto *g=tflite::GetModel(rt.model)->subgraphs()->Get(0);int id=output?g->outputs()->Get(0):g->inputs()->Get(0);const auto *t=g->tensors()->Get(id);
+    info->tensor=id;info->type=t->type();info->rank=t->shape()?t->shape()->size():0;info->bytes=output?rt.output_bytes:rt.input_bytes;
+    for(int i=0;i<info->rank;++i)info->dims[i]=t->shape()->Get(i);
+    const auto *q=t->quantization();if(q&&q->scale()&&q->scale()->size()){info->scale=q->scale()->Get(0);info->zero_point=q->zero_point()->Get(0);}return 0;
+}
+
+extern "C" unsigned psc_tflite_operator_count(void){return rt.prepared?(rt.generic?psc_tflite_graph_count():rt.count):0;}

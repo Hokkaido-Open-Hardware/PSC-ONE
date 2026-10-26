@@ -17,6 +17,7 @@ static void check(bool ok,unsigned line) {
 #define CHECK(x) check(bool(x),__LINE__)
 extern "C" int sa_run_rect_checked(const uint8_t *,const uint8_t *,uint32_t,uint32_t,uint32_t,uint32_t *,int);
 static unsigned sa_calls;
+extern "C" int psc_tflite_synap_available(void){return 1;}
 extern "C" int psc_tflite_sa_tile(const int8_t *a,const int8_t *b,int32_t *c,unsigned m,unsigned k,unsigned n,psc_sa_profile_t *p) {
     ++sa_calls;
     int start=psc_tflite_clock_us();

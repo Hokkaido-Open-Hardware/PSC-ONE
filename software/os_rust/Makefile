@@ -6,6 +6,8 @@ BUILD := $(ROOT)/build
 TARGET := riscv32im-unknown-none-elf
 # rtl: preload both .mem images; sd: read USER.MEM from FAT32 on cold boot.
 USER_SOURCE ?= rtl
+CPU_VERSION ?= v1
+USER_FEATURES = firmware,user$(if $(filter v1,$(CPU_VERSION)),$(comma)pulp)
 ifeq ($(filter $(USER_SOURCE),rtl sd),)
 $(error USER_SOURCE must be rtl or sd)
 endif
@@ -34,6 +36,9 @@ FORCE:
 $(BUILD)/kernel.config: FORCE
 	@python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s=sys.argv[2]; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(s) if not p.exists() or p.read_text()!=s else None' $(BUILD)/kernel.config "$(USER_SOURCE)"
 
+$(BUILD)/user.config: FORCE
+	@python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s=sys.argv[2]; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(s) if not p.exists() or p.read_text()!=s else None' $@ "$(USER_FEATURES)"
+
 all: $(BUILD)/kernel.mem $(BUILD)/user.mem
 
 $(BUILD):
@@ -58,8 +63,8 @@ $(BUILD)/tjpgd.o: $(OS)/third_party/tjpgd/src/tjpgd.c $(OS)/third_party/tjpgd/sr
 	cp $(OS)/third_party/tjpgd/src/tjpgd.c $(OS)/third_party/tjpgd/src/tjpgd.h $(ROOT)/tools/tjpgdcnf.h $(BUILD)/tjpgd/
 	$(CC) $(CFLAGS) -I$(BUILD)/tjpgd -c $(BUILD)/tjpgd/tjpgd.c -o $@
 
-$(BUILD)/user.elf: $(RUST_SOURCES) $(ROOT)/Cargo.toml $(ROOT)/link/user.ld $(BUILD)/tjpgd.o $(MP_LIB) $(MP_PRINTF) $(ROOT)/Makefile
-	$(CARGO) rustc --offline --manifest-path $(ROOT)/Cargo.toml --target $(TARGET) --release --features firmware,user --bin user -- -C link-arg=-T$(ROOT)/link/user.ld -C link-arg=--no-relax -C link-arg=$(BUILD)/tjpgd.o -C link-arg=$(MP_LIB) -C link-arg=$(MP_PRINTF) -C link-arg=$(LIBDIR)/libm.a -C link-arg=$(LIBDIR)/libc.a -C link-arg=$(LIBGCC) -C link-arg=-Map=$(BUILD)/user.map
+$(BUILD)/user.elf: $(BUILD)/user.config $(RUST_SOURCES) $(ROOT)/Cargo.toml $(ROOT)/link/user.ld $(BUILD)/tjpgd.o $(MP_LIB) $(MP_PRINTF) $(ROOT)/Makefile
+	$(CARGO) rustc --offline --manifest-path $(ROOT)/Cargo.toml --target $(TARGET) --release --features $(USER_FEATURES) --bin user -- -C link-arg=-T$(ROOT)/link/user.ld -C link-arg=--no-relax -C link-arg=$(BUILD)/tjpgd.o -C link-arg=$(MP_LIB) -C link-arg=$(MP_PRINTF) -C link-arg=$(LIBDIR)/libm.a -C link-arg=$(LIBDIR)/libc.a -C link-arg=$(LIBGCC) -C link-arg=-Map=$(BUILD)/user.map
 	cp $(ROOT)/target/$(TARGET)/release/user $@
 
 $(BUILD)/shell.bin: $(BUILD)/user.elf
@@ -82,5 +87,6 @@ verify: all
 	python3 $(ROOT)/tools/verify_images.py
 
 check:
+	python3 $(ROOT)/tools/generate_tflite_schema.py --check
 	$(CARGO) fmt --manifest-path $(ROOT)/Cargo.toml -- --check
 	$(CARGO) test --offline --manifest-path $(ROOT)/Cargo.toml --tests

@@ -42,7 +42,7 @@ def main():
         includes += ['-isystem', str(path)]
     objects = []
     for src in [dst / 'tflite_runtime.cc', HERE / 'target_test.cc'] + [OS / 'src/api/tflite' / name for name in
-                 ('tflite_inspect.cc', 'tflite_quant.cc', 'tflite_synap.cc')]:
+                 ('tflite_inspect.cc', 'tflite_graph.cc', 'tflite_cpu_conv.c', 'tflite_cpu_binary.c', 'tflite_cpu_logistic.c', 'tflite_cpu_pool.c', 'tflite_cpu_transform.c', 'tflite_quant.cc', 'tflite_synap.cc')]:
         obj = build / (src.stem + '.o')
         subprocess.run(['clang++', *flags, *includes, '-std=c++17', '-fno-exceptions', '-fno-rtti',
                         '-fno-threadsafe-statics', '-DTFLITE_SINGLE_ROUNDING=0',
@@ -58,10 +58,11 @@ def main():
     lib = Path('/usr/lib/picolibc/riscv64-unknown-elf/lib/rv32i/ilp32')
     elf = build / 'pulp_fc.elf'
     # Full schema/inspector exceeds the tiny C++ test's 64 KiB layout. Use
-    # 128 KiB of existing SDRAM; the testbench preloads beyond the boot ROM.
+    # 256 KiB of existing SDRAM; the testbench preloads beyond the boot ROM.
     linker=build/'target.ld'
-    layout=(sim/'cpp/link.ld').read_text().replace('LENGTH = 64K','LENGTH = 128K')
+    layout=(sim/'cpp/link.ld').read_text().replace('LENGTH = 64K','LENGTH = 256K')
     layout=layout.replace('__bss_end = .;', '. = ALIGN(4); __bss_end = .;')
+    layout += '\nASSERT(__bss_end + 8192 <= _stack_top, "test data overlaps stack reserve")\n'
     linker.write_text(layout)
     objects=[objects[-1]]+objects[:-1]  # reset PC 0 must execute _start
     subprocess.run(['clang', *arch, '-nostdlib', '-fuse-ld=lld',
@@ -89,7 +90,7 @@ def main():
                                                    if count(v,0x9000107b) or k=='audit_scalar'},indent=2)+'\n')
     subprocess.run(['riscv64-unknown-elf-objcopy', '-O', 'binary', str(elf), str(build / 'pulp_fc.bin')],check=True)
     data = (build / 'pulp_fc.bin').read_bytes()
-    assert len(data)<128*1024-8192
+    assert len(data)<256*1024-8192
     mem = build / 'sim/mem';mem.mkdir(parents=True, exist_ok=True)
     (mem / 'test_program.mem').write_text(''.join(f'{int.from_bytes(data[i:i+4],"little"):08x}\n'
                                                 for i in range(0,16384,4)))

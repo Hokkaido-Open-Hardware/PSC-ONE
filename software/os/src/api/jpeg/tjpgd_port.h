@@ -2,6 +2,7 @@
 #define PSC_TJPGD_PORT_H
 #include "../../fs/fat32.h"
 #include "tjpgd.h"
+#include "jpeg_view.h"
 
 /* Also includes the decoder's input/MCU/RGB scratch allocations. */
 #define JPEG_WORK_BYTES 4096
@@ -18,6 +19,7 @@ typedef struct {
     uint16_t width, height;
     int error;
     uint8_t entropy_ff, eoi;
+    jpeg_rgb_sink_t sink;
 } jpeg_session_t;
 int jpeg_check_headers(jpeg_session_t *s);
 size_t jpeg_input(JDEC *jd, uint8_t *buffer, size_t count);

@@ -39,6 +39,7 @@ pub struct Runtime<'a> {
     arena: [i8; 4096],
     offsets: [usize; 32],
     used: usize,
+    required: usize,
     fc: [Fc; 8],
     backend: Backend,
     tile: usize,
@@ -49,48 +50,134 @@ pub struct Runtime<'a> {
     dots: [i32; 4096],
 }
 impl<'a> Runtime<'a> {
-    /// Prove accumulator and left-shift bounds for every possible INT8 activation.
-    pub fn prepare(bytes: &'a [u8]) -> Result<Self, i32> {
-        let model = inspect(bytes)?;
-        let mut rt = Self {
-            model,
+    /// A resident firmware runtime is initialized here, not copied through the stack.
+    pub(super) const fn empty() -> Self {
+        Self {
+            model: Model {
+                bytes: &[],
+                tensors: [Tensor {
+                    shape: [0; 4],
+                    rank: 0,
+                    kind: 0,
+                    data: 0,
+                    bytes: 0,
+                    scale: 0.0,
+                    zero: 0,
+                }; 32],
+                operators: [Operator {
+                    x: 0,
+                    w: 0,
+                    bias: None,
+                    y: 0,
+                    relu: false,
+                }; 8],
+                input: 0,
+                output: 0,
+                info: Info {
+                    version: 0,
+                    tensors: 0,
+                    operators: 0,
+                    constant_bytes: 0,
+                    tensor_bytes: 0,
+                },
+            },
             arena: [0; 4096],
             offsets: [0; 32],
             used: 0,
-            fc: core::array::from_fn(|_| Fc::default()),
+            required: 0,
+            fc: [Fc {
+                m: 0,
+                k: 0,
+                n: 0,
+                multiplier: 0,
+                shift: 0,
+                row_sum_offset: 0,
+            }; 8],
             backend: Backend::Cpu,
             tile: 4,
             output_valid: false,
             profiling: false,
-            profile: Profile::default(),
-            scratch: Scratch::default(),
+            profile: Profile {
+                tiles: 0,
+                packing_us: 0,
+                syscall_us: 0,
+                copy_in_us: 0,
+                execute_us: 0,
+                copy_out_us: 0,
+                partial_us: 0,
+                post_us: 0,
+                valid: false,
+                device_status: 0,
+            },
+            scratch: Scratch::new(),
             dots: [0; 4096],
-        };
-        for i in 0..rt.model.info.tensors as usize {
-            let t = rt.model.tensors[i];
+        }
+    }
+    pub(super) fn reset(&mut self) {
+        self.model.bytes = &[];
+        self.model.info = Info::default();
+        self.output_valid = false;
+        self.used = 0;
+        self.required = 0;
+    }
+    /// Host convenience. Firmware uses prepare_into to avoid large return values.
+    pub fn prepare(bytes: &'a [u8]) -> Result<Self, i32> {
+        let mut rt = Self::empty();
+        rt.prepare_into(bytes)?;
+        Ok(rt)
+    }
+    /// Prove accumulator bounds and initialize the resident workspace in place.
+    pub(super) fn prepare_into(&mut self, bytes: &'a [u8]) -> Result<(), i32> {
+        self.reset();
+        self.model = inspect(bytes)?;
+        let mut planned = 0usize;
+        for t in &self.model.tensors[..self.model.info.tensors as usize] {
             if t.data == 0 {
-                let pos = (rt.used + 3) & !3;
-                if t.bytes > 4096usize.saturating_sub(pos) {
-                    return Err(SIZE);
-                }
-                rt.offsets[i] = pos;
-                rt.used = pos + t.bytes;
+                planned = (planned + 3) & !3;
+                planned += t.bytes;
             }
         }
-        for i in 0..rt.model.info.operators as usize {
-            let op = rt.model.operators[i];
+        for op in &self.model.operators[..self.model.info.operators as usize] {
+            planned = (planned + 3) & !3;
+            planned += self.model.tensors[op.w].shape[0] * 4;
+        }
+        self.required = planned;
+        if planned > self.arena.len() {
+            return Err(-210);
+        }
+
+        self.arena.fill(0);
+        self.offsets.fill(0);
+        self.fc.fill(Fc::default());
+        self.backend = Backend::Cpu;
+        self.tile = 4;
+        self.profiling = false;
+        self.profile = Profile::default();
+        for i in 0..self.model.info.tensors as usize {
+            let t = self.model.tensors[i];
+            if t.data == 0 {
+                let pos = (self.used + 3) & !3;
+                if t.bytes > 4096usize.saturating_sub(pos) {
+                    return Err(-210);
+                }
+                self.offsets[i] = pos;
+                self.used = pos + t.bytes;
+            }
+        }
+        for i in 0..self.model.info.operators as usize {
+            let op = self.model.operators[i];
             let (x, w, y) = (
-                rt.model.tensors[op.x],
-                rt.model.tensors[op.w],
-                rt.model.tensors[op.y],
+                self.model.tensors[op.x],
+                self.model.tensors[op.w],
+                self.model.tensors[op.y],
             );
             let (multiplier, shift) = quantize(x.scale as f64 * w.scale as f64 / y.scale as f64)?;
             let (m, k, n) = (x.shape[0], w.shape[1], w.shape[0]);
-            let pos = (rt.used + 3) & !3;
+            let pos = (self.used + 3) & !3;
             if n * 4 > 4096usize.saturating_sub(pos) {
-                return Err(SIZE);
+                return Err(-210);
             }
-            rt.used = pos + n * 4;
+            self.used = pos + n * 4;
             let f = Fc {
                 m,
                 k,
@@ -100,7 +187,7 @@ impl<'a> Runtime<'a> {
                 row_sum_offset: pos,
             };
             for c in 0..n {
-                let bias = rt.bias(op.bias, c) as i64;
+                let bias = self.bias(op.bias, c) as i64;
                 let (mut low, mut high) = (bias, bias);
                 let mut sum = 0;
                 for j in 0..k {
@@ -112,7 +199,7 @@ impl<'a> Runtime<'a> {
                     high += a.max(b) as i64;
                 }
                 for (j, byte) in sum.to_le_bytes().iter().enumerate() {
-                    rt.arena[pos + c * 4 + j] = *byte as i8;
+                    self.arena[pos + c * 4 + j] = *byte as i8;
                 }
                 let factor = 1i64 << shift.max(0);
                 if low < (i32::MIN as i64 + 128) / factor || high > (i32::MAX as i64 - 128) / factor
@@ -120,9 +207,9 @@ impl<'a> Runtime<'a> {
                     return Err(GRAPH);
                 }
             }
-            rt.fc[i] = f;
+            self.fc[i] = f;
         }
-        Ok(rt)
+        Ok(())
     }
 
     // Row sums share the bounded arena with activations; no per-layer oversized array.
@@ -150,6 +237,7 @@ impl<'a> Runtime<'a> {
     }
 
     pub fn input(&mut self) -> &mut [i8] {
+        self.output_valid = false;
         let id = self.model.input;
         let start = self.offsets[id];
         &mut self.arena[start..start + self.model.tensors[id].bytes]
@@ -162,6 +250,10 @@ impl<'a> Runtime<'a> {
         let id = self.model.output;
         let start = self.offsets[id];
         Some(&self.arena[start..start + self.model.tensors[id].bytes])
+    }
+
+    pub fn arena_required(&self) -> usize {
+        self.required
     }
 
     pub fn arena_used(&self) -> usize {
@@ -189,6 +281,11 @@ impl<'a> Runtime<'a> {
             Backend::Synap => (Backend::Synap, self.tile),
             Backend::Auto if matches!(f.m, 16 | 32) && f.k == f.m && f.n == f.m => {
                 (Backend::Synap, f.m)
+            }
+            Backend::Pulp | Backend::Auto
+                if cfg!(feature = "pulp") && (4..=8192).contains(&f.k) =>
+            {
+                (Backend::Pulp, self.tile)
             }
             _ => (Backend::Cpu, self.tile),
         }
@@ -264,11 +361,25 @@ impl<'a> Runtime<'a> {
                         }
                     } else {
                         let mut dot = 0i32;
-                        for j in 0..k {
+                        let mut j = 0;
+                        if backend == Backend::Pulp {
+                            while j + 4 <= k {
+                                let a = core::array::from_fn(|lane| {
+                                    self.value(op.x, row * k + j + lane) as u8
+                                });
+                                let b = core::array::from_fn(|lane| {
+                                    self.value(op.w, first * k + j + lane) as u8
+                                });
+                                dot = dot.wrapping_add(super::tflite_cpu::dot4(a, b));
+                                j += 4;
+                            }
+                        }
+                        while j < k {
                             dot = dot.wrapping_add(
                                 self.value(op.x, row * k + j) as i32
                                     * self.value(op.w, first * k + j) as i32,
                             );
+                            j += 1;
                         }
                         self.dots[0] = dot;
                     }

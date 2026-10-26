@@ -163,6 +163,9 @@ JPEG_SRCS := $(Src)/fs/fat32_stream.c $(JPEG_DIR)/jpeg_view.c \
              $(JPEG_DIR)/jpeg_headers.c $(JPEG_DIR)/tjpgd_port.c $(TJPGD_BUILD)/tjpgd.c
 JPEG_HEADERS := $(wildcard $(JPEG_DIR)/*.h) $(Src)/fs/fat32.h $(Src)/api/jpeg_display.h
 JPEG_CPPFLAGS := -I$(Src) -I$(TJPGD_BUILD) -Imicropython/ports/psc/libc
+YOLO_DIR := $(Src)/api/yolo
+YOLO_SRCS := $(YOLO_DIR)/yolo_preprocess.c $(YOLO_DIR)/yolo_postprocess.c $(YOLO_DIR)/yolo_command.c $(YOLO_DIR)/yolo_display.c
+YOLO_HEADERS := $(wildcard $(YOLO_DIR)/*.h) $(Src)/drivers/font.h
 
 # Header-only official FlatBuffers reader, isolated from C-only user.h/libc.
 # No C++ runtime linkage: the inspection path uses neither heap nor exceptions.
@@ -170,6 +173,9 @@ CXX := clang++
 TFLITE_DIR := $(Src)/api/tflite
 TFLITE_VENDOR := third_party/tflite
 TFLITE_CV_DOTSP_B := 0
+# Explicit platform capability: no CSR probe on generic QEMU/SBI builds.
+# A board built without SynapEngine must set TFLITE_HAS_SYNAP=0.
+TFLITE_HAS_SYNAP ?= $(if $(filter $(MODE),sim fpga_mem psc),1,0)
 ifeq ($(CPU_VERSION),v1)
 ifneq ($(filter $(MODE),sim fpga_mem psc),)
 TFLITE_CV_DOTSP_B := 1
@@ -179,6 +185,7 @@ endif
 ifeq ($(RUN_QEMU),1)
 ifneq ($(filter run,$(MAKECMDGOALS)),)
 TFLITE_CV_DOTSP_B := 0
+TFLITE_HAS_SYNAP := 0
 endif
 endif
 TFLITE_CXX_ROOT ?= /usr/include/newlib/c++/$(shell $(GCC_PREFIX)-gcc -dumpversion)
@@ -188,13 +195,15 @@ TFLITE_CPPFLAGS := -I$(TFLITE_DIR) -I$(TFLITE_VENDOR) \
 	-isystem $(TFLITE_CXX_ROOT)/riscv64-unknown-elf/rv32im/ilp32 \
 	-isystem /usr/lib/picolibc/riscv64-unknown-elf/include \
 	-DFLATBUFFERS_LOCALE_INDEPENDENT=0 -DTFLITE_SINGLE_ROUNDING=0 -DNDEBUG \
-	-DPSC_HAS_CV_DOTSP_B=$(TFLITE_CV_DOTSP_B)
+	-DPSC_HAS_CV_DOTSP_B=$(TFLITE_CV_DOTSP_B) -DPSC_TFLITE_HAS_SYNAP=$(TFLITE_HAS_SYNAP)
 TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/api/sa_transfer.h $(Src)/api/sa_limits.h \
 	$(TFLITE_VENDOR)/psc/pulp_fc.h $(Build)/tflite_cpu_config \
 	$(shell rg --files $(TFLITE_VENDOR)/tensorflow $(TFLITE_VENDOR)/gemmlowp) \
 	$(TFLITE_VENDOR)/schema_generated.h \
 	$(wildcard $(TFLITE_VENDOR)/flatbuffers/include/flatbuffers/*.h)
-TFLITE_OBJ := $(Build)/tflite_inspect.o $(Build)/tflite_runtime.o $(Build)/tflite_synap.o $(Build)/tflite_quant.o
+TFLITE_CPPFLAGS += -DPSC_TFLITE_ARENA_ADDRESS=0x00c00000u
+TFLITE_CPU_OBJ := $(addprefix $(Build)/,tflite_cpu_conv.o tflite_cpu_binary.o tflite_cpu_logistic.o tflite_cpu_pool.o tflite_cpu_transform.o)
+TFLITE_OBJ := $(TFLITE_CPU_OBJ) $(Build)/tflite_graph.o $(Build)/tflite_inspect.o $(Build)/tflite_runtime.o $(Build)/tflite_synap.o $(Build)/tflite_quant.o
 
 # Rebuild when switching CPU/mode in the same Build directory. Preserve the
 # stamp's mtime for unchanged flags so ordinary incremental builds stay cheap.
@@ -211,10 +220,13 @@ tflite_vendor_check:
 
 # libstdc++ 14 declarations require hosted preprocessing even though we link
 # no hosted C++ runtime. -fno-builtin and -nostdlib remain; audit undefined symbols.
-$(Build)/tflite_inspect.o $(Build)/tflite_runtime.o $(Build)/tflite_synap.o: $(Build)/%.o: $(TFLITE_DIR)/%.cc $(TFLITE_HEADERS) Makefile | $(Build) tflite_vendor_check
+$(Build)/tflite_graph.o $(Build)/tflite_inspect.o $(Build)/tflite_runtime.o $(Build)/tflite_synap.o: $(Build)/%.o: $(TFLITE_DIR)/%.cc $(TFLITE_HEADERS) Makefile | $(Build) tflite_vendor_check
 	$(CXX) $(filter-out -std=c11 -ffreestanding,$(CFLAGS)) -std=c++17 -Os -fno-builtin \
 		-fno-exceptions -fno-rtti -fno-threadsafe-statics \
 		-fstack-usage $(TFLITE_CPPFLAGS) -c $< -o $@
+
+$(TFLITE_CPU_OBJ): $(Build)/%.o: $(TFLITE_DIR)/%.c $(TFLITE_HEADERS) Makefile | $(Build)
+	$(CC) $(CFLAGS) -I$(TFLITE_DIR) -isystem /usr/lib/picolibc/riscv64-unknown-elf/include -c $< -o $@
 
 # Prune only the imported helper translation unit, leaving shell link behavior
 # unchanged. No unrelated float operators from common/quantization_util survive.
@@ -222,7 +234,7 @@ $(Build)/tflite_quant.o: $(TFLITE_DIR)/tflite_quant.cc $(TFLITE_DIR)/tflite_quan
 	$(CXX) $(filter-out -std=c11 -ffreestanding,$(CFLAGS)) -std=c++17 -Os -fno-builtin \
 		-fno-exceptions -fno-rtti -fno-threadsafe-statics -ffunction-sections -fdata-sections \
 		-fstack-usage $(TFLITE_CPPFLAGS) -c $< -o $(Build)/tflite_quant_full.o
-	ld.lld -r --gc-sections --undefined=psc_tflite_quantize --undefined=psc_tflite_requantize \
+	ld.lld -r --gc-sections --undefined=psc_tflite_quantize --undefined=psc_tflite_requantize --undefined=psc_tflite_logistic_lut --undefined=psc_tflite_softmax_lut --undefined=psc_tflite_softmax_scale --undefined=psc_tflite_softmax_output \
 		$(Build)/tflite_quant_full.o -o $@
 
 $(TJPGD_DIR)/src/tjpgd.c $(TJPGD_DIR)/src/tjpgd.h:
@@ -246,7 +258,7 @@ SRCS_USER := \
 	$(Src)/fs/fat32.c \
 	$(Src)/shell/elf_command.c $(Src)/kernel/elf_loader.c \
 	$(TFLITE_DIR)/tflite_file.c $(TFLITE_DIR)/tflite_platform.c \
-	$(JPEG_SRCS)
+	$(JPEG_SRCS) $(YOLO_SRCS)
 
 SIM_USER ?= full
 ifeq ($(SIM_USER),minimal)
@@ -256,7 +268,7 @@ ifeq ($(SIM_USER),minimal)
   USER_OBJCOPY_FLAGS =
 else ifeq ($(SIM_USER),full)
   USER_SRCS = $(SRCS_USER)
-  USER_DEPS = $(SRCS_USER) $(Src)/elego_robot/pwm_test.h $(Src)/elego_robot/imu.h $(MICROPY_LIB) $(JPEG_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/shell/user.ld $(Src)/api/user.h $(Src)/api/i2c_capture.h $(Src)/api/robot/robot_control.h $(Src)/kernel/syscall.h $(Src)/kernel/elf_loader.h $(Src)/kernel/user_memory.h
+  USER_DEPS = $(SRCS_USER) $(Src)/elego_robot/pwm_test.h $(Src)/elego_robot/imu.h $(MICROPY_LIB) $(JPEG_HEADERS) $(YOLO_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/shell/user.ld $(Src)/api/user.h $(Src)/api/i2c_capture.h $(Src)/api/robot/robot_control.h $(Src)/kernel/syscall.h $(Src)/kernel/elf_loader.h $(Src)/kernel/user_memory.h
   USER_LIBS = $(TFLITE_OBJ) $(MICROPY_LIB) $(LIBM) $(LIBC)
   USER_OBJCOPY_FLAGS = --set-section-flags .bss=alloc,contents
 else

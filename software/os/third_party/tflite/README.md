@@ -269,3 +269,10 @@ file-set/checksum checker also checks their hashes through `files_sha256`; its
 printed “upstream files” count now includes those local files. No upstream
 content was modified, no files were deleted, and no Git staging/commit/push was
 performed.
+
+The CPU graph host oracle additionally vendors unmodified TFLM reference
+`conv.h`, `add.h`, `mul.h`, `logistic.h`, `pooling.h`, and `broadcast_loop.h` from
+the same pinned archive. MUL's header dependency, ruy profiler instrumentation,
+is pinned to d37128311b445e758136b8602d1bbd2a755e115d with its Apache-2.0 LICENSE.
+All hashes/provenance are in manifest.json. The PSC-local test runners now link
+the common graph and C kernels; upstream sources are unchanged.

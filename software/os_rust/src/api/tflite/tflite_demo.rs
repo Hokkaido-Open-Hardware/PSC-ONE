@@ -26,18 +26,18 @@ const TRACE: [[i32; 3]; 20] = [
     [169, 18, 18],
     [16, 8, 8],
 ];
-static mut DIAGNOSTICS: bool = true;
 
 /// Only the serialized shell command loop changes this setting.
 pub fn diagnostics(enabled: bool) {
-    unsafe {
-        DIAGNOSTICS = enabled;
-    }
+    super::tflite_file::diagnostics(enabled);
 }
 
 /// Reuse the original immutable demo oracle; tracing is outside timed inference.
 pub fn run(name: &str, backend: Backend) -> Result<(), i32> {
     load(name)?;
+    if is_graph() {
+        return run_graph(backend);
+    }
     unsafe {
         with_runtime(|rt| {
             rt.set_backend(backend);
@@ -66,7 +66,7 @@ pub fn run(name: &str, backend: Backend) -> Result<(), i32> {
             };
             result?;
             let output = rt.output().ok_or(-203)?;
-            if DIAGNOSTICS {
+            if diagnostics_enabled() {
                 for (i, row) in trace[..count].iter().enumerate() {
                     print(format_args!(
                         "channel={i} acc={} requant={} output={}\n",
@@ -74,6 +74,11 @@ pub fn run(name: &str, backend: Backend) -> Result<(), i32> {
                     ));
                 }
             }
+            print(format_args!("Output: ["));
+            for (i, v) in output.iter().enumerate() {
+                print(format_args!("{}{v}", if i == 0 { "" } else { "," }));
+            }
+            print(format_args!("]\n"));
             print(format_args!(
                 "TFLite {} output={:?}; invoke={elapsed} us; arena={} / 4096\n",
                 backend_name(backend),
@@ -102,6 +107,9 @@ pub fn run(name: &str, backend: Backend) -> Result<(), i32> {
 /// Compare every output byte and rotate backend order across three warm samples.
 pub fn bench(name: &str, quick: bool) -> Result<(), i32> {
     load(name)?;
+    if is_graph() {
+        return bench_graph(quick);
+    }
     unsafe {
         with_runtime(|rt| {
             for (i, v) in rt.input().iter_mut().enumerate() {
@@ -157,6 +165,173 @@ pub fn bench(name: &str, quick: bool) -> Result<(), i32> {
             print(format_args!(
                 "Comparison: PASS ({size} output bytes, three warm samples)\n"
             ));
+            Ok(())
+        })
+    }
+}
+
+fn hash(bytes: &[u8]) -> u32 {
+    bytes
+        .iter()
+        .fold(2166136261u32, |h, b| (h ^ *b as u32).wrapping_mul(16777619))
+}
+fn values(kind: u8, bytes: &[u8], limit: usize) {
+    let width = if kind == 9 { 1 } else { 4 };
+    for (i, chunk) in bytes.chunks_exact(width).take(limit).enumerate() {
+        if i != 0 {
+            print(format_args!(","));
+        }
+        match kind {
+            9 => print(format_args!("{}", chunk[0] as i8)),
+            0 => print(format_args!(
+                "{:.5e}",
+                f32::from_le_bytes(chunk.try_into().unwrap())
+            )),
+            _ => print(format_args!(
+                "{}",
+                i32::from_le_bytes(chunk.try_into().unwrap())
+            )),
+        }
+    }
+}
+fn run_graph(backend: Backend) -> Result<(), i32> {
+    unsafe {
+        with_graph(|g| {
+            let input_kind = g.input_info()?.kind;
+            g.set_backend(backend);
+            let input = g.input()?;
+            if input_kind == 9 {
+                for (i, b) in input.iter_mut().enumerate() {
+                    *b = INPUT[i % 16] as u8;
+                }
+            } else {
+                input.fill(0);
+            }
+            print(format_args!(
+                "TFLite: prepare {} operators PASS; backend={}\n",
+                g.info.operators,
+                backend_name(backend)
+            ));
+            let timing = call_timer_measure_begin() == 0;
+            let result = g.invoke(&mut Platform, |op, tensor, kind, bytes| {
+                if diagnostics_enabled() {
+                    print(format_args!(
+                        "TensorTrace op={op} tensor={tensor} type={kind} bytes={} fnv1a32={:08x}\n",
+                        bytes.len(),
+                        hash(bytes)
+                    ));
+                    if matches!(op, 0 | 3 | 4 | 5 | 288) {
+                        print(format_args!("TensorValues op={op} first16=["));
+                        values(kind, bytes, 16);
+                        print(format_args!("]\n"));
+                    }
+                }
+                Ok(())
+            });
+            let elapsed = if timing {
+                call_timer_measure_end_us()
+            } else {
+                -1
+            };
+            result?;
+            let (mut counts, mut times, mut tiles) = ([0; 3], [0i64; 3], 0u32);
+            for (i, r) in g.records[..g.info.operators].iter().enumerate() {
+                counts[r.backend as usize] += 1;
+                times[r.backend as usize] += r.us as i64;
+                tiles += r.tiles;
+                if diagnostics_enabled() {
+                    print(format_args!(
+                        "Operator {i} {} backend={} time={} us status={}\n",
+                        super::tflite_graph::name(r.kind),
+                        ["cpu", "npu", "pulp"][r.backend as usize],
+                        r.us,
+                        r.status
+                    ));
+                }
+            }
+            let output = g.output().ok_or(-203)?;
+            print(format_args!(
+                "TFLite: invoke complete; output tensor ready\nOutput: ["
+            ));
+            values(g.output_info()?.kind, output, 32);
+            print(format_args!(
+                "]\nOutput bytes={} fnv1a32={:08x}\n",
+                output.len(),
+                hash(output)
+            ));
+            let (load, prepare) = times_from_file();
+            print(format_args!("Arena: {} / {} bytes\nLoad: {load} us; Prepare: {prepare} us; Invoke: {elapsed} us\nExecution: cpu={} pulp={} npu={}; times cpu={} pulp={} npu={} us; NPU tiles={tiles}\n",g.required,super::tflite_graph::ARENA_CAPACITY,counts[0],counts[2],counts[1],times[0],times[2],times[1]));
+            Ok(())
+        })
+    }
+}
+fn times_from_file() -> (i32, i32) {
+    super::tflite_file::times()
+}
+fn bench_graph(quick: bool) -> Result<(), i32> {
+    unsafe {
+        with_graph(|g| {
+            let kind = g.input_info()?.kind;
+            let input = g.input()?;
+            if kind == 9 {
+                for (i, b) in input.iter_mut().enumerate() {
+                    *b = INPUT[i % 16] as u8;
+                }
+            } else {
+                input.fill(0);
+            }
+            g.set_backend(Backend::Cpu);
+            g.invoke(&mut Platform, |_, _, _, _| Ok(()))?;
+            // Match the C command's bounded comparison storage. No hash-only PASS.
+            let mut reference = [0u8; 4096];
+            let output = g.output().ok_or(-203)?;
+            if output.len() > reference.len() {
+                print(format_args!(
+                    "Comparison: FAIL reference (output exceeds 4096 bytes)\n"
+                ));
+                return Err(-210);
+            }
+            let size = output.len();
+            reference[..size].copy_from_slice(output);
+            let modes = [
+                (Backend::Cpu, 4),
+                (Backend::Pulp, 4),
+                (Backend::Synap, 32),
+                (Backend::Synap, 16),
+                (Backend::Auto, 4),
+                (Backend::Synap, 4),
+                (Backend::Synap, 8),
+                (Backend::Synap, 12),
+                (Backend::Synap, 64),
+            ];
+            let count = if quick { 5 } else { modes.len() };
+            for sample in 0..3 {
+                for turn in 0..count {
+                    let (mode, tile) = modes[(sample + turn) % count];
+                    g.set_backend(mode);
+                    g.set_tile(tile)?;
+                    g.invoke(&mut Platform, |_, _, _, _| Ok(()))?;
+                    let timing = call_timer_measure_begin() == 0;
+                    let result = g.invoke(&mut Platform, |_, _, _, _| Ok(()));
+                    let elapsed = if timing {
+                        call_timer_measure_end_us()
+                    } else {
+                        -1
+                    };
+                    result?;
+                    if g.output() != Some(&reference[..size]) {
+                        return Err(-203);
+                    }
+                    print(format_args!(
+                        "BENCH_GRAPH sample={sample} backend={} tile={tile} invoke={elapsed} us\n",
+                        backend_name(mode)
+                    ));
+                }
+            }
+            print(format_args!("Comparison: PASS (all graph output bytes, cpu/npu/pulp/auto, three warm samples)\n"));
+            g.set_backend(Backend::Cpu);
+            g.set_tile(4)?;
+            g.invoke(&mut Platform, |_, _, _, _| Ok(()))?;
             Ok(())
         })
     }

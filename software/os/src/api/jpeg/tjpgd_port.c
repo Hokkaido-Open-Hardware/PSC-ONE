@@ -34,9 +34,11 @@ int jpeg_output(JDEC *jd, void *bitmap, JRECT *rect)
         rect->right >= s->width || rect->bottom >= s->height) {
         s->error = JPEG_ERR_FORMAT; return 0;
     }
-    if (call_lcd_rgb888_rect(rect->left, rect->top, rect->right - rect->left + 1,
-                            rect->bottom - rect->top + 1, bitmap)) {
-        s->error = JPEG_ERR_LCD; return 0;
+    int rc = s->sink.rect(s->sink.user, rect->left, rect->top,
+                         rect->right - rect->left + 1,
+                         rect->bottom - rect->top + 1, bitmap);
+    if (rc) {
+        s->error = rc < 0 ? rc : JPEG_ERR_FORMAT; return 0;
     }
     return 1;
 }

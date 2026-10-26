@@ -5,7 +5,8 @@
 #define PSC_TFLITE_ARENA_CAPACITY 4096u
 enum psc_tflite_fc_backend { PSC_TFLITE_FC_CPU=0, PSC_TFLITE_FC_SYNAP=1, PSC_TFLITE_FC_PULP=2, PSC_TFLITE_FC_AUTO=3 };
 enum { PSC_TFLITE_ERR_SYNAP=-206, PSC_TFLITE_ERR_SYNAP_TIMEOUT=-207,
-       PSC_TFLITE_ERR_SYNAP_ARGUMENT=-208, PSC_TFLITE_ERR_SYNAP_BUSY=-209 };
+       PSC_TFLITE_ERR_SYNAP_ARGUMENT=-208, PSC_TFLITE_ERR_SYNAP_BUSY=-209,
+       PSC_TFLITE_ERR_ARENA=-210 };
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -21,9 +22,22 @@ int8_t *psc_tflite_get_input(size_t *bytes);
 const int8_t *psc_tflite_get_output(size_t *bytes);
 int psc_tflite_invoke(void);
 size_t psc_tflite_arena_used(void);
-/* Default CPU and tile=4 after load/prepare/reset. Switching invalidates only
-   output, preserving the prepared model and input. PULP falls back to CPU when unavailable; Synap errors never fall back.
-   AUTO owns its calibrated NPU tile; the explicit tile setting is unchanged. */
+size_t psc_tflite_arena_capacity(void);
+unsigned psc_tflite_operator_count(void);
+typedef struct {int32_t tensor,type,rank,dims[8],zero_point;float scale;size_t bytes;} psc_tflite_tensor_info_t;
+int psc_tflite_get_io_info(int output,psc_tflite_tensor_info_t *info);
+/* Synchronous observer, after each generic operator, before Arena reuse.
+   Returning nonzero aborts invoke safely; callback must not reenter the API. */
+typedef int (*psc_tflite_tensor_trace_fn)(void *,unsigned,int,const void *,size_t,int);
+int psc_tflite_set_tensor_trace(psc_tflite_tensor_trace_fn,void *);
+/* Exact allocation plan for a supported graph, including alignment/row sums.
+   Zero means unavailable (e.g. unsupported operators); retained on arena error. */
+size_t psc_tflite_arena_required(void);
+/* Default CPU; tile=4 for legacy FC/reset, tile=32 for generic graphs.
+   Switching invalidates only
+   output, preserving the prepared model and input. Unsupported operators or
+   unavailable hardware use CPU. Started Synap errors abort; no unsafe retry.
+   Legacy FC-only AUTO owns its calibrated NPU tile; the explicit setting is unchanged. */
 int psc_tflite_set_fc_backend(enum psc_tflite_fc_backend backend);
 int psc_tflite_set_synap_tile_size(unsigned size); /* multiples of 4, up to SA_MAT_MAX */
 typedef struct {
@@ -33,6 +47,17 @@ typedef struct {
 } psc_tflite_profile_t;
 int psc_tflite_set_profiling(int enabled);
 const psc_tflite_profile_t *psc_tflite_get_profile(void);
+/* Last invocation: counts include only completed operators. Fallbacks count
+   CPU operators in a non-CPU mode, including pre-dispatch unsupported cases.
+   Times exclude layer/tensor callbacks; FC per-channel debug traces add overhead.
+   -1 means clock unavailable/overflow. NPU tile counts (when profiling is on)
+   are successful hardware calls, not requested mode labels. */
+typedef struct { int kind, backend, us, status; uint32_t npu_tiles; } psc_tflite_operator_profile_t;
+typedef struct { unsigned operators[3], fallbacks, completed; int invoke_us[3]; } psc_tflite_execution_t;
+const psc_tflite_execution_t *psc_tflite_get_execution(void);
+const psc_tflite_operator_profile_t *psc_tflite_get_operator_profile(unsigned index);
+/* Last completed operator's dispatch/fallback reason; NULL before completion. */
+const char *psc_tflite_get_operator_reason(unsigned index);
 /* Debug callbacks run synchronously; must not reenter API or allocate/read files.
    requant is AFTER output zero point, BEFORE INT8 saturation and fused ReLU. */
 typedef void (*psc_tflite_trace_fn)(void *, unsigned layer, unsigned channel,

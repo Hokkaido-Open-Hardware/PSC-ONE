@@ -29,7 +29,7 @@ def main():
     cxx = os.environ.get('CXX', 'g++')
     common = []
     for src in [OS / 'src/api/tflite' / name for name in
-                ('tflite_inspect.cc', 'tflite_quant.cc', 'tflite_synap.cc')] + [OS / 'tests/tflite/synap_mock.cc']:
+                ('tflite_inspect.cc', 'tflite_graph.cc', 'tflite_cpu_conv.c', 'tflite_cpu_binary.c', 'tflite_cpu_logistic.c', 'tflite_cpu_pool.c', 'tflite_cpu_transform.c', 'tflite_quant.cc', 'tflite_synap.cc')] + [OS / 'tests/tflite/synap_mock.cc']:
         obj = build / (src.stem + '.o')
         subprocess.run([cxx, *flags, '-c', str(src), '-o', str(obj)], check=True)
         common.append(str(obj))
