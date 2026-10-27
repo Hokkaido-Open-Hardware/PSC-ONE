@@ -3,6 +3,7 @@
 //! Commands borrow the current input line and finish before its buffer is reused.
 use crate::api::tflite::{tflite_file, tflite_runtime::Backend};
 use crate::api::user::*;
+use crate::api::yolo::yolo_command;
 use crate::fs::fat32::Fat32;
 // Use the user-mode formatter, so shell messages never access privileged UART MMIO.
 macro_rules! out { ($($arg:tt)*) => { print(format_args!($($arg)*)) }; }
@@ -16,6 +17,9 @@ const HELP: &str = concat!(
     "fat32_cat FILE | fat32_read FILE | fat32_touch FILE\n",
     "speech | micropython | jpeg FILE.JPG\n",
     "i2c_capture [self|imu_read|imu_test|imu_monitor|pwm_test]\n",
+    "yolo YOLO.TFL TEST.JPG (detection to UART + LCD)\n",
+    "yolo_backend cpu|pulp|npu|auto (default cpu)\n",
+    "yolo_diag on|off (tensor hashes; default off)\n",
     "tflite_info FILE.TFL | tflite_run FILE.TFL [cpu|npu|pulp|auto]\n",
     "tflite_diag [on|off] | tflite_bench FILE.TFL [quick]\n",
     "exit | quit | q\n",
@@ -310,6 +314,14 @@ fn dispatch(args: &[&str]) -> Result<(), i32> {
             _ => out!("usage: i2c_capture [self|imu_read|imu_test|imu_monitor|pwm_test]\n"),
         },
         // Resident model replacement invalidates pointers obtained from a previous load.
+        "yolo_backend" if args.len() <= 2 => yolo_command::cmd_backend(args.get(1).copied()),
+        "yolo_backend" => out!("usage: yolo_backend cpu|pulp|npu|auto\n"),
+        "yolo_diag" if args.len() == 2 && matches!(args[1], "on" | "off") => {
+            yolo_command::diagnostics(args[1] == "on")
+        }
+        "yolo_diag" => out!("usage: yolo_diag on|off\n"),
+        "yolo" if args.len() == 3 => yolo_command::command(args[1], args[2]),
+        "yolo" => out!("usage: yolo MODEL.TFL IMAGE.JPG\n"),
         "tflite_info" if args.len() == 2 => {
             if let Err(e) = tflite_file::info(args[1]) {
                 out!("TFLite error {e}: {}\n", tflite_file::error_string(e));

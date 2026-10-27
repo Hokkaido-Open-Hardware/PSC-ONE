@@ -113,6 +113,47 @@ impl<'a> Runtime<'a> {
             dots: [0; 4096],
         }
     }
+    /// Safety: aligned uninitialized storage, with no outstanding model/arena borrows.
+    #[cfg(any(target_arch = "riscv32", test))]
+    pub(super) unsafe fn init_at(p: *mut Self) {
+        use core::ptr::{addr_of_mut, write_bytes};
+        // Model metadata is small; the 40 KiB GEMM scratch is written in place.
+        addr_of_mut!((*p).model).write(Model {
+            bytes: &[],
+            tensors: [Tensor {
+                shape: [0; 4],
+                rank: 0,
+                kind: 0,
+                data: 0,
+                bytes: 0,
+                scale: 0.0,
+                zero: 0,
+            }; 32],
+            operators: [Operator {
+                x: 0,
+                w: 0,
+                bias: None,
+                y: 0,
+                relu: false,
+            }; 8],
+            input: 0,
+            output: 0,
+            info: Info::default(),
+        });
+        write_bytes(addr_of_mut!((*p).arena).cast::<i8>(), 0, 4096);
+        write_bytes(addr_of_mut!((*p).offsets).cast::<usize>(), 0, 32);
+        addr_of_mut!((*p).used).write(0);
+        addr_of_mut!((*p).required).write(0);
+        addr_of_mut!((*p).fc).write([Fc::default(); 8]);
+        addr_of_mut!((*p).backend).write(Backend::Cpu);
+        addr_of_mut!((*p).tile).write(4);
+        addr_of_mut!((*p).output_valid).write(false);
+        addr_of_mut!((*p).profiling).write(false);
+        addr_of_mut!((*p).profile).write(Profile::ZERO);
+        // Scratch contains only integer arrays; all-zero is its valid initial value.
+        write_bytes(addr_of_mut!((*p).scratch), 0, 1);
+        write_bytes(addr_of_mut!((*p).dots).cast::<i32>(), 0, 4096);
+    }
     pub(super) fn reset(&mut self) {
         self.model.bytes = &[];
         self.model.info = Info::default();
@@ -425,4 +466,19 @@ pub fn backend_name(backend: Backend) -> &'static str {
         Backend::Pulp => "pulp",
         Backend::Auto => "auto",
     }
+}
+
+impl Profile {
+    pub const ZERO: Self = Self {
+        tiles: 0,
+        packing_us: 0,
+        syscall_us: 0,
+        copy_in_us: 0,
+        execute_us: 0,
+        copy_out_us: 0,
+        partial_us: 0,
+        post_us: 0,
+        valid: false,
+        device_status: 0,
+    };
 }

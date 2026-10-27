@@ -586,6 +586,34 @@ speech-recognition implementation.
 
 ------------------------------------------------------------------------
 
+## PSC-ONE YOLOv8n Demo Project
+
+This project demonstrates YOLOv8n object detection on **PSC-ONE**, a custom FPGA-based RISC-V SoC.
+
+JPEG images and a TFLite model are loaded from an SD card. PSC-OS handles image preprocessing, inference, and detection postprocessing. The project explores running neural-network inference on a small FPGA system using a variety of test images.
+
+### System Configuration
+
+- **Hardware:** Tang Nano 20K / PSC-ONE
+- **CPU:** Custom RISC-V CPU
+- **OS:** PSC-OS
+- **Model:** YOLOv8n, INT8-quantized TFLite model (approximately 3.5 MB)
+- **Model input resolution:** 160 × 160 pixels
+- **Image source:** JPEG files stored on an SD card
+
+### Input Images and Detection Results
+
+| Sample | Input Image | Detection Result |
+| :--- | :---: | :---: |
+| ANIME | <img src="docs/yolo_images/ANIME.JPG" width="320"> | <img src="docs/yolo_images/ANIME_yolo.jpg" width="320"> |
+| BUS | <img src="docs/yolo_images/BUS.JPG" width="320"> | <img src="docs/yolo_images/BUS_yolo.jpg" width="320"> |
+| CUPBAN | <img src="docs/yolo_images/CUPBAN.JPG" width="320"> | <img src="docs/yolo_images/CUPBAN_yolo.jpg" width="320"> |
+| NEKO | <img src="docs/yolo_images/NEKO.JPG" width="320"> | <img src="docs/yolo_images/NEKO_yolo.jpg" width="320"> |
+
+This demo focuses on validating inference in an embedded environment rather than achieving real-time performance. Detection results depend on the input image and the object classes supported by the pretrained model.
+
+------------------------------------------------------------------------
+
 ## FST Viewer
 
 <img src="docs/images/FST_viewer_image1.jpg" width="800" alt="FST viewer image1">

@@ -109,6 +109,9 @@ pub struct Graph<'a> {
     backend: Backend,
     tile: usize,
     pub records: [Record; 512],
+    pub execution: Execution,
+    pub profile: super::tflite_runtime::Profile,
+    pub profiling: bool,
 }
 impl<'a> Graph<'a> {
     pub const fn new() -> Self {
@@ -141,6 +144,9 @@ impl<'a> Graph<'a> {
             output_valid: false,
             backend: Backend::Cpu,
             tile: 32,
+            execution: Execution::ZERO,
+            profile: super::tflite_runtime::Profile::ZERO,
+            profiling: false,
             records: [Record {
                 kind: 0,
                 backend: 0,
@@ -150,6 +156,45 @@ impl<'a> Graph<'a> {
             }; 512],
         }
     }
+    /// Initialize uninitialized resident storage without a model-sized stack copy.
+    /// Safety: `p` is aligned, writable and has no outstanding borrows.
+    #[cfg(any(target_arch = "riscv32", test))]
+    pub(super) unsafe fn init_at(p: *mut Self) {
+        use core::ptr::{addr_of_mut, write_bytes};
+        addr_of_mut!((*p).info).write(Analysis::default());
+        addr_of_mut!((*p).required).write(0);
+        addr_of_mut!((*p).model).write(&[]);
+        for i in 0..LIMIT {
+            addr_of_mut!((*p).plans)
+                .cast::<Plan>()
+                .add(i)
+                .write(Plan::EMPTY);
+        }
+        addr_of_mut!((*p).codes).write(0);
+        addr_of_mut!((*p).buffers).write(0);
+        addr_of_mut!((*p).nbuffers).write(0);
+        addr_of_mut!((*p).ops).write(0);
+        addr_of_mut!((*p).input_id).write(0);
+        addr_of_mut!((*p).output_id).write(0);
+        write_bytes(addr_of_mut!((*p).params).cast::<usize>(), 0, 512);
+        addr_of_mut!((*p).arena).write(None);
+        addr_of_mut!((*p).prepared).write(false);
+        addr_of_mut!((*p).output_valid).write(false);
+        addr_of_mut!((*p).backend).write(Backend::Cpu);
+        addr_of_mut!((*p).tile).write(32);
+        for i in 0..512 {
+            addr_of_mut!((*p).records)
+                .cast::<Record>()
+                .add(i)
+                .write(Record {
+                    us: -1,
+                    ..Record::default()
+                });
+        }
+        addr_of_mut!((*p).execution).write(Execution::ZERO);
+        addr_of_mut!((*p).profile).write(super::tflite_runtime::Profile::ZERO);
+        addr_of_mut!((*p).profiling).write(false);
+    }
     pub fn reset(&mut self) {
         self.prepared = false;
         self.output_valid = false;
@@ -158,6 +203,9 @@ impl<'a> Graph<'a> {
         self.required = 0;
         self.backend = Backend::Cpu;
         self.tile = 32;
+        self.execution = Execution::ZERO;
+        self.profiling = false;
+        self.profile = super::tflite_runtime::Profile::ZERO;
     }
     pub(super) fn reader(&self) -> Reader<'a> {
         Reader(self.model)
@@ -568,6 +616,31 @@ impl<'a> Graph<'a> {
     pub fn set_backend(&mut self, b: Backend) {
         self.backend = b;
         self.output_valid = false;
+        self.execution = Execution::ZERO;
+    }
+    /// Reason for the last completed dispatch, unavailable before invoke/reset.
+    pub fn operator_reason(&self, i: usize) -> Option<&'static str> {
+        if !self.prepared || i >= self.execution.completed as usize {
+            return None;
+        }
+        let r = self.records[i];
+        Some(if self.backend == Backend::Cpu {
+            "explicit CPU"
+        } else if r.backend == 1 {
+            "INT8 Conv/FC NPU"
+        } else if r.backend == 2 {
+            "INT8 Conv/FC SIMD"
+        } else if !matches!(r.kind, 3 | 9) {
+            "operator uses CPU kernel"
+        } else if self.backend == Backend::Synap {
+            "NPU unavailable in platform"
+        } else if cfg!(feature = "pulp") {
+            "no SIMD span executed"
+        } else if self.backend == Backend::Auto {
+            "PULP disabled in build; AUTO NPU not calibrated"
+        } else {
+            "PULP disabled in build"
+        })
     }
     pub fn set_tile(&mut self, tile: usize) -> Result<(), i32> {
         if !(4..=64).contains(&tile) || tile % 4 != 0 {
@@ -609,25 +682,59 @@ impl<'a> Graph<'a> {
     pub fn invoke(
         &mut self,
         device: &mut impl Device,
+        trace: impl FnMut(usize, usize, u8, &[u8]) -> Result<(), i32>,
+    ) -> Result<(), i32> {
+        self.invoke_traced(device, trace, |_, _| {})
+    }
+    /// Progress is outside the operator stopwatch; traces precede arena reuse.
+    pub fn invoke_traced(
+        &mut self,
+        device: &mut impl Device,
         mut trace: impl FnMut(usize, usize, u8, &[u8]) -> Result<(), i32>,
+        mut progress: impl FnMut(usize, bool),
+    ) -> Result<(), i32> {
+        self.invoke_callbacks(device, &mut trace, &mut progress)
+    }
+    // One execution loop per device type, instead of duplicating it for every
+    // shell/benchmark/YOLO closure in the memory-constrained firmware.
+    #[inline(never)]
+    fn invoke_callbacks(
+        &mut self,
+        device: &mut impl Device,
+        trace: &mut dyn FnMut(usize, usize, u8, &[u8]) -> Result<(), i32>,
+        progress: &mut dyn FnMut(usize, bool),
     ) -> Result<(), i32> {
         self.output_valid = false;
         if !self.prepared {
             return Err(GRAPH);
         }
-        self.records.fill(Record::default());
+        self.execution = Execution::ZERO;
+        self.profile = super::tflite_runtime::Profile::ZERO;
+        self.profile.valid = self.profiling;
+        self.records.fill(Record {
+            us: -1,
+            status: -205,
+            ..Record::default()
+        });
         for i in 0..self.info.operators {
             let op = tflite_cpu::compile(self, i)?;
             let kind = self.tensor(op.y)?.kind;
             let backend = tflite_cpu::select(&op, self.backend);
+            progress(i, true);
+            let old_tiles = self.profile.tiles;
             let start = device.clock_us();
+            let mut tracked = TrackedDevice {
+                device,
+                profile: &mut self.profile,
+                profiling: self.profiling,
+            };
             let result = tflite_cpu::execute(
                 &op,
                 self.model,
                 &self.plans,
                 self.arena.as_deref_mut().ok_or(GRAPH)?,
                 self.params[i],
-                device,
+                &mut tracked,
                 backend,
                 self.tile,
             );
@@ -646,16 +753,38 @@ impl<'a> Graph<'a> {
                     -1
                 },
                 status: result.as_ref().err().copied().unwrap_or(0),
-                tiles: result.as_ref().copied().unwrap_or(0),
+                tiles: self.profile.tiles - old_tiles,
             };
-            result?;
+            progress(i, false);
+            if let Err(e) = result {
+                self.profile.valid = false;
+                return Err(e);
+            }
+            let b = self.records[i].backend as usize;
+            self.execution.completed += 1;
+            self.execution.operators[b] += 1;
+            if self.backend != Backend::Cpu && b == 0 {
+                self.execution.fallbacks += 1;
+            }
+            self.execution.invoke_us[b] =
+                if self.records[i].us < 0 || self.execution.invoke_us[b] < 0 {
+                    -1
+                } else {
+                    self.execution.invoke_us[b]
+                        .checked_add(self.records[i].us)
+                        .unwrap_or(-1)
+                };
             let p = self.plans[op.y];
-            trace(
+            let traced = trace(
                 i,
                 op.y,
                 kind,
                 &self.arena.as_deref().ok_or(GRAPH)?[p.offset..p.offset + p.bytes],
-            )?;
+            );
+            if let Err(e) = traced {
+                self.profile.valid = false;
+                return Err(e);
+            }
         }
         self.output_valid = true;
         Ok(())
@@ -692,5 +821,67 @@ pub fn name(k: i32) -> &'static str {
         97 => "RESIZE_NEAREST_NEIGHBOR",
         114 => "QUANTIZE",
         _ => "UNSUPPORTED",
+    }
+}
+
+/// Completed work only; failed or unstarted operators are excluded.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Execution {
+    pub operators: [u32; 3],
+    pub fallbacks: u32,
+    pub completed: u32,
+    pub invoke_us: [i32; 3],
+}
+impl Execution {
+    const ZERO: Self = Self {
+        operators: [0; 3],
+        fallbacks: 0,
+        completed: 0,
+        invoke_us: [0; 3],
+    };
+}
+struct TrackedDevice<'a, D: Device> {
+    device: &'a mut D,
+    profile: &'a mut super::tflite_runtime::Profile,
+    profiling: bool,
+}
+impl<D: Device> Device for TrackedDevice<'_, D> {
+    fn clock_us(&mut self) -> i32 {
+        self.device.clock_us()
+    }
+    fn tile(
+        &mut self,
+        a: &[i8],
+        b: &[i8],
+        c: &mut [i32],
+        m: usize,
+        k: usize,
+        n: usize,
+        _: Option<&mut crate::api::sa_transfer::Profile>,
+    ) -> i32 {
+        let mut p = crate::api::sa_transfer::Profile::default();
+        let rc = self.device.tile(
+            a,
+            b,
+            c,
+            m,
+            k,
+            n,
+            if self.profiling { Some(&mut p) } else { None },
+        );
+        self.profile.device_status = rc;
+        if rc == 0 {
+            self.profile.tiles += 1;
+        }
+        if self.profiling {
+            if rc != 0 || p.valid == 0 {
+                self.profile.valid = false;
+            } else {
+                self.profile.copy_in_us += p.copy_in_us;
+                self.profile.execute_us += p.execute_us;
+                self.profile.copy_out_us += p.copy_out_us;
+            }
+        }
+        rc
     }
 }

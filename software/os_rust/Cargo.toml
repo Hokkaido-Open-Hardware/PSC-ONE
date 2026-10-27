@@ -21,6 +21,8 @@ firmware = []
 user = []
 sd-user = []
 pulp = []
+# Host validation links the same TJpgDec ABI through the test runner.
+jpeg-host = []
 
 [[bin]]
 name = "user"
@@ -31,3 +33,7 @@ required-features = ["firmware", "user"]
 name = "kernel"
 path = "src/bin/kernel.rs"
 required-features = ["firmware"]
+
+[[example]]
+name = "yolo_reference"
+required-features = ["jpeg-host"]

@@ -228,3 +228,64 @@ multiplication and do not establish hardware timing.
 The checked-in Rust schema descriptors are regenerated with
 `tools/generate_tflite_schema.py` from the pinned schema declaration. Normal
 Rust builds do not read, compile or link that C++ header.
+
+## YOLO JPEG detection (C OS parity)
+
+```text
+yolo_backend cpu
+yolo YOLO.TFL TEST.JPG
+yolo_backend npu
+yolo YOLO.TFL TEST2.JPG
+yolo_diag on
+```
+
+`yolo_backend [cpu|pulp|npu|auto]` selects/shows a persistent preference;
+CPU is the boot default. It is reapplied after each model load and is independent
+of `tflite_run`. `yolo_diag on|off` controls tensor hashes and operator diagnostics
+independently of `tflite_diag`, and defaults to off. The command accepts two
+uppercase root-directory 8.3 filenames, matching the C shell.
+
+This is the same fixed normalized-xywh COCO80 profile as
+[`os/src/api/yolo/`](../os/src/api/yolo/README.md): FLOAT32 `[1,3,160,160]` input,
+FLOAT32 `[1,84,525]` output, and 289 operators. Shape checks do not establish
+compatibility with an arbitrary model using different output semantics.
+Baseline JPEG limits remain 480x320. RGB decoding streams into a 17-row buffer;
+centered letterbox, rational ties-to-even dimensions, half-pixel bilinear pixel
+rounding, RGB/255 CHW layout, score > 0.25, class-wise IoU > 0.45 NMS, stable ties,
+original-image clipping and the 50-detection limit match C.
+
+The shell clears the previous LCD result first. JPEG preflight precedes model
+loading; full decode and EOI must succeed before inference. Inference failure
+clears saved detections and resets runtime output. Started NPU failures abort
+without CPU retry. After successful inference, the JPEG is decoded again and
+bounded RGB888 tiles draw yellow boxes and white labels. A display error keeps
+the inference results. The `yolo_command::run` entry performs inference without
+LCD access; the shell wrapper adds display. No full-frame buffer is allocated.
+
+UART reports requested and actual backend counts, fallback reasons, successful
+NPU tile calls, input/output hashes, stage timing and optional per-operator
+traces. Operator time sums describe completed work only; they are not a
+CPU-only model baseline. Host PULP/NPU tests use emulation/mocks, not hardware.
+
+FC execution and generic-graph/YOLO work share a resident allocation, and JPEG
+preprocessing shares storage with NMS. Only the active member is accessed under
+the existing synchronous runtime lock. Stage changes initialize storage in
+place to avoid large stack temporaries. The model/Arena addresses, 128 KiB user
+stack, page-pool bounds and linker assertions remain unchanged.
+
+Additional verification (from repository root):
+
+```sh
+# Requires the existing Python environment with NumPy, Pillow, OpenCV and LiteRT.
+python -B PSC-ONE/software/os/tests/yolo/run.py --build build/yolo-c-reference --mixed
+python -B PSC-ONE/software/os_rust/tests/yolo/run.py --build build/yolo-rust-reference --c-reference build/yolo-c-reference
+python3 PSC-ONE/software/os_rust/tests/yolo/memory.py --build PSC-ONE/software/os_rust/build
+```
+
+The comparison checks 36 streaming input cases, NMS boundaries, exact LCD pixels,
+and both SD JPEGs across four backends against all 289 reference tensors. The
+`jpeg-host` feature exposes the same decoder callbacks for this test; its runner
+links only the existing TJpgDec C decoder. It does not link C YOLO/TFLite code.
+`tests/yolo/uart.py --help` describes the separate bounded RTL smoke for command
+syntax, model-profile rejection, FC/graph storage transitions and warm restart.
+It does not attempt full YOLO inference on RTL.

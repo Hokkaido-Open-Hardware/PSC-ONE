@@ -11,9 +11,44 @@ use crate::{
     kernel::user_memory::*,
 };
 use core::ptr::{addr_of_mut, null, null_mut};
-static mut RUNTIME: Runtime<'static> = Runtime::empty();
+// FC and generic graph execution are mutually exclusive. YOLO scratch is only
+// live with a generic graph, so the complete resident state shares one allocation.
+use core::mem::ManuallyDrop;
+struct GenericState {
+    graph: Graph<'static>,
+    yolo: crate::api::yolo::Workspace,
+}
+impl GenericState {
+    const fn new() -> Self {
+        Self {
+            graph: Graph::new(),
+            yolo: crate::api::yolo::Workspace::new(),
+        }
+    }
+}
+union Storage {
+    fc: ManuallyDrop<Runtime<'static>>,
+    generic: ManuallyDrop<GenericState>,
+}
+static mut STORAGE: Storage = Storage {
+    generic: ManuallyDrop::new(GenericState::new()),
+};
+static mut STORAGE_FC: bool = false;
+unsafe fn fc_ptr() -> *mut Runtime<'static> {
+    addr_of_mut!((*addr_of_mut!(STORAGE)).fc).cast()
+}
+unsafe fn generic_ptr() -> *mut GenericState {
+    addr_of_mut!((*addr_of_mut!(STORAGE)).generic).cast()
+}
+unsafe fn graph_ptr() -> *mut Graph<'static> {
+    addr_of_mut!((*generic_ptr()).graph)
+}
+unsafe fn activate_fc() {
+    // Call only after all graph borrows have ended. Neither member has a destructor.
+    Runtime::init_at(fc_ptr());
+    STORAGE_FC = true;
+}
 static mut FC_READY: bool = false;
-static mut GRAPH_RUNTIME: Graph<'static> = Graph::new();
 static mut GENERIC: bool = false;
 static mut BUSY: bool = false;
 static mut DIAGNOSTICS: bool = true;
@@ -41,7 +76,7 @@ pub unsafe fn with_runtime<T>(
     }
     BUSY = true;
     let result = if FC_READY {
-        f(&mut *addr_of_mut!(RUNTIME))
+        f(&mut *fc_ptr())
     } else {
         Err(GRAPH)
     };
@@ -55,14 +90,24 @@ pub unsafe fn with_graph<T>(
         return Err(-205);
     }
     BUSY = true;
-    let result = f(&mut *addr_of_mut!(GRAPH_RUNTIME));
+    let result = if STORAGE_FC {
+        Err(GRAPH)
+    } else {
+        f(&mut *graph_ptr())
+    };
     BUSY = false;
     result
 }
 unsafe fn reset_inner() {
     FC_READY = false;
-    (&mut *addr_of_mut!(RUNTIME)).reset();
-    (&mut *addr_of_mut!(GRAPH_RUNTIME)).reset();
+    if STORAGE_FC {
+        (&mut *fc_ptr()).reset();
+        Graph::init_at(graph_ptr());
+        crate::api::yolo::Workspace::init_at(addr_of_mut!((*generic_ptr()).yolo));
+        STORAGE_FC = false;
+    } else {
+        (&mut *graph_ptr()).reset();
+    }
     GENERIC = false;
 }
 /// All existing model/arena borrows are dropped before replacing the backing bytes.
@@ -111,7 +156,7 @@ pub fn load(name: &str) -> Result<(), i32> {
             PREPARE_US = -1;
             let bytes = bytes?;
             let timing = user::call_timer_measure_begin() == 0;
-            let graph = &mut *addr_of_mut!(GRAPH_RUNTIME);
+            let graph = &mut *graph_ptr();
             let prepared = (|| {
                 graph.analyze(bytes)?;
                 GENERIC = !graph.is_legacy_fc();
@@ -121,7 +166,8 @@ pub fn load(name: &str) -> Result<(), i32> {
                         core::slice::from_raw_parts_mut(USER_ARENA_BASE as *mut u8, ARENA_CAPACITY),
                     )
                 } else {
-                    (&mut *addr_of_mut!(RUNTIME)).prepare_into(bytes)?;
+                    activate_fc();
+                    (&mut *fc_ptr()).prepare_into(bytes)?;
                     FC_READY = true;
                     Ok(())
                 }
@@ -135,10 +181,10 @@ pub fn load(name: &str) -> Result<(), i32> {
                 "Model: {} / {} bytes; Arena required: {} / {} bytes\n",
                 bytes.len(),
                 MODEL_CAPACITY,
-                if GENERIC {
-                    graph.required
+                if STORAGE_FC {
+                    (&*fc_ptr()).arena_required()
                 } else {
-                    (&*addr_of_mut!(RUNTIME)).arena_required()
+                    (&*graph_ptr()).required
                 },
                 if GENERIC { ARENA_CAPACITY } else { 4096 }
             ));
@@ -164,7 +210,7 @@ pub fn info(name: &str) -> Result<(), i32> {
                 -1
             };
             let bytes = bytes?;
-            let g = &mut *addr_of_mut!(GRAPH_RUNTIME);
+            let g = &mut *graph_ptr();
             let a = g.analyze(bytes)?;
             let legacy = g.is_legacy_fc();
             let capacity = if legacy { 4096 } else { ARENA_CAPACITY };
@@ -190,7 +236,8 @@ pub fn info(name: &str) -> Result<(), i32> {
                 }
             }
             let profile = if legacy {
-                let runtime = &mut *addr_of_mut!(RUNTIME);
+                activate_fc();
+                let runtime = &mut *fc_ptr();
                 runtime.prepare_into(bytes).map(|_| runtime.arena_used())
             } else {
                 g.prepare(
@@ -208,8 +255,7 @@ pub fn info(name: &str) -> Result<(), i32> {
                     error_string(e)
                 )),
             };
-            g.reset();
-            (&mut *addr_of_mut!(RUNTIME)).reset();
+            reset_inner();
             Ok(())
         })();
         BUSY = false;
@@ -333,9 +379,11 @@ pub unsafe extern "C" fn psc_tflite_arena_required() -> usize {
         return 0;
     }
     if GENERIC {
-        (&*addr_of_mut!(GRAPH_RUNTIME)).required
+        (&*graph_ptr()).required
+    } else if STORAGE_FC {
+        (&*fc_ptr()).arena_required()
     } else {
-        (&*addr_of_mut!(RUNTIME)).arena_required()
+        0
     }
 }
 #[no_mangle]
@@ -370,4 +418,22 @@ pub unsafe extern "C" fn psc_tflite_set_synap_tile_size(tile: u32) -> i32 {
     }
     .err()
     .unwrap_or(0)
+}
+
+/// Hold the model lock across JPEG preprocessing, invoke and NMS. The stage
+/// workspace borrows cannot escape the synchronous closure.
+pub unsafe fn with_yolo<T>(
+    f: impl FnOnce(&mut Graph<'static>, &mut crate::api::yolo::Workspace) -> Result<T, i32>,
+) -> Result<T, i32> {
+    if BUSY {
+        return Err(-205);
+    }
+    if STORAGE_FC || !GENERIC {
+        return Err(GRAPH);
+    }
+    BUSY = true;
+    let state = &mut *generic_ptr();
+    let result = f(&mut state.graph, &mut state.yolo);
+    BUSY = false;
+    result
 }

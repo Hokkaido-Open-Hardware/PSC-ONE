@@ -1,6 +1,7 @@
 //! TJpgDec ABI for JD_FASTDECODE=1, JD_FORMAT=0 and RGB888 tiles.
 use super::jpeg_headers::*;
-use crate::{api::user::*, fs::fat32_stream::File};
+use super::RgbSink;
+use crate::fs::{fat32::BlockDevice, fat32_stream::File};
 use core::ffi::c_void;
 #[repr(C)]
 pub struct Rect {
@@ -52,7 +53,9 @@ extern "C" {
         scale: u8,
     ) -> i32;
 }
-pub struct Session {
+pub struct Session<'a, D: BlockDevice> {
+    pub dev: &'a mut D,
+    pub sink: &'a mut dyn RgbSink,
     pub file: File,
     pub header: Header,
     pub error: i32,
@@ -61,17 +64,21 @@ pub struct Session {
 }
 
 /// Track read-ahead too: the upstream decoder stops at MCU count, not necessarily EOI.
-unsafe fn input_session(s: &mut Session, buffer: *mut u8, count: usize) -> usize {
+unsafe fn input_session<D: BlockDevice>(
+    s: &mut Session<'_, D>,
+    buffer: *mut u8,
+    count: usize,
+) -> usize {
     if s.error != 0 {
         return 0;
     }
     let pos = s.file.file_pos;
     let mut got = 0;
     let result = if buffer.is_null() {
-        s.file.skip(&mut UserSd, count as u32, &mut got)
+        s.file.skip(s.dev, count as u32, &mut got)
     } else {
         s.file.read(
-            &mut UserSd,
+            s.dev,
             core::slice::from_raw_parts_mut(buffer, count),
             &mut got,
         )
@@ -106,13 +113,21 @@ unsafe fn input_session(s: &mut Session, buffer: *mut u8, count: usize) -> usize
 }
 
 /// C calls synchronously; the session and scratch storage outlive both decoder calls.
-pub unsafe extern "C" fn input(jd: *mut Decoder, buffer: *mut u8, count: usize) -> usize {
-    input_session(&mut *((*jd).device.cast::<Session>()), buffer, count)
+pub unsafe extern "C" fn input<D: BlockDevice>(
+    jd: *mut Decoder,
+    buffer: *mut u8,
+    count: usize,
+) -> usize {
+    input_session(&mut *((*jd).device.cast::<Session<'_, D>>()), buffer, count)
 }
 
 /// Validate rectangle bounds before constructing a Rust slice over the C RGB buffer.
-pub unsafe extern "C" fn output(jd: *mut Decoder, bitmap: *mut c_void, rect: *mut Rect) -> i32 {
-    let s = &mut *((*jd).device.cast::<Session>());
+pub unsafe extern "C" fn output<D: BlockDevice>(
+    jd: *mut Decoder,
+    bitmap: *mut c_void,
+    rect: *mut Rect,
+) -> i32 {
+    let s = &mut *((*jd).device.cast::<Session<'_, D>>());
     if s.error != 0 {
         return 0;
     }
@@ -132,15 +147,15 @@ pub unsafe extern "C" fn output(jd: *mut Decoder, bitmap: *mut c_void, rect: *mu
         return 0;
     }
     let rgb = core::slice::from_raw_parts(bitmap.cast::<u8>(), (w * h * 3) as usize);
-    if call_lcd_rgb888_rect(r.left as u32, r.top as u32, w, h, rgb) != 0 {
-        s.error = LCD;
+    if let Err(e) = s.sink.rect(r.left as u32, r.top as u32, w, h, rgb) {
+        s.error = if e < 0 { e } else { FORMAT };
         return 0;
     }
     1
 }
 
 /// Reject a truncated entropy stream even when all expected MCUs were decoded.
-pub fn finish(s: &mut Session) -> Result<(), i32> {
+pub fn finish<D: BlockDevice>(s: &mut Session<'_, D>) -> Result<(), i32> {
     let mut tail = [0; 32];
     while !s.eoi && s.error == 0 {
         if unsafe { input_session(s, tail.as_mut_ptr(), tail.len()) } == 0 {
@@ -154,7 +169,7 @@ pub fn finish(s: &mut Session) -> Result<(), i32> {
     }
 }
 
-pub fn decoder_result(s: &Session, result: i32) -> Result<(), i32> {
+pub fn decoder_result<D: BlockDevice>(s: &Session<'_, D>, result: i32) -> Result<(), i32> {
     if s.error != 0 {
         return Err(s.error);
     }
@@ -168,7 +183,10 @@ pub fn decoder_result(s: &Session, result: i32) -> Result<(), i32> {
 }
 
 // Verify both sides whenever the vendor/configuration changes; see verify_images.py.
+#[cfg(target_pointer_width = "32")]
 const _: () = assert!(core::mem::size_of::<Decoder>() == 132);
+#[cfg(target_pointer_width = "32")]
 const _: () = assert!(core::mem::offset_of!(Decoder, device) == 124);
+#[cfg(target_pointer_width = "32")]
 const _: () = assert!(core::mem::offset_of!(Decoder, width) == 28);
 const _: () = assert!(core::mem::size_of::<Rect>() == 8);
