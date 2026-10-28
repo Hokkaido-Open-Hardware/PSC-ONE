@@ -43,6 +43,8 @@ int psc_tflite_set_synap_tile_size(unsigned size); /* multiples of 4, up to SA_M
 typedef struct {
     uint32_t tiles, packing_us, syscall_us, copy_in_us, execute_us, copy_out_us;
     uint32_t partial_us, post_us;
+    uint32_t syscalls, read_bytes, write_bytes;
+    uint32_t copy_in_bytes; /* A+B staged by kernel; excludes metadata/cache traffic */
     int valid, device_status;
 } psc_tflite_profile_t;
 int psc_tflite_set_profiling(int enabled);

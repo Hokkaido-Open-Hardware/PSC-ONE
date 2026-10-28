@@ -42,8 +42,10 @@ module PSC_NPU_Controller #(
     input  wire             c_write_ready,
 
     output reg              busy,
-    output reg              done
+    output reg              done,
+    output wire [31:0] status_extra
 );
+    assign status_extra=32'd0;
 
     `ifdef COCOTB_SIM
     `ifdef DUMP_VCD_CTRL

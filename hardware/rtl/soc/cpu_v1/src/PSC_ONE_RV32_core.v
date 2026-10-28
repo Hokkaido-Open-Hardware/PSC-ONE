@@ -293,7 +293,8 @@ module PSC_ONE_RV32_core #(
     // sa controll.
     wire sa_busy;
     wire sa_done;
-    assign csr_SA_STATUS = {30'b0, sa_busy, sa_done};
+    wire [31:0] sa_status_extra;
+    assign csr_SA_STATUS = sa_status_extra | {30'b0, sa_busy, sa_done};
     wire sa_start         = csr_SA_CTRL[0];
     wire sa_state_reset   = csr_SA_CTRL[1];
     wire sa_clear         = csr_SA_CTRL[2];
@@ -368,6 +369,7 @@ module PSC_ONE_RV32_core #(
 
         // status
         .busy               (sa_busy),
+        .status_extra       (sa_status_extra),
         .done               (sa_done)
     );
 

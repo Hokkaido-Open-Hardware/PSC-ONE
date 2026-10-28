@@ -270,6 +270,8 @@ NPU_V2_FILES = \
 NPU_LEGACY_FILES = \
 	$(NPU_LEGACY_DIR)/PSC_NPU_Controller.v \
 	$(NPU_LEGACY_DIR)/PSC_NPU_Engine.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Requantize.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_TilePost.sv \
 	$(NPU_LEGACY_DIR)/PSC_LPU_Controller.sv \
 	$(NPU_LEGACY_DIR)/PSC_NPU_ReadController.v \
 	$(NPU_LEGACY_DIR)/PSC_NPU_SystolicArray4x4.v \
@@ -344,7 +346,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	add_test1:RV32_chip_test:./mem/add_test1.mem:0xff00ff0b \
+	npu_test1:RV32_chip_test:./mem/npu_test1.mem:0x0000beef \
 
 # ============================================================
 # 複数テスト定義
@@ -432,6 +434,7 @@ PSCONE_LONG_TESTS = \
 	nn_64x16x1_test1:RV32_chip_test:./mem/nn_64x16x1_test1.mem:0x00000780 \
 	mmu_test1:RV32_chip_test:./mem/mmu_test1.mem:0x00000033 \
 	nn_test4:RV32_chip_test:./mem/nn_test4.mem:0x001c2000 \
+	npu_test1:RV32_chip_test:./mem/npu_test1.mem:0x0000beef \
 	memcpy_test1:RV32_chip_test:./mem/memcpy_test1.mem:0x00002521 \
 	pipeline_test1:RV32_chip_test:./mem/pipeline_test1.mem:0x0000009d \
 	pipeline_test2:RV32_chip_test:./mem/pipeline_test2.mem:0xfc1667c7 \

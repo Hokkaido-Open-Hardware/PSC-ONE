@@ -49,7 +49,8 @@ module PSC_NPU_Controller #(
     input  wire             c_write_ready,
 
     output reg              busy,
-    output reg              done
+    output reg              done,
+    output wire [31:0] status_extra
 );
 
     `ifdef COCOTB_SIM
@@ -106,9 +107,11 @@ generate
             .c_write_wdata          (c_write_wdata),
             .c_write_ready          (c_write_ready),
             .busy                   (busy),
+            .status_extra           (status_extra),
             .done                   (done)
         );
     end else if (ENABLE_LPU) begin : g_lpu_enabled
+        assign status_extra=32'd0;
         PSC_LPU_Controller #(
             .OUT_SHIFT              (OUT_SHIFT),
             .OUTPUT_INT32           (LPU_OUTPUT_INT32)
@@ -137,6 +140,7 @@ generate
             .done                   (done)
         );
     end else begin : g_disabled
+        assign status_extra=32'd0;
         assign rd_read_addr = 32'd0;
         assign rd_read_valid = 1'b0;
         assign c_write_valid = 1'b0;

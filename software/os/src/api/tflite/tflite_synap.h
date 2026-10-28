@@ -3,6 +3,7 @@
 #include "tflite_api.h"
 #include "tflite_cpu.h"
 #include "../sa_transfer.h"
+#include "../sa_qtile.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -11,6 +12,11 @@ extern "C" {
 int psc_tflite_sa_tile(const int8_t *a,const int8_t *b,int32_t *c,
                         unsigned m,unsigned k,unsigned n,psc_sa_profile_t *profile);
 int psc_tflite_clock_us(void);
+/* -1: opt-out (no syscall); 0: probed unsupported; 1: supported. */
+int psc_tflite_qtile_available(void);
+int psc_tflite_sa_qtile(const int8_t *,const int8_t *,int8_t *,unsigned,unsigned,psc_sa_qtile_t *);
+int psc_tflite_qbatch_enabled(void);
+int psc_tflite_sa_qbatch(const int8_t *,const int8_t *,int8_t *,psc_sa_qbatch_t *);
 /* Platform opt-in. Default false; never probe an absent device via CSR/MMIO. */
 int psc_tflite_synap_available(void);
 /* Tiled im2col, bounded shared workspace; scratch is SA_MAT_MAX^2 INT32.

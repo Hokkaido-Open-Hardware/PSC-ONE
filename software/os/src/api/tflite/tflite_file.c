@@ -235,6 +235,9 @@ static void backend_summary(enum psc_tflite_fc_backend requested,int wall_us) {
     }
     printf("CONV_2D us: cpu=%d pulp=%d npu=%d\n",conv[0],conv[2],conv[1]);
     printf("NPU successful tiles=%d profile_valid=%d status=%d\n",p->tiles,p->valid,p->device_status);
+    printf("NPU calls: syscalls=%d read_payload=%d write_payload=%d bytes\n",
+        p->syscalls,p->read_bytes,p->write_bytes);
+    printf("NPU kernel A+B copy-in=%d bytes (excludes metadata/cache traffic)\n",p->copy_in_bytes);
     if(p->tiles&&p->valid)printf("NPU us: packing=%d syscall=%d copy_in=%d execute=%d copy_out=%d partial=%d post=%d\n",
         p->packing_us,p->syscall_us,p->copy_in_us,p->execute_us,p->copy_out_us,p->partial_us,p->post_us);
 }

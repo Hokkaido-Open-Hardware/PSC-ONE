@@ -1,7 +1,6 @@
 `timescale 1ns/1ps
 
 module PSC_NPU_Engine #(
-    // Param
     parameter integer PE_N     = 4,     // Physical SA size: 4x4 fixed
     parameter integer MATRIX_N = 4,     // Default matrix size
     parameter integer MUL_NUM  = 4      // Number of physical multipliers
@@ -13,7 +12,7 @@ module PSC_NPU_Engine #(
     // SA control
     input  wire             start,
     input  wire             sa_state_reset,
-    input  wire [3:0]       sa_os_instruction,  // Reserved
+    input  wire [3:0]       sa_os_instruction,  // 0: raw GEMM, 1: FIRST, 2: CONTINUE, 3: LAST, 4: SINGLE
     input  wire             sa_clear,
 
     // Runtime matrix size: 4, 8, 12, 16, ...
@@ -44,23 +43,117 @@ module PSC_NPU_Engine #(
     input  wire             c_write_ready,
 
     output reg              busy,
-    output reg              done
+    output reg              done,
+    output wire [31:0]      status_extra
 );
 
-    localparam integer DW = 8;
-    localparam integer PW = 32;
-    localparam integer SW = 32;
+    `ifdef COCOTB_SIM
+    `ifdef DUMP_VCD_CTRL
+    initial begin
+        `ifdef DUMP_VCD
+        $display("COCOTB_SIM SA DUMP_VCD ENABLE");
+        $dumpfile("./wave/SystolicArray4x4_Ctrl_test.vcd");
+        $dumpvars(0);
+        `else
+        $display("COCOTB_SIM SA verilator FST ENABLE");
+        $dumpfile("./wave/SystolicArray4x4_Ctrl_test.fst");
+        $dumpvars(0);
+        `endif
+    end
+    `endif
+    `endif
+
+    //======================================================
+    // Command registers
+    //
+    // CSR values are captured once when start is accepted.
+    // busy中のサイズ・アドレス・命令変更は実行中の要求に影響しない。
+    //======================================================
+    reg        signed_mode_latched;
+    reg [7:0]  matrix_size_x_latched;
+    reg [7:0]  matrix_size_y_latched;
+    reg [31:0] BASE_ADDR_A_latched;
+    reg [31:0] BASE_ADDR_B_latched;
+    reg [31:0] BASE_ADDR_C_latched;
+    reg [3:0]  command;
+
+    reg        acc_valid;
+    reg        fault;
+    reg        start_seen;
+    reg        abort_pending;
+    reg [7:0]  saved_rows;
+    reg [31:0] saved_base;
+
+    wire quantized     = (command != 0);
+    wire first_command = (command == 1) || (command == 4);
+    wire last_command  = (command == 3) || (command == 4);
+
+    // SA_STATUS: capability[8], accumulator valid[3], error[2]
+    assign status_extra = reset_n
+                          ? (32'h100 | {28'd0, acc_valid, fault, 2'b00})
+                          : 32'd0;
+
+    //--------------------------------------------
+    // Parameter / output processor signals
+    //--------------------------------------------
+    wire [31:0] mac_read_addr;
+    wire        mac_read_valid;
+    wire [31:0] post_read_addr;
+    wire        post_read_valid;
+    wire [31:0] post_write_addr;
+    wire [31:0] post_write_data;
+    wire        post_write_valid;
+    wire        post_done;
+    wire        post_error;
+    wire        seed_valid;
+    wire [3:0]  post_index;
+    wire [31:0] seed_data;
+
+    reg         post_init;
+    reg         post_output;
+
+    wire post_active = (state == S_PARAM_WAIT) || (state == S_POST_WAIT);
+
+    assign rd_read_addr  = post_active ? post_read_addr  : mac_read_addr;
+    assign rd_read_valid = post_active ? post_read_valid : mac_read_valid;
+
+    //======================================================
+    // Parameter / output processor instance
+    //======================================================
+    PSC_NPU_TilePost u_post (
+        .clock        (clock),
+        .reset_n      (reset_n),
+        .init_start   (post_init),
+        .output_start (post_output),
+        .base         (BASE_ADDR_C_latched),
+        .rows         (matrix_rows),
+        .req_ready    (sa_req_ready),
+        .read_ready   (rd_read_ready),
+        .write_ready  (c_write_ready),
+        .read_data    (rd_read_data),
+        .acc_data     (ps_acc_out),
+        .read_addr    (post_read_addr),
+        .read_valid   (post_read_valid),
+        .write_addr   (post_write_addr),
+        .write_data   (post_write_data),
+        .write_valid  (post_write_valid),
+        .seed_valid   (seed_valid),
+        .acc_index    (post_index),
+        .seed_data    (seed_data),
+        .done         (post_done),
+        .error        (post_error)
+    );
 
     // Runtime dimensions:
-    //   A = M x matrix_size_x
-    //   B = matrix_size_x x matrix_size_y
-    //   C = M x matrix_size_y
+    //   A = M x matrix_size_x_latched
+    //   B = matrix_size_x_latched x matrix_size_y_latched
+    //   C = M x matrix_size_y_latched
     //
     // X/K and Y/N must be non-zero multiples of four. M may be 1..255.
-    // Keep dimensions and base addresses stable until done. Capture M at start.
-    reg  [7:0] matrix_rows;
-    wire [7:0] tile_count_k = matrix_size_x >> 2;
-    wire [7:0] tile_count_y = matrix_size_y >> 2;
+    // Dimensions and base addresses remain latched until the command completes.
+    reg [7:0] matrix_rows;
+    wire [7:0] tile_count_k = matrix_size_x_latched >> 2;
+    wire [7:0] tile_count_y = matrix_size_y_latched >> 2;
     wire [7:0] last_matrix_row = matrix_rows - 8'd1;
 
     // 4x4 tile loop indices:
@@ -69,8 +162,8 @@ module PSC_NPU_Engine #(
     reg [7:0] j_idx;
     reg [7:0] k_idx;
 
-    // Precompute the final PE selector once per tile; keep row-address
-    // arithmetic out of the write-ack -> state/address control path.
+    // Precompute the final PE selector once per tile to keep the
+    // write-ack control path free of row-address arithmetic.
     reg [5:0] tile_last_output;
     reg       last_m_tile;
 
@@ -102,10 +195,10 @@ module PSC_NPU_Engine #(
     reg [7:0] c_col_q;
     reg [31:0] c_row_delta_q;
 
-    // C is uint32_t, therefore one matrix row occupies matrix_size_y * 4
+    // C is uint32_t, therefore one matrix row occupies matrix_size_y_latched * 4
     // bytes.  After writing column 3 of a 4-wide tile, advance from
     // current col3 to next-row col0: row_stride_bytes - 12.
-    wire [31:0] c_row_stride_bytes = {22'd0, matrix_size_y, 2'b00};
+    wire [31:0] c_row_stride_bytes = {22'd0, matrix_size_y_latched, 2'b00};
     wire [31:0] c_next_row_delta   = c_row_stride_bytes - 32'd12;
 
     //--------------------------------------------
@@ -131,16 +224,13 @@ module PSC_NPU_Engine #(
     // SA instance
     //======================================================
     PSC_NPU_SystolicArray4x4 #(
-        .DW                     (DW),
-        .PW                     (PW),
-        .SW                     (SW),
         .MUL_NUM                (MUL_NUM)
     ) u_sa (
         .clock                  (clock),
         .reset_n                (reset_n),
-        .signed_mode            (signed_mode),
+        .signed_mode            (signed_mode_latched),
 
-        .data_clear             (data_clear | sa_clear),
+        .data_clear             (data_clear),
         .en_b_shift_bottom      (en_b_shift_bottom),
         .en_shift_right         (en_shift_right),
         .start_pulse            (start_pulse),
@@ -148,7 +238,10 @@ module PSC_NPU_Engine #(
         .a_left_in_bus          (a_left_in_bus),
         .b_top_in_bus           (b_top_in_bus),
 
-        .ps_select              (row_s),
+        .seed_valid             (seed_valid),
+        .seed_index             (post_index),
+        .seed_data              (seed_data),
+        .ps_select              (post_active ? {2'b0, post_index} : row_s),
         .ps_acc_out             (ps_acc_out),
 
         .busy_out               (busy_out),
@@ -171,11 +264,11 @@ module PSC_NPU_Engine #(
         .clock              (clock),
         .reset_n            (reset_n),
 
-        .BASE_ADDR_A        (BASE_ADDR_A),
-        .BASE_ADDR_B        (BASE_ADDR_B),
+        .BASE_ADDR_A        (BASE_ADDR_A_latched),
+        .BASE_ADDR_B        (BASE_ADDR_B_latched),
 
-        .matrix_size_x      (matrix_size_x),
-        .matrix_size_y      (matrix_size_y),
+        .matrix_size_x      (matrix_size_x_latched),
+        .matrix_size_y      (matrix_size_y_latched),
         .matrix_size_m      (matrix_rows),
 
         .i_idx              (i_idx),
@@ -185,8 +278,8 @@ module PSC_NPU_Engine #(
         .read_valid         (read_start),
         .read_ready         (read_end),
 
-        .rd_read_addr       (rd_read_addr),
-        .rd_read_valid      (rd_read_valid),
+        .rd_read_addr       (mac_read_addr),
+        .rd_read_valid      (mac_read_valid),
         .rd_read_ready      (rd_read_ready),
         .rd_read_data       (rd_read_data),
 
@@ -305,9 +398,17 @@ module PSC_NPU_Engine #(
         S_C_ADDR_COLUMN         = 6'd22,
         S_C_ADDR_BASE           = 6'd23,
         S_C_ADDR_ROW            = 6'd24,
+        S_PARAM_WAIT           = 6'd25,
+        S_POST_WAIT            = 6'd26,
         S_DONE                  = 6'd31;
 
     reg [5:0] state;
+
+    // Reset/clear要求を受けても、実行中のメモリ応答まではbusyを保持する。
+    always @(*) begin
+        busy = (state != S_IDLE) && ((state != S_DONE) || abort_pending);
+        done = (state == S_DONE) && !abort_pending;
+    end
 
     //--------------------------------------------
     // Main FSM
@@ -315,6 +416,22 @@ module PSC_NPU_Engine #(
     always @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             state             <= S_IDLE;
+
+            signed_mode_latched   <= 1'b0;
+            matrix_size_x_latched <= 8'd0;
+            matrix_size_y_latched <= 8'd0;
+            BASE_ADDR_A_latched   <= 32'd0;
+            BASE_ADDR_B_latched   <= 32'd0;
+            BASE_ADDR_C_latched   <= 32'd0;
+            command               <= 4'd0;
+            acc_valid             <= 1'b0;
+            fault                 <= 1'b0;
+            start_seen            <= 1'b0;
+            abort_pending         <= 1'b0;
+            saved_rows            <= 8'd0;
+            saved_base            <= 32'd0;
+            post_init             <= 1'b0;
+            post_output           <= 1'b0;
 
             read_start        <= 1'b0;
 
@@ -342,10 +459,19 @@ module PSC_NPU_Engine #(
             c_base_q          <= 32'd0;
             c_col_q           <= 8'd0;
             c_row_delta_q     <= 32'd0;
-
-            busy              <= 1'b0;
-            done              <= 1'b0;
         end else begin
+            if (!start)
+                start_seen <= 1'b0;
+            else
+                start_seen <= 1'b1;
+
+            if ((sa_state_reset || sa_clear)
+                && (state != S_IDLE) && (state != S_DONE))
+                abort_pending <= 1'b1;
+
+            post_init   <= 1'b0;
+            post_output <= 1'b0;
+
             // Default one-cycle pulses
             read_start        <= 1'b0;
             data_clear        <= 1'b0;
@@ -354,15 +480,26 @@ module PSC_NPU_Engine #(
             start_pulse       <= 1'b0;
             c_write_valid     <= 1'b0;
 
-            busy <= (state != S_IDLE) && (state != S_DONE);
-            done <= (state == S_DONE);
-
             case (state)
                 //--------------------------------------------
                 // Start i=0, j=0, k=0.
                 //--------------------------------------------
                 S_IDLE: begin
-                    if (start) begin
+                    if (sa_clear) begin
+                        acc_valid  <= 1'b0;
+                        fault      <= 1'b0;
+                        data_clear <= 1'b1;
+                    end else if (start && !start_seen && !sa_state_reset) begin
+                        signed_mode_latched   <= signed_mode;
+                        matrix_size_x_latched <= matrix_size_x;
+                        matrix_size_y_latched <= matrix_size_y;
+                        BASE_ADDR_A_latched   <= BASE_ADDR_A;
+                        BASE_ADDR_B_latched   <= BASE_ADDR_B;
+                        BASE_ADDR_C_latched   <= BASE_ADDR_C;
+                        command               <= sa_os_instruction;
+                        fault                 <= 1'b0;
+                        abort_pending         <= 1'b0;
+
                         matrix_rows   <= (matrix_size_m == 8'd0)
                                          ? matrix_size_y : matrix_size_m;
                         i_idx         <= 8'd0;
@@ -372,6 +509,27 @@ module PSC_NPU_Engine #(
                         cur_a_data    <= 32'd0;
                         cur_b_data    <= 32'd0;
                         state         <= S_CLEAR;
+
+                        if (sa_os_instruction == 0) begin
+                            acc_valid <= 1'b0;
+                        end else if ((sa_os_instruction > 4)
+                            || !signed_mode || (matrix_size_y != 4)
+                            || (matrix_size_m < 1) || (matrix_size_m > 4)
+                            || (matrix_size_x == 0) || (matrix_size_x[1:0] != 0)
+                            || (BASE_ADDR_A[1:0] != 0) || (BASE_ADDR_B[1:0] != 0)
+                            || (BASE_ADDR_C[1:0] != 0)
+                            || (((sa_os_instruction == 2) || (sa_os_instruction == 3))
+                                && (!acc_valid || (saved_rows != matrix_size_m)
+                                    || (saved_base != BASE_ADDR_C)))) begin
+                            fault     <= 1'b1;
+                            acc_valid <= 1'b0;
+                            state     <= S_DONE;
+                        end else if ((sa_os_instruction == 1)
+                            || (sa_os_instruction == 4)) begin
+                            saved_rows <= matrix_size_m;
+                            saved_base <= BASE_ADDR_C;
+                            acc_valid  <= 1'b0;
+                        end
                     end
                 end
 
@@ -381,22 +539,50 @@ module PSC_NPU_Engine #(
                 //--------------------------------------------
                 S_CLEAR: begin
                     last_m_tile <= (i_idx == {2'b00, last_matrix_row[7:2]});
-                    if ((matrix_rows[1:0] != 2'd0)
-                        && (i_idx == {2'b00, matrix_rows[7:2]}))
-                        tile_last_output <= {2'b00, (matrix_rows[1:0] - 2'd1), 2'b11};
+                    if (i_idx == {2'b00, last_matrix_row[7:2]})
+                        tile_last_output <= {2'b00, last_matrix_row[1:0], 2'b11};
                     else
                         tile_last_output <= 6'd15;
-                    data_clear <= 1'b1;
+                    data_clear <= !quantized || first_command;
                     row_s      <= 6'd0;
                     k_idx      <= 8'd0;
                     cur_a_data <= 32'd0;
                     cur_b_data <= 32'd0;
-                    state      <= S_RA_START;
+                    if (quantized && first_command) begin
+                        post_init <= 1'b1;
+                        state     <= S_PARAM_WAIT;
+                    end else begin
+                        state <= S_RA_START;
+                    end
                 end
 
                 //--------------------------------------------
                 // Read A[i_idx][k_idx] and B[k_idx][j_idx].
                 //--------------------------------------------
+                S_PARAM_WAIT: begin
+                    if (post_done) begin
+                        if (post_error) begin
+                            fault     <= 1'b1;
+                            acc_valid <= 1'b0;
+                            state     <= S_DONE;
+                        end else begin
+                            acc_valid <= 1'b1;
+                            state     <= S_RA_START;
+                        end
+                    end
+                end
+
+                S_POST_WAIT: begin
+                    c_write_valid <= post_write_valid;
+                    c_write_addr  <= post_write_addr;
+                    c_write_wdata <= post_write_data;
+
+                    if (post_done) begin
+                        acc_valid <= 1'b0;
+                        state     <= S_DONE;
+                    end
+                end
+
                 S_RA_START: begin
                     read_start <= 1'b1;
                     state      <= S_RA_WAIT;
@@ -494,10 +680,20 @@ module PSC_NPU_Engine #(
                                 // Preload the first write address here so
                                 // row_s is not on the c_write_addr timing path.
                                 c_row_elements_q <= matrix_row_elements(
-                                    global_row_base, matrix_size_y);
-                                c_col_q <= global_col_base;
-                                c_base_q <= BASE_ADDR_C;
-                                state <= S_C_ADDR_COLUMN;
+                                    global_row_base, matrix_size_y_latched);
+                                c_col_q  <= global_col_base;
+                                c_base_q <= BASE_ADDR_C_latched;
+
+                                if (quantized) begin
+                                    if (last_command) begin
+                                        post_output <= 1'b1;
+                                        state       <= S_POST_WAIT;
+                                    end else begin
+                                        state <= S_DONE;
+                                    end
+                                end else begin
+                                    state <= S_C_ADDR_COLUMN;
+                                end
                             end else begin
                                 // Keep ps_acc and process the next K tile.
                                 k_idx <= k_idx + 8'd1;
@@ -543,7 +739,8 @@ module PSC_NPU_Engine #(
                     if (c_write_ready) begin
                         if (row_s == tile_last_output) begin
                             row_s <= 6'd0;
-                            k_idx <= 8'd0;
+                            // S_CLEAR resets K before the next tile. Avoid
+                            // feeding the write-ack/tile-end path into K's CE.
 
                             if (j_idx != tile_count_y - 8'd1) begin
                                 j_idx <= j_idx + 8'd1;
@@ -573,8 +770,16 @@ module PSC_NPU_Engine #(
                 end
 
                 S_DONE: begin
-                    if (sa_state_reset)
+                    if (abort_pending || sa_clear) begin
+                        acc_valid     <= 1'b0;
+                        data_clear    <= 1'b1;
+                        abort_pending <= 1'b0;
+                        fault         <= 1'b0;
+                        state         <= S_IDLE;
+                    end else if (sa_state_reset) begin
+                        fault <= 1'b0;
                         state <= S_IDLE;
+                    end
                 end
 
                 default: begin

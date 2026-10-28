@@ -175,6 +175,9 @@ TFLITE_VENDOR := third_party/tflite
 TFLITE_CV_DOTSP_B := 0
 # Explicit platform capability: no CSR probe on generic QEMU/SBI builds.
 # A board built without SynapEngine must set TFLITE_HAS_SYNAP=0.
+# Experimental: 0=RAW, 1=single QTILE, 2=8x8 software batch (same RTL).
+# Opt in only after measuring on the selected bitstream.
+TFLITE_NPU_QTILE ?= 0
 TFLITE_HAS_SYNAP ?= $(if $(filter $(MODE),sim fpga_mem psc),1,0)
 ifeq ($(CPU_VERSION),v1)
 ifneq ($(filter $(MODE),sim fpga_mem psc),)
@@ -195,8 +198,8 @@ TFLITE_CPPFLAGS := -I$(TFLITE_DIR) -I$(TFLITE_VENDOR) \
 	-isystem $(TFLITE_CXX_ROOT)/riscv64-unknown-elf/rv32im/ilp32 \
 	-isystem /usr/lib/picolibc/riscv64-unknown-elf/include \
 	-DFLATBUFFERS_LOCALE_INDEPENDENT=0 -DTFLITE_SINGLE_ROUNDING=0 -DNDEBUG \
-	-DPSC_HAS_CV_DOTSP_B=$(TFLITE_CV_DOTSP_B) -DPSC_TFLITE_HAS_SYNAP=$(TFLITE_HAS_SYNAP)
-TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/api/sa_transfer.h $(Src)/api/sa_limits.h \
+	-DPSC_HAS_CV_DOTSP_B=$(TFLITE_CV_DOTSP_B) -DPSC_TFLITE_HAS_SYNAP=$(TFLITE_HAS_SYNAP) -DPSC_TFLITE_NPU_QTILE=$(TFLITE_NPU_QTILE)
+TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/api/sa_transfer.h $(Src)/api/sa_limits.h $(Src)/api/sa_qtile.h \
 	$(TFLITE_VENDOR)/psc/pulp_fc.h $(Build)/tflite_cpu_config \
 	$(shell rg --files $(TFLITE_VENDOR)/tensorflow $(TFLITE_VENDOR)/gemmlowp) \
 	$(TFLITE_VENDOR)/schema_generated.h \
@@ -469,7 +472,7 @@ $(USER_ELF): \
 	$(USER_DEPS) \
 	$(Build)/divmodsi3.o
 
-	$(CC) $(CFLAGS) $(JPEG_CPPFLAGS) $(DUSERBASE) $(DEFUSERBASE) \
+	$(CC) $(CFLAGS) $(JPEG_CPPFLAGS) -DPSC_TFLITE_HAS_SYNAP=$(TFLITE_HAS_SYNAP) -DPSC_TFLITE_NPU_QTILE=$(TFLITE_NPU_QTILE) $(DUSERBASE) $(DEFUSERBASE) \
 		$(LDFLAGS_USER) \
 		-o $@ \
 		$(USER_SRCS) \

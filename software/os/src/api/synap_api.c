@@ -1,6 +1,7 @@
 #include "synap_api.h"
 #include "../kernel/kernel.h"
 #include "../lib/common.h"
+#include "../drivers/timer_api.h"
 
 #ifndef SA_DEBUG
 #define SA_DEBUG 0
@@ -59,18 +60,156 @@
 #endif
 
 static int sa_active;
-int sa_run_rect_checked(
+unsigned sa_capabilities(void) { return CSR_READ(CSR_SA_STATUS) & PSC_SA_CAP_QTILE; }
+
+/* Caller holds sa_active for the entire K sequence/batch. A -5 result
+   permanently quarantines all shared DMA buffers until system reset. */
+static int sa_qcommand(const uint8_t *a,const uint8_t *b,uint32_t *block,
+                       unsigned m,unsigned len,unsigned code) {
+    unsigned config=0x18u|(code<<8);
+    CSR_WRITE(CSR_SA_CTRL,config|2u);CSR_WRITE(CSR_SA_CTRL,config);
+    CSR_WRITE(CSR_SA_ADDR_A,(uintptr_t)a);CSR_WRITE(CSR_SA_ADDR_B,(uintptr_t)b);
+    CSR_WRITE(CSR_SA_ADDR_C,(uintptr_t)block);
+    CSR_WRITE(CSR_SA_SIZE,(m<<16)|(4u<<8)|len);
+    __asm__ volatile("fence rw,rw" ::: "memory");
+    CSR_WRITE(CSR_SA_CTRL,config|1u);
+
+    unsigned timeout=10000000u,status;
+    do {status=CSR_READ(CSR_SA_STATUS);} while(!(status&1u) && --timeout);
+    if(!timeout || (status&4u)) {
+        /* Keep outstanding requests alive until acknowledged. A stuck bus
+           leaves the lock held permanently: no reuse and no fallback. */
+        CSR_WRITE(CSR_SA_CTRL,config|6u);
+        unsigned drain=10000000u;
+        do {status=CSR_READ(CSR_SA_STATUS);} while((status&10u) && --drain);
+        if(!drain) return -5;
+        CSR_WRITE(CSR_SA_CTRL,config);
+        __asm__ volatile("fence rw,rw" ::: "memory");
+        return timeout?-6:-2;
+    }
+    CSR_WRITE(CSR_SA_CTRL,config);
+    return 0;
+}
+
+int sa_run_qtile_checked(const uint8_t *a,const uint8_t *b,uint8_t *c,
+                        unsigned m,unsigned k,psc_sa_qtile_t *q) {
+    if(!a || !b || !c || !q || !m || m>4 || !k || k>PSC_SA_Q_MAX_K || (k&3)) return -1;
+    if(!sa_capabilities()) return -4;
+    if(sa_active) return -3;
+    for(unsigned j=8;j<12;++j) if(q->parameters[j]<-31 || q->parameters[j]>30) return -1;
+    if(q->parameters[12]<-128 || q->parameters[12]>127 || q->parameters[13]<-128 ||
+       q->parameters[14]>127 || q->parameters[13]>q->parameters[14] || q->parameters[15]) return -1;
+    /* Single hart, synchronous syscall with interrupts disabled by trap entry.
+       All raw and quantized requests use this same lock. */
+    sa_active=1;
+    static _Alignas(16) uint8_t qa[4*252],qb[252*4];
+    static _Alignas(16) uint32_t block[20];
+    for(unsigned j=0;j<16;++j)block[j]=(uint32_t)q->parameters[j];
+    q->commands=0;q->read_bytes=0;q->write_bytes=0;
+    q->copy_in_us=0;q->execute_us=0;q->copy_out_us=0;q->valid=1;
+    for(unsigned base=0;base<k;base+=252) {
+        unsigned len=k-base;if(len>252)len=252;
+        int t0=timer_measure_read_us();
+        for(unsigned r=0;r<m;++r)for(unsigned j=0;j<len;++j)qa[r*len+j]=a[r*k+base+j];
+        for(unsigned j=0;j<len*4;++j)qb[j]=b[base*4+j];
+        int t1=timer_measure_read_us();
+        if(t0<0 || t1<t0)q->valid=0;else q->copy_in_us+=t1-t0;
+        unsigned code=k<=252?4:base==0?1:base+len==k?3:2;
+        int rc=sa_qcommand(qa,qb,block,m,len,code);
+        if(rc) { q->valid=0;if(rc!=-5)sa_active=0; return rc; }
+        ++q->commands;q->read_bytes+=m*len+4*len+(base==0?64:0);
+        int t2=timer_measure_read_us();
+        if(t1<0 || t2<t1)q->valid=0;else q->execute_us+=t2-t1;
+    }
+    __asm__ volatile("fence rw,rw" ::: "memory");
+    int t0=timer_measure_read_us();
+    volatile const uint8_t *out=(volatile const uint8_t *)&block[16];
+    for(unsigned j=0;j<m*4;++j)c[j]=out[j];
+    int t1=timer_measure_read_us();
+    if(t0<0 || t1<t0)q->valid=0;else q->copy_out_us=t1-t0;
+    q->write_bytes=m*4;sa_active=0;return 0;
+}
+
+/* Software batching only: the hardware still receives the original commands.
+   Segment-major A permits reuse without a second copy before each launch.
+   B already consists of contiguous Kx4 panels. All scratch is kernel-owned. */
+int sa_run_qbatch_checked(const uint8_t *a,const uint8_t *b,uint8_t *c,psc_sa_qbatch_t *q) {
+    if(!q)return -1;
+    unsigned m=q->m,k=q->k,n=q->n;
+    q->commands=q->completed_tiles=q->read_bytes=q->write_bytes=q->copy_in_bytes=0;
+    q->copy_in_us=q->execute_us=q->copy_out_us=0;q->valid=0;
+    if(!a || !b || !c || !m || m>PSC_SA_Q_BATCH_M || !k || k>PSC_SA_Q_MAX_K ||
+       (k&3u) || !n || n>PSC_SA_Q_BATCH_N || (n&3u) || q->reserved)return -1;
+    if(sa_active)return -3;
+    if(!sa_capabilities())return -4;
+    for(unsigned g=0;g<n/4;++g) {
+        const int *p=q->parameters[g];
+        for(unsigned j=8;j<12;++j)if(p[j]<-31 || p[j]>30)return -1;
+        if(p[12]<-128 || p[12]>127 || p[13]<-128 || p[14]>127 || p[13]>p[14] || p[15])return -1;
+    }
+    sa_active=1;q->valid=1;
+    static _Alignas(16) uint8_t a_stage[PSC_SA_Q_BATCH_M*PSC_SA_Q_MAX_K];
+    static _Alignas(16) uint8_t b_stage[PSC_SA_Q_BATCH_N*PSC_SA_Q_MAX_K];
+    static _Alignas(16) uint32_t blocks[PSC_SA_Q_BATCH_N/4][20];
+    static uint8_t result[PSC_SA_Q_BATCH_M*PSC_SA_Q_BATCH_N];
+    int t0=timer_measure_read_us();
+    for(unsigned r0=0;r0<m;r0+=4) {
+        unsigned rows=m-r0;if(rows>4)rows=4;
+        for(unsigned base=0;base<k;base+=252) {
+            unsigned len=k-base;if(len>252)len=252;
+            for(unsigned r=0;r<rows;++r)
+                for(unsigned j=0;j<len;++j)
+                    a_stage[r0*k+rows*base+r*len+j]=a[(r0+r)*k+base+j];
+        }
+    }
+    for(unsigned j=0;j<n*k;++j)b_stage[j]=b[j];
+    for(unsigned g=0;g<n/4;++g)
+        for(unsigned j=0;j<16;++j)blocks[g][j]=(uint32_t)q->parameters[g][j];
+    q->copy_in_bytes=(m+n)*k;
+    int t1=timer_measure_read_us();
+    if(t0<0 || t1<t0)q->valid=0;else q->copy_in_us=t1-t0;
+    for(unsigned g=0;g<n/4;++g)for(unsigned r0=0;r0<m;r0+=4) {
+        unsigned rows=m-r0;if(rows>4)rows=4;
+        t0=timer_measure_read_us();
+        for(unsigned base=0;base<k;base+=252) {
+            unsigned len=k-base;if(len>252)len=252;
+            unsigned code=k<=252?4:base==0?1:base+len==k?3:2;
+            int rc=sa_qcommand(a_stage+r0*k+rows*base,b_stage+g*k*4+base*4,
+                               blocks[g],rows,len,code);
+            if(rc) { q->valid=0;if(rc!=-5)sa_active=0;return rc; }
+            ++q->commands;q->read_bytes+=(rows+4)*len+(base==0?64:0);
+        }
+        __asm__ volatile("fence rw,rw" ::: "memory");
+        t1=timer_measure_read_us();
+        if(t0<0 || t1<t0)q->valid=0;else q->execute_us+=t1-t0;
+        volatile const uint8_t *out=(volatile const uint8_t *)&blocks[g][16];
+        for(unsigned r=0;r<rows;++r)for(unsigned j=0;j<4;++j)
+            result[(r0+r)*n+g*4+j]=out[r*4+j];
+        int t2=timer_measure_read_us();
+        if(t1<0 || t2<t1)q->valid=0;else q->copy_out_us+=t2-t1;
+        ++q->completed_tiles;q->write_bytes+=rows*4;
+    }
+    t0=timer_measure_read_us();
+    for(unsigned j=0;j<m*n;++j)c[j]=result[j];
+    t1=timer_measure_read_us();
+    if(t0<0 || t1<t0)q->valid=0;else q->copy_out_us+=t1-t0;
+    sa_active=0;return 0;
+}
+
+int sa_run_rect_profiled(
     const uint8_t *in_A,
     const uint8_t *in_B,
     uint32_t m, uint32_t k, uint32_t n,
     uint32_t *out_C,
-    bool signed_mode)
+    bool signed_mode, psc_sa_profile_t *profile)
 {
     if (!in_A || !in_B || !out_C || !m || !k || !n ||
         m > SA_MAT_MAX || k > SA_MAT_MAX || n > SA_MAT_MAX ||
         (k & 3u) || (n & 3u)) return -1;
     if (sa_active) return -3;
     sa_active = 1;
+    int execute_start = profile ? timer_measure_read_us() : -1;
+    if(profile) { profile->valid=0; profile->execute_us=0; profile->copy_out_us=0; }
     uint32_t config = (1u << 4); /* OS mode; instruction[11:8] = 0. */
     const uint32_t size =
         (m << 16) | /* M: A/C rows */
@@ -179,6 +318,11 @@ int sa_run_rect_checked(
             );
 
             CSR_WRITE(CSR_SA_CTRL, config | 0x02u);
+            /* Legacy reset is acknowledged only at completion. Keep reset
+               asserted and ownership held until its outstanding bus work ends. */
+            uint32_t drain = 10000000u;
+            while ((CSR_READ(CSR_SA_STATUS) & 2u) && --drain) { }
+            if (!drain) return -5;
             CSR_WRITE(CSR_SA_CTRL, config);
             __asm__ volatile("fence rw, rw" ::: "memory");
             sa_active = 0;
@@ -204,6 +348,7 @@ int sa_run_rect_checked(
 
     __asm__ volatile("fence rw, rw" ::: "memory");
 
+    int copy_start = profile ? timer_measure_read_us() : -1;
     const uint32_t count = m * n;
 
     for (uint32_t index = 0u;
@@ -222,9 +367,22 @@ int sa_run_rect_checked(
         out_C[index] = result[index];
     }
 
+    if(profile) {
+        int end=timer_measure_read_us();
+        profile->valid=execute_start>=0 && copy_start>=execute_start && end>=copy_start;
+        if(profile->valid) {
+            profile->execute_us=copy_start-execute_start;
+            profile->copy_out_us=end-copy_start;
+        }
+    }
     SA_LOG("SA run complete\n");
     sa_active = 0;
     return 0;
+}
+
+int sa_run_rect_checked(const uint8_t *a,const uint8_t *b,uint32_t m,uint32_t k,
+                        uint32_t n,uint32_t *c,bool signed_mode) {
+    return sa_run_rect_profiled(a,b,m,k,n,c,signed_mode,0);
 }
 
 int sa_run_checked(const uint8_t *a, const uint8_t *b, uint8_t n,

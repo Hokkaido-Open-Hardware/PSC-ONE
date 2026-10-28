@@ -124,6 +124,33 @@ void handle_syscall(struct trap_frame *f) {
         break;
 
     case SYS_SA_RUN: {
+        if(f->a5==PSC_SA_CAPS_FLAG) { f->a0=sa_capabilities(); break; }
+        if(f->a5==PSC_SA_QBATCH_FLAG) {
+            psc_sa_qbatch_t q;
+            if((f->a6&3u) || !user_accessible(f->a6,sizeof(q),PAGE_R|PAGE_W)) {
+                f->a0=(uint32_t)-1;break;
+            }
+            memcpy(&q,(const void *)(uintptr_t)f->a6,sizeof(q));
+            if(!q.m || q.m>PSC_SA_Q_BATCH_M || !q.k || q.k>PSC_SA_Q_MAX_K || (q.k&3u) ||
+               !q.n || q.n>PSC_SA_Q_BATCH_N || (q.n&3u) || q.reserved ||
+               !user_accessible(f->a0,q.m*q.k,PAGE_R) || !user_accessible(f->a1,q.n*q.k,PAGE_R) ||
+               !user_accessible(f->a2,q.m*q.n,PAGE_W)) { f->a0=(uint32_t)-1;break; }
+            int rc=sa_run_qbatch_checked((const uint8_t *)(uintptr_t)f->a0,
+                (const uint8_t *)(uintptr_t)f->a1,(uint8_t *)(uintptr_t)f->a2,&q);
+            memcpy((void *)(uintptr_t)f->a6,&q,sizeof(q));f->a0=(uint32_t)rc;break;
+        }
+        if(f->a5==PSC_SA_QTILE_FLAG) {
+            unsigned m=f->a4>>16,k=f->a4&65535u;
+            psc_sa_qtile_t q;
+            if(!m || m>4 || !k || k>PSC_SA_Q_MAX_K || (k&3u) || (f->a6&3u) ||
+               !user_accessible(f->a0,m*k,PAGE_R) || !user_accessible(f->a1,k*4,PAGE_R) ||
+               !user_accessible(f->a2,m*4,PAGE_W) ||
+               !user_accessible(f->a6,sizeof(q),PAGE_R|PAGE_W)) { f->a0=(uint32_t)-1; break; }
+            memcpy(&q,(const void *)(uintptr_t)f->a6,sizeof(q));
+            int rc=sa_run_qtile_checked((const uint8_t *)(uintptr_t)f->a0,
+                (const uint8_t *)(uintptr_t)f->a1,(uint8_t *)(uintptr_t)f->a2,m,k,&q);
+            memcpy((void *)(uintptr_t)f->a6,&q,sizeof(q));f->a0=(uint32_t)rc;break;
+        }
         const uint8_t *user_A = (const uint8_t *)(uintptr_t)f->a0;
         const uint8_t *user_B = (const uint8_t *)(uintptr_t)f->a1;
         uint32_t *user_C = (uint32_t *)(uintptr_t)f->a2;
@@ -161,7 +188,8 @@ void handle_syscall(struct trap_frame *f) {
         for (uint32_t i = 0; i < elements; ++i) kernel_C[i] = 0;
 
         int t1 = profiling ? timer_measure_read_us() : -1;
-        int status = sa_run_rect_checked(kernel_A, kernel_B, m, k, n, kernel_C, option);
+        int status = sa_run_rect_profiled(kernel_A, kernel_B, m, k, n, kernel_C, option,
+                                          profiling ? &profile : 0);
         if (status) { f->a0 = (uint32_t)status; break; }
         int t2 = profiling ? timer_measure_read_us() : -1;
 
@@ -169,11 +197,10 @@ void handle_syscall(struct trap_frame *f) {
             user_C[i] = kernel_C[i];
         if (profiling) {
             int t3 = timer_measure_read_us();
-            profile.valid = t0 >= 0 && t1 >= t0 && t2 >= t1 && t3 >= t2;
+            profile.valid = profile.valid && t0 >= 0 && t1 >= t0 && t2 >= t1 && t3 >= t2;
             if (profile.valid) {
                 profile.copy_in_us = t1-t0;
-                profile.execute_us = t2-t1;
-                profile.copy_out_us = t3-t2;
+                profile.copy_out_us += t3-t2;
             }
             memcpy((void *)(uintptr_t)f->a6, &profile, sizeof(profile));
         }

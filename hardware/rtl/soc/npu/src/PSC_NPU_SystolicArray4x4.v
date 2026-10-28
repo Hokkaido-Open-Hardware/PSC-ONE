@@ -12,6 +12,9 @@ module PSC_NPU_SystolicArray4x4 #(
     input  wire              signed_mode,
 
     // Shared controls
+    input wire seed_valid,
+    input wire [3:0] seed_index,
+    input wire [SW-1:0] seed_data,
     input  wire              data_clear,
     input  wire              en_b_shift_bottom,
     input  wire              en_shift_right,
@@ -199,6 +202,7 @@ module PSC_NPU_SystolicArray4x4 #(
         .reset_n            (reset_n),
         .signed_mode        (signed_mode),
 
+        .seed_valid(seed_valid), .seed_index(seed_index), .seed_data(seed_data),
         .data_clear         (data_clear),
         .start              (start_pulse),
 

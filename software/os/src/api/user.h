@@ -98,3 +98,8 @@ int call_sa_matmul_int8(const int8_t *a, const int8_t *b, int32_t *c,
 /* Row-major A[m][k] * B[k][n] = C[m][n]; m=1..64, k/n multiples of 4. */
 int call_sa_matmul_int8_rect(const int8_t *a, const int8_t *b, int32_t *c,
                              unsigned m, unsigned k, unsigned n, psc_sa_profile_t *profile);
+
+#include "sa_qtile.h"
+int call_sa_qtile(const int8_t *,const int8_t *,int8_t *,unsigned,unsigned,psc_sa_qtile_t *);
+int call_sa_qbatch(const int8_t *,const int8_t *,int8_t *,psc_sa_qbatch_t *);
+unsigned call_sa_capabilities(void);

@@ -256,6 +256,8 @@ NPU_V2_FILES = \
 NPU_LEGACY_FILES = \
 	$(NPU_LEGACY_DIR)/PSC_NPU_Controller.v \
 	$(NPU_LEGACY_DIR)/PSC_NPU_Engine.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Requantize.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_TilePost.sv \
 	$(NPU_LEGACY_DIR)/PSC_LPU_Controller.sv \
 	$(NPU_LEGACY_DIR)/PSC_NPU_ReadController.v \
 	$(NPU_LEGACY_DIR)/PSC_NPU_SystolicArray4x4.v \

@@ -14,6 +14,9 @@ module PSC_NPU_PE_INT #(
     input  logic                         reset_n,
     input  logic                         signed_mode,
 
+    input wire seed_valid,
+    input wire [3:0] seed_index,
+    input wire [SW-1:0] seed_data,
     input  logic                         data_clear,
     input  logic                         start,
     input  logic                         en_b_shift_bottom,
@@ -120,6 +123,8 @@ module PSC_NPU_PE_INT #(
                         product       <= {(THREADS*PW){1'b0}};
                         ps_acc        <= {(THREADS*SW){1'b0}};
 
+                    end else if (seed_valid) begin
+                        ps_acc[seed_index*SW +: SW] <= seed_data;
                     end else if (start) begin
                         busy                <= 1'b1;
                         signed_mode_latch   <= signed_mode;

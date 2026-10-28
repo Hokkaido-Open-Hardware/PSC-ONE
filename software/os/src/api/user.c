@@ -822,3 +822,33 @@ int call_sa_matmul_int8_rect(const int8_t *a, const int8_t *b, int32_t *c,
         : "r"(a1), "r"(a2), "r"(a3), "r"(a4), "r"(a5), "r"(a6) : "memory");
     return (int)a0;
 }
+
+int call_sa_qtile(const int8_t *a,const int8_t *b,int8_t *c,unsigned m,unsigned k,psc_sa_qtile_t *q) {
+    register uint32_t a0 __asm__("a0")=(uint32_t)(uintptr_t)a;
+    register uint32_t a1 __asm__("a1")=(uint32_t)(uintptr_t)b;
+    register uint32_t a2 __asm__("a2")=(uint32_t)(uintptr_t)c;
+    register uint32_t a3 __asm__("a3")=SYS_SA_RUN;
+    register uint32_t a4 __asm__("a4")=(m<<16)|k;
+    register uint32_t a5 __asm__("a5")=PSC_SA_QTILE_FLAG;
+    register uint32_t a6 __asm__("a6")=(uint32_t)(uintptr_t)q;
+    __asm__ volatile("ecall" : "+r"(a0):"r"(a1),"r"(a2),"r"(a3),"r"(a4),"r"(a5),"r"(a6):"memory");
+    return (int)a0;
+}
+unsigned call_sa_capabilities(void) {
+    register uint32_t a0 __asm__("a0")=0;
+    register uint32_t a3 __asm__("a3")=SYS_SA_RUN;
+    register uint32_t a5 __asm__("a5")=PSC_SA_CAPS_FLAG;
+    __asm__ volatile("ecall" : "+r"(a0):"r"(a3),"r"(a5):"memory");
+    return a0;
+}
+
+int call_sa_qbatch(const int8_t *a,const int8_t *b,int8_t *c,psc_sa_qbatch_t *q) {
+    register uint32_t a0 __asm__("a0")=(uint32_t)(uintptr_t)a;
+    register uint32_t a1 __asm__("a1")=(uint32_t)(uintptr_t)b;
+    register uint32_t a2 __asm__("a2")=(uint32_t)(uintptr_t)c;
+    register uint32_t a3 __asm__("a3")=SYS_SA_RUN;
+    register uint32_t a5 __asm__("a5")=PSC_SA_QBATCH_FLAG;
+    register uint32_t a6 __asm__("a6")=(uint32_t)(uintptr_t)q;
+    __asm__ volatile("ecall" : "+r"(a0):"r"(a1),"r"(a2),"r"(a3),"r"(a5),"r"(a6):"memory");
+    return (int)a0;
+}

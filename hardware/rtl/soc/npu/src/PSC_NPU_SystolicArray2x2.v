@@ -186,6 +186,7 @@ module PSC_NPU_SystolicArray2x2 #(
         .reset_n            (reset_n),
         .signed_mode        (signed_mode),
 
+        .seed_valid(1'b0), .seed_index(4'd0), .seed_data(32'd0),
         .data_clear         (data_clear),
         .start              (start_pulse),
 

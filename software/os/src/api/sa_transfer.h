@@ -8,6 +8,8 @@
 #define PSC_SA_DIMS(m,k,n) (((m) << 16) | ((n) << 8) | (k))
 #define PSC_SA_PROFILE_FLAG 0x80000000u
 typedef struct {
+    /* execute: CSR/start/poll/fence only; copy_out: both result->kernel and
+       kernel->user transfers. All are nested in syscall wall time. */
     int valid;
     unsigned copy_in_us, execute_us, copy_out_us;
 } psc_sa_profile_t;

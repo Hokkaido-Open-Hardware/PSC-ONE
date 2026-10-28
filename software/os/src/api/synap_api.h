@@ -49,7 +49,8 @@ void sa_run(
     uint32_t *out_C,
     bool signed_mode
 );
-/* Status-returning variant: 0 success, -1 arguments, -2 timeout, -3 busy.
+/* Status-returning variant: 0 success, -1 arguments, -2 timeout, -3 busy,
+   -5 unquiesced DMA (device quarantined).
    Legacy sa_run remains source compatible. Output is untouched on failure. */
 int sa_run_checked(const uint8_t *in_A, const uint8_t *in_B,
                    uint8_t matrix_N, uint32_t *out_C, bool signed_mode);
@@ -65,3 +66,14 @@ void s_call_sa_api(
     bool verify,
     bool signed_mode)
 ;
+
+#include "sa_qtile.h"
+#include "sa_transfer.h"
+int sa_run_qbatch_checked(const uint8_t *,const uint8_t *,uint8_t *,psc_sa_qbatch_t *);
+int sa_run_rect_profiled(const uint8_t *,const uint8_t *,uint32_t,uint32_t,uint32_t,
+                         uint32_t *,bool,psc_sa_profile_t *);
+unsigned sa_capabilities(void);
+/* Whole tile, full K in one ownership interval. A[m][k], B[k][4].
+   -4 unsupported, -5 unquiesced DMA (device quarantined), -6 device error. */
+int sa_run_qtile_checked(const uint8_t *a,const uint8_t *b,uint8_t *c,
+                        unsigned m,unsigned k,psc_sa_qtile_t *request);
