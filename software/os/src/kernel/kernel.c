@@ -59,10 +59,10 @@ long uart_getchar(void) {
 #else
 
 #ifndef PIO32_ADDR
-#define PIO32_ADDR (*(volatile uint32_t *)0x10001000)
+#define PIO32_ADDR (*(volatile uint32_t *)PSC_BOARD_SWITCH_BASE)
 #endif
 #ifndef UART_MMIO_BASE
-#define UART_MMIO_BASE 0x10000000u
+#define UART_MMIO_BASE PSC_BOARD_UART_BASE
 #endif
 #ifndef UART_TX
 #define UART_TX 0x0

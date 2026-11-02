@@ -1,3 +1,4 @@
+#include "../board/board.h"
 #include "../drivers/sdcard_api.h"
 #include "boot_fat32.h"
 #include "../kernel/kernel.h"
@@ -7,7 +8,7 @@
 #include <stdbool.h>
 
 #ifndef UART_MMIO_BASE
-#define UART_MMIO_BASE 0x10000000u
+#define UART_MMIO_BASE PSC_BOARD_UART_BASE
 #endif
 
 #ifndef UART_TX
@@ -33,7 +34,7 @@
 #define SD_READ_RETRY_MAX   3u
 
 #ifndef KERNEL_LOAD_ADDR
-#define KERNEL_LOAD_ADDR    0x00200000u
+#define KERNEL_LOAD_ADDR    PSC_BOARD_KERNEL_BASE
 #endif
 
 void putchar(char ch)
@@ -247,15 +248,15 @@ void bootloader_main(void)
     bl_print("\n");
 
     bl_print("kernel[0]=");
-    bl_print_hex(*(volatile uint32_t *)0x00200000);
+    bl_print_hex(*(volatile uint32_t *)(PSC_BOARD_KERNEL_BASE + 0u));
     bl_print("\n");
 
     bl_print("kernel[1]=");
-    bl_print_hex(*(volatile uint32_t *)0x00200004);
+    bl_print_hex(*(volatile uint32_t *)(PSC_BOARD_KERNEL_BASE + 4u));
     bl_print("\n");
 
     bl_print("kernel[2]=");
-    bl_print_hex(*(volatile uint32_t *)0x00200008);
+    bl_print_hex(*(volatile uint32_t *)(PSC_BOARD_KERNEL_BASE + 8u));
     bl_print("\n");
 
     bl_print("USER.MEM deferred to kernel\n");

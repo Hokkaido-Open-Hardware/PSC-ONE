@@ -1,3 +1,4 @@
+#include "../board/board.h"
 /* JPEG total-time measurement using the existing 1us MMIO timer.
    Borrow only an idle timer; never replace a running scheduler/user timer.
    50ms IRQs extend the 16-bit counter without polling inside the decoder. */
@@ -5,7 +6,7 @@
 #include "timer_api.h"
 
 #define MEASURE_PERIOD_US 50000u
-#define MEASURE_CTRL (*(volatile uint32_t *)0x10002000u)
+#define MEASURE_CTRL (*(volatile uint32_t *)PSC_BOARD_TIMER_BASE)
 #define MEASURE_RELOAD (MEASURE_PERIOD_US - 1u)
 #define MEASURE_RUN (MEASURE_RELOAD | (1u << 17) | (1u << 18))
 static volatile uint32_t measure_active, measure_us, measure_stopping;

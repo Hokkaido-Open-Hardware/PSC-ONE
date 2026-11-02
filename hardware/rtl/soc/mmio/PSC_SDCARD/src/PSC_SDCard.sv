@@ -8,6 +8,7 @@
 
 module PSC_SDCard #(
     parameter ADDR_WIDTH        = 32,
+    parameter FAST_SCK_MHz      = 10,             // 5MHz〜20MHz
     parameter CLK_FREQ_MHz      = 80,
     parameter INIT_80CLK        = 80,
     parameter PROTECT_ADDRESS   = 32'h0000_1000,  // > 4098
@@ -57,7 +58,7 @@ module PSC_SDCard #(
             `ifdef fast_sck
             (CLK_FREQ_MHz * 1_000_000) / (2 * 12_500_000);      // 12.5MHz
             `else
-            (CLK_FREQ_MHz * 1_000_000) / (2 *  5_000_000);      //  5.0MHz
+            (CLK_FREQ_MHz * 1_000_000) / (2 * FAST_SCK_MHz * 1_000_000);
             `endif
 
     localparam FAST_SCK_DIV =

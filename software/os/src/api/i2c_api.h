@@ -1,5 +1,6 @@
 // PSC_RV32_I2C slave: CPU-side MMIO API (kernel / bare metal).
 #pragma once
+#include "../board/board.h"
 
 #include <stdint.h>
 
@@ -10,19 +11,19 @@ extern "C" {
 /* PSC_ONE_SOC addresses, not the standalone module's 0x10002000 default.
  * Override each address when the SoC parameters differ. */
 #ifndef PSC_I2C_ADDR_INPUT
-#define PSC_I2C_ADDR_INPUT   0x10009000u
+#define PSC_I2C_ADDR_INPUT   (PSC_BOARD_I2C_BASE + 0x00u)
 #endif
 #ifndef PSC_I2C_ADDR_STATUS
-#define PSC_I2C_ADDR_STATUS  0x10009004u
+#define PSC_I2C_ADDR_STATUS  (PSC_BOARD_I2C_BASE + 0x04u)
 #endif
 #ifndef PSC_I2C_ADDR_OUTPUT
-#define PSC_I2C_ADDR_OUTPUT  0x10009008u
+#define PSC_I2C_ADDR_OUTPUT  (PSC_BOARD_I2C_BASE + 0x08u)
 #endif
 #ifndef PSC_I2C_ADDR_CONTROL
-#define PSC_I2C_ADDR_CONTROL 0x1000900cu
+#define PSC_I2C_ADDR_CONTROL (PSC_BOARD_I2C_BASE + 0x0cu)
 #endif
 #ifndef PSC_I2C_ADDR_SEQ
-#define PSC_I2C_ADDR_SEQ     0x10009010u
+#define PSC_I2C_ADDR_SEQ     (PSC_BOARD_I2C_BASE + 0x10u)
 #endif
 
 #define PSC_I2C_INPUT_COUNT          4u

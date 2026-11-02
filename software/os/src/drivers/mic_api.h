@@ -1,12 +1,13 @@
 // mic_api.h
 #pragma once
+#include "../board/board.h"
 
 /* ===== MMIO 定義 ===== */
-#define PSC_I2S_RX  (*(volatile uint32_t*)0x10007000u)
-#define PSC_I2S_ST  (*(volatile uint32_t*)0x10007004u)
+#define PSC_I2S_RX  (*(volatile uint32_t*)(PSC_BOARD_MIC_BASE + 0x00u))
+#define PSC_I2S_ST  (*(volatile uint32_t*)(PSC_BOARD_MIC_BASE + 0x04u))
 
-//#define I2S_RX      0x10007000u
-//#define I2S_ST      0x10007004u
+//#define I2S_RX      (PSC_BOARD_MIC_BASE + 0x00u)
+//#define I2S_ST      (PSC_BOARD_MIC_BASE + 0x04u)
 
 typedef int bool;
 typedef unsigned char uint8_t;

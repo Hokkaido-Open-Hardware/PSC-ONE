@@ -1,15 +1,16 @@
+#include "../board/board.h"
 #include "../drivers/sdcard_api.h"
 #include "../kernel/kernel.h"
 #include "../lib/common.h"
 #include <stdint.h>
 
-#define PIO32 (*(volatile uint32_t*)0x10001000)
+#define PIO32 (*(volatile uint32_t*)PSC_BOARD_SWITCH_BASE)
 
-#define KERNEL_LOAD_ADDR   0x00200000u
+#define KERNEL_LOAD_ADDR   PSC_BOARD_KERNEL_BASE
 
 // UART ベースやビット定義が common.h に無ければ保険として定義
 #ifndef UART_MMIO_BASE
-#define UART_MMIO_BASE 0x10000000u
+#define UART_MMIO_BASE PSC_BOARD_UART_BASE
 #endif
 
 #ifndef UART_TX
@@ -71,7 +72,7 @@
 
 /* ------------------------------------------------------- */
 #if 0
-#define UART_BASE          0x10000000u
+#define UART_BASE          PSC_BOARD_UART_BASE
 void putchar(char c)
 {
     volatile uint32_t *uart = (volatile uint32_t *)UART_BASE;
@@ -561,7 +562,7 @@ void bootloader_main(void)
 
     // random R/W
     bl_print("\n=== PSC random memory RW test start ===\n");
-    random_mem_check(0x00600000, 0x00800000, (uint32_t)500);
+    random_mem_check(PSC_BOARD_MEMORY_TEST_START, PSC_BOARD_MEMORY_TEST_END, (uint32_t)500);
 
     bl_print("\n=== PSC bootloader start ===\n");
     bl_print_kv_hex("CTRL=", PSC_SD_IF_CTRL);

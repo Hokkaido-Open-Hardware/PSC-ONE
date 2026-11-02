@@ -1,5 +1,6 @@
 // sdcard_api.h
 #pragma once
+#include "../board/board.h"
 
 /* ===== MMIO 定義 ===== */
 
@@ -7,13 +8,13 @@
 // Wait for the read command to finish before draining. With fewer than four
 // bytes, DATA returns 0x000000E0 without consuming data; EMPTY means zero bytes.
 // DATA WRITE still pushes only bits [7:0] (512 writes per sector).
-#define PSC_IF_DATA     (*(volatile uint32_t*)0x10006000u)
-#define PSC_SD_SECTOR   (*(volatile uint32_t*)0x10006004u)
-#define PSC_SD_IF_CTRL  (*(volatile uint32_t*)0x10006008u)
+#define PSC_IF_DATA     (*(volatile uint32_t*)(PSC_BOARD_SD_BASE + 0x00u))
+#define PSC_SD_SECTOR   (*(volatile uint32_t*)(PSC_BOARD_SD_BASE + 0x04u))
+#define PSC_SD_IF_CTRL  (*(volatile uint32_t*)(PSC_BOARD_SD_BASE + 0x08u))
 
-//#define SD_DATA_ADDR     0x10006000u
-//#define SD_SECTOR_ADDR   0x10006004u
-//#define SD_IF_CTRL_ADDR  0x10006008u
+//#define SD_DATA_ADDR     (PSC_BOARD_SD_BASE + 0x00u)
+//#define SD_SECTOR_ADDR   (PSC_BOARD_SD_BASE + 0x04u)
+//#define SD_IF_CTRL_ADDR  (PSC_BOARD_SD_BASE + 0x08u)
 
 typedef int bool;
 typedef unsigned char uint8_t;

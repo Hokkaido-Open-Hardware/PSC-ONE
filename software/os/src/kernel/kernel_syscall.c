@@ -15,7 +15,7 @@
 #include "../api/i2c_capture.h"
 
 #ifndef PIO32_ADDR
-#define PIO32_ADDR (*(volatile uint32_t *)0x10001000)
+#define PIO32_ADDR (*(volatile uint32_t *)PSC_BOARD_SWITCH_BASE)
 #endif
 
 /* Validate every Sv32 page before dereferencing a user rectangle.

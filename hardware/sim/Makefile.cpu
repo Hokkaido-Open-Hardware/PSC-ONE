@@ -346,7 +346,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	npu_test1:RV32_chip_test:./mem/npu_test1.mem:0x0000beef \
+	sd_card_test1:RV32_chip_test:./mem/sd_card_test1.mem:0x000000e0 \
 
 # ============================================================
 # 複数テスト定義

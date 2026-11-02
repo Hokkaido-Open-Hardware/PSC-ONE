@@ -1,12 +1,13 @@
 // lcd_api.h
 #pragma once
+#include "../board/board.h"
 
 /* ===== MMIO 定義 ===== */
-#define PSC_LCD_PIXS_DATA   (*(volatile uint32_t*)0x10003000u)
-#define PSC_LCD_PIXS_ST     (*(volatile uint32_t*)0x10003004u)
+#define PSC_LCD_PIXS_DATA   (*(volatile uint32_t*)(PSC_BOARD_LCD_BASE + 0x00u))
+#define PSC_LCD_PIXS_ST     (*(volatile uint32_t*)(PSC_BOARD_LCD_BASE + 0x04u))
 
-#define LCD_PIXS_DATA     0x10003000u
-#define LCD_PIXS_ST       0x10003004u
+#define LCD_PIXS_DATA     (PSC_BOARD_LCD_BASE + 0x00u)
+#define LCD_PIXS_ST       (PSC_BOARD_LCD_BASE + 0x04u)
 
 #define AFTER_WAIT  50000
 

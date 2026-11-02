@@ -15,7 +15,7 @@
 
 /* Only the shell receives this mapping; idle/foreground ELF tables do not.
    Static leaf avoids allocation failure/panic when loading a large model. */
-_Static_assert(PSC_SA_ADDR_C + SA_MAT_MAX * SA_MAT_MAX * 4 <= 0x00040000u, "NPU result overlaps Arena");
+_Static_assert(PSC_SA_ADDR_C + SA_MAT_MAX * SA_MAT_MAX * 4 <= PSC_BOARD_ARENA_PHYS_BASE, "NPU result overlaps Arena");
 _Static_assert(USER_ARENA_SIZE == 768 * 1024, "Arena mapping size");
 static uint32_t arena_leaf[1024] __attribute__((aligned(PAGE_SIZE)));
 static uint32_t model_leaf[1024] __attribute__((aligned(PAGE_SIZE)));
@@ -149,8 +149,8 @@ static struct process *create_process_image(const void *image,
 
     // ---- UART MMIO mapping (identity map) ----
 #ifndef USE_SBI_CONSOLE
-    #define MMIO_BASE 0x10000000u
-    #define MMIO_SIZE 0x00010000u
+    #define MMIO_BASE PSC_BOARD_MMIO_BASE
+    #define MMIO_SIZE PSC_BOARD_MMIO_SIZE
     s_printf("---- MMIO map start. ----\n");
     s_printf("---- MMIO region map start. ----\n");
     for (uintptr_t va = MMIO_BASE; va < MMIO_BASE + MMIO_SIZE; va += PAGE_SIZE)
@@ -493,15 +493,15 @@ __attribute__((used, noinline, noreturn)) void machine_restart_finish(void)
 
     /* Stop first, then W1C pending on a separate transaction so an expiry
        on the stop cycle cannot leave a stale level interrupt behind. */
-    mmio_w32(0x10002000u, 1u << 19);
-    mmio_w32(0x10002000u, (1u << 19) | (1u << 20));
-    while (mmio_r32(0x10002008u) & ((1u << 7) | (1u << 10))) {}
-    mmio_w32(0x10004000u, 0); /* LEDs agree with the fresh driver's state */
-    mmio_w32(0x10007004u, 1); /* discard old microphone FIFO samples */
+    mmio_w32((PSC_BOARD_TIMER_BASE + 0u), 1u << 19);
+    mmio_w32((PSC_BOARD_TIMER_BASE + 0u), (1u << 19) | (1u << 20));
+    while (mmio_r32((PSC_BOARD_TIMER_BASE + 8u)) & ((1u << 7) | (1u << 10))) {}
+    mmio_w32(PSC_BOARD_LED_BASE, 0); /* LEDs agree with the fresh driver's state */
+    mmio_w32((PSC_BOARD_MIC_BASE + 4u), 1); /* discard old microphone FIFO samples */
     /* SD/SPI and LCD commands are synchronous. Keep the card initialized
        and the panel contents; fresh filesystem/LCD state initializes on use. */
-    while (mmio_r32(0x10000008u) & 1u) {} /* finish restart message */
-    while (mmio_r32(0x10000008u) & 2u) (void)mmio_r32(0x10000004u);
+    while (mmio_r32((PSC_BOARD_UART_BASE + 8u)) & 1u) {} /* finish restart message */
+    while (mmio_r32((PSC_BOARD_UART_BASE + 8u)) & 2u) (void)mmio_r32((PSC_BOARD_UART_BASE + 4u));
 
     WRITE_CSR(mip, 0);
     WRITE_CSR(medeleg, 0);

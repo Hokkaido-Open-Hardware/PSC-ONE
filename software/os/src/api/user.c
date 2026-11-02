@@ -1,3 +1,4 @@
+#include "../board/board.h"
 // user.c — SBIモードのみ ecall、PSCモードはMMIOのみ
 
 #include "user.h"
@@ -103,16 +104,16 @@ void exit(void) {
 
 /* ===== UART MMIO 定義 ===== */
 #ifndef UART_TX_ADDR
-#define UART_TX_ADDR 0x10000000u
+#define UART_TX_ADDR (PSC_BOARD_UART_BASE + 0u)
 #endif
 #ifndef UART_RX_ADDR
-#define UART_RX_ADDR 0x10000004u
+#define UART_RX_ADDR (PSC_BOARD_UART_BASE + 4u)
 #endif
 #ifndef UART_ST_ADDR
-#define UART_ST_ADDR 0x10000008u
+#define UART_ST_ADDR (PSC_BOARD_UART_BASE + 8u)
 #endif
 #ifndef UART_CT_ADDR
-#define UART_CT_ADDR 0x1000000Cu
+#define UART_CT_ADDR (PSC_BOARD_UART_BASE + 12u)
 #endif
 
 #ifndef ST_TX_BUSY

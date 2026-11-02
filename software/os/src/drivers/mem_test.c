@@ -1,10 +1,11 @@
+#include "../board/board.h"
 #include "mem_test.h"
 #include "../lib/common.h"
 
 #define MEM_STEP 4u   // 32bit access
 
 #ifndef UART_MMIO_BASE
-#define UART_MMIO_BASE 0x10000000u
+#define UART_MMIO_BASE PSC_BOARD_UART_BASE
 #endif
 
 #ifndef UART_TX

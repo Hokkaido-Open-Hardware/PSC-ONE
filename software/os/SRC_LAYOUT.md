@@ -1,5 +1,41 @@
 # PSC-OS source layout
 
+## ボード設定
+
+```text
+src/board/
+├── board.h                 # 選択した設定を公開（host/RV32の既定はpsc_one）
+├── psc_one/                # PSC_RV32
+│   ├── config.h            # MMIO、boot/load先、ユーザーメモリ範囲
+│   └── board.mk            # RV32 ISA/ABIとビルド設定
+└── psc_one_rv64/           # PSC_RV64
+    ├── config.h            # CPU幅、OS対応状況（現在は未対応）
+    ├── board.mk            # 未対応の説明を出してビルド停止
+    └── README.md
+```
+
+Rust版 `PSC-OS_RV64/os_rust_rv64/src/board` と同様、boardにはボード設定を置きます。
+`api/i2c_api.c`、`drivers/*`、`boot/*`、リンカスクリプトは元の位置に残し、
+既存の実装から `board/board.h` を通じてMMIOベースアドレス等を参照します。
+レジスタoffset、bit定義、デバイス制御アルゴリズムは各driver/APIに残します。
+リンカスクリプトの配置と数値は維持しています。メモリ配置変更時はC/assembly設定と
+リンカ・RTLの契約を合わせて更新してください。
+
+```sh
+make BOARD=psc_one CPU_VERSION=v1 sim_mem
+make BOARD=psc_one CPU_VERSION=v2 SIM_USER=minimal sim_mem
+make BOARD=psc_one fpga_mem
+```
+
+PSC_RV32のv1/v2は同じボード設定を使います。既存の引数省略時の挙動も維持します。
+`BOARD=psc_one_rv64` または `CPU_VERSION=rv64` は、RV64 OSが未実装であることを
+明示して停止します。今回の整理はRV64 ABI/trap/Sv39への移植を含みません。
+
+今回のボード設定分離で既存ファイルの移動・削除はありません。
+検証結果は `report/psc_os_board_layout.md` を参照してください。
+
+## 既存ソース配置
+
 Paths below are relative to `src/`. Only paths and includes change.
 
 | Original | Destination |

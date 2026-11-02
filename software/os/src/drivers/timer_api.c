@@ -1,11 +1,12 @@
+#include "../board/board.h"
 #include <stdint.h>
 
 /* ------------------------------------------------------------
  * TIMER MMIO
  * ------------------------------------------------------------ */
-#define TIMER_CTRL_ADDR    0x10002000u
-#define TIMER_COUNT_ADDR   0x10002004u
-#define TIMER_STATUS_ADDR  0x10002008u
+#define TIMER_CTRL_ADDR    (PSC_BOARD_TIMER_BASE + 0x00u)
+#define TIMER_COUNT_ADDR   (PSC_BOARD_TIMER_BASE + 0x04u)
+#define TIMER_STATUS_ADDR  (PSC_BOARD_TIMER_BASE + 0x08u)
 
 #define TIMER_CTRL    (*(volatile uint32_t *)TIMER_CTRL_ADDR)
 #define TIMER_COUNT   (*(volatile uint32_t *)TIMER_COUNT_ADDR)

@@ -1,3 +1,4 @@
+#include "../board/board.h"
 #ifndef LED_API_H
 #define LED_API_H
 
@@ -7,7 +8,7 @@
 extern "C" {
 #endif
 
-#define PSC_LED_BASE_ADDR  0x10004000u
+#define PSC_LED_BASE_ADDR  PSC_BOARD_LED_BASE
 #define PSC_LED_MASK       0x3Fu
 
 void led_write(uint32_t value);

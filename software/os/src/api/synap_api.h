@@ -1,17 +1,18 @@
 // synap_api.h
 #pragma once
+#include "../board/board.h"
 
 #include "sa_limits.h"
 
 /* ============================================================
    MMIO definitions used by kernel.c
    ============================================================ */
-#define PSC_SA_CTRL       0x10005000u
-#define PSC_SA_DATA_BASE  0x00020000u
-#define PSC_SA_DATA_WB    0x00030000u
+#define PSC_SA_CTRL       PSC_BOARD_SYNAP_BASE
+#define PSC_SA_DATA_BASE  PSC_BOARD_SYNAP_DATA_BASE
+#define PSC_SA_DATA_WB    PSC_BOARD_SYNAP_RESULT_BASE
 
 /* Current RTL result buffer address */
-#define PSC_SA_ADDR_C     0x00030000u
+#define PSC_SA_ADDR_C     PSC_BOARD_SYNAP_RESULT_BASE
 
 /* ============================================================
    SynapEngine CSR addresses

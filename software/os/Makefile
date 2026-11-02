@@ -28,10 +28,20 @@ MODE ?= sim
 # recursive make. This selects software capabilities, not a different ISA ABI.
 CPU_VERSION ?= v1
 
+# Board wiring/configuration is separate from the PSC_RV32 v1/v2 selector.
+BOARD ?= $(if $(filter rv64,$(CPU_VERSION)),psc_one_rv64,psc_one)
+ifeq ($(filter $(BOARD),psc_one psc_one_rv64),)
+$(error Unknown BOARD '$(BOARD)' (use: psc_one | psc_one_rv64))
+endif
+BOARD_DIR := $(Src)/board/$(BOARD)
+BOARD_MK := $(BOARD_DIR)/board.mk
+include $(BOARD_MK)
+BOARD_HEADERS := $(Src)/board/board.h $(BOARD_DIR)/config.h
+
 ifneq ($(filter $(MODE),sim fpga_mem),)
   BOOT_FLOW     := direct
   RUN_QEMU      := 1
-  USER_BASE_VAL := 0x00400000
+  USER_BASE_VAL := $(BOARD_USER_BASE)
 
   ifeq ($(MODE),sim)
     KCPPFLAGS   := -DBSS_CLEAR_OFF=1
@@ -43,13 +53,13 @@ else ifeq ($(MODE),sbi)
   BOOT_FLOW     := direct
   RUN_QEMU      := 1
   KCPPFLAGS     := -DUSE_SBI_CONSOLE
-  USER_BASE_VAL := 0x01000000
+  USER_BASE_VAL := $(BOARD_SBI_USER_BASE)
 
 else ifeq ($(MODE),psc)
   BOOT_FLOW     := loader
   RUN_QEMU      := 0
   KCPPFLAGS     := -DBSS_CLEAR_OFF=0
-  USER_BASE_VAL := 0x00400000
+  USER_BASE_VAL := $(BOARD_USER_BASE)
 
 else
   $(error Unknown MODE '$(MODE)' (use: sim | fpga_mem | sbi | psc))
@@ -91,10 +101,7 @@ DUSERBASE   := -DUSER_BASE=$(USER_BASE_VAL)
 # ========================
 # ARCH / FLAGS
 # ========================
-ARCH := \
-	-march=rv32im_zicsr_zifencei \
-	-mabi=ilp32 \
-	-mno-relax
+ARCH := $(BOARD_ARCH) -mno-relax
 
 CFLAGS ?= \
 	-std=c11 \
@@ -103,7 +110,7 @@ CFLAGS ?= \
 	-Wall \
 	-Wextra \
 	--target=riscv64-unknown-elf \
-	$(ARCH) \
+	$(ARCH) $(BOARD_CPPFLAGS) \
 	-fno-stack-protector \
 	-ffreestanding \
 	-nostdlib \
@@ -199,7 +206,7 @@ TFLITE_CPPFLAGS := -I$(TFLITE_DIR) -I$(TFLITE_VENDOR) \
 	-isystem /usr/lib/picolibc/riscv64-unknown-elf/include \
 	-DFLATBUFFERS_LOCALE_INDEPENDENT=0 -DTFLITE_SINGLE_ROUNDING=0 -DNDEBUG \
 	-DPSC_HAS_CV_DOTSP_B=$(TFLITE_CV_DOTSP_B) -DPSC_TFLITE_HAS_SYNAP=$(TFLITE_HAS_SYNAP) -DPSC_TFLITE_NPU_QTILE=$(TFLITE_NPU_QTILE)
-TFLITE_HEADERS := $(wildcard $(TFLITE_DIR)/*.h) $(Src)/api/sa_transfer.h $(Src)/api/sa_limits.h $(Src)/api/sa_qtile.h \
+TFLITE_HEADERS := $(BOARD_HEADERS) $(BOARD_MK) $(wildcard $(TFLITE_DIR)/*.h) $(Src)/api/sa_transfer.h $(Src)/api/sa_limits.h $(Src)/api/sa_qtile.h \
 	$(TFLITE_VENDOR)/psc/pulp_fc.h $(Build)/tflite_cpu_config \
 	$(shell rg --files $(TFLITE_VENDOR)/tensorflow $(TFLITE_VENDOR)/gemmlowp) \
 	$(TFLITE_VENDOR)/schema_generated.h \
@@ -266,12 +273,12 @@ SRCS_USER := \
 SIM_USER ?= full
 ifeq ($(SIM_USER),minimal)
   USER_SRCS = $(Src)/shell/sim_shell.c
-  USER_DEPS = $(Src)/shell/sim_shell.c
+  USER_DEPS = $(Src)/shell/sim_shell.c $(BOARD_HEADERS) $(BOARD_MK) Makefile $(Src)/shell/user.ld
   USER_LIBS =
   USER_OBJCOPY_FLAGS =
 else ifeq ($(SIM_USER),full)
   USER_SRCS = $(SRCS_USER)
-  USER_DEPS = $(SRCS_USER) $(Src)/elego_robot/pwm_test.h $(Src)/elego_robot/imu.h $(MICROPY_LIB) $(JPEG_HEADERS) $(YOLO_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/shell/user.ld $(Src)/api/user.h $(Src)/api/i2c_capture.h $(Src)/api/robot/robot_control.h $(Src)/kernel/syscall.h $(Src)/kernel/elf_loader.h $(Src)/kernel/user_memory.h
+  USER_DEPS = $(BOARD_HEADERS) $(BOARD_MK) $(SRCS_USER) $(Src)/elego_robot/pwm_test.h $(Src)/elego_robot/imu.h $(MICROPY_LIB) $(JPEG_HEADERS) $(YOLO_HEADERS) $(TFLITE_HEADERS) $(TFLITE_OBJ) Makefile $(TJPGD_BUILD)/.ready $(Src)/shell/user.ld $(Src)/api/user.h $(Src)/api/i2c_capture.h $(Src)/api/robot/robot_control.h $(Src)/kernel/syscall.h $(Src)/kernel/elf_loader.h $(Src)/kernel/user_memory.h
   USER_LIBS = $(TFLITE_OBJ) $(MICROPY_LIB) $(LIBM) $(LIBC)
   USER_OBJCOPY_FLAGS = --set-section-flags .bss=alloc,contents
 else
@@ -317,7 +324,7 @@ MEM_FILE   := $(Build)/kernel.mem
 
 RISCV_CLANG  := clang
 RISCV_TARGET := --target=riscv64-unknown-elf
-RISCV_ARCH   := -march=rv32im_zicsr_zifencei -mabi=ilp32
+RISCV_ARCH   := $(BOARD_ARCH)
 
 # ========================
 # compiler helper objects
@@ -353,7 +360,7 @@ else
   BIOS_FLAGS :=
 endif
 
-$(BOOT_ELF): $(Build) $(SRCS_MBIOS) $(wildcard $(Src)/boot/mbios.h) $(Src)/boot/bootrom.ld
+$(BOOT_ELF): $(Build) $(SRCS_MBIOS) $(wildcard $(Src)/boot/mbios.h) $(Src)/boot/bootrom.ld $(BOARD_HEADERS) $(BOARD_MK) Makefile
 	$(CC) $(CFLAGS) $(BIOS_FLAGS) \
 		-Wl,-T$(Src)/boot/bootrom.ld \
 		-o $@ \
@@ -380,7 +387,7 @@ BOOTLOADER_ELF := $(Build)/bootloader.elf
 BOOTLOADER_BIN := $(Build)/bootloader.bin
 BOOTLOADER_MEM := $(Build)/bootloader.mem
 
-$(BOOTLOADER_ELF): $(Build) $(SRCS_BOOT)
+$(BOOTLOADER_ELF): $(Build) $(SRCS_BOOT) $(BOARD_HEADERS) $(BOARD_MK) $(Src)/boot/bootloader.ld Makefile
 	$(CC) $(CFLAGS) \
 		-Wl,-T$(Src)/boot/bootloader.ld \
 		-Wl,-Map=$(Build)/bootloader.map \
@@ -408,7 +415,7 @@ BOOTLOADER_FAT32_ELF := $(Build)/bootloader_fat32.elf
 BOOTLOADER_FAT32_BIN := $(Build)/bootloader_fat32.bin
 BOOTLOADER_FAT32_MEM := $(Build)/bootloader_fat32.mem
 
-$(BOOTLOADER_FAT32_ELF): $(Build) $(SRCS_BOOT_FAT32) $(Src)/boot/boot_fat32.h Makefile
+$(BOOTLOADER_FAT32_ELF): $(Build) $(SRCS_BOOT_FAT32) $(Src)/boot/boot_fat32.h $(BOARD_HEADERS) $(BOARD_MK) $(Src)/boot/bootloader.ld Makefile
 	$(CC) $(CFLAGS) \
 		-Wl,-T$(Src)/boot/bootloader.ld \
 		-Wl,-Map=$(Build)/bootloader.map \
@@ -529,12 +536,12 @@ FORCE_KERNEL_CONFIG:
 # A changed option must rebuild kernel.elf even when the sources are unchanged.
 # Preserve the timestamp on an identical configuration; no clean is needed.
 $(Build)/kernel.config: FORCE_KERNEL_CONFIG | $(Build)
-	@python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s="\n".join(sys.argv[2:])+"\n"; p.write_text(s) if not p.exists() or p.read_text()!=s else None' "$@" "$(MODE)" "$(KCPPFLAGS)" "$(USER_LOAD_CPPFLAGS)"
+	@python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s="\n".join(sys.argv[2:])+"\n"; p.write_text(s) if not p.exists() or p.read_text()!=s else None' "$@" "$(BOARD)" "$(MODE)" "$(KCPPFLAGS)" "$(USER_LOAD_CPPFLAGS)"
 
 $(KERNEL_ELF): \
 	$(Build) \
 	$(SRCS_KERNEL) \
-	$(wildcard $(Src)/*/*.h) $(Src)/api/robot/robot_control.h $(Src)/kernel/kernel_fpga.ld \
+	$(wildcard $(Src)/*/*.h) $(BOARD_HEADERS) $(BOARD_MK) $(Src)/api/robot/robot_control.h $(Src)/kernel/kernel_fpga.ld \
 	$(USER_BIN) \
 	$(Build)/divmodsi3.o $(KERNEL_BUILTINS) Makefile $(Build)/kernel.config
 
