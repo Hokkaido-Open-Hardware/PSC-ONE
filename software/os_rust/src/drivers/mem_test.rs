@@ -30,7 +30,7 @@ unsafe fn check(start: u32, end: u32, random: bool) -> bool {
                         value,
                         expected
                     );
-                    mmio_w32(0x10000000, 0xee01);
+                    mmio_w32(crate::board::UART_BASE, 0xee01);
                 }
             }
             lfsr = lfsr_next(lfsr);

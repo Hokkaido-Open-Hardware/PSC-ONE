@@ -227,7 +227,9 @@ fn dispatch(args: &[&str]) -> Result<(), i32> {
         // Keep hexadecimal address/length defaults and the trusted-shell diagnostic ABI.
         "dump" => unsafe {
             call_dump_api(
-                argument.and_then(parse_hex).unwrap_or(0x200000),
+                argument
+                    .and_then(parse_hex)
+                    .unwrap_or(crate::board::KERNEL_BASE),
                 args.get(2).and_then(|s| parse_hex(s)).unwrap_or(0x100),
             );
         },
@@ -298,6 +300,9 @@ fn dispatch(args: &[&str]) -> Result<(), i32> {
         }
         // The C interpreter owns its REPL until psc.exit() returns control here.
         // No Rust callback enters the VM, keeping C NLR unwinding inside C frames.
+        #[cfg(not(feature = "micropython"))]
+        "microPython" | "micropython" => out!("MicroPython is disabled in this build.\n"),
+        #[cfg(feature = "micropython")]
         "microPython" | "micropython" => {
             out!("\n--- MicroPython start ---\n");
             let result = unsafe { super::micropython::run() };

@@ -1,7 +1,13 @@
 pub mod jpeg_headers;
-#[cfg(any(target_arch = "riscv32", feature = "jpeg-host"))]
+#[cfg(any(
+    any(target_arch = "riscv32", target_arch = "riscv64"),
+    feature = "jpeg-host"
+))]
 pub mod jpeg_view;
-#[cfg(any(target_arch = "riscv32", feature = "jpeg-host"))]
+#[cfg(any(
+    any(target_arch = "riscv32", target_arch = "riscv64"),
+    feature = "jpeg-host"
+))]
 pub mod tjpgd_port;
 
 /// Synchronous packed RGB888 MCU sink. Commit only after decode and EOI succeed.

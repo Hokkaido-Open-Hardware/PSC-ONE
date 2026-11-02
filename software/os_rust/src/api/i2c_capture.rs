@@ -21,26 +21,26 @@ pub const ABORTED: u32 = 1 << 4;
 pub unsafe fn execute(op: u32) -> u32 {
     match op {
         ARM_PWM => {
-            if mmio_r32(0x10009014) & PWM_SUPPORTED == 0 {
+            if mmio_r32(crate::board::I2C_BASE + 0x14) & PWM_SUPPORTED == 0 {
                 return u32::MAX;
             }
-            mmio_w32(0x10009014, 13);
+            mmio_w32(crate::board::I2C_BASE + 0x14, 13);
             0
         }
         ARM_SELF => {
-            if mmio_r32(0x10009014) & SELF_SUPPORTED == 0 {
+            if mmio_r32(crate::board::I2C_BASE + 0x14) & SELF_SUPPORTED == 0 {
                 return u32::MAX;
             }
-            mmio_w32(0x10009014, 5);
+            mmio_w32(crate::board::I2C_BASE + 0x14, 5);
             0
         }
         ARM | ABORT => {
-            mmio_w32(0x10009014, if op == ARM { 1 } else { 2 });
+            mmio_w32(crate::board::I2C_BASE + 0x14, if op == ARM { 1 } else { 2 });
             0
         }
-        STATUS => mmio_r32(0x10009014),
-        COUNT => mmio_r32(0x10009018),
-        POP => mmio_r32(0x1000901c),
+        STATUS => mmio_r32(crate::board::I2C_BASE + 0x14),
+        COUNT => mmio_r32(crate::board::I2C_BASE + 0x18),
+        POP => mmio_r32(crate::board::I2C_BASE + 0x1c),
         _ => u32::MAX,
     }
 }

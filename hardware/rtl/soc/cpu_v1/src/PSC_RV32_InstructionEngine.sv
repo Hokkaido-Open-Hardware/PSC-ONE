@@ -41,6 +41,7 @@ module PSC_RV32_InstructionEngine #(
     output dec_ctrl_t   decoder_ctrl,
     input  logic        i_pf,
     output logic        d_pf,
+    output logic        d_access_fault,
     input  logic        i_pf_event,
     input  logic        d_pf_event,
     output logic [31:0] data_fault_pc,
@@ -103,6 +104,8 @@ module PSC_RV32_InstructionEngine #(
     logic d_mmu_mem_valid;
     logic d_mmu_done;
     logic d_mmu_fault;
+    logic d_page_fault;
+    assign d_mmu_fault = d_page_fault || d_access_fault;
     logic d_mode_sv32;
     logic [31:0] d_mmu_mem_addr;
     logic [31:0] d_paddr;
@@ -251,6 +254,7 @@ module PSC_RV32_InstructionEngine #(
         .opcode               (opcode),
         .in_pc                (pc_now),
         .current_priv         (priv_mode),
+        .tvm                  (csr_state.mstatus[20]),
         .decode_done          (decode_done),
         .decoder_ctrl         (decoded_ctrl)
     );
@@ -281,6 +285,9 @@ module PSC_RV32_InstructionEngine #(
         .vaddr                (vaddr),
         .satp                 (csr_satp),
         .priv_mode            (priv_mode),
+        .mstatus              (csr_state.mstatus),
+        .mem_access_fault     (1'b0),
+        .access_fault         (d_access_fault),
         .access_r             (memory_ctrl.is_load),
         .access_w             (memory_ctrl.is_store),
         .access_x             (1'b0),
@@ -292,7 +299,7 @@ module PSC_RV32_InstructionEngine #(
         .cpu_state_done       (cpu_state_done),
         .sfence_vma           (fifo_flush_sig && commit_ctrl.is_sfence_vma),
         .paddr                (d_paddr),
-        .page_fault           (d_mmu_fault),
+        .page_fault           (d_page_fault),
         .mode_sv32            (d_mode_sv32),
         .mmu_done             (d_mmu_done)
     );

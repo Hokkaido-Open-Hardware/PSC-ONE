@@ -13,8 +13,7 @@ extern "C" {
     static mut __data: u8;
     static mut __data_end: u8;
     static mut __data_initial: u8;
-    static _binary_shell_bin_start: u8;
-    static _binary_shell_bin_end: u8;
+    static __shell_image_size: u8;
 }
 static mut NEXT: usize = 0;
 /// Allocate zeroed physical pages from linker-owned free RAM; pages are never reclaimed.
@@ -46,7 +45,9 @@ pub unsafe fn map_page(root: *mut u32, va: u32, pa: u32, flags: u32) {
     }
     // PTE bits 31:10 hold the physical page number, not a byte address.
     let leaf = ((*entry >> 10) * 4096) as *mut u32;
-    *leaf.add((va >> 12) as usize & 1023) = ((pa / 4096) << 10) | flags | PAGE_V;
+    // Svade compatibility until accessed/dirty tracking is implemented.
+    // Parent pointers remain V-only; A/D are set exclusively on leaf PTEs.
+    *leaf.add((va >> 12) as usize & 1023) = ((pa / 4096) << 10) | flags | PAGE_V | PAGE_A | PAGE_D;
 }
 
 /// Write back the data cache before invalidating stale instruction-cache contents.
@@ -69,8 +70,8 @@ pub unsafe fn sync_user_code() {
 /// Return one byte, or -1 after the bounded polling window expires.
 pub unsafe fn uart_getchar_timeout(timeout: u32) -> i32 {
     for _ in 0..timeout {
-        if mmio_r32(0x10000008) & 2 != 0 {
-            return (mmio_r32(0x10000004) & 255) as i32;
+        if mmio_r32(crate::board::UART_BASE + 8) & 2 != 0 {
+            return (mmio_r32(crate::board::UART_BASE + 4) & 255) as i32;
         }
         delay(1);
     }
@@ -152,46 +153,25 @@ pub unsafe extern "C" fn kernel_main(warm: u32) -> ! {
             "  AUDIO     mic_read, mic_write\n",
             "  FILES     fat32_info, fat32_ls, fat32_cat,\n",
             "            fat32_touch\n",
-            "  RUNTIME   microPython, run (.ELF)\n",
+            "  RUNTIME   run (.ELF)\n",
             "\n",
-            "  MicroPython reset: Ctrl+D\n",
-            "  Return to shell  : import psc; psc.exit()\n",
             "  QEMU exit        : Ctrl+A, C -> q\n",
             "  --------------------------------------------------\n",
             "\n",
         ),
         env!("CARGO_PKG_VERSION")
     );
+    #[cfg(feature = "micropython")]
+    crate::s_print!(
+        "  MicroPython: microPython / micropython; reset Ctrl+D; exit import psc; psc.exit()\n"
+    );
     // The idle page table provides the supervisor-only template for foreground ELFs.
     let idle = super::kernel_process::create_process(&[]);
     (*idle).pid = 0;
     super::kernel_process::IDLE = idle;
     super::kernel_process::CURRENT = idle;
-    let shell = core::ptr::addr_of!(_binary_shell_bin_start);
-    let size = core::ptr::addr_of!(_binary_shell_bin_end) as usize - shell as usize;
-    #[cfg(feature = "sd-user")]
-    if warm == 0 {
-        // Cold SD boot stages USER.MEM at the same physical address used by RTL.
-        // Warm restart retains this immutable source image and avoids another SD read.
-        crate::s_print!("KERNEL: initializing SD for USER.MEM\n");
-        let mut sd = crate::boot::bootloader_fat32::BootSd::init().expect("SD init failed");
-        let volume =
-            crate::boot::boot_fat32::BootFat32::mount(&mut sd).expect("FAT32 mount failed");
-        let words = (size + 3) / 4;
-        crate::s_print!("KERNEL: reading USER.MEM from SD ({} words)\n", words);
-        let image = core::slice::from_raw_parts_mut(shell as *mut u32, words);
-        let actual = volume
-            .load_mem_file_bounded(&mut sd, "USER.MEM", image)
-            .expect("USER.MEM load failed");
-        assert_eq!(
-            actual as usize, words,
-            "USER.MEM does not match this kernel build"
-        );
-        crate::s_print!("KERNEL: USER.MEM loaded ({} bytes)\n", actual * 4);
-    }
-    #[cfg(not(feature = "sd-user"))]
-    crate::s_print!("KERNEL: using RTL-preloaded user image (SD loading disabled)\n");
-    super::kernel_process::create_process(core::slice::from_raw_parts(shell, size));
+    let size = core::ptr::addr_of!(__shell_image_size) as usize;
+    super::kernel_process::create_process_from_sd(size);
     asm!("fence.i");
     super::kernel_process::yield_now();
     panic!("switched to idle process")

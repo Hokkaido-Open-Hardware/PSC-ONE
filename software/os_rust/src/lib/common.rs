@@ -62,17 +62,23 @@ impl Write for Console {
 
 /// Wait for UART TX to become idle before submitting one byte.
 pub unsafe fn putchar(b: u8) {
-    #[cfg(all(feature = "user", target_arch = "riscv32"))]
+    #[cfg(all(
+        feature = "user",
+        any(target_arch = "riscv32", target_arch = "riscv64")
+    ))]
     {
         crate::api::user::putchar(b);
         return;
     }
-    #[cfg(not(all(feature = "user", target_arch = "riscv32")))]
+    #[cfg(not(all(
+        feature = "user",
+        any(target_arch = "riscv32", target_arch = "riscv64")
+    )))]
     {
-        while mmio_r32(0x10000008) & 1 != 0 {
+        while mmio_r32(crate::board::UART_BASE + 0x8) & 1 != 0 {
             core::hint::spin_loop();
         }
-        mmio_w32(0x10000000, b as u32);
+        mmio_w32(crate::board::UART_BASE, b as u32);
     }
 }
 

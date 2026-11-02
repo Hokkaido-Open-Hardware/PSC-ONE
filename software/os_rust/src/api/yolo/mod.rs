@@ -1,5 +1,5 @@
 //! Fixed normalized-xywh COCO80 profile, corresponding to os/src/api/yolo/.
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub mod yolo_command;
 pub mod yolo_display;
 pub mod yolo_postprocess;
@@ -136,7 +136,7 @@ impl Workspace {
         }
     }
     /// Safety: writable aligned storage with no outstanding stage borrows.
-    #[cfg(any(target_arch = "riscv32", test))]
+    #[cfg(any(any(target_arch = "riscv32", target_arch = "riscv64"), test))]
     pub(crate) unsafe fn init_at(p: *mut Self) {
         // Both stages contain only unsigned integers, floats and bools. Zero is
         // valid for the active preprocessor; never create a temporary stage.

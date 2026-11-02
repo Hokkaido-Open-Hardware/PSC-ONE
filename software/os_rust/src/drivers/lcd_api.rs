@@ -2,8 +2,8 @@
 use crate::common::{delay, mmio_r32, mmio_w32};
 /// Shared post-initialization delay, matching lcd_api.h.
 pub const AFTER_WAIT: u32 = 50000;
-const DATA: u32 = 0x10003000;
-const STATUS: u32 = 0x10003004;
+const DATA: u32 = crate::board::LCD_BASE;
+const STATUS: u32 = crate::board::LCD_BASE + 0x4;
 static mut X: u32 = 0;
 static mut Y: u32 = 0;
 static mut SCROLL: u32 = 0;

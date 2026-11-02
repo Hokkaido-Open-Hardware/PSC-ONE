@@ -61,7 +61,7 @@ pub unsafe fn elf_run(f: &mut TrapFrame) {
     for s in &plan.segments[..plan.count as usize] {
         let first = s.vaddr & !4095;
         let end = (s.vaddr + s.memsz + 4095) & !4095;
-        let mut flags = PAGE_U | 64 | 128;
+        let mut flags = PAGE_U | PAGE_A | PAGE_D;
         if s.flags & 4 != 0 {
             flags |= PAGE_R;
         }
@@ -91,7 +91,7 @@ pub unsafe fn elf_run(f: &mut TrapFrame) {
             root,
             STACK_BOTTOM + i * 4096,
             page as u32,
-            PAGE_U | PAGE_R | PAGE_W | 64 | 128,
+            PAGE_U | PAGE_R | PAGE_W | PAGE_A | PAGE_D,
         );
     }
     SHELL_FRAME = *f;

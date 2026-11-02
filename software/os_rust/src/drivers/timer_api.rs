@@ -1,8 +1,8 @@
 //! drivers/timer_api.c/.h
 use crate::common::{mmio_r32, mmio_w32};
-pub const CTRL: u32 = 0x10002000;
-pub const COUNT: u32 = 0x10002004;
-pub const STATUS: u32 = 0x10002008;
+pub const CTRL: u32 = crate::board::TIMER_BASE;
+pub const COUNT: u32 = crate::board::TIMER_BASE + 0x4;
+pub const STATUS: u32 = crate::board::TIMER_BASE + 0x8;
 pub const TIMER_ST_RUNNING: u32 = 1 << 7;
 pub const TIMER_ST_IRQ_ENABLE: u32 = 1 << 9;
 pub const TIMER_ST_IRQ_PENDING: u32 = 1 << 10;

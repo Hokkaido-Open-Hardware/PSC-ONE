@@ -114,7 +114,7 @@ impl<'a> Runtime<'a> {
         }
     }
     /// Safety: aligned uninitialized storage, with no outstanding model/arena borrows.
-    #[cfg(any(target_arch = "riscv32", test))]
+    #[cfg(any(any(target_arch = "riscv32", target_arch = "riscv64"), test))]
     pub(super) unsafe fn init_at(p: *mut Self) {
         use core::ptr::{addr_of_mut, write_bytes};
         // Model metadata is small; the 40 KiB GEMM scratch is written in place.

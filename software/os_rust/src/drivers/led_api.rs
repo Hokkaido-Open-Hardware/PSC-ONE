@@ -1,6 +1,6 @@
 //! drivers/led_api.c/.h. The kernel must serialize access to LED state.
 use crate::common::mmio_w32;
-pub const PSC_LED_BASE_ADDR: u32 = 0x10004000;
+pub const PSC_LED_BASE_ADDR: u32 = crate::board::LED_BASE;
 pub const PSC_LED_MASK: u32 = 0x3f;
 static mut LED_STATE: u32 = 0;
 /// Keep the software shadow and the six physical LED bits in agreement.

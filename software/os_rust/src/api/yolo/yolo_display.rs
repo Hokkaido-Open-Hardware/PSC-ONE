@@ -201,9 +201,9 @@ impl<L: Lcd> RgbSink for ImageSink<'_, L> {
         self.lcd.rect(x, y, w, h, rgb).map_err(|_| LCD)
     }
 }
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub struct PlatformLcd;
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 impl Lcd for PlatformLcd {
     fn begin(&mut self) -> Result<(), i32> {
         if crate::api::user::call_lcd_rgb888_begin() == 0 {

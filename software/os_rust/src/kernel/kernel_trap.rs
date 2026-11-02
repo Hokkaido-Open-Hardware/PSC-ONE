@@ -155,12 +155,14 @@ unsafe extern "C" fn handle_machine_trap(c: &mut MachineContext) {
 #[unsafe(naked)]
 pub unsafe extern "C" fn user_entry() -> ! {
     naked_asm!(
-        "li sp, 0x00500000",
-        "li t0, 0x00400000",
+        "li sp, {stack}",
+        "li t0, {user}",
         "csrw sepc, t0",
         "li t0, 32",
         "csrw sstatus, t0",
-        "sret"
+        "sret",
+        stack = const crate::board::USER_STACK_TOP,
+        user = const crate::board::USER_BASE,
     );
 }
 

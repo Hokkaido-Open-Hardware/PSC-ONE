@@ -8,25 +8,33 @@ import re
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--os", type=Path, required=True)
 parser.add_argument("--bootrom", type=Path, required=True)
-parser.add_argument("--bootloader", type=Path, help="FAT32 loader ROM for SD boot")
+parser.add_argument("--bootloader", type=Path, required=True, help="FAT32 loader ROM for SD boot")
 parser.add_argument("--run", type=Path, required=True)
 args = parser.parse_args()
 
-# Validate every input before replacing any staged image. Limits match the
-# PSCOS_SIM configuration in PSC_ONE_Boot_axi.v, including the fixed SBI ROM.
+# Validate every input before replacing any staged image. SD image word counts
+# must match the linked image sizes; only boot ROMs have RTL capacities.
+config = (args.os / "build" / "image_layout.h").read_text()
+expected = {}
+for name in ("kernel", "user"):
+    match = re.search(rf"^#define IMAGE_{name.upper()}_WORDS (\d+)u$", config, re.M)
+    if not match:
+        raise SystemExit(f"missing IMAGE_{name.upper()}_WORDS in image_layout.h")
+    expected[name] = int(match[1])
 images = {}
 inputs = [
     ("bootrom", args.bootrom, 128),
-    ("kernel", args.os / "build" / "kernel.mem", 200_000),
-    ("user", args.os / "build" / "user.mem", 180_000),
+    ("kernel", args.os / "build" / "kernel.mem", expected["kernel"]),
+    ("user", args.os / "build" / "user.mem", expected["user"]),
+    ("bootloader_fat32", args.bootloader, 4500),
 ]
-if args.bootloader:
-    inputs.append(("bootloader_fat32", args.bootloader, 4500))
 for name, source, limit in inputs:
     raw = source.read_bytes()
     words = raw.split()
     if not 0 < len(words) <= limit:
         raise SystemExit(f"{source}: {len(words)} words exceeds capacity {limit}, or is empty")
+    if name in expected and len(words) != expected[name]:
+        raise SystemExit(f"{source}: word count does not match the linked image size")
     if not all(re.fullmatch(rb"[0-9a-fA-F]{8}", word) for word in words):
         raise SystemExit(f"{source}: expected one 32-bit hexadecimal word per entry")
     images[name] = (raw, words)
@@ -38,8 +46,3 @@ for name, (raw, words) in images.items():
     if name == "bootrom":
         raw = b"\n".join(words + [b"00000000"] * (128 - len(words))) + b"\n"
     (args.run / "mem" / f"{name}.mem").write_bytes(raw)
-
-# The RTL instantiates this ROM even in direct boot, but never executes it.
-# Supply deterministic zeros so the unused instance does not emit a missing-file warning.
-if not args.bootloader:
-    (args.run / "mem" / "bootloader_fat32.mem").write_bytes(b"00000000\n" * 4500)

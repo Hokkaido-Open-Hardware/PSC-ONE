@@ -10,10 +10,12 @@ module MMU (
     input  wire [31:0]      vaddr,       // 仮想アドレス
     input  wire [31:0]      satp,        // CSR satp
     input  wire [1:0]       priv_mode,   // M-mode -> MMU:off
+    input  wire [31:0]     mstatus,         // SUM/MXR and data-only MPRV/MPP
     input  wire             access_r,    // 読みアクセス要求？
     input  wire             access_w,    // 書きアクセス要求？
     input  wire             access_x,    // 実行アクセス要求？
     input  wire [31:0]      mem_rdata,   // PTE値（mem_readyが1のサイクルで有効）
+    input  wire            mem_access_fault, // Valid with mem_ready
     input  wire             mem_ready,   // ★追加: PTE応答レディ（この拍にmem_rdata有効）
     input  wire             cpu_state_done,  // CPU state終了タイミング
     input  wire             sfence_vma,      // sfence.vma（TLBキャッシュクリア）
@@ -23,10 +25,18 @@ module MMU (
     output reg              mem_valid,    // PTE読出し要求（1サイクルパルス）
     output wire [31:0]      paddr,        // 変換後の 物理アドレス
     output reg              page_fault,   // どれかのページフォールト（種別は外で解釈）
+    output reg            access_fault,    // Physical range / PTE access failure
     output wire             mode_sv32,
     output wire             mmu_done      // MMU完了通知
 );
 
+    // Sv32 + Svade: software manages A/D. Physical bus supports PA[31:0].
+    // Keep request context stable across privilege/CSR changes during a walk.
+    reg [31:0] req_vaddr, req_satp, req_mstatus;
+    reg [1:0] req_priv;
+    reg req_r, req_w, req_x;
+    wire [1:0] effective_priv = (!access_x && mstatus[17])
+                               ? mstatus[12:11] : priv_mode;
     // Privilege level encoding (RISC-V spec)
     localparam [1:0] PRIV_U = 2'b00;
     localparam [1:0] PRIV_S = 2'b01;
@@ -39,9 +49,9 @@ module MMU (
     reg     sfence_vma_reg;
 
     // ---- SV32 のアドレス分解 ----
-    wire [9:0]  vpn1     = vaddr[31:22];
-    wire [9:0]  vpn0     = vaddr[21:12];
-    wire [11:0] page_off = vaddr[11:0];
+    wire [9:0]  vpn1     = req_vaddr[31:22];
+    wire [9:0]  vpn0     = req_vaddr[21:12];
+    wire [11:0] page_off = req_vaddr[11:0];
 
     // paddr_34bitの32bitのみ使用
     reg [33:0] paddr_34bit;
@@ -52,7 +62,7 @@ module MMU (
 
     // satp フィールド（SV32）
     assign      mode_sv32 = satp[31];       // MODE: 0=bare, 1=Sv32
-    wire [21:0] root_ppn  = satp[21:0];     // ルートページテーブルの PPN
+    wire [21:0] root_ppn  = req_satp[21:0];     // ルートページテーブルの PPN
 
     // ---- ステート ----
     localparam [3:0]
@@ -81,6 +91,7 @@ module MMU (
     // L1
     wire cache_hit = pte_cached &&
                     (cache_root_ppn == root_ppn) &&
+                    (cache_asid == req_satp[30:22]) && !sfence_vma && !sfence_vma_reg &&
                     (cache_vpn1 == vpn1);
 
     reg        l0_cached;
@@ -92,6 +103,7 @@ module MMU (
                         cache_hit &&       // ← L1が一致していること
                         (cache_vpn0 == vpn0);
 
+    reg [8:0] cache_asid;
     // ---- ヘルパ（許可・違法組合せチェック）---- (Verilog-2001 style)
 
     // W=1 && R=0 は違法
@@ -114,7 +126,8 @@ module MMU (
     function [0:0] pte_valid;
         input [31:0] pte;
     begin
-        pte_valid = (pte[0] && !illegal_rw(pte));
+        pte_valid = pte[0] && !illegal_rw(pte) &&
+                    (is_leaf(pte) || !(pte[7] || pte[6] || pte[4]));
     end
     endfunction
 
@@ -126,16 +139,22 @@ module MMU (
         input        w;
         input        x;
     begin
-        perm_ok = ((!r) || pte[1]) &&
-                  ((!w) || pte[2]) &&
-                  ((!x) || pte[3]);
-        // ※ U/S, A/D ビットの扱いは最小実装として省略
+        perm_ok = ((!r) || pte[1] || (req_mstatus[19] && pte[3])) &&
+                  ((!w) || pte[2]) && ((!x) || pte[3]) &&
+                  ((req_priv == PRIV_U) ? pte[4] :
+                   (!pte[4] || (!x && req_mstatus[18]))) &&
+                  pte[6] && (!w || pte[7]);
     end
     endfunction
 
     // ===== 本体 =====
     always @(posedge clk or negedge reset_n) begin
         if (!reset_n) begin
+            req_vaddr <= 0; req_satp <= 0; req_mstatus <= 0;
+            req_priv <= PRIV_M; req_r <= 0; req_w <= 0; req_x <= 0;
+            cache_asid <= 0;
+            access_fault <= 0;
+
             state       <= S_IDLE;
             mem_valid   <= 1'b0;
             mem_addr_34bit <= 34'h0;
@@ -159,8 +178,10 @@ module MMU (
             //  cpu state done. sfence_vma. 
             // --------------------------------------------------
             // page_falut=Lに戻す.
-            if(cpu_state_done) 
-                page_fault <= 1'b0; 
+            if (cpu_state_done) begin
+                page_fault <= 1'b0;
+                access_fault <= 1'b0;
+            end
             // PTEキャッシュクリア. cpu_state_done=Hと同じ
             if (sfence_vma) 
                 sfence_vma_reg <= 1'b1;
@@ -183,20 +204,33 @@ module MMU (
             case (state)
                 // --------------------------------------------------
                 S_IDLE: begin
-                    if (MMU_enb)
-                        state    <= S_START;
+                    if (MMU_enb) begin
+                        req_vaddr <= vaddr;
+                        req_satp <= satp;
+                        req_mstatus <= mstatus;
+                        req_priv <= effective_priv;
+                        req_r <= access_r; req_w <= access_w; req_x <= access_x;
+                        state <= S_START;
+                    end
+                    if (sfence_vma_reg)
+                        sfence_vma_reg <= 1'b0;
                 end
 
                 // --------------------------------------------------
                 S_START: begin
+                    access_fault <= 1'b0;
+                    sfence_vma_reg <= 1'b0;
                     page_fault <= 1'b0; // 新規トランザクション開始
-                    if (!mode_sv32 || (priv_mode == PRIV_M)) begin
+                    if (!req_satp[31] || (req_priv == PRIV_M)) begin
                         // Bare モード：変換無し
-                        paddr_34bit <= vaddr;
+                        paddr_34bit <= req_vaddr;
                         state       <= S_DONE;
                     end else begin
                         // PTE モード：変換あり
-                        if(cache_hit) begin    // PTEキャッシュあり
+                        if (|root_ppn[21:20]) begin
+                            access_fault <= 1'b1;
+                            state <= S_DONE;
+                        end else if (cache_hit) begin    // PTEキャッシュあり
                             pte_l1 <= cache_pte_l1;
                             state <= S_L1_CHECK;
                         end else begin          // PTEキャッシュなし
@@ -216,7 +250,11 @@ module MMU (
                 end
 
                 S_L1_WAIT: begin
-                    if (mem_ready) begin
+                    if (mem_ready && mem_access_fault) begin
+                        access_fault <= 1'b1;
+                        state <= S_DONE;
+                    end else if (mem_ready) begin
+                        cache_asid <= req_satp[30:22];
                         pte_l1          <= mem_rdata; // この拍に有効
                         cache_pte_l1    <= mem_rdata;
                         cache_vpn1      <= vpn1;        // vpn1 cache data
@@ -230,7 +268,10 @@ module MMU (
 
                 S_L1_CHECK: begin
                     // V=1? W=1 & R=0 でない? をまず確認
-                    if (!pte_valid(pte_l1)) begin
+                    if (sfence_vma_reg || sfence_vma) begin
+                        sfence_vma_reg <= 1'b0;
+                        state <= S_START;
+                    end else if (!pte_valid(pte_l1)) begin
                         page_fault <= 1'b1;
                         state      <= S_DONE;
                     end else if (is_leaf(pte_l1)) begin
@@ -239,9 +280,12 @@ module MMU (
                         if (|pte_l1[19:10]) begin
                             page_fault <= 1'b1; // misaligned superpage
                             state      <= S_DONE;
-                        end else if (!perm_ok(pte_l1, access_r, access_w, access_x)) begin
+                        end else if (!perm_ok(pte_l1, req_r, req_w, req_x)) begin
                             page_fault <= 1'b1;
                             state      <= S_DONE;
+                        end else if (|pte_l1[31:30]) begin
+                            access_fault <= 1'b1;
+                            state <= S_DONE;
                         end else begin
                             // Sv32 L1 leaf (4MiB superpage)
                             // PA[31:22] = PTE.PPN[1] (= pte_l1[31:20])
@@ -252,7 +296,10 @@ module MMU (
                         end
                     end else begin
                         // ポインタPTE → L0
-                        if (l0_cache_hit) begin
+                        if (|pte_l1[31:30]) begin
+                            access_fault <= 1'b1;
+                            state <= S_DONE;
+                        end else if (l0_cache_hit) begin
                             pte_l0 <= cache_pte_l0;
                             state  <= S_L0_CHECK;
                         end else begin
@@ -273,7 +320,10 @@ module MMU (
                 end
 
                 S_L0_WAIT: begin
-                    if (mem_ready) begin
+                    if (mem_ready && mem_access_fault) begin
+                        access_fault <= 1'b1;
+                        state <= S_DONE;
+                    end else if (mem_ready) begin
                         pte_l0       <= mem_rdata;
                         cache_pte_l0 <= mem_rdata;      // vpn0 cache data
                         cache_vpn0   <= vpn0;           // cache vpn0 に対応するvpn0
@@ -283,12 +333,21 @@ module MMU (
                 end
 
                 S_L0_CHECK: begin
-                    if (!pte_valid(pte_l0)) begin
+                    if (sfence_vma_reg || sfence_vma) begin
+                        sfence_vma_reg <= 1'b0;
+                        state <= S_START;
+                    end else if (!pte_valid(pte_l0)) begin
                         page_fault <= 1'b1;
                         state      <= S_DONE;
-                    end else if (!perm_ok(pte_l0, access_r, access_w, access_x)) begin
+                    end else if (!is_leaf(pte_l0)) begin
+                        page_fault <= 1'b1;
+                        state <= S_DONE;
+                    end else if (!perm_ok(pte_l0, req_r, req_w, req_x)) begin
                         page_fault <= 1'b1;
                         state      <= S_DONE;
+                    end else if (|pte_l0[31:30]) begin
+                        access_fault <= 1'b1;
+                        state <= S_DONE;
                     end else begin
                         // 4KiBページ
                         //paddr <= {pte_l0[31:10], page_off};
@@ -307,6 +366,11 @@ module MMU (
                 default: state <= S_IDLE;
 
             endcase
+            if (sfence_vma || sfence_vma_reg) begin
+                pte_cached <= 1'b0;
+                l0_cached <= 1'b0;
+            end
+
         end
     end
 

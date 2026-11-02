@@ -1,10 +1,10 @@
 //! api/i2c_api.c/.h. All accesses are aligned volatile 32-bit operations.
 use crate::common::{mmio_r32, mmio_w32};
-pub const INPUT: u32 = 0x10009000;
-pub const STATUS: u32 = 0x10009004;
-pub const OUTPUT: u32 = 0x10009008;
-pub const CONTROL: u32 = 0x1000900c;
-pub const SEQ: u32 = 0x10009010;
+pub const INPUT: u32 = crate::board::I2C_BASE;
+pub const STATUS: u32 = crate::board::I2C_BASE + 0x4;
+pub const OUTPUT: u32 = crate::board::I2C_BASE + 0x8;
+pub const CONTROL: u32 = crate::board::I2C_BASE + 0xc;
+pub const SEQ: u32 = crate::board::I2C_BASE + 0x10;
 pub const INPUT_READY: u32 = 1;
 pub const OUTPUT_READY: u32 = 2;
 pub const OVERRUN: u32 = 4;

@@ -338,7 +338,7 @@ pub fn speech_class_name(id: i32) -> &'static str {
 
 /// Flush old I2S samples and stop recording at the first microphone timeout.
 pub unsafe fn speech_record(samples: &mut [i16]) -> usize {
-    crate::common::mmio_w32(0x10007004, 1);
+    crate::common::mmio_w32(crate::board::MIC_BASE + 0x4, 1);
     for (i, s) in samples.iter_mut().enumerate() {
         match crate::drivers::mic_api::mic_read_sample24() {
             Ok(raw) => *s = sample24_to_s16(raw),

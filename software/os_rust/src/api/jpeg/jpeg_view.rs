@@ -59,15 +59,15 @@ pub fn decode_with_device<D: BlockDevice>(
     result
 }
 
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub fn probe(name: &str) -> Result<Header, i32> {
     probe_with_device(name, &mut crate::api::user::UserSd)
 }
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub fn decode_rgb(name: &str, sink: &mut dyn RgbSink) -> Result<(), i32> {
     decode_with_device(name, &mut crate::api::user::UserSd, sink)
 }
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub fn view(name: &str) -> Result<(), i32> {
     use crate::api::user::*;
     struct Lcd;

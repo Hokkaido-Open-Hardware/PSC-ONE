@@ -40,7 +40,11 @@ typedef long mp_off_t;
 // We need to provide a declaration/definition of alloca()
 
 #define MICROPY_HW_BOARD_NAME "PSC-ONE"
+#if defined(__riscv_xlen) && __riscv_xlen == 64
+#define MICROPY_HW_MCU_NAME "RV64IM"
+#else
 #define MICROPY_HW_MCU_NAME "RV32IM"
+#endif
 
 #if defined(__linux__) || defined(__APPLE__)
 #define MICROPY_MIN_USE_STDOUT (1)
@@ -87,7 +91,12 @@ void psc_mp_poll(void);
 #define MICROPY_ENABLE_FINALISER (1)
 #define MICROPY_PY_BUILTINS_BYTEARRAY (1)
 // FAT timestamps and SD/file sizes exceed the RV32 tagged small-int range.
+#if defined(__riscv_xlen) && __riscv_xlen == 64
+// The longlong implementation assumes a 32-bit mp_uint_t.
+#define MICROPY_LONGINT_IMPL (MICROPY_LONGINT_IMPL_MPZ)
+#else
 #define MICROPY_LONGINT_IMPL (MICROPY_LONGINT_IMPL_LONGLONG)
+#endif
 #define MICROPY_FATFS_ENABLE_LFN (2)
 #define MICROPY_FATFS_RPATH (2)
 #define MICROPY_FATFS_NORTC (1)

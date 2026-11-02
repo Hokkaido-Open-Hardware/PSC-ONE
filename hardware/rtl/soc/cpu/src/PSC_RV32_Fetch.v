@@ -20,13 +20,17 @@ module PSC_RV32_Fetch #(
     // other sig.
     input wire [31:0]       pc,
     input wire [31:0]       csr_satp,
+    input wire [31:0]       csr_mstatus,
     input  wire [1:0]       priv_mode,
     input wire              is_load,
     input wire              is_store,
     input wire              is_sfence_vma,
     output wire             fifo_ready,
     // fault sig.
-    output wire             i_pf,
+    input wire              fault_ack,
+    output reg              i_pf,
+    output reg              i_access_fault,
+    output reg [31:0]        i_fault_vaddr,
     // to memory
     output wire             program_mem_read_valid,
     input wire              program_mem_read_ready,
@@ -99,7 +103,7 @@ module PSC_RV32_Fetch #(
             if (fetch_state == IDLE)
                 flush_execute_done <= 1'b0;
             else if (execute_ready &&
-                     ((fetch_state == FIFO_FLUSH) ||
+                     (fifo_flush || (fetch_state == FIFO_FLUSH) ||
                       (fetch_state == FIFO_FLUSH_MMU_W) ||
                       (fetch_state == FIFO_FLUSH_W)))
                 flush_execute_done <= 1'b1;
@@ -191,7 +195,7 @@ module PSC_RV32_Fetch #(
                 // state = 3
                 FETCH_MMU_W: begin
                     if (i_mmu_done)
-                        next_state = FETCH;
+                        next_state = i_mmu_fault ? EXECUTE_W : FETCH;
                 end
 
                 // =====================
@@ -289,6 +293,29 @@ module PSC_RV32_Fetch #(
     // fetch_state = FETCH_MMU
     // I-side MMU: pc を翻訳（実行属性）
 
+    wire i_page_fault;
+    wire i_mmu_access_fault;
+    wire i_mmu_fault = i_page_fault | i_mmu_access_fault;
+    reg discard_walk;
+    always @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            i_pf <= 1'b0;
+            i_access_fault <= 1'b0;
+            i_fault_vaddr <= 32'd0;
+            discard_walk <= 1'b0;
+        end else if (cpu_stop || fifo_flush || fault_ack) begin
+            i_pf <= 1'b0;
+            i_access_fault <= 1'b0;
+            discard_walk <= 1'b1;
+        end else begin
+            if (i_MMU_enb) discard_walk <= 1'b0;
+            if (i_mmu_done && i_mmu_fault && !discard_walk) begin
+                i_pf <= 1'b1;
+                i_access_fault <= i_mmu_access_fault;
+                i_fault_vaddr <= fetch_pc;
+            end
+        end
+    end
     MMU u_mmu_i (
         .clk                (clock),
         .reset_n            (reset_n),
@@ -296,6 +323,9 @@ module PSC_RV32_Fetch #(
         .vaddr              (fetch_pc),        // vaddr
         .satp               (csr_satp),        // Csr から出した satp
         .priv_mode          (priv_mode),
+        .mstatus            (csr_mstatus),
+        .mem_access_fault   (1'b0),
+        .access_fault       (i_mmu_access_fault),
         .access_r           (1'b0),
         .access_w           (1'b0),
         .access_x           (1'b1),
@@ -304,11 +334,11 @@ module PSC_RV32_Fetch #(
         .mem_addr           (data_mem_read_address),
         .mem_valid          (data_mem_read_valid),
         .mem_ready          (data_mem_read_ready),
-        .cpu_state_done     (fetch_state==FETCH_W),
+        .cpu_state_done     ((fetch_state==FETCH_W) || fault_ack || (fifo_flush && i_pf)),
         .sfence_vma         (fifo_flush & is_sfence_vma),
         
         .paddr              (i_paddr),
-        .page_fault         (i_pf),
+        .page_fault         (i_page_fault),
         .mode_sv32          (i_mode_sv32),      // 0: 仮想メモリモードOFF.
         .mmu_done           (i_mmu_done)
     );

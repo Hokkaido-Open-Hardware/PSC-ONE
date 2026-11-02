@@ -36,6 +36,8 @@
 #define PAGE_W (1 << 2)
 #define PAGE_X (1 << 3)
 #define PAGE_U (1 << 4)
+#define PAGE_A (1 << 6)
+#define PAGE_D (1 << 7)
 
 struct sbiret { long error; long value; };
 

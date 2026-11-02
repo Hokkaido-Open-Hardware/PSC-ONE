@@ -24,6 +24,7 @@ module PSC_RV32_Execute #(
     input  wire [31:0]      pc,
     input  wire [31:0]      opcode,
     input  wire [31:0]      csr_satp,
+    input wire [31:0]       csr_mstatus,
     input  wire [1:0]       priv_mode,
     output wire [31:0]      alu_data,
     output wire             is_load,
@@ -35,6 +36,7 @@ module PSC_RV32_Execute #(
     output wire             is_ecall,
     output wire             is_fence_i,
     output wire             d_pf,
+    output wire             d_access_fault,
     output wire             illegal_instruction,
     // CSR sig
     output wire             csr_enb,
@@ -74,7 +76,7 @@ module PSC_RV32_Execute #(
                                   (pc_sel2 | is_sfence_vma | is_fence_i | is_ecall | do_mret | do_sret | cpu_trap);
 
     // CSR
-    assign csr_enb      = (execute_state==BRANCH) & branch_done;
+    assign csr_enb      = (execute_state==BRANCH) & (branch_done | d_pf);
     assign csr_valid    = execute_ready;
 
     // ============================================================
@@ -209,7 +211,9 @@ module PSC_RV32_Execute #(
 
             // =====================
             BRANCH:
-                if (branch_done)
+                if (d_pf)
+                    next_state = STORE;
+                else if (branch_done)
                     next_state = STORE_MMU;
 
             // =====================
@@ -227,7 +231,9 @@ module PSC_RV32_Execute #(
 
             // =====================
             STORE:
-                if (mem_rw) begin
+                if (d_pf) begin
+                    next_state = IDLE;
+                end else if (mem_rw) begin
                     if (store_done)
                         next_state = IDLE;
                 end else begin
@@ -333,6 +339,7 @@ module PSC_RV32_Execute #(
 
         // Privilege level encoding (RISC-V spec)
         .current_priv       (priv_mode),
+        .tvm                (csr_mstatus[20]),
         // ==== CSR outputs ====
         .csr_wr             (csr_wr),
         .csr_cmd            (csr_cmd),
@@ -392,6 +399,8 @@ module PSC_RV32_Execute #(
     assign d_pte_mem_rdata = data_mem_read_data;
     assign vaddr = alu_data;
 
+    wire d_page_fault;
+    assign d_pf = d_page_fault | d_access_fault;
     MMU u_mmu_d (
         .clk                (clock),
         .reset_n            (reset_n),
@@ -399,6 +408,9 @@ module PSC_RV32_Execute #(
         .vaddr              (vaddr),
         .satp               (csr_satp),
         .priv_mode          (priv_mode),
+        .mstatus            (csr_mstatus),
+        .mem_access_fault   (1'b0),
+        .access_fault       (d_access_fault),
         .access_r           (is_load),
         .access_w           (is_store),
         .access_x           (1'b0),
@@ -411,7 +423,7 @@ module PSC_RV32_Execute #(
         .sfence_vma         (fifo_flush_sig & is_sfence_vma),
         
         .paddr              (d_paddr),
-        .page_fault         (d_pf),
+        .page_fault         (d_page_fault),
         .mode_sv32          (d_mode_sv32),
         .mmu_done           (d_mmu_done)
     );
@@ -426,7 +438,7 @@ module PSC_RV32_Execute #(
         .clock                  (clock),            // クロック
         .reset_n                (reset_n),          // リセット（負論理）
         // ブランチ有効信号. pc_sel2更新のためpipeline_modeはEXECUTEで更新
-        .branch_enb             (execute_state==BRANCH | (execute_state==EXECUTE & pipeline_mode)),
+        .branch_enb             (!d_pf && (execute_state==BRANCH | (execute_state==EXECUTE & pipeline_mode))),
         .is_load_store          (is_load | is_store),
         .funct3                 (funct3),           // funct3（Decorder出力）
         .r_data1                (r_data1),          // レジスタデータ1（Execute出力）
@@ -464,7 +476,7 @@ module PSC_RV32_Execute #(
     ) u_memory_store (
         .clock                      (clock),                  // クロック
         .reset_n                    (reset_n),                // リセット（負論理）
-        .store_enb                  (execute_state==STORE & !pipeline_mode),   // ストア有効
+        .store_enb                  (execute_state==STORE & !pipeline_mode & !d_pf),   // ストア有効
         .mem_rw                     (mem_rw),                 // メモリR/W制御（Decorder出力）
         .wb_sel                     (wb_sel),                 // Write Back 選択（Decorder出力）
         .pc_sel2                    (pc_sel2),                // ブランチ判定結果（Branch出力）
@@ -501,7 +513,7 @@ module PSC_RV32_Execute #(
         .clock              (clock),
         .reset_n            (reset_n),
         .store_enb          (execute_state==STORE),
-        .rf_wen             (rf_wen),
+        .rf_wen             (rf_wen & !d_pf & !illegal_instruction),
         .w_addr             (w_addr),
         .w_data             (w_data),
         .r_addr1            (r_addr1),

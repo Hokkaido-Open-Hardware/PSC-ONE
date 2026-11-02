@@ -19,8 +19,9 @@ overflow-checks = false
 [features]
 firmware = []
 user = []
-sd-user = []
 pulp = []
+# Disabled by default, like PSC_OS_DEBUG_WITHOUT_MICROPYTHON in the C shell.
+micropython = []
 # Host validation links the same TJpgDec ABI through the test runner.
 jpeg-host = []
 
@@ -37,3 +38,13 @@ required-features = ["firmware"]
 [[example]]
 name = "yolo_reference"
 required-features = ["jpeg-host"]
+
+[[bin]]
+name = "bootrom"
+path = "src/bin/bootrom.rs"
+required-features = ["firmware"]
+
+[[bin]]
+name = "bootloader_fat32"
+path = "src/bin/bootloader_fat32.rs"
+required-features = ["firmware"]

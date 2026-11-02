@@ -1,6 +1,6 @@
 //! tflite_platform.c: user-mode device calls, never direct NPU MMIO.
 pub struct Platform;
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 impl super::tflite_synap::Device for Platform {
     fn tile(
         &mut self,

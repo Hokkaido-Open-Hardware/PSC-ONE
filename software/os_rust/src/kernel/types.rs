@@ -9,6 +9,8 @@ pub const PAGE_R: u32 = 2;
 pub const PAGE_W: u32 = 4;
 pub const PAGE_X: u32 = 8;
 pub const PAGE_U: u32 = 16;
+pub const PAGE_A: u32 = 1 << 6;
+pub const PAGE_D: u32 = 1 << 7;
 #[derive(Clone, Copy, Default)]
 #[repr(C, align(16))]
 pub struct MachineContext {

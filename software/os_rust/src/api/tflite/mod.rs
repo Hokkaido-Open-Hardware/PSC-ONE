@@ -1,7 +1,7 @@
 pub mod tflite_cpu;
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub mod tflite_demo;
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub mod tflite_file;
 pub mod tflite_graph;
 pub mod tflite_inspect;

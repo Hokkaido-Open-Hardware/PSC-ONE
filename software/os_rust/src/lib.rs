@@ -2,6 +2,7 @@
 #![no_std]
 #![allow(clippy::missing_safety_doc)]
 pub mod api;
+pub mod board;
 pub mod boot;
 #[path = "lib/common.rs"]
 pub mod common;
@@ -14,5 +15,5 @@ pub mod kernel;
 pub mod mulsi3;
 
 pub mod elego_robot;
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 pub mod shell;

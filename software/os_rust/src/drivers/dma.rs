@@ -1,5 +1,5 @@
 //! drivers/dma.c/.h. Identity mapped nonoverlapping buffers, no concurrent DMA.
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 /// Publish dirty cache lines before DMA; optionally invalidate stale destination lines.
 unsafe fn cache_sync(addr: *const u8, invalidate: bool) {
     if invalidate {
@@ -12,7 +12,7 @@ unsafe fn cache_sync(addr: *const u8, invalidate: bool) {
 /// Transfer aligned whole words with DMA and copy any remaining bytes with the CPU.
 pub unsafe fn memcpy_dma(dst: *mut u8, src: *const u8, n: usize) -> *mut u8 {
     let mut bytes = 0;
-    #[cfg(target_arch = "riscv32")]
+    #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
     if (dst as usize | src as usize) & 3 == 0 && n >= 4 {
         bytes = n & !3;
         // DMA bypasses the write-back cache, so publish source and dirty destination lines.

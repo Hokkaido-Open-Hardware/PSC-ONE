@@ -237,7 +237,9 @@ void map_page(uint32_t *table1, uint32_t vaddr, paddr_t paddr, uint32_t flags) {
     }
     uint32_t vpn0 = (vaddr >> 12) & 0x3ff;
     uint32_t *table0 = (uint32_t *)((table1[vpn1] >> 10) * PAGE_SIZE);
-    table0[vpn0] = ((paddr / PAGE_SIZE) << 10) | flags | PAGE_V;
+    /* Svade compatibility: no accessed/dirty tracking or A/D fault handler.
+       These flags belong only to leaf PTEs; the parent pointer stays V-only. */
+    table0[vpn0] = ((paddr / PAGE_SIZE) << 10) | flags | PAGE_V | PAGE_A | PAGE_D;
 }
 
 __attribute__((section(".text.boot")))

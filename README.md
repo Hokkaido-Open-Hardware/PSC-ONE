@@ -609,6 +609,7 @@ JPEG images and a TFLite model are loaded from an SD card. PSC-OS handles image 
 | BUS | <img src="docs/yolo_images/BUS.JPG" width="320"> | <img src="docs/yolo_images/BUS_yolo.jpg" width="320"> |
 | CUPBAN | <img src="docs/yolo_images/CUPBAN.JPG" width="320"> | <img src="docs/yolo_images/CUPBAN_yolo.jpg" width="320"> |
 | NEKO | <img src="docs/yolo_images/NEKO.JPG" width="320"> | <img src="docs/yolo_images/NEKO_yolo.jpg" width="320"> |
+| DOG | <img src="docs/yolo_images/DOG.JPG" width="320"> | <img src="docs/yolo_images/DOG_yolo.jpg" width="320"> |
 
 This demo focuses on validating inference in an embedded environment rather than achieving real-time performance. Detection results depend on the input image and the object classes supported by the pretrained model.
 

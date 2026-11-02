@@ -9,6 +9,7 @@ module Decorder (
     input  logic [31:0]   opcode,
     input  logic [31:0]   in_pc,
     input  logic [1:0]    current_priv,
+    input wire             tvm,
     output logic          decode_done,
 
     output dec_ctrl_t     decoder_ctrl
@@ -47,7 +48,7 @@ module Decorder (
     wire        is_sfence_vma_w =
                             is_system &&
                             (sys_f3 == 3'b000) &&
-                            (opcode[31:25] == 7'b0001001);
+                            (opcode[31:25] == 7'b0001001) && (opcode[11:7] == 5'b0);
     wire        is_system  = (op == ECALLEBREAK);
     wire [2:0]  sys_f3     = opcode[14:12];
     //wire        is_priv    = is_system && (sys_f3 == 3'b000); // ECALL/EBREAK/MRET/WFI
@@ -99,6 +100,9 @@ module Decorder (
 
     // CSR命令か？
     wire        is_csr_any = is_csrrw | is_csrrs | is_csrrc | is_csri;
+    wire illegal_vm = (is_sfence_vma_w || (is_csr_any && opcode[31:20] == 12'h180)) &&
+                      (current_priv == PRIV_U || (current_priv == PRIV_S && tvm));
+
 
     // funct3 → Csr.v のコマンド(0:RW,1:RS,2:RC) に正規化
     //   001/101 → RW(00), 010/110 → RS(01), 011/111 → RC(10)
@@ -264,7 +268,7 @@ module Decorder (
                       2'b00;
 
     // ---- CSR新規出力（組合せ値）----
-    wire        csr_wr_w       = is_csr_any;
+    wire        csr_wr_w       = is_csr_any && !illegal_vm;
     wire [1:0]  csr_cmd_w      = csr_cmd_norm; // 0:RW,1:RS,2:RC
     wire        csr_use_imm_w  = is_csri;
     wire [11:0] csr_addr_mux   = csr_addr_w;
@@ -356,7 +360,7 @@ module Decorder (
         decoder_ctrl_next.pc_sel                   = pc_sel_w;
         decoder_ctrl_next.is_fence                 = is_fence_w;
         decoder_ctrl_next.is_fence_i               = is_fence_i_w;
-        decoder_ctrl_next.is_sfence_vma            = is_sfence_vma_w;
+        decoder_ctrl_next.is_sfence_vma            = is_sfence_vma_w && !illegal_vm;
         decoder_ctrl_next.csr_wr                   = csr_wr_w;
         decoder_ctrl_next.csr_cmd                  = csr_cmd_w;
         decoder_ctrl_next.csr_use_imm              = csr_use_imm_w;
@@ -376,7 +380,7 @@ module Decorder (
         decoder_ctrl_next.raise_illegal_instruction =
                                     raise_illegal_instruction_sw |
                                     raise_illegal_instruction_mw |
-                                    raise_illegal_instruction_alu;
+                                    raise_illegal_instruction_alu | illegal_vm;
     end
 
     // Register the full decode result before rename.  This separates the

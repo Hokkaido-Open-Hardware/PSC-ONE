@@ -12,6 +12,7 @@ module Fetch #(
     // MMU
     output logic        mmu_valid,
     input  logic        mmu_ready,
+    input  logic        mmu_fault,
     output logic [31:0] vaddr,
     input  logic [31:0] paddr,
 
@@ -102,7 +103,9 @@ module Fetch #(
                 end
 
                 MMU_WAIT: begin
-                    if (mmu_ready) begin
+                    if (mmu_ready && mmu_fault) begin
+                        state <= FETCH_DONE;
+                    end else if (mmu_ready) begin
                         // Latch the completed translation; keep vaddr for the PC.
                         program_mem_read_address <= paddr;
                         burst_count      <= 3'd0;

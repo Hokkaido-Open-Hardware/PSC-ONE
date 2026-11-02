@@ -14,12 +14,12 @@ pub unsafe extern "C" fn mbios_entry() -> ! {
     naked_asm!(
         ".option norvc",
         "j 2f", "j 3f",
-        "2: li a1, 0x00200000",
+        "2: li a1, {loader}",
         "3: la sp, {stack}", "li t0, 4096", "add sp, sp, t0",
         "csrw mscratch, sp", "la t0, {trap}", "csrw mtvec, t0",
         "csrw satp, zero", "li t0, 0xb1ff", "csrw medeleg, t0",
         "li t0, 0x800", "csrw mstatus, t0", "csrw mepc, a1", "mret",
-        stack = sym STACK, trap = sym trap,
+        stack = sym STACK, trap = sym trap, loader = const crate::board::BOOTLOADER_BASE,
     );
 }
 
@@ -45,14 +45,14 @@ unsafe extern "C" fn trap() -> ! {
         "beq a7, t1, 4f",
         "j 9f",
         // UART output waits for TX idle; input waits for RX available.
-        "2: li t1, 0x10000000",
+        "2: li t1, {uart}",
         "3: lw t2, 8(t1)",
         "andi t2, t2, 1",
         "bnez t2, 3b",
         "sb a0, 0(t1)",
         "li a0, 0",
         "j 6f",
-        "4: li t1, 0x10000000",
+        "4: li t1, {uart}",
         "7: lw t2, 8(t1)",
         "andi t2, t2, 2",
         "beqz t2, 7b",
@@ -77,5 +77,6 @@ unsafe extern "C" fn trap() -> ! {
         // The trusted restart routine installs a fresh stack; discard this frame.
         "8: jr a0",
         "9: j 9b",
+        uart = const crate::board::UART_BASE,
     );
 }

@@ -5,7 +5,8 @@ FPGA platform. It provides a bare-metal supervisor kernel and a separate
 user-mode command shell, with access to PSC-ONE peripherals through system
 calls and memory-mapped hardware interfaces.
 
-The Rust code uses `#![no_std]` and targets `riscv32im-unknown-none-elf`.
+The Rust code uses `#![no_std]` and targets `riscv32im-unknown-none-elf`
+or `riscv64im-unknown-none-elf` (RV64IM / LP64 / Sv39).
 Hardware execution requires the PSC-ONE environment; the firmware is not a
 desktop application. Selected hardware-independent routines can be tested
 on the host.
@@ -13,25 +14,27 @@ on the host.
 ## Architecture
 
 - **Kernel:** supervisor-mode startup, traps and system calls, physical page
-  allocation, Sv32 address translation, and user-process support.
+  allocation, Sv32 (RV32) or Sv39 (RV64) address translation, and user-process support.
 - **User shell:** a separately linked user-mode image with an interactive
   UART console and the `PSC_OS>` prompt.
 - **Storage:** SD-card access, FAT32 operations, and ELF application loading.
 - **Peripherals and applications:** LCD output, JPEG display, timers, LEDs,
   DMA, microphone and I2C access, robot support, and TensorFlow Lite model
   inspection and execution with CPU and accelerator backends.
-- **MicroPython:** an embedded interpreter linked through the existing PSC
-  MicroPython C port.
+- **MicroPython:** disabled by default for both RV32 and RV64, matching the
+  C shell's `PSC_OS_DEBUG_WITHOUT_MICROPYTHON` configuration. The optional
+  interpreter code remains available through `MICROPYTHON=1`.
 
 This is a mixed Rust/C firmware build. It reuses the TJpgDec C decoder,
-MicroPython, and runtime libraries from the existing [C implementation](../os/).
+runtime libraries, and optionally MicroPython from the existing [C implementation](../os/).
 TFLite parsing, verification, quantization, CPU kernels and accelerator dispatch
 are implemented independently in Rust; no C/C++ TFLite runtime is linked.
-The simulation flow also builds the existing SBI boot ROM and, for SD boot,
-the FAT32 bootloader. These dependencies must be available in the checkout.
+The RV32 build reuses the existing C SBI boot ROM and FAT32 bootloader.
+RV64 builds a separate Rust MBIOS and Rust FAT32 bootloader with LP64 register
+saves. The TJpgDec and Picolibc sources/libraries must be available in the checkout.
 
 The kernel entry address is `0x00200000`; the user image is linked at virtual
-address `0x00400000`. The linker scripts define the memory layout, stack
+address `0x00400000` on RV32 or `0x01000000` on RV64. The linker scripts define the memory layout, stack
 regions, and checks against image overlap.
 
 ## Source layout
@@ -46,7 +49,9 @@ regions, and checks against image overlap.
 | `src/drivers/` | PSC-ONE peripheral drivers |
 | `src/api/` | User APIs, signal processing, and inference support |
 | `src/elego_robot/` | Robot PWM and IMU support |
-| `link/` | Kernel and user linker scripts |
+| `src/board/psc_one/` | RV32 MMIO, memory layout, linker scripts and build flags |
+| `src/board/psc_one_rv64/` | RV64 build/link settings, Sv39, LP64 traps/context, ELF64 and MBIOS |
+| `link/` | Compatibility wrappers for the board linker scripts |
 | `assets/` | Boot logo and font data |
 | `tests/` | Host-side logic tests and fixtures |
 | `tools/` | Image conversion and firmware verification tools |
@@ -62,8 +67,9 @@ GNU Make, Python 3, ripgrep, Clang, `llvm-objcopy`, and the
 
 The current Makefile expects Picolibc under
 `/usr/lib/picolibc/riscv64-unknown-elf`, including its `rv32i/ilp32` libraries.
-The MicroPython checkout must already contain the PSC port patches; the Rust
-Makefile deliberately bypasses the wrapper that applies patches through Git.
+MicroPython is not built or linked by default. If enabled, its checkout must
+already contain the PSC port patches; the Rust Makefile deliberately bypasses
+the wrapper that applies patches through Git.
 
 ```sh
 rustup target add riscv32im-unknown-none-elf
@@ -76,50 +82,132 @@ inside this directory.
 
 | Output | Description |
 | --- | --- |
+| `build/bootrom.mem`, `build/bootloader_fat32.mem` | Matching FPGA boot ROMs |
 | `build/kernel.elf`, `build/user.elf` | Linked firmware with symbols |
 | `build/kernel.bin`, `build/shell.bin` | Binary kernel and user images |
 | `build/kernel.mem`, `build/user.mem` | Hexadecimal memory images |
 | `build/kernel.map`, `build/user.map` | Linker maps |
 
-The default `USER_SOURCE=rtl` expects the user image to be preloaded by the
-simulation environment. To build a kernel that reads `USER.MEM` from FAT32
-on cold boot, use:
+`BOARD=psc_one` is the supported RV32 profile. MMIO bases and the user ABI
+are defined in `src/board/psc_one/config.rs`; `memory.ld`, `kernel.ld`, and
+`user.ld` own the linked layout, and `board.mk` owns the toolchain flags.
+`CPU_VERSION=rv64` selects `BOARD=psc_one_rv64` automatically; an explicit
+`BOARD=psc_one_rv64` also selects RV64. Unknown boards are rejected.
+
+### RV64 / Sv39 support (2026-11-03)
 
 ```sh
-make -C PSC-ONE/software/os_rust USER_SOURCE=sd CPU_VERSION=v1
+# One-time toolchain setup. RV64IM core/compiler_builtins are built from source.
+rustup toolchain install nightly-2026-09-04 --component rust-src
+# Build and statically verify all four RV64 images (MicroPython disabled).
+make -C PSC-ONE/software/os_rust verify CPU_VERSION=rv64
+# Equivalent explicit board selection:
+make -C PSC-ONE/software/os_rust verify BOARD=psc_one_rv64
+# Optional library-only type check/build:
+make -C PSC-ONE/software/os_rust check-target CPU_VERSION=rv64
+make -C PSC-ONE/software/os_rust lib CPU_VERSION=rv64
 ```
+
+`board.mk` selects `riscv64im-unknown-none-elf`, `+zicsr,+zifencei`, static
+relocation, the medium code model, and C `-march=rv64im_zicsr_zifencei -mabi=lp64`.
+Cargo uses `-Z build-std=core,compiler_builtins`; the IMAC prebuilt library is not
+used because it may contain unsupported atomic/compressed instructions.
+`RUST_TOOLCHAIN` can override the pinned nightly. Cargo builds remain offline.
+
+Sv39 uses three levels of 512 64-bit PTEs, 4 KiB pages, `satp.MODE=8`, and
+`sfence.vma` on address-space changes. Page construction sets accessed/dirty
+bits; user-buffer checks walk all three levels and require user permissions.
+Noncanonical addresses, reserved PTE encodings and misaligned superpages are
+rejected by the walker. Kernel/MMIO pages remain supervisor-only and the user
+stack guard remains unmapped. Model and arena mappings use separate user leaves.
+Trap frames, machine contexts and cooperative register saves use 64-bit slots.
+The foreground loader accepts bounded ELF64/RISC-V soft-float executables and
+rejects ELF32. The existing PSC syscall device values and user buffers remain
+within the board's low 32-bit address range; this is not an unrestricted 64-bit
+userspace address allocation API.
+
+| Setting | RV32 | RV64 |
+| --- | --- | --- |
+| Kernel entry (physical) | `0x00200000` | `0x00200000` |
+| Kernel/page-pool upper bound | `0x00400000` | `0x004c0000` |
+| Shell entry (virtual) | `0x00400000` | `0x01000000` |
+| User stack top (virtual) | `0x00500000` | `0x01100000` |
+| Model / arena user VA | `0x00800000` / `0x00c00000` | Same |
+| Output directory | `os_rust/build/` | `os_rust/build/psc_one_rv64/` |
+
+RV64 moves the shell VA outside the extended kernel identity range, leaving
+space for its larger LP64 images and page tables (including optional MicroPython).
+The physical 4 MiB model and 768 KiB arena reservations remain unchanged; the
+higher user VA does not require additional physical SDRAM. RV32 keeps its
+existing memory map and Sv32 implementation. The default behavior change common
+to both builds is that MicroPython is disabled; its command reports that state.
+
+For RV64 hardware, use **all four files from `build/psc_one_rv64/`**:
+`bootrom.mem` and `bootloader_fat32.mem` for the RV64 FPGA boot images, and
+`kernel.mem` / `user.mem` as `KERNEL.MEM` / `USER.MEM` on the FAT32 SD card.
+The RV32 ROM/loader and RV32 ELF applications must not be mixed into this set.
+No FPGA files are installed by this Makefile. Kernel and shell images are read
+from SD in the same order as RV32.
+
+Verification here means compilation/linking, ELF/MEM/layout/C-ABI checks and
+host tests for Sv39/ELF64. **RV64 hardware boot, interrupts, restart and peripheral
+operation remain unverified. No Rust OS RTL simulation was run for this change**,
+as requested; hardware operation is to be checked separately.
+
+### MicroPython selection
+
+`MICROPYTHON=0` is the default for **both** architectures. It excludes the Rust
+VM entry/callback module, MicroPython archive and its printf object from the
+firmware build. Sources remain available behind the `micropython` Cargo feature.
+The configuration stamp tracks the selection so switching modes rebuilds images.
+To explicitly re-enable it, pass `MICROPYTHON=1` to make. RV64 then uses the
+upstream RV64 GC/NLR helpers, LP64 C libraries and MPZ integers. Normal builds
+do not require a MicroPython compilation.
+
+The boot flow is the same as the C PSC-OS SD configuration:
+
+1. The RV32 C loader or RV64 Rust loader loads `KERNEL.MEM` from FAT32.
+2. The kernel calls `create_process_from_sd()`, reads `USER.MEM` from SD into
+   newly allocated contiguous process pages, and maps them at the board's user VA.
+3. A warm restart restores kernel data, clears BSS, resets the allocator and
+   reads `USER.MEM` from SD again.
+
+There is no fixed physical USER.MEM staging address or preloaded-image contract.
+`USER.MEM deferred to kernel` is the expected bootloader message. The kernel then
+prints `KERNEL: reading USER.MEM from SD into process pages` and confirms the load.
+
+The normal `make` / `make verify` generates all four MEM files under the selected
+board output directory shown above.
+For physical FPGA use, copy `kernel.mem` and `user.mem` to the FAT32 SD card.
+For RV32, the standard C OS `bootrom.mem` and `bootloader_fat32.mem` are reused unchanged;
+no Rust-specific user address or image size is compiled into the ROM.
+`build/image_layout.h` contains sizes/allocator bounds only for staging checks
+and the native testbench. It is not an input to the bootloader.
 
 ## RTL simulation
 
-The Rust simulation wrapper currently supports Verilator. It also requires
-the Python/cocotb environment used by the PSC-ONE simulation infrastructure.
-Run an interactive simulation with CPU v1 using:
+The RV32 Rust simulation wrapper supports Verilator and always boots from SD.
+The RV64 addition described above does not enable this wrapper for RV64.
+It requires the Python/cocotb environment used by PSC-ONE.
 
 ```sh
-make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust simulate_PSCOS CPU_VERSION=v1
-```
-
-For a bounded boot check that succeeds when the testbench observes `PSC_OS>`:
-
-```sh
-make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust smoke CPU_VERSION=v1
-```
-
-To exercise the FAT32 SD-card boot path:
-
-```sh
+# Prepare matching Rust firmware, C BIOS/loader, and the FAT32 card.
+make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust prepare_rust CPU_VERSION=v1
+# Interactive SD boot (also the default target).
 make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust simulate_SD_PSCOS CPU_VERSION=v1
+# Bounded boot check; succeeds only after observing PSC_OS>.
 make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust smoke_sd CPU_VERSION=v1
 ```
 
-These targets select the appropriate `USER_SOURCE` automatically and prepare
-the required boot images. Simulation artifacts and UART logs are stored under
-`PSC-ONE/hardware/sim/build/pscos-rust/`, with separate directories for direct
-and SD boot.
+The direct-load targets `simulate_PSCOS`, `simulate_PSCOS_RUST`, and `smoke`
+have been removed. `RUST_BOOT=rtl` and `USER_SOURCE=rtl` are rejected.
+Artifacts and UART logs live under
+`PSC-ONE/hardware/sim/build/pscos-rust/sd_<CPU>_<NPU>_<SIM_FAST>/`.
 
 At the shell prompt, enter `help` for the implemented command syntax.
 Commands include `hello`, `primes`, `fat32_info`, `fat32_ls`, `run`,
-`micropython`, `jpeg`, `tflite_info`, and `tflite_run`. Commands that access
+`jpeg`, `tflite_info`, and `tflite_run`; `micropython` reports disabled unless
+explicitly enabled at build time. Commands that access
 files or peripherals require the corresponding SD contents or hardware/model
 configuration. The reserved `self_test` command does not perform validation.
 
@@ -133,13 +221,25 @@ make -C PSC-ONE/software/os_rust check
 
 The tests cover inference reference results, malformed model handling,
 integer and signal-processing helpers, FAT32 streaming, JPEG header
-validation, and ELF loader checks.
+validation, Sv39 translation/permissions/boundaries, and ELF32/ELF64 loader checks.
 
 Build and verify the firmware images:
 
 ```sh
 make -C PSC-ONE/software/os_rust verify
 ```
+
+For the native Verilator boot/restart check using the same compiled SD-mode RTL:
+
+```sh
+python3 -B PSC-ONE/software/os_rust/tests/boot.py \
+  --run PSC-ONE/hardware/sim/build/pscos-rust/sd_v1_legacy_1 \
+  --build build/rust-sd-boot-check
+```
+
+This verifies the C bootloader/kernel division, SD loading into contiguous
+process pages, unmapped stack guards, `hello`, and SD USER.MEM reload on warm
+restart before another successful `hello`.
 
 Image verification checks ELF entry addresses and format, unresolved symbols,
 binary-to-memory-image conversion, required integration symbols, and the
@@ -167,7 +267,10 @@ Model capacity is 4 MiB. The model is mapped at VA `0x00800000`, separately
 from the shell and stack. Mixed graphs have a 768 KiB Arena at VA `0x00c00000`;
 the existing FC-only profile retains its separate 4 KiB Arena. The kernel uses
 the same split physical model backing as C, preserving the bootloader,
-USER.MEM source and warm restart. Linker/image checks enforce these reservations.
+the 4 MiB model and 768 KiB Arena reservations. USER.MEM now resides in the
+kernel page pool; restart reloads it from SD. Linker/image checks enforce
+non-overlap with BSS and kernel stack, plus sufficient space for the user image,
+user stack and page tables.
 
 The independent Rust graph implementation supports the current 16 operators:
 CONV_2D, FULLY_CONNECTED, ADD, SUB, MUL, LOGISTIC, MAX_POOL_2D, TRANSPOSE, PAD,

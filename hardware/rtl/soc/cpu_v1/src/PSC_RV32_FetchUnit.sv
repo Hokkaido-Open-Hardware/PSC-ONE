@@ -31,12 +31,15 @@ module PSC_RV32_FetchUnit #(
 
     input  logic [31:0] pc,
     input  logic [31:0] csr_satp,
+    input  logic [31:0] csr_mstatus,
     input  logic [1:0]  priv_mode,
     input  logic        is_load,
     input  logic        is_store,
     input  logic        is_sfence_vma,
     output logic        fifo_ready,
     output logic        i_pf,
+    output logic        i_access_fault,
+    output logic [31:0] i_fault_vaddr,
 
     // Program memory
     output logic        program_mem_burst_mode,
@@ -208,11 +211,12 @@ module PSC_RV32_FetchUnit #(
     ) u_fetch(
         .clock                    (clock),
         .reset_n                  (reset_n),
-        .fetch_enb                (fetch_enb),
+        .fetch_enb                (fetch_enb && !i_pf),
         .mode_sv32                (i_mode_sv32),
         .fetch_address            (fetch_pc),
         .mmu_valid                (mmu_valid),
         .mmu_ready                (i_mmu_done),
+        .mmu_fault                (i_mmu_fault || i_pf),
         .vaddr                    (vaddr),
         .paddr                    (i_paddr),
         .program_mem_burst_mode   (program_mem_burst_mode),
@@ -306,6 +310,31 @@ module PSC_RV32_FetchUnit #(
     // =====================================
     // Instruction-side MMU
     logic i_mode_sv32;
+    logic i_page_fault;
+    logic i_mmu_access_fault;
+    wire i_mmu_fault = i_page_fault || i_mmu_access_fault;
+    logic discard_walk;
+    // A speculative translation fault waits for retirement of older work.
+    // Redirects discard it, including a response arriving after the redirect.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            i_pf <= 1'b0;
+            i_access_fault <= 1'b0;
+            i_fault_vaddr <= 32'd0;
+            discard_walk <= 1'b0;
+        end else if (cpu_stop || fifo_flush) begin
+            i_pf <= 1'b0;
+            i_access_fault <= 1'b0;
+            discard_walk <= 1'b1;
+        end else begin
+            if (mmu_valid) discard_walk <= 1'b0;
+            if (i_mmu_fault && !discard_walk) begin
+                i_pf <= 1'b1;
+                i_access_fault <= i_mmu_access_fault;
+                i_fault_vaddr <= vaddr;
+            end
+        end
+    end
 
     MMU u_mmu_i(
         .clk                      (clock),
@@ -314,6 +343,9 @@ module PSC_RV32_FetchUnit #(
         .vaddr                    (vaddr),
         .satp                     (csr_satp),
         .priv_mode                (priv_mode),
+        .mstatus                  (csr_mstatus),
+        .mem_access_fault         (1'b0),
+        .access_fault             (i_mmu_access_fault),
         .access_r                 (1'b0),
         .access_w                 (1'b0),
         .access_x                 (1'b1),
@@ -325,7 +357,7 @@ module PSC_RV32_FetchUnit #(
         .cpu_state_done           (cpu_state_done),
         .sfence_vma               (fifo_flush && is_sfence_vma),
         .paddr                    (i_paddr),
-        .page_fault               (i_pf),
+        .page_fault               (i_page_fault),
         .mode_sv32                (i_mode_sv32),
         .mmu_done                 (i_mmu_done)
     );

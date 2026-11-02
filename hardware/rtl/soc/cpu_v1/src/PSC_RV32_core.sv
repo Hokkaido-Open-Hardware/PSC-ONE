@@ -179,7 +179,8 @@ module PSC_RV32_core #(
     logic data_fault_is_store;
     logic data_fault_misaligned;
 
-    assign trap_sepc = d_pf_event ? data_fault_pc : pc;
+    assign trap_sepc = d_pf_event ? data_fault_pc :
+                       i_pf_event ? i_fault_vaddr : pc;
 
     logic [31:0] execute_vaddr;
     logic [31:0] trap_stval;
@@ -189,7 +190,7 @@ module PSC_RV32_core #(
     logic [31:0] trap_mcause;
     logic timer_irq_take;
 
-    assign trap_stval = i_pf_event ? pc :
+    assign trap_stval = i_pf_event ? i_fault_vaddr :
                         d_pf_event ? data_fault_vaddr :
                                32'h0;
 
@@ -197,11 +198,12 @@ module PSC_RV32_core #(
         ecall_u                                ? 32'd8  :
         ecall_s                                ? 32'd9  :
         decoder_ctrl.raise_illegal_instruction ? 32'd2  :
-        i_pf_event                             ? 32'd12 :
+        i_pf_event                             ? (i_access_fault ? 32'd1 : 32'd12) :
         d_pf_event                             ?
             (data_fault_misaligned ?
                 (data_fault_is_store ? 32'd6 : 32'd4) :
-                (data_fault_is_store ? 32'd15 : 32'd13)) :
+                (d_access_fault ? (data_fault_is_store ? 32'd7 : 32'd5) :
+                 (data_fault_is_store ? 32'd15 : 32'd13))) :
                                                  32'd0;
 
     assign set_mtrap   = ecall_m || timer_irq_take;
@@ -237,6 +239,8 @@ module PSC_RV32_core #(
 
     // CSR logic
     logic [1:0] priv_mode;
+    logic i_access_fault, d_access_fault;
+    logic [31:0] i_fault_vaddr;
 
     logic [31:0] csr_reg_data_1;
 
@@ -340,6 +344,9 @@ module PSC_RV32_core #(
 
     // MMU fault
     logic i_pf;
+    logic i_fetch_fault_pending;
+    assign i_pf = i_fetch_fault_pending && !execute_task_busy &&
+                  !fifo_req_ready && (pc == i_fault_vaddr);
     logic d_pf;
 
     // Program Counter
@@ -370,13 +377,16 @@ module PSC_RV32_core #(
         // other sig.
         .pc                         (fetch_pc),
         .csr_satp                   (csr_state.satp),
+        .csr_mstatus                (csr_state.mstatus),
+        .i_access_fault             (i_access_fault),
+        .i_fault_vaddr              (i_fault_vaddr),
         .priv_mode                  (priv_mode),
         .is_load                    (decoder_ctrl.is_load),
         .is_store                   (decoder_ctrl.is_store),
         .is_sfence_vma              (is_sfence_vma),
         .fifo_ready                 (),
         // MMU fault sig.
-        .i_pf                       (i_pf),
+        .i_pf                       (i_fetch_fault_pending),
         // to memory
         .program_mem_burst_mode     (program_mem_burst_mode),
         .program_mem_read_valid     (program_mem_read_valid),
@@ -457,6 +467,7 @@ module PSC_RV32_core #(
         // MMU fault sig.
         .i_pf                       (i_pf),
         .d_pf                       (d_pf),
+        .d_access_fault             (d_access_fault),
         .i_pf_event                 (i_pf_event),
         .d_pf_event                 (d_pf_event),
         .data_fault_pc              (data_fault_pc),

@@ -190,3 +190,10 @@ const _: () = assert!(core::mem::offset_of!(Decoder, device) == 124);
 #[cfg(target_pointer_width = "32")]
 const _: () = assert!(core::mem::offset_of!(Decoder, width) == 28);
 const _: () = assert!(core::mem::size_of::<Rect>() == 8);
+
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::size_of::<Decoder>() == 240);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(Decoder, device) == 224);
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::offset_of!(Decoder, width) == 40);

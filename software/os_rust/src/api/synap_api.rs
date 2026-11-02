@@ -32,7 +32,7 @@ pub unsafe fn sa_run_rect_checked(
     ACTIVE = true;
     let config = 16 | if signed { 8 } else { 0 };
     let size = ((m << 16) | (n << 8) | k) as u32;
-    asm!("csrw 0x7d0, {a}","csrw 0x7d4, {b}","csrw 0x7d8, {c}","csrw 0x7c4, {size}","fence rw, rw",a=in(reg) a.as_ptr(),b=in(reg) b.as_ptr(),c=in(reg) 0x30000u32,size=in(reg) size);
+    asm!("csrw 0x7d0, {a}","csrw 0x7d4, {b}","csrw 0x7d8, {c}","csrw 0x7c4, {size}","fence rw, rw",a=in(reg) a.as_ptr(),b=in(reg) b.as_ptr(),c=in(reg) crate::board::SYNAP_RESULT_BASE,size=in(reg) size);
     for value in [config | 2, config, config | 4, config, config | 1] {
         asm!("csrw 0x7c0, {}",in(reg) value);
     }
@@ -53,7 +53,7 @@ pub unsafe fn sa_run_rect_checked(
     }
     asm!("csrw 0x7c0, {}","fence rw, rw",in(reg) config);
     for (i, out) in c[..m * n].iter_mut().enumerate() {
-        *out = core::ptr::read_volatile((0x30000 as *const u32).add(i));
+        *out = core::ptr::read_volatile((crate::board::SYNAP_RESULT_BASE as *const u32).add(i));
     }
     ACTIVE = false;
     Ok(())

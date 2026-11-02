@@ -16,15 +16,15 @@ pub unsafe fn irq() {
     if !read(addr_of!(ACTIVE)) {
         return;
     }
-    let status = mmio_r32(0x10000008);
+    let status = mmio_r32(crate::board::UART_BASE + 0x8);
     if status & 8 != 0 {
         write(addr_of_mut!(LOST), read(addr_of!(LOST)).wrapping_add(1));
-        mmio_w32(0x1000000c, 13);
+        mmio_w32(crate::board::UART_BASE + 0xc, 13);
     }
     if status & 2 == 0 {
         return;
     }
-    let byte = mmio_r32(0x10000004) as u8;
+    let byte = mmio_r32(crate::board::UART_BASE + 0x4) as u8;
     if byte as i32 == read(addr_of!(INTERRUPT_CHAR)) {
         write(
             addr_of_mut!(INTERRUPTS),
@@ -52,7 +52,7 @@ pub unsafe fn control(action: u32, value: i32) -> i32 {
             if read(addr_of!(ACTIVE)) {
                 return -1;
             }
-            SAVED_CTRL = mmio_r32(0x1000000c);
+            SAVED_CTRL = mmio_r32(crate::board::UART_BASE + 0xc);
             write(addr_of_mut!(HEAD), 0);
             write(addr_of_mut!(TAIL), 0);
             write(addr_of_mut!(INTERRUPTS), 0);
@@ -61,11 +61,11 @@ pub unsafe fn control(action: u32, value: i32) -> i32 {
             SEEN = 0;
             super::kernel_process::enable_machine_timer_trap();
             write(addr_of_mut!(ACTIVE), true);
-            mmio_w32(0x1000000c, 15);
+            mmio_w32(crate::board::UART_BASE + 0xc, 15);
             0
         }
         1 => {
-            mmio_w32(0x1000000c, SAVED_CTRL | 6);
+            mmio_w32(crate::board::UART_BASE + 0xc, SAVED_CTRL | 6);
             write(addr_of_mut!(ACTIVE), false);
             0
         }

@@ -17,6 +17,8 @@ async def reset_dut(dut):
     dut.MMU_enb.value = 0
     dut.vaddr.value = 0
     dut.satp.value = 0
+    dut.mstatus.value = 0
+    dut.mem_access_fault.value = 0
     dut.priv_mode.value = 0
 
     dut.access_r.value = 0
@@ -332,6 +334,7 @@ async def mmu_sv32_l1_leaf_test(dut):
 
     l1_pte = (
         (target_ppn1 << 20)
+        | (1 << 6)        # A: valid accessed leaf under Svade
         | (1 << 1)        # R
         | (1 << 0)        # V
     )
@@ -525,6 +528,7 @@ async def mmu_sv32_l0_leaf_test(dut):
     # X=0
     l0_pte = (
         (target_ppn << 10)
+        | (1 << 6)        # A: valid accessed leaf under Svade
         | (1 << 1)       # R
         | (1 << 0)       # V
     )
@@ -808,6 +812,7 @@ async def mmu_sfence_vma_rewalk_test(dut):
 
     l0_pte = (
         (target_ppn << 10)
+        | (1 << 6)        # A: valid accessed leaf under Svade
         | (1 << 1)       # R
         | (1 << 0)       # V
     )

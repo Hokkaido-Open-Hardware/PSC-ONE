@@ -101,7 +101,7 @@ module Csr (
     logic [31:0] csr_mtval;
 
     // ---------------- Supervisor CSRs ----------------
-    logic [31:0] csr_sstatus;   // ★独立CSR（SIE=bit1 等）
+    wire [31:0] csr_sstatus = csr_mstatus & SSTATUS_MASK;   // Architectural mstatus subset
     logic [31:0] csr_sie;       // ★独立CSR（SSIP=1, STIP=5, SEIP=9）
     logic [31:0] csr_stvec;
     logic [31:0] csr_sscratch;
@@ -208,7 +208,7 @@ module Csr (
             endcase
         end
     endfunction
-    
+
     logic trap_to_s;
 
     assign trap_to_s =
@@ -327,7 +327,7 @@ module Csr (
             csr_mtval     <= 32'b0;
             csr_mip       <= 32'b0;
             // S
-            csr_sstatus   <= 32'b0;
+
             csr_sie       <= 32'b0;
             csr_stvec     <= 32'b0;
             csr_sscratch  <= 32'b0;
@@ -336,20 +336,20 @@ module Csr (
             csr_stval     <= 32'b0;
             csr_satp      <= 32'b0;
             // Data Cache
-            csr_DCACHE_CTRL <= 32'b0; 
+            csr_DCACHE_CTRL <= 32'b0;
             // DMA
-            csr_DMA_CTRL    <= 32'b0; 
-            csr_DMA_WORDS   <= 32'b0; 
-            csr_DMA_SRC     <= 32'b0; 
-            csr_DMA_DST     <= 32'b0; 
+            csr_DMA_CTRL    <= 32'b0;
+            csr_DMA_WORDS   <= 32'b0;
+            csr_DMA_SRC     <= 32'b0;
+            csr_DMA_DST     <= 32'b0;
             // SA
-            csr_SA_CTRL     <= 32'b0; 
-            csr_SA_SIZE     <= 32'b0; 
+            csr_SA_CTRL     <= 32'b0;
+            csr_SA_SIZE     <= 32'b0;
             csr_SA_ADDR_A   <= SA_ADDR_A;
             csr_SA_ADDR_B   <= SA_ADDR_B;
             csr_SA_ADDR_C   <= SA_ADDR_C;
             // MONITOR
-            csr_CPU_MON_CTRL <= 32'b0; 
+            csr_CPU_MON_CTRL <= 32'b0;
 
         end else begin
             // ---- CSR writes ----
@@ -359,7 +359,7 @@ module Csr (
 
                 case (csr_addr)
                     // ===== Supervisor =====
-                    12'h100: csr_sstatus  <= (newv & SSTATUS_MASK);   // sstatus
+                    12'h100: csr_mstatus  <= (csr_mstatus & ~SSTATUS_MASK) | (newv & SSTATUS_MASK);   // sstatus
                     12'h104: csr_sie      <= (newv & SIRQ_MASK);      // sie
                     12'h105: csr_stvec    <= pack_tvec_direct(newv);  // stvec
                     12'h140: csr_sscratch <= newv;
@@ -370,7 +370,8 @@ module Csr (
                     12'h144: begin
                         if (!side_effect_none_rs) csr_mip[3] <= newv[1];
                     end
-                    12'h180: csr_satp     <= pack_satp_sv32(newv);
+                    12'h180: if (priv_mode == PRIV_M || (priv_mode == PRIV_S && !csr_mstatus[20]))
+                        csr_satp <= pack_satp_sv32(newv);
 
                     // ===== Machine =====
                     12'h300: csr_mstatus  <= newv;                    // mstatus
@@ -419,9 +420,9 @@ module Csr (
                             csr_scause <= trap_scause;
                             csr_stval  <= trap_stval;
 
-                            csr_sstatus[S_SPIE_BIT] <= csr_sstatus[S_SIE_BIT];
-                            csr_sstatus[S_SIE_BIT]  <= 1'b0;
-                            csr_sstatus[S_SPP_BIT]  <= priv_mode[0];
+                            csr_mstatus[S_SPIE_BIT] <= csr_sstatus[S_SIE_BIT];
+                            csr_mstatus[S_SIE_BIT]  <= 1'b0;
+                            csr_mstatus[S_SPP_BIT]  <= priv_mode[0];
 
                         end else begin
                             // ---- M trap ----
@@ -440,17 +441,19 @@ module Csr (
             if (csr_enb) begin
                 // ---- Supervisor trap in/out (SRET) ----
                 if (do_sret) begin
-                    csr_priv_mode <= {1'b0, csr_sstatus[S_SPP_BIT]}; // 0 or 1
+                    csr_priv_mode <= {1'b0, csr_sstatus[S_SPP_BIT]};
+                    csr_mstatus[17] <= 1'b0; // 0 or 1
                     csr_sepc   <= pack_epc(csr_sepc);
-                    csr_sstatus[S_SIE_BIT]  <= csr_sstatus[S_SPIE_BIT];
-                    csr_sstatus[S_SPIE_BIT] <= 1'b1;
-                    csr_sstatus[S_SPP_BIT]  <= 1'b0;     
+                    csr_mstatus[S_SIE_BIT]  <= csr_sstatus[S_SPIE_BIT];
+                    csr_mstatus[S_SPIE_BIT] <= 1'b1;
+                    csr_mstatus[S_SPP_BIT]  <= 1'b0;
                 end
 
                 // ---- Machine trap in/out ----
                 if (do_mret) begin
                     // 特権遷移
                     csr_priv_mode <= csr_mstatus[12:11];
+                    if (csr_mstatus[12:11] != PRIV_M) csr_mstatus[17] <= 1'b0;
 
                     // mstatus の更新（あなたの既存コードに追加）
                     csr_mstatus[3]  <= csr_mstatus[7];  // MIE  <- MPIE

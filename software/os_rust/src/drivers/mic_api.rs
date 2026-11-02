@@ -1,7 +1,7 @@
 //! drivers/mic_api.c/.h. Capture is bounded by the original 160000-word buffer.
 use crate::common::{delay, mmio_r32, mmio_w32};
-const RX: u32 = 0x10007000;
-const STATUS: u32 = 0x10007004;
+const RX: u32 = crate::board::MIC_BASE;
+const STATUS: u32 = crate::board::MIC_BASE + 0x4;
 static mut SAMPLES: [u32; 160000] = [0; 160000];
 /// Bound the wait for a nonempty I2S receive FIFO.
 pub unsafe fn mic_wait_sample() -> Result<(), i32> {

@@ -30,7 +30,7 @@ pub unsafe fn robot_control_run() -> ! {
     }
 }
 
-#[cfg(target_arch = "riscv32")]
+#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 /// Poll UART nonblockingly so quitting the diagnostic never prevents I2C reception.
 pub unsafe fn robot_control() {
     i2c_init();

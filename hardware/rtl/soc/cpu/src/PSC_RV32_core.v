@@ -103,6 +103,8 @@ module PSC_RV32_core #(
         end else if(cpu_stop) begin
             cpu_state <= IDLE;
             fetch_valid <= 1'b0;
+        end else if (i_fault_take) begin
+            cpu_state <= CPU_RUN;
         end else begin
             case(cpu_state)
                 // IDLE
@@ -113,7 +115,7 @@ module PSC_RV32_core #(
                 // CPU Run.
                 CPU_RUN: begin
                     fetch_valid <= 1'b1;
-                    if (illegal_instruction | i_pf | d_pf)
+                    if (illegal_instruction | i_fault_take | d_pf)
                         cpu_state <= CPU_TRAP;
                 end
                 // CPU Trap.
@@ -157,21 +159,21 @@ module PSC_RV32_core #(
     wire        ecall_s     = is_ecall && (priv_mode == PRIV_S);
     wire        ecall_m     = is_ecall && (priv_mode == PRIV_M);
 
-    wire        set_trap    = is_ecall || illegal_instruction || i_pf || d_pf;
+    wire        set_trap    = is_ecall || illegal_instruction || i_fault_take || d_pf;
 
-    wire [31:0] trap_sepc   = pc;
+    wire [31:0] trap_sepc   = i_fault_take ? i_fault_vaddr : pc;
 
     wire [31:0] execute_vaddr;
-    wire [31:0] trap_stval = i_pf ? pc :
+    wire [31:0] trap_stval = i_fault_take ? i_fault_vaddr :
                              d_pf ? execute_vaddr :
                              32'h0;
 
     wire [31:0] trap_scause =
+                            i_fault_take        ? (i_access_fault ? 32'd1 : 32'd12) :
                             ecall_u             ? 32'd8  :
                             ecall_s             ? 32'd9  :
                             illegal_instruction ? 32'd2  :
-                            i_pf                ? 32'd12 :
-                            d_pf                ? (is_store ? 32'd15 : 32'd13) :
+                            d_pf                ? (d_access_fault ? (is_store ? 32'd7 : 32'd5) : (is_store ? 32'd15 : 32'd13)) :
                                                 32'd0;
 
     wire        timer_irq_request = timer_irq_ext && csr_mstatus[3] && csr_mie[7];
@@ -210,17 +212,19 @@ module PSC_RV32_core #(
     wire [4:0]  csr_zimm;
     wire [31:0] csr_satp; 
     wire [1:0]  priv_mode;
+    wire i_access_fault, d_access_fault;
+    wire [31:0] i_fault_vaddr;
 
     wire [31:0] csr_reg_data_1;
 
     Csr u_csr (
         .clock              (clock),
         .reset_n            (reset_n),
-        .csr_enb            (csr_enb),
+        .csr_enb            (csr_enb || i_fault_take),
         .csr_valid          (csr_valid),    // 次サイクルでcsrレジスタを反映.
 
         // ==== CSR命令実行側（パイプラインから）====
-        .csr_wr             (csr_wr),
+        .csr_wr             (csr_wr && !i_fault_take),
         .csr_cmd            (csr_cmd),
         .csr_use_imm        (csr_use_imm),
         .csr_addr           (csr_addr),
@@ -233,13 +237,13 @@ module PSC_RV32_core #(
         .trap_sepc          (trap_sepc),
         .trap_scause        (trap_scause),
         .trap_stval         (trap_stval),
-        .do_sret            (do_sret),
+        .do_sret            (do_sret && !i_fault_take),
 
         // ==== トラップ入口/出口 (Machine側, 将来用/デバッグ用) ====
         .set_mtrap          (set_mtrap),
         .trap_mepc          (trap_mepc),
         .trap_mcause        (trap_mcause),
-        .do_mret            (do_mret),
+        .do_mret            (do_mret && !i_fault_take),
 
         .set_msip    (set_msip),    .clr_msip (clr_msip),
         .set_mtip    (set_mtip),    .clr_mtip (clr_mtip),
@@ -321,7 +325,7 @@ module PSC_RV32_core #(
         .fetch_ready                (fetch_ready),
         // An interrupt can be accepted while Execute is already IDLE, so
         // use the accept pulse to complete the fetch FIFO flush as well.
-        .execute_ready              (execute_ready | timer_irq_take | timer_irq_active),
+        .execute_ready              (execute_ready | timer_irq_take | timer_irq_active | i_fault_take),
         // fifo sig.
         .fifo_empty                 (fifo_empty),
         .fifo_full                  (fifo_full),
@@ -331,6 +335,7 @@ module PSC_RV32_core #(
         // other sig.
         .pc                         (fetch_pc),
         .csr_satp                   (csr_satp),
+        .csr_mstatus                (csr_mstatus),
         .priv_mode                  (priv_mode),
         .is_load                    (is_load),
         .is_store                   (is_store),
@@ -338,6 +343,9 @@ module PSC_RV32_core #(
         .fifo_ready                 (),
         // MMU fault sig.
         .i_pf                       (i_pf),
+        .fault_ack                  (i_fault_take),
+        .i_access_fault             (i_access_fault),
+        .i_fault_vaddr              (i_fault_vaddr),
         // to memory
         .program_mem_read_valid     (program_mem_read_valid),
         .program_mem_read_ready     (program_mem_read_ready),
@@ -392,6 +400,7 @@ module PSC_RV32_core #(
         .pc                         (pc),
         .opcode                     (fifo_opcode_data),
         .csr_satp                   (csr_satp),
+        .csr_mstatus                (csr_mstatus),
         .priv_mode                  (priv_mode),
         .alu_data                   (alu_data),
         .is_load                    (is_load),
@@ -416,6 +425,7 @@ module PSC_RV32_core #(
         .is_fence_i                 (is_fence_i),
         // MMU fault sig.
         .d_pf                       (d_pf),
+        .d_access_fault             (d_access_fault),
         .illegal_instruction        (illegal_instruction),
         // to memory
         .data_mem_read_valid        (data_mem_read_valid),
@@ -436,8 +446,12 @@ module PSC_RV32_core #(
     // =====================================
     // NEXT PC
     // =====================================
-    assign timer_irq_take = timer_irq_request && !timer_irq_active && execute_idle;
-    assign fifo_flush_sig = execute_fifo_flush_sig || timer_irq_take;
+    // Accept a fetch fault only after older instructions have drained. A
+    // wrong-path fetch fault is discarded by the older branch's FIFO flush.
+    wire i_fault_take = i_pf && execute_idle && fifo_empty &&
+                        (pc == i_fault_vaddr) && !execute_fifo_flush_sig;
+    assign timer_irq_take = timer_irq_request && !timer_irq_active && execute_idle && !i_fault_take;
+    assign fifo_flush_sig = execute_fifo_flush_sig || timer_irq_take || i_fault_take;
 
     always @(posedge clock or negedge reset_n) begin
         if (!reset_n)
@@ -450,7 +464,7 @@ module PSC_RV32_core #(
             timer_irq_active <= 1'b1;
     end
 
-    wire exception = is_ecall | illegal_instruction | d_pf | i_pf;
+    wire exception = is_ecall | illegal_instruction | d_pf | i_fault_take;
     wire interrupt = timer_irq_take;
 
     wire trap = exception | interrupt;
@@ -504,7 +518,9 @@ module PSC_RV32_core #(
             pc      <= 32'b0;
             counter <= 32'b0;
         end else begin
-            if(timer_irq_take) begin
+            if (i_fault_take) begin
+                pc <= trap_pc;
+            end else if(timer_irq_take) begin
                 pc      <= csr_mtvec;
                 counter <= counter + 1;
             end else if(execute_ready) begin

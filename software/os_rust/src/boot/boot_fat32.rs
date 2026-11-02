@@ -119,8 +119,8 @@ impl BootFat32 {
         let mut b = [0; 512];
         // Match the bootloader's progress format for the kernel's user-image load.
         // Count ASCII file bytes, including whitespace, rather than decoded RAM bytes.
-        let report_progress =
-            cfg!(target_arch = "riscv32") && name.eq_ignore_ascii_case("USER.MEM");
+        let report_progress = cfg!(any(target_arch = "riscv32", target_arch = "riscv64"))
+            && name.eq_ignore_ascii_case("USER.MEM");
         if report_progress {
             crate::s_print!("FAT32: loading USER.MEM size={}\n", size);
         }

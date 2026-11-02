@@ -1,8 +1,8 @@
 //! drivers/sdcard_api.c/.h; 128 word reads but 512 byte-valued word writes.
 use crate::common::{delay, mmio_r32, mmio_w32};
-const DATA: u32 = 0x10006000;
-const SECTOR: u32 = 0x10006004;
-const CTRL: u32 = 0x10006008;
+const DATA: u32 = crate::board::SD_BASE;
+const SECTOR: u32 = crate::board::SD_BASE + 0x4;
+const CTRL: u32 = crate::board::SD_BASE + 0x8;
 /// Poll until the selected status condition changes; retain the caller-specific timeout code.
 unsafe fn wait(mask: u32, set: bool, error: i32) -> Result<(), i32> {
     let mut timeout = 100000;

@@ -207,6 +207,7 @@ all: $(OBJ)
 # ------------------------------------------------------------
 # Frozen MPY
 # ------------------------------------------------------------
+PSC_MPY_LONGINT_IMPL ?= longlong
 
 $(BUILD)/_frozen_mpy.c: \
 	$(TOP)/tests/assets/frozentest.mpy \
@@ -217,7 +218,7 @@ $(BUILD)/_frozen_mpy.c: \
 	$(Q)$(TOP)/tools/mpy-tool.py \
 		-f \
 		-q $(BUILD)/genhdr/qstrdefs.preprocessed.h \
-		-mlongint-impl=longlong \
+		-mlongint-impl=$(PSC_MPY_LONGINT_IMPL) \
 		$< > $@
 
 # ------------------------------------------------------------

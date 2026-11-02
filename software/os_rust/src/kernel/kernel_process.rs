@@ -29,7 +29,7 @@ unsafe fn map_inference(root: *mut u32) {
     let low_size = addr_of!(__model_low_end) as u32 - low;
     let model = addr_of_mut!(MODEL_LEAF.0).cast::<u32>();
     let arena = addr_of_mut!(ARENA_LEAF.0).cast::<u32>();
-    let flags = PAGE_V | PAGE_U | PAGE_R | PAGE_W | (1 << 6) | (1 << 7);
+    let flags = PAGE_V | PAGE_U | PAGE_R | PAGE_W | PAGE_A | PAGE_D;
     for offset in (0..USER_MODEL_SIZE).step_by(4096) {
         let pa = if offset < low_size {
             low + offset
@@ -81,33 +81,74 @@ unsafe fn initialize_stack(p: *mut Process, entry: unsafe extern "C" fn() -> !) 
     init_process_machine_context(p, entry);
 }
 
-/// Build supervisor identity maps and private user code/stack pages before making a task runnable.
+/// Build a process from an in-memory image (the idle process uses an empty slice).
 pub unsafe fn create_process(image: &[u8]) -> *mut Process {
+    create_process_image(image, image.len(), false)
+}
+
+/// Like the C OS: read USER.MEM from SD into final allocated process pages.
+pub unsafe fn create_process_from_sd(size: usize) -> *mut Process {
+    assert!(size != 0, "empty USER.MEM image");
+    create_process_image(&[], size, true)
+}
+
+unsafe fn create_process_image(image: &[u8], size: usize, from_sd: bool) -> *mut Process {
     let (p, i) = slot();
     initialize_stack(p, super::kernel_trap::user_entry);
     let root = alloc_pages(1) as *mut u32;
     for pa in (addr_of!(__kernel_base) as u32..addr_of!(__free_ram_end) as u32).step_by(4096) {
         map_page(root, pa, pa, PAGE_R | PAGE_W | PAGE_X);
     }
-    for pa in (0x10000000..0x10010000).step_by(4096) {
+    for pa in
+        (crate::board::MMIO_BASE..crate::board::MMIO_BASE + crate::board::MMIO_SIZE).step_by(4096)
+    {
         map_page(root, pa, pa, PAGE_R | PAGE_W);
     }
-    map_page(root, 0x20000, 0x20000, PAGE_R | PAGE_W);
-    for pa in (0x30000..0x34000).step_by(4096) {
+    map_page(
+        root,
+        crate::board::SYNAP_DATA_BASE,
+        crate::board::SYNAP_DATA_BASE,
+        PAGE_R | PAGE_W,
+    );
+    for pa in (crate::board::SYNAP_RESULT_BASE
+        ..crate::board::SYNAP_RESULT_BASE + crate::board::SYNAP_RESULT_SIZE)
+        .step_by(4096)
+    {
         map_page(root, pa, pa, PAGE_R | PAGE_W);
     }
-    if !image.is_empty() {
+    if size != 0 {
         assert!(
-            image.len() as u32 <= USER_STACK_TOP - USER_STACK_SIZE - USER_STACK_GUARD - USER_BASE,
+            size <= (USER_STACK_TOP - USER_STACK_SIZE - USER_STACK_GUARD - USER_BASE) as usize,
             "user image overlaps stack"
         );
-        for (i, chunk) in image.chunks(4096).enumerate() {
-            let page = alloc_pages(1);
-            crate::drivers::dma::memcpy_dma(page as *mut u8, chunk.as_ptr(), chunk.len());
+        // Allocate one contiguous run in the kernel page pool. There is no
+        // fixed physical staging address and no second image copy.
+        let pages = crate::common::align_up(size, 4096) / 4096;
+        let base = alloc_pages(pages);
+        if from_sd {
+            crate::s_print!("KERNEL: reading USER.MEM from SD into process pages\n");
+            let mut sd = crate::boot::bootloader_fat32::BootSd::init().expect("SD init failed");
+            let volume =
+                crate::boot::boot_fat32::BootFat32::mount(&mut sd).expect("FAT32 mount failed");
+            let expected = (size + 3) / 4;
+            let destination = core::slice::from_raw_parts_mut(base as *mut u32, expected);
+            let words = volume
+                .load_mem_file_bounded(&mut sd, "USER.MEM", destination)
+                .expect("USER.MEM load failed");
+            assert_eq!(words as usize, expected, "USER.MEM size mismatch");
+            crate::s_print!(
+                "KERNEL: USER.MEM loaded ({} bytes) at {:08x}\n",
+                words * 4,
+                base
+            );
+        } else {
+            crate::drivers::dma::memcpy_dma(base as *mut u8, image.as_ptr(), size);
+        }
+        for i in 0..pages {
             map_page(
                 root,
                 USER_BASE + i as u32 * 4096,
-                page,
+                base + i as u32 * 4096,
                 PAGE_U | PAGE_R | PAGE_W | PAGE_X,
             );
         }
@@ -272,14 +313,14 @@ unsafe extern "C" fn machine_restart_finish() -> ! {
         }
     }
     asm!("csrw 0x7e0, zero","csrw 0x7e4, zero","csrw 0x7e8, zero","csrw 0x7ec, zero","csrw 0x7c0, {reset}","csrw 0x7c0, zero","csrw 0x7c4, zero",reset=in(reg) 2u32);
-    mmio_w32(0x10002000, 1 << 19);
-    mmio_w32(0x10002000, (1 << 19) | (1 << 20));
-    while mmio_r32(0x10002008) & ((1 << 7) | (1 << 10)) != 0 {}
-    mmio_w32(0x10004000, 0);
-    mmio_w32(0x10007004, 1);
-    while mmio_r32(0x10000008) & 1 != 0 {}
-    while mmio_r32(0x10000008) & 2 != 0 {
-        mmio_r32(0x10000004);
+    mmio_w32(crate::board::TIMER_BASE, 1 << 19);
+    mmio_w32(crate::board::TIMER_BASE, (1 << 19) | (1 << 20));
+    while mmio_r32(crate::board::TIMER_BASE + 0x8) & ((1 << 7) | (1 << 10)) != 0 {}
+    mmio_w32(crate::board::LED_BASE, 0);
+    mmio_w32(crate::board::MIC_BASE + 0x4, 1);
+    while mmio_r32(crate::board::UART_BASE + 0x8) & 1 != 0 {}
+    while mmio_r32(crate::board::UART_BASE + 0x8) & 2 != 0 {
+        mmio_r32(crate::board::UART_BASE + 0x4);
     }
     asm!(
         "csrw mip, zero",

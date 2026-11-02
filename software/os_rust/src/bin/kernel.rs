@@ -1,4 +1,4 @@
-//! Link the supervisor kernel with a separately loaded user.mem image.
+//! Link the supervisor kernel with a user.mem image read from SD by the kernel.
 #![no_std]
 #![no_main]
 

@@ -51,7 +51,7 @@ void elf_run(struct trap_frame *f)
         const psc_elf_segment_t *s = &plan.segments[i];
         uint32_t first = s->vaddr & ~(PAGE_SIZE - 1);
         uint32_t end = (s->vaddr + s->memsz + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-        uint32_t flags = PAGE_U | (1u << 6) | (1u << 7);
+        uint32_t flags = PAGE_U | PAGE_A | PAGE_D;
         if (s->flags & 4) flags |= PAGE_R;
         if (s->flags & 2) flags |= PAGE_W;
         if (s->flags & 1) flags |= PAGE_X;
@@ -67,7 +67,7 @@ void elf_run(struct trap_frame *f)
         uint8_t *page = elf_pages[PSC_ELF_LOAD_PAGES + i];
         memset(page, 0, PAGE_SIZE);
         map_page(elf_root, PSC_ELF_STACK_BOTTOM + i * PAGE_SIZE, (uint32_t)page,
-                 PAGE_U | PAGE_R | PAGE_W | (1u << 6) | (1u << 7));
+                 PAGE_U | PAGE_R | PAGE_W | PAGE_A | PAGE_D);
     }
 
     shell_frame = *f; /* shell ECALL return PC was already advanced */

@@ -24,6 +24,7 @@ module Decorder(
     output reg              is_sfence_vma,
     // Privilege level encoding (RISC-V spec)
     input wire [1:0]        current_priv,
+    input wire             tvm,
     // ==== CSR命令デコード結果 ====
     output reg              csr_wr,        // CSRRW/CSRRS/CSRRC/CSRR*I
     output reg  [1:0]       csr_cmd,       // 0:RW, 1:RS, 2:RC
@@ -80,7 +81,7 @@ module Decorder(
     wire        is_sfence_vma_w =
                             is_system &&
                             (sys_f3 == 3'b000) &&
-                            (opcode[31:25] == 7'b0001001);
+                            (opcode[31:25] == 7'b0001001) && (opcode[11:7] == 5'b0);
     wire        is_system  = (op == ECALLEBREAK);
     wire [2:0]  sys_f3     = opcode[14:12];
     //wire        is_priv    = is_system && (sys_f3 == 3'b000); // ECALL/EBREAK/MRET/WFI
@@ -132,6 +133,9 @@ module Decorder(
 
     // CSR命令か？
     wire        is_csr_any = is_csrrw | is_csrrs | is_csrrc | is_csri;
+    wire illegal_vm = (is_sfence_vma_w || (is_csr_any && opcode[31:20] == 12'h180)) &&
+                      (current_priv == PRIV_U || (current_priv == PRIV_S && tvm));
+
 
     // funct3 → Csr.v のコマンド(0:RW,1:RS,2:RC) に正規化
     //   001/101 → RW(00), 010/110 → RS(01), 011/111 → RC(10)
@@ -297,7 +301,7 @@ module Decorder(
                       2'b00;
 
     // ---- CSR新規出力（組合せ値）----
-    wire        csr_wr_w       = is_csr_any;
+    wire        csr_wr_w       = is_csr_any && !illegal_vm;
     wire [1:0]  csr_cmd_w      = csr_cmd_norm; // 0:RW,1:RS,2:RC
     wire        csr_use_imm_w  = is_csri;
     wire [11:0] csr_addr_mux   = csr_addr_w;
@@ -372,7 +376,7 @@ module Decorder(
                 pc_sel      <= pc_sel_w;
                 is_fence    <= is_fence_w;
                 is_fence_i  <= is_fence_i_w;
-                is_sfence_vma <= is_sfence_vma_w;
+                is_sfence_vma <= is_sfence_vma_w && !illegal_vm;
                 // CSR
                 csr_wr      <= csr_wr_w;
                 csr_cmd     <= csr_cmd_w;
@@ -392,7 +396,7 @@ module Decorder(
                 out_pc      <= in_pc;
                 // illegal_instruction
                 raise_illegal_instruction <= raise_illegal_instruction_sw | raise_illegal_instruction_mw 
-                                            | raise_illegal_instruction_alu;
+                                            | raise_illegal_instruction_alu | illegal_vm;
                 decode_done <= 1'b1;
             end
         end

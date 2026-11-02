@@ -212,7 +212,7 @@ pub unsafe fn handle_syscall(f: &mut TrapFrame) {
                 f.a0 as usize,
             );
         }
-        SYS_SW_READ => f.a0 = crate::common::mmio_r32(0x10001000) & 3,
+        SYS_SW_READ => f.a0 = crate::common::mmio_r32(crate::board::SWITCH_BASE) & 3,
         SYS_SPEECH_RECOGNITION => {
             f.a0 = crate::api::speech_recognition_api::s_call_speech_recognition_api() as u32
         }

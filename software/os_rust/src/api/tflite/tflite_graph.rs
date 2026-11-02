@@ -158,7 +158,7 @@ impl<'a> Graph<'a> {
     }
     /// Initialize uninitialized resident storage without a model-sized stack copy.
     /// Safety: `p` is aligned, writable and has no outstanding borrows.
-    #[cfg(any(target_arch = "riscv32", test))]
+    #[cfg(any(any(target_arch = "riscv32", target_arch = "riscv64"), test))]
     pub(super) unsafe fn init_at(p: *mut Self) {
         use core::ptr::{addr_of_mut, write_bytes};
         addr_of_mut!((*p).info).write(Analysis::default());
