@@ -307,6 +307,8 @@ module PSC_RV64_InstructionEngine #(
         .satp                 (csr_satp),
         .priv_mode            (priv_mode),
         .access_r             (memory_ctrl.is_load),
+        .status_sum           (csr_state.sstatus[18]),
+        .status_mxr           (csr_state.sstatus[19]),
         .access_w             (memory_ctrl.is_store),
         .access_x             (1'b0),
         .mem_req_ready        (data_mem_req_ready),

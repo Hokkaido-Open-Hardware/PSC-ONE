@@ -94,6 +94,77 @@ module PSC_FetchPredict #(
     logic        candidate_head;
     logic        candidate_valid;
 
+    // A branch resolution uses the same 32-bit comparators on two edges.
+    // Register the final match before it drives the FIFO control fanout.
+    typedef enum logic [1:0] {CMP_IDLE, CMP_HIGH, CMP_DONE} compare_state_t;
+    compare_state_t compare_state;
+    logic compare_start, compare_block;
+    logic [31:0] resolve_pc_high, resolve_target_high;
+    logic resolve_pc_low_equal, resolve_target_low_equal;
+    logic resolve_pc_match, resolve_target_match;
+    logic resolve_taken, resolve_flush;
+    wire [31:0] compare_pc_a = compare_state == CMP_HIGH
+                            ? resolve_pc_high : branch_resolve_pc[31:0];
+    wire [31:0] compare_pc_b = compare_state == CMP_HIGH
+                            ? prediction_pc[63:32] : prediction_pc[31:0];
+    wire [31:0] compare_target_a = compare_state == CMP_HIGH
+                                ? resolve_target_high : branch_resolve_target[31:0];
+    wire [31:0] compare_target_b = compare_state == CMP_HIGH
+                                ? predicted_pc[63:32] : predicted_pc[31:0];
+    (* keep = "true" *) wire [15:0] compare_pc_equal;
+    (* keep = "true" *) wire [15:0] compare_target_equal;
+    genvar eq_group;
+    generate
+        for (eq_group = 0; eq_group < 16; eq_group = eq_group + 1) begin : g_resolve_equal
+            assign compare_pc_equal[eq_group] =
+                ~|(compare_pc_a[eq_group*2 +: 2] ^ compare_pc_b[eq_group*2 +: 2]);
+            assign compare_target_equal[eq_group] =
+                ~|(compare_target_a[eq_group*2 +: 2] ^ compare_target_b[eq_group*2 +: 2]);
+        end
+    endgenerate
+
+    assign compare_start = branch_resolve_valid && prediction_pending &&
+                           compare_state == CMP_IDLE && !cpu_stop &&
+                           state != DRAIN && state != RECOVER;
+    assign compare_block = compare_start || compare_state != CMP_IDLE;
+
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            compare_state            <= CMP_IDLE;
+            resolve_pc_high          <= '0;
+            resolve_target_high      <= '0;
+            resolve_pc_low_equal     <= 1'b0;
+            resolve_target_low_equal <= 1'b0;
+            resolve_pc_match         <= 1'b0;
+            resolve_target_match     <= 1'b0;
+            resolve_taken            <= 1'b0;
+            resolve_flush            <= 1'b0;
+        end else if (cpu_stop || (fifo_flush && !compare_start)) begin
+            // A fresh exception/flush always takes priority over a saved hit.
+            compare_state <= CMP_IDLE;
+            resolve_flush <= 1'b0;
+        end else begin
+            case (compare_state)
+                CMP_IDLE: if (compare_start) begin
+                    resolve_pc_high          <= branch_resolve_pc[63:32];
+                    resolve_target_high      <= branch_resolve_target[63:32];
+                    resolve_pc_low_equal     <= &compare_pc_equal;
+                    resolve_target_low_equal <= &compare_target_equal;
+                    resolve_taken            <= branch_resolve_taken;
+                    resolve_flush            <= fifo_flush;
+                    compare_state            <= CMP_HIGH;
+                end
+                CMP_HIGH: begin
+                    resolve_pc_match     <= resolve_pc_low_equal && (&compare_pc_equal);
+                    resolve_target_match <= resolve_target_low_equal && (&compare_target_equal);
+                    compare_state        <= CMP_DONE;
+                end
+                default: compare_state <= CMP_IDLE;
+            endcase
+        end
+    end
+
+
     // =====================================
     // Prediction candidate
     // =====================================
@@ -116,7 +187,8 @@ module PSC_FetchPredict #(
     assign out_data        = target_active ? target_data  : normal_data;
     assign out_pc          = target_active ? target_pc    : normal_pc;
     assign fifo_req_ready  = (target_active ? target_valid : normal_valid) &&
-                             (state != DRAIN) && (state != RECOVER) && !cpu_stop;
+                             (state != DRAIN) && (state != RECOVER) && !cpu_stop &&
+                             !compare_block;
     assign fifo_ready      = fifo_req_ready;
     assign fifo_full       = (normal_count == COUNT_BITS'(FIFO_DEPTH));
     assign pop             = fifo_read_valid && fifo_req_ready;
@@ -142,15 +214,18 @@ module PSC_FetchPredict #(
     assign predict = candidate_valid && prediction_enable && !prediction_pending &&
                      !target_active && !(request_target && state != READY) &&
                      (head_branch || head_jal) && !head_offset[1] &&
-                     state != DRAIN && state != RECOVER;
-    assign resolved = branch_resolve_valid && prediction_pending &&
-                      (branch_resolve_pc == prediction_pc);
-    assign promote  = resolved && branch_resolve_taken && predicted_taken &&
-                      (branch_resolve_target == predicted_pc);
+                     state != DRAIN && state != RECOVER && !compare_block;
+    assign resolved = compare_state == CMP_DONE && prediction_pending &&
+                      resolve_pc_match && !fifo_flush && !cpu_stop;
+    assign promote  = resolved && resolve_taken && predicted_taken &&
+                      resolve_target_match;
 
     // pipeline側のfifo_flushは、後続のID命令を従来どおり破棄する。
     // Fetch側では、確定したtargetと一致するFIFOだけを保持する。
-    assign redirect     = fifo_flush && !promote;
+    // The pipeline still flushes ID immediately. Defer only the fetch-side
+    // branch flush until both halves match; unrelated flushes remain immediate.
+    assign redirect     = (fifo_flush && !compare_start) ||
+                          (compare_state == CMP_DONE && resolve_flush && !promote);
     assign normal_flush = cpu_stop || redirect || promote || state == DRAIN;
     assign target_flush = cpu_stop || redirect || state == DRAIN || predict ||
                           (resolved && !promote);
@@ -197,7 +272,7 @@ module PSC_FetchPredict #(
 
     // Fetch開始前に、要求アドレスと応答の格納先をregisterへ保持する。
     assign fetch_enb      = state == LAUNCH && !redirect &&
-                            !(promote && !request_target) && !cpu_stop;
+                            !(promote && !request_target) && !cpu_stop && !compare_block;
     assign cpu_state_done = state == WAIT_DATA;
 
     always_ff @(posedge clock or negedge reset_n) begin
@@ -255,7 +330,7 @@ module PSC_FetchPredict #(
 
             case (state)
                 READY:
-                    if (fetch_valid && wakeup > 10'h300 && !resolved) begin
+                    if (fetch_valid && wakeup > 10'h300 && !resolved && !compare_block) begin
                         if (((prediction_pending && predicted_taken) || target_active) &&
                             !target_requested) begin
                             fetch_pc         <= predicted_pc;
@@ -275,10 +350,12 @@ module PSC_FetchPredict #(
                     end
 
                 LAUNCH: begin
-                    state <= WAIT_DATA;
+                    if (!compare_block)
+                        state <= WAIT_DATA;
                     // 未発行の通常要求がTakenで取り消された場合、Fetchは
                     // fetch_enbを受けていないため、応答を待たない。
-                    if (promote && !request_target)
+                    if (resolved && ((promote && !request_target) ||
+                                     (!promote && request_target)))
                         state <= READY;
                 end
 
@@ -342,8 +419,8 @@ module PSC_FetchPredict #(
         end else begin
             if (resolved) begin
                 prediction_count <= prediction_count + 1;
-                if (predicted_taken == branch_resolve_taken &&
-                    (!branch_resolve_taken || branch_resolve_target == predicted_pc))
+                if (predicted_taken == resolve_taken &&
+                    (!resolve_taken || resolve_target_match))
                     prediction_hit <= prediction_hit + 1;
                 else
                     prediction_miss <= prediction_miss + 1;

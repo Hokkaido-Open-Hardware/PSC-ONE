@@ -1,28 +1,438 @@
 # Rust PSC-OS: the FAT32 bootloader loads KERNEL.MEM; the kernel reads USER.MEM from SD.
 #   make -f Makefile.pscos.rust simulate_SD_PSCOS CPU_VERSION=v1
 #   make -f Makefile.pscos.rust smoke_sd CPU_VERSION=v1
+#   make -f Makefile.pscos.rust simulate_SD_PSCOS SIM_LEVEL=GATE
 # Run files stay under build/pscos-rust; the C simulation's mem/ is not overwritten.
+# ============================================================
+# Default target and configuration
+# ============================================================
+
 .DEFAULT_GOAL := simulate_SD_PSCOS
 RUST_SIM_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
-PSCOS_CONFIG_ONLY := 1
 SIM_FAST ?= $(if $(filter 1,$(DUMP_FST)),0,1)
-include $(RUST_SIM_DIR)/Makefile.pscos
-ifneq ($(MODE),verilator)
-$(error Rust PSC-OS simulation currently supports MODE=verilator)
+# Standalone RV32 configuration; keep C OS build targets independent.
+MODE = verilator
+# Simulation level is separate from the simulator backend.
+# Keep older MODE=GATE invocations compatible.
+SIM_LEVEL ?= $(if $(filter GATE,$(MODE)),GATE,RTL)
+ifeq ($(filter $(SIM_LEVEL),RTL GATE),)
+$(error Unsupported SIM_LEVEL=$(SIM_LEVEL); use RTL or GATE)
 endif
+
+# ============================================================
+# シミュレーションモードに応じた設定
+# ============================================================
+ifeq ($(MODE),verilator)
+SIM          		= verilator
+SDRAM_MODEL  		= ../rtl/model/SDRAM_model/w9825g6kh_verilator.v
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram_verilator.v
+SDCARD_MODEL 		= ../rtl/model/SDCARD_model/sdcard_spi_model.v
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+
+ifeq ($(SIM_FAST),1)
+EXTRA_ARGS = \
+	-O3 --bbox-sys --x-assign fast --x-initial fast \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
+else
+EXTRA_ARGS = \
+	-O3 --trace --trace-fst \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
+endif
+
+endif
+
+ifeq ($(DUMP_FST),1)
+VCD_COMPILE_ARGS 	= -DDUMP_FST
+endif
+
+ifeq ($(MODE),icarus)
+SIM          		= icarus
+SDRAM_MODEL    		= ../rtl/model/SDRAM_model/w9825g6kh.v 	# ← Icarus 用 Micron モデルに修正
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram.v
+SDCARD_MODEL		= ../rtl/model/SDCARD_model/sdcard_spi_model.v
+
+EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_VCD
+
+endif
+
+ifeq ($(MODE),icarus_os)
+SIM          		= icarus
+SDRAM_MODEL  		= ../rtl/model/SDRAM_model/w9825g6kh.v  # ← Icarus 用 Micron モデルに修正
+GW2AR_SDRAM_MODEL 	= ../rtl/model/SDRAM_model/GW2AR_sdram.v
+SDCARD_MODEL 		= ../rtl/model/SDCARD_model/sdcard_spi_model.v
+
+EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_VCD
+
+endif
+
+ifneq ($(SIM_LEVEL),GATE)
+ifeq ($(SDRAM_MODEL),)
+$(error Unsupported MODE=$(MODE); use MODE=verilator or SIM_LEVEL=GATE)
+endif
+endif
+
+# ============================================================
+# RTL top modules and source directories
+# ============================================================
+
+TOP          = PSC_RV32IS_Chip_sim
+PSCONE_TOP   = PSC_ONE_Chip_sim
+
+CPU_SRC_DIR  = ../rtl/soc/cpu/src
+TOP_SRC_DIR  = ../rtl/tang20k/top
+CACHE_DIR    = ../rtl/soc/cache/src
+SOC_TOP_SRC_DIR  = ../rtl/soc/soc_top
+
+PSCONE_SIM_TOP_FILE = \
+	$(TOP_SRC_DIR)/PSC_ONE_Chip_sim.v \
+
+PSCONE_TOP_FILE = \
+	$(TOP_SRC_DIR)/PSC_ONE_Chip.v
+
+PSCONE_SOC_TOP_FILE = \
+	$(SOC_TOP_SRC_DIR)/PSC_ONE_SOC.v
+
+# ============================================================
+# Legacy RV32 core source files
+# ============================================================
+
+# RV32_core
+CPU_CORE_FILES = \
+	$(CPU_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Execute.v \
+	$(CPU_SRC_DIR)/Fetch_Fifo.v \
+	$(CPU_SRC_DIR)/Fetch.v \
+	$(CPU_SRC_DIR)/Decorder.v \
+	$(CPU_SRC_DIR)/Execute.v \
+	$(CPU_SRC_DIR)/Execute_Divider.v \
+	$(CPU_SRC_DIR)/Execute_Mul.v \
+	$(CPU_SRC_DIR)/Branch.v \
+	$(CPU_SRC_DIR)/MemoryStore.v \
+	$(CPU_SRC_DIR)/Register.v \
+	$(CPU_SRC_DIR)/MMU.v \
+	$(CPU_SRC_DIR)/Csr.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
+
+# ============================================================
+# RV32 v1 core source files
+# ============================================================
+
+CPU_V1_SRC_DIR  = ../rtl/soc/cpu_v1/src
+
+# RV32_core
+CPU_V1_CORE_FILES = \
+	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_FetchPredict.sv \
+	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V1_SRC_DIR)/Fetch.sv \
+	$(CPU_V1_SRC_DIR)/Decorder.sv \
+	$(CPU_V1_SRC_DIR)/Execute.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V1_SRC_DIR)/Branch.sv \
+	$(CPU_V1_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V1_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V1_SRC_DIR)/MMU.sv \
+	$(CPU_V1_SRC_DIR)/Csr.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
+
+# ============================================================
+# RV32 v2 core source files
+# ============================================================
+
+CPU_V2_SRC_DIR  = ../rtl/soc/cpu_v2_experimental/src
+
+# RV32_core(V2)
+CPU_V2_CORE_FILES = \
+	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_FetchUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
+	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch.sv \
+	$(CPU_V2_SRC_DIR)/Decorder.sv \
+	$(CPU_V2_SRC_DIR)/Execute.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V2_SRC_DIR)/Branch.sv \
+	$(CPU_V2_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V2_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V2_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V2_SRC_DIR)/MMU.sv \
+	$(CPU_V2_SRC_DIR)/Csr.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
+
+MMIO_DIR	= ../rtl/soc/mmio/MMIO
+UART_DIR	= ../rtl/soc/mmio/UART
+I2C_DIR		= ../rtl/soc/mmio/I2C
+LED_DIR		= ../rtl/soc/mmio/LED
+
+# ============================================================
+# CPUコアの切り替え（v1 / legacy）
+# ============================================================
+# デフォルトはV1
+CPU_VERSION ?= v1
+
+ifeq ($(CPU_VERSION),v1)
+SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)
+else ifeq ($(CPU_VERSION),v2)
+SELECTED_CPU_CORE_FILES = $(CPU_V2_CORE_FILES)
+else ifeq ($(CPU_VERSION),legacy)
+SELECTED_CPU_CORE_FILES = $(CPU_CORE_FILES)
+else
+$(error CPU_VERSION=$(CPU_VERSION) は不正です。v1 または legacy を指定してください)
+endif
+
+# ============================================================
+# CPU, cache, and peripheral source files
+# ============================================================
+
+# CPU_core + Cache
+CPU_FILES = \
+	$(SELECTED_CPU_CORE_FILES) \
+	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
+	$(UART_DIR)/PSC_RV32IS_UART.v \
+	$(I2C_DIR)/PSC_I2C_capture.sv \
+	$(I2C_DIR)/PSC_RV32_I2C.sv \
+	$(LED_DIR)/PSC_RV32IS_LED.v \
+	$(CACHE_DIR)/cache_dma_controller.sv \
+	$(CACHE_DIR)/cache_dma_controller_io.sv \
+	$(CACHE_DIR)/dm_cache_data.v \
+	$(CACHE_DIR)/dm_cache_tag.v \
+	$(TOP_SRC_DIR)/Delay_N.v
+
+AXI_DIR			= ../rtl/soc/axi
+SDRAM_CNT_DIR	= ../rtl/tang20k/sdram_controller
+BOOT_SRC_DIR	= ../rtl/soc/boot
+DMA_SRC_DIR		= ../rtl/soc/dma
+
+SDRAM_32bit_AXI_FILES = \
+	$(AXI_DIR)/PSC_RV32_CacheAXI.v \
+	$(SDRAM_CNT_DIR)/sdram_axi_controller.v \
+	$(SDRAM_CNT_DIR)/sdram_controller.sv \
+	$(GW2AR_SDRAM_MODEL)
+
+PSC_ONE_BOOT_FILE = $(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v
+
+PSC_ONE_DMA_FILE =  $(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
+
+# ============================================================
+# NPU implementation selection (v1 / v2 / legacy)
+# ============================================================
+
+# デフォルトはlegacy
+NPU_VERSION ?= legacy
+
+NPU_LEGACY_DIR = ../rtl/soc/npu/src
+NPU_V1_DIR     = ../rtl/soc/npu_v1/src
+NPU_V2_DIR     = ../rtl/soc/npu_v2/src
+
+# NPU V1: 4 MUL -> 4 fixed WB lanes -> 16 ACC bank
+NPU_V1_FILES = \
+	$(NPU_V1_DIR)/PSC_NPU_Controller.v \
+	$(NPU_V1_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_V1_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_V1_DIR)/PSC_NPU_MACScheduler.sv \
+	$(NPU_V1_DIR)/PSC_NPU_Mul4.sv \
+	$(NPU_V1_DIR)/PSC_NPU_AccBank.sv
+
+# NPU V2: selector 8 lanes, two signed power-of-two terms per weight byte.
+NPU_V2_FILES = \
+	$(NPU_V2_DIR)/PSC_NPU_Controller.v \
+	$(NPU_V2_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_V2_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_V2_DIR)/PSC_NPU_MACScheduler.sv \
+	$(NPU_V2_DIR)/PSC_NPU_PotLanes.sv \
+	$(NPU_V2_DIR)/PSC_NPU_AccBank.sv
+
+# Legacy NPU
+NPU_LEGACY_FILES = \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Controller.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Engine.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Requantize.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_TilePost.sv \
+	$(NPU_LEGACY_DIR)/PSC_LPU_Controller.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_PE_INT.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_PE_Mult.sv
+
+ifeq ($(NPU_VERSION),v1)
+SA_DIR  = $(NPU_V1_DIR)
+SA_FILE = $(NPU_V1_FILES)
+else ifeq ($(NPU_VERSION),v2)
+SA_DIR  = $(NPU_V2_DIR)
+SA_FILE = $(NPU_V2_FILES)
+else ifeq ($(NPU_VERSION),legacy)
+SA_DIR  = $(NPU_LEGACY_DIR)
+SA_FILE = $(NPU_LEGACY_FILES)
+else
+$(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 / v2 / legacy を指定してください)
+endif
+
+# ============================================================
+# Peripheral and simulation model source files
+# ============================================================
+
+MMIO_BASE_DIR	= ../rtl/soc/mmio
+
+# LCD
+PSCONELCD_FILE = \
+	$(MMIO_BASE_DIR)/LCD/PSC_ONE_LCD.v \
+	$(MMIO_BASE_DIR)/LCD/tft_clock_divider.v \
+	$(MMIO_BASE_DIR)/LCD/tft_ili9488.v \
+	$(MMIO_BASE_DIR)/LCD/tft_ili9488_spi.v
+
+# SD Card Reader
+SD_READER_FILE = \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard.sv \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard_SPI.sv
+
+# PSC Phase Flow Engine
+FPE_DIR  = ../rtl/soc/pfe/src
+FPE_FILE = \
+	$(FPE_DIR)/PSC_PFE.v
+
+# Timer
+TIMER_FILE = $(MMIO_BASE_DIR)/TIMER/PSC_RV32IS_TIMER.v
+
+# I2S Rx
+I2S_RX_FILE = \
+	$(MMIO_BASE_DIR)/I2S_RX/PSC_I2SRX.sv \
+
+I2S_MIC_MODEL = ../rtl/model/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v
+
+LCD_ILI9488_MODEL = ../rtl/model/LCD_model/PSC_LCD_ILI9488_MODEL.v
+
+# ============================================================
+# RTL simulation source selection
+# ============================================================
+
+INPUT_PSCONE_SIM_FILE = \
+	$(PSCONE_SIM_TOP_FILE) $(PSCONE_TOP_FILE) $(PSCONE_SOC_TOP_FILE) \
+	$(CPU_FILES) $(SDRAM_32bit_AXI_FILES) \
+	$(PSC_ONE_BOOT_FILE) $(PSC_ONE_DMA_FILE) \
+	$(SA_FILE) $(PSCONELCD_FILE) $(SD_READER_FILE) $(TIMER_FILE) \
+	$(I2S_RX_FILE) $(I2S_MIC_MODEL) $(LCD_ILI9488_MODEL) \
+	$(FPE_FILE) \
+	$(SDCARD_MODEL)
+
+INPUT_FILE_PSCONE = \
+	$(INPUT_PSCONE_SIM_FILE)
+
+# ============================================================
+# Cocotb configuration
+# ============================================================
+
+COCOTB_CFG       := $(shell which cocotb-config)
+COCOTB_MAKEFILE  := $(shell cocotb-config --makefiles)/Makefile.sim
+ifeq ($(NPU_VERSION),v2)
+# Do not reuse a simulator binary built for the INT8 NPU implementations.
+export SIM_BUILD ?= sim_build/npu_v2
+else
+SIM_BUILD        ?= sim_build
+endif
+
+ifeq ($(SIM_LEVEL),RTL)
+ifneq ($(MODE),verilator)
+$(error Rust PSC-OS RTL simulation requires MODE=verilator)
+endif
+endif
+
+# ============================================================
+# Rust firmware and simulation output
+# ============================================================
 
 RUST_OS_DIR := $(abspath $(RUST_SIM_DIR)/../../software/os_rust)
 ifneq ($(filter-out sd,$(RUST_BOOT)),)
 $(error RUST_BOOT=rtl is removed; Rust simulation always boots from SD)
 endif
-RUST_RUN_DIR ?= $(RUST_SIM_DIR)/build/pscos-rust/sd_$(CPU_VERSION)_$(NPU_VERSION)_$(SIM_FAST)
+RUST_RUN_DIR ?= $(RUST_SIM_DIR)/build/pscos-rust/$(if $(filter GATE,$(SIM_LEVEL)),gate_rv32,sd_$(CPU_VERSION)_$(NPU_VERSION)_$(SIM_FAST))
 RUST_SIM_BUILD := $(RUST_RUN_DIR)/sim_build
 RUST_RTL_SOURCES := $(abspath $(addprefix $(RUST_SIM_DIR)/,$(INPUT_FILE_PSCONE)))
 RUST_VDEF := -DFST_UART_MODE -DPSCOS_SIM -DFPGA_BOOT_LOADER_MODE
 
+# ============================================================
+# Gowin gate simulation configuration
+# ============================================================
+
+ifeq ($(SIM_LEVEL),GATE)
+# CPU/ROM configuration is baked into this Gowin synthesis result.
+GATE_NETLIST ?= $(HOME)/Program/Gowin/PSC-ONE_RV32/impl/gwsynthesis/PSC-ONE_RV32.vg
+GOWIN_SIMLIB ?= /opt/gowin/IDE/simlib/gw2a/prim_sim.v
+GATE_CLOCK_PERIOD_NS ?= 37.038
+GATE_UART_BIT_NS ?= 8568
+# Temporary model hold-time workaround: preserve data at the +4.630 ns sample.
+# Original model timing is tAC=5.4, tOH=3.0. This is not hardware timing signoff.
+GATE_SDRAM_TAC_NS ?= 5.4
+GATE_SDRAM_TOH_NS ?= 5.0
+GATE_SDRAM_INIT_ZERO ?= 1
+GATE_SOURCES := $(abspath $(GATE_NETLIST)) $(abspath $(GOWIN_SIMLIB)) \
+	$(RUST_SIM_DIR)/testbench/PSC_ONE_Chip_gate_sim.sv \
+	$(abspath $(RUST_SIM_DIR)/../rtl/model/SDRAM_model/GW2AR_sdram.v) \
+	$(abspath $(RUST_SIM_DIR)/../rtl/model/SDCARD_model/sdcard_spi_model.v)
+GATE_COMPILE_ARGS := -g2012 \
+	-PPSC_ONE_Chip_gate_sim.CLOCK_PERIOD_NS=$(GATE_CLOCK_PERIOD_NS) \
+	-PPSC_ONE_Chip_gate_sim.SDRAM_TAC_NS=$(GATE_SDRAM_TAC_NS) \
+	-PPSC_ONE_Chip_gate_sim.SDRAM_TOH_NS=$(GATE_SDRAM_TOH_NS)
+ifeq ($(GATE_SDRAM_INIT_ZERO),1)
+GATE_COMPILE_ARGS += -DINIT_CLEAR_MEM_BANKS
+endif
+ifeq ($(DUMP_FST),1)
+GATE_COMPILE_ARGS += -DDUMP_FST
+GATE_PLUSARGS := -fst
+endif
+
+# ============================================================
+# Gate input validation and compilation
+# ============================================================
+
+.PHONY: check_gate_inputs gate_config compile_gate
+check_gate_inputs:
+	@test -r "$(GATE_NETLIST)" || { echo "Missing GATE_NETLIST: $(GATE_NETLIST)"; exit 1; }
+	@test -r "$(GOWIN_SIMLIB)" || { echo "Missing GOWIN_SIMLIB: $(GOWIN_SIMLIB)"; exit 1; }
+	@command -v iverilog >/dev/null && command -v vvp >/dev/null
+
+prepare_rust: check_gate_inputs
+run_rust: gate_config
+# Track model settings as well as source selection to prevent stale binaries.
+gate_config: check_gate_inputs
+	@python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s="\n".join(sys.argv[2:])+"\n"; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(s) if not p.exists() or p.read_text()!=s else None' "$(RUST_SIM_BUILD)/gate.config" "$(GATE_SOURCES)" "$(GATE_COMPILE_ARGS)"
+
+compile_gate: check_gate_inputs
+	mkdir -p $(RUST_SIM_BUILD)
+	iverilog -s PSC_ONE_Chip_gate_sim $(GATE_COMPILE_ARGS) -o $(RUST_SIM_BUILD)/gate_compile.vvp $(GATE_SOURCES)
+endif
+
+# ============================================================
+# SD boot simulation targets
+# ============================================================
+
 .PHONY: simulate_SD_PSCOS smoke_sd prepare_rust
 simulate_SD_PSCOS: prepare_rust
 	$(MAKE) -f $(RUST_SIM_DIR)/Makefile.pscos.rust run_rust
+
+# ============================================================
+# SD boot smoke test
+# ============================================================
 
 smoke_sd: export PSC_UART_GUI = 0
 smoke_sd: export PSC_UART_INTERACTIVE = 0
@@ -31,15 +441,43 @@ smoke_sd: export PSC_OS_STOP_AFTER_BOOT = 1
 smoke_sd: export RUN_CYCLES = 1500000000
 smoke_sd: simulate_SD_PSCOS
 
+# ============================================================
+# Firmware and SD card image preparation
+# ============================================================
+
 prepare_rust:
-	$(MAKE) -C $(RUST_OS_DIR) CPU_VERSION=$(CPU_VERSION) all
+	$(MAKE) -C $(RUST_OS_DIR) CPU_VERSION=$(CPU_VERSION) $(if $(filter GATE,$(SIM_LEVEL)),MODE=psc) all
 	python3 $(RUST_SIM_DIR)/python_tool/prepare_pscos_rust.py --os $(RUST_OS_DIR) --bootrom $(RUST_OS_DIR)/build/bootrom.mem --bootloader $(RUST_OS_DIR)/build/bootloader_fat32.mem --run $(RUST_RUN_DIR)
 	$(MAKE) -C $(RUST_SIM_DIR) -f Makefile.sdcard INPUT_DIR=$(RUST_RUN_DIR)/mem SDCARD_DIR=$(RUST_RUN_DIR)/sdcard all
 	cp $(RUST_OS_DIR)/build/kernel.elf $(RUST_RUN_DIR)/kernel.elf
 	cp $(RUST_OS_DIR)/build/image_layout.h $(RUST_RUN_DIR)/image_layout.h
 
+# ============================================================
+# Simulation execution (RTL / GATE)
+# ============================================================
+
 .PHONY: run_rust
 run_rust:
+ifeq ($(SIM_LEVEL),GATE)
+	@echo "[Rust PSC-OS RV32 GATE] netlist=$(GATE_NETLIST) run=$(RUST_RUN_DIR)"
+	@echo "[Rust PSC-OS RV32 GATE] ROM contents come from the netlist; only the SD image is updated."
+	@echo "[Rust PSC-OS RV32 GATE] SDRAM model: tAC=$(GATE_SDRAM_TAC_NS) ns, tOH=$(GATE_SDRAM_TOH_NS) ns, initial zero=$(GATE_SDRAM_INIT_ZERO)"
+	cd $(RUST_RUN_DIR) && \
+	PYTHONPATH=$(RUST_SIM_DIR):$(PYTHONPATH) \
+	COCOTB_TEST_MODULES=cocotb_tb.psc_os.test_gate_rv32 \
+	PSC_OS_BOOT_MARKER='PSC_OS>' \
+	UART_BIT_NS=$(GATE_UART_BIT_NS) \
+	GATE_CLOCK_PERIOD_NS=$(GATE_CLOCK_PERIOD_NS) \
+	COCOTB_RESULTS_FILE=$(RUST_SIM_BUILD)/results.xml \
+	PSC_UART_LOGFILE=$(RUST_RUN_DIR)/log_uart/uart.log \
+	TOPLEVEL=PSC_ONE_Chip_gate_sim TOPLEVEL_LANG=verilog \
+	SIM=icarus SIM_BUILD=$(RUST_SIM_BUILD) \
+	VERILOG_SOURCES="$(GATE_SOURCES)" \
+	CUSTOM_COMPILE_DEPS="$(RUST_SIM_BUILD)/gate.config" \
+	COMPILE_ARGS="$(GATE_COMPILE_ARGS)" \
+	EXTRA_ARGS= SIM_ARGS= COCOTB_PLUSARGS="$(GATE_PLUSARGS)" \
+	$(MAKE) --silent -f $(COCOTB_MAKEFILE)
+else
 	@echo "[Rust PSC-OS] CPU=$(CPU_VERSION) NPU=$(NPU_VERSION) run=$(RUST_RUN_DIR)"
 	cd $(RUST_RUN_DIR) && \
 	PYTHONPATH=$(RUST_SIM_DIR):$(PYTHONPATH) \
@@ -55,3 +493,4 @@ run_rust:
 	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS) $(RUST_VDEF)" \
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
 	$(MAKE) --silent -f $(COCOTB_MAKEFILE)
+endif

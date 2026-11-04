@@ -64,9 +64,16 @@ module PSC_PC #(
 
     assign trap = exception | interrupt;
 
-    assign trap_deleg_to_s =
-        (priv_mode != PRIV_M) &&
-        (((csr_state.medeleg >> trap_scause) & 64'd1) != 64'd0);
+    // Decode in parallel rather than shifting medeleg after cause encoding.
+    (* keep = "true" *) wire [31:0] delegated_cause;
+    genvar cause_bit;
+    generate
+        for (cause_bit = 0; cause_bit < 32; cause_bit = cause_bit + 1) begin : g_delegated_cause
+            assign delegated_cause[cause_bit] =
+                (trap_scause == 5'(cause_bit)) && csr_state.medeleg[cause_bit];
+        end
+    endgenerate
+    assign trap_deleg_to_s = (priv_mode != PRIV_M) && (|delegated_cause);
 
     assign trap_pc =
         !interrupt && trap_deleg_to_s

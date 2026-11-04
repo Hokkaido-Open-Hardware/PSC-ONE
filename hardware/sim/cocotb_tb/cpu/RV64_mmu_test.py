@@ -1,6 +1,6 @@
 """Standalone RV64 Sv39 MMU tests.
 
-Profile: 64-bit PTEs, 56-bit physical addresses, Svade, SUM=MXR=0,
+Profile: 64-bit PTEs, 56-bit physical addresses, Svade, SUM/MXR,
 no TLB/PTE cache. MPRV is resolved by the caller (effective priv_mode).
 The memory interface grants a one-cycle request with mem_req_ready, then
 returns one atomic PTE with mem_ready. These tests use only public ports.
@@ -47,7 +47,7 @@ async def reset_dut(dut):
     for name in (
         "reset_n", "MMU_enb", "vaddr", "satp", "priv_mode", "access_r",
         "access_w", "access_x", "mem_req_ready", "mem_rdata", "mem_ready",
-        "cpu_state_done", "sfence_vma",
+        "cpu_state_done", "sfence_vma", "status_sum", "status_mxr",
     ):
         getattr(dut, name).value = 0
     for _ in range(5):
@@ -335,3 +335,27 @@ async def mmu_sfence_before_request_test(dut):
     address = await walk_to_level(dut, 0)
     await respond_pte_read(dut, address, pte_value(PA, V | R | A))
     await finish_translation(dut, PA | (VA & 0xFFF))
+
+
+@cocotb.test()
+async def mmu_sum_mxr_permissions(dut):
+    """SUM permits S data only; MXR permits reading executable leaves only."""
+    await reset_dut(dut)
+    for sum_bit in (0, 1):
+        for mxr_bit in (0, 1):
+            for priv in (U_MODE, S_MODE):
+                for access in ('r', 'w', 'x'):
+                    for flags in (V | U | X | A, V | U | R | W | A | D):
+                        await FallingEdge(dut.clk)
+                        dut.status_sum.value = sum_bit
+                        dut.status_mxr.value = mxr_bit
+                        await start_translation(dut, priv=priv, access=access)
+                        # Accepted status is latched, not reread during walk.
+                        dut.status_sum.value = 1 - sum_bit
+                        dut.status_mxr.value = 1 - mxr_bit
+                        address = await walk_to_level(dut, 0)
+                        await respond_pte_read(dut, address, pte_value(PA, flags))
+                        permission = (priv == U_MODE or (sum_bit and access != 'x'))
+                        permission &= {'r': bool(flags & R or (mxr_bit and flags & X)),
+                                       'w': bool(flags & W), 'x': bool(flags & X)}[access]
+                        await finish_translation(dut, PA | (VA & 0xFFF), fault=not permission)

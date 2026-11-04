@@ -18,6 +18,24 @@ pub fn satp(root: u64) -> u64 {
     (8 << 60) | (root >> 12)
 }
 
+/// Install the address space and fail here if the CPU rejects Sv39.
+/// All process roots must identity-map the executing kernel and its stack.
+#[cfg(target_arch = "riscv64")]
+pub unsafe fn activate(root: u64) {
+    let expected = satp(root);
+    let actual: u64;
+    core::arch::asm!(
+        "fence rw, rw",
+        "sfence.vma",
+        "csrw satp, {expected}",
+        "csrr {actual}, satp",
+        "sfence.vma",
+        expected = in(reg) expected,
+        actual = out(reg) actual,
+    );
+    assert_eq!(actual, expected, "CPU rejected Sv39 satp configuration");
+}
+
 fn table_address(pte: u64) -> u64 {
     ((pte >> 10) & PPN_MASK) << 12
 }

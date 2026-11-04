@@ -182,6 +182,30 @@ See the [CPU guide](docs/cpu.md) and [hardware overview](hardware/README.md).
 
 ------------------------------------------------------------------------
 
+## CPU RV64 architecture
+
+PSC_RV64 is an experimental 64-bit extension of the PSC_RV32 design.
+
+<img src="docs/images/PSC_RV64.jpg" width="800" alt="PSC-RV64">
+
+targets RV64IM with Zicsr and Zifencei, extending the integer registers and
+datapath to 64 bits while retaining 32-bit instruction encodings.
+
+RV64 adds 64-bit load/store operations and word operations that produce
+32-bit results sign-extended to 64 bits. The port also requires RV64-specific
+handling of shift amounts, arithmetic, multiplication and division.
+
+Initial development focuses on bare-metal execution and adapting the existing
+C/C++ test programs using `-march=rv64im_zicsr_zifencei -mabi=lp64`.
+Sv39 virtual memory and PSC-OS support are separate development steps;
+64-bit execution alone does not establish Linux compatibility.
+
+The core remains experimental. RV32 regression results and CoreMark scores
+do not establish RV64 correctness or performance; RV64 validation results
+will be documented separately.
+
+------------------------------------------------------------------------
+
 ## CoreMark (CPU Core Only)
 
 CoreMark was also measured with the SDRAM/cache path removed and replaced by a 1-cycle cocotb memory model.

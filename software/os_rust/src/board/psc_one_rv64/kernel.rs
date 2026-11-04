@@ -146,7 +146,7 @@ pub unsafe extern "C" fn kernel_main(warm: u32) -> ! {
             "            fat32_touch\n",
             "  RUNTIME   run (.ELF)\n",
             "\n",
-            "  QEMU exit        : Ctrl+A, C -> q\n",
+            "  Platform        : PSC-ONE FPGA / RV64\n",
             "  --------------------------------------------------\n",
             "\n",
         ),

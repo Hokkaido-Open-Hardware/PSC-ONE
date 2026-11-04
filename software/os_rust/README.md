@@ -186,9 +186,10 @@ and the native testbench. It is not an input to the bootloader.
 
 ## RTL simulation
 
-The RV32 Rust simulation wrapper supports Verilator and always boots from SD.
-The RV64 addition described above does not enable this wrapper for RV64.
-It requires the Python/cocotb environment used by PSC-ONE.
+The RV32 and RV64 Rust simulation wrappers support Verilator and always boot
+from SD. Each Makefile lists its own RTL sources and simulation configuration;
+neither includes `Makefile.pscos`. They require the Python/cocotb environment
+used by PSC-ONE.
 
 ```sh
 # Prepare matching Rust firmware, C BIOS/loader, and the FAT32 card.
@@ -197,7 +198,21 @@ make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust prepare_rust CPU_VERSION=v1
 make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust simulate_SD_PSCOS CPU_VERSION=v1
 # Bounded boot check; succeeds only after observing PSC_OS>.
 make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust smoke_sd CPU_VERSION=v1
+
+# RV64: Rust MBIOS/loader/kernel/shell and the PSC_RV64 RTL core.
+make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust.rv64 simulate_SD_PSCOS_RV64
+# Explicitly display the UART console on the desktop.
+make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust.rv64 simulate_SD_PSCOS_RV64 PSC_UART_GUI=1
+# Headless boot check, stopping after PSC_OS> is observed.
+make -C PSC-ONE/hardware/sim -f Makefile.pscos.rust.rv64 smoke_sd
 ```
+
+The RV64 wrapper selects `CPU_VERSION=rv64` and `BOARD=psc_one_rv64`, stages
+all four images from `os_rust/build/psc_one_rv64/`, and defines `CPU_RV64` for
+the SoC. Conflicting CPU/board overrides are rejected. `prepare_rust` builds
+and stages the firmware/card without starting the simulator. `DUMP_FST=1`
+enables wave output; `PSC_UART_GUI=0` disables the GUI. Interactive simulation
+runs until `RUN_CYCLES` expires or it is interrupted.
 
 The direct-load targets `simulate_PSCOS`, `simulate_PSCOS_RUST`, and `smoke`
 have been removed. `RUST_BOOT=rtl` and `USER_SOURCE=rtl` are rejected.

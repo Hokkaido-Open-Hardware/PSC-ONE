@@ -133,6 +133,7 @@ module PSC_InstructionUnit (
     logic ex_mem_ready;
     logic mem_wb_ready;
     logic memory_complete;
+    logic [1:0] csr_read_ready;
     logic branch_taken_now;
     logic raw_hazard;
     logic raw_hazard_rs1;
@@ -326,9 +327,24 @@ module PSC_InstructionUnit (
         raw_hazard = raw_hazard_rs1 || raw_hazard_rs2;
     end
 
+    // Csr's registered decode and partial read mux need two complete MEM
+    // cycles. Keep EX/MEM (including the address) stable until both elapse.
+    // A replacement, cancellation or retirement always starts a fresh read.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n)
+            csr_read_ready <= 2'b00;
+        else if (cpu_stop || d_pf || ex_fire || mem_fire)
+            csr_read_ready <= 2'b00;
+        else if (ex_mem.valid && (ex_mem.ctrl.wb_sel == 2'b11))
+            csr_read_ready <= {csr_read_ready[0], 1'b1};
+        else
+            csr_read_ready <= 2'b00;
+    end
+
     // Stage handshakes hold EX/MEM and backpressure issue until memory completes.
     assign memory_complete           = ex_mem.ctrl.is_load  ? load_done  :
-                             ex_mem.ctrl.is_store ? store_done : 1'b1;
+                             ex_mem.ctrl.is_store ? store_done :
+                             (ex_mem.ctrl.wb_sel == 2'b11) ? csr_read_ready[1] : 1'b1;
 
     assign mem_wb_ready              = 1'b1;
     assign mem_fire                  = ex_mem.valid && memory_complete && mem_wb_ready;
@@ -449,19 +465,24 @@ module PSC_InstructionUnit (
             csr_valid <= commit.valid;
     end
 
+    // Flush/stop cancels only the valid bit. Payload capture depends on the
+    // stage transfer alone; invalid payload never causes an architectural effect.
+    // This removes the global clear signal from the wide payload enables.
     // ID/ISSUE accepts decoded instructions and discards them on flush.
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             id_issue  <= '0;
-        end else if (cpu_stop || fifo_flush) begin
-            id_issue  <= '0;
         end else begin
+            if (cpu_stop || fifo_flush)
+                id_issue.valid <= 1'b0;
+            else if (decode_fire)
+                id_issue.valid <= 1'b1;
+            else if (issue_fire)
+                id_issue.valid <= 1'b0;
+
             if (decode_fire) begin
-                id_issue.valid      <= 1'b1;
                 id_issue.ctrl       <= decoded_ctrl;
                 id_issue.pc         <= pc_now;
-            end else if (issue_fire) begin
-                id_issue.valid      <= 1'b0;
             end
         end
     end
@@ -470,17 +491,19 @@ module PSC_InstructionUnit (
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             issue_ex  <= '0;
-        end else if (cpu_stop || d_pf) begin
-            issue_ex  <= '0;
         end else begin
+            if (cpu_stop || d_pf)
+                issue_ex.valid <= 1'b0;
+            else if (issue_fire)
+                issue_ex.valid <= 1'b1;
+            else if (ex_fire)
+                issue_ex.valid <= 1'b0;
+
             if (issue_fire) begin
-                issue_ex.valid      <= 1'b1;
                 issue_ex.ctrl       <= id_issue.ctrl;
                 issue_ex.pc         <= id_issue.pc;
                 issue_ex.reg_data_1 <= issue_reg_data_1;
                 issue_ex.reg_data_2 <= issue_reg_data_2;
-            end else if (ex_fire) begin
-                issue_ex.valid      <= 1'b0;
             end
         end
     end
@@ -489,18 +512,20 @@ module PSC_InstructionUnit (
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             ex_mem    <= '0;
-        end else if (cpu_stop || d_pf) begin
-            ex_mem    <= '0;
         end else begin
+            if (cpu_stop || d_pf)
+                ex_mem.valid <= 1'b0;
+            else if (ex_fire)
+                ex_mem.valid <= 1'b1;
+            else if (mem_fire)
+                ex_mem.valid <= 1'b0;
+
             if (ex_fire) begin
-                ex_mem.valid        <= 1'b1;
                 ex_mem.ctrl         <= issue_ex.ctrl;
                 ex_mem.pc           <= issue_ex.pc;
                 ex_mem.reg_data_1   <= issue_ex.reg_data_1;
                 ex_mem.reg_data_2   <= issue_ex.reg_data_2;
                 ex_mem.alu_data     <= execute_alu_data;
-            end else if (mem_fire) begin
-                ex_mem.valid        <= 1'b0;
             end
         end
     end
@@ -509,11 +534,15 @@ module PSC_InstructionUnit (
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             mem_wb    <= '0;
-        end else if (cpu_stop || d_pf) begin
-            mem_wb    <= '0;
         end else begin
+            if (cpu_stop || d_pf)
+                mem_wb.valid <= 1'b0;
+            else if (mem_fire)
+                mem_wb.valid <= 1'b1;
+            else
+                mem_wb.valid <= 1'b0;
+
             if (mem_fire) begin
-                mem_wb.valid        <= 1'b1;
                 mem_wb.ctrl         <= ex_mem.ctrl;
                 mem_wb.pc           <= ex_mem.pc;
                 mem_wb.reg_data_1   <= ex_mem.reg_data_1;
@@ -528,8 +557,6 @@ module PSC_InstructionUnit (
                     2'b10: mem_wb.w_data <= ex_mem.pc + 64'd4;
                     default: mem_wb.w_data <= csr_rdata;
                 endcase
-            end else begin
-                mem_wb.valid        <= 1'b0;
             end
         end
     end
@@ -538,19 +565,21 @@ module PSC_InstructionUnit (
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
             commit    <= '0;
-        end else if (cpu_stop || d_pf) begin
-            commit    <= '0;
         end else begin
+            if (cpu_stop || d_pf)
+                commit.valid <= 1'b0;
+            else if (mem_wb.valid)
+                commit.valid <= 1'b1;
+            else
+                commit.valid <= 1'b0;
+
             if (mem_wb.valid) begin
-                commit.valid        <= 1'b1;
                 commit.ctrl         <= mem_wb.ctrl;
                 commit.pc           <= mem_wb.pc;
                 commit.reg_data_1   <= mem_wb.reg_data_1;
                 commit.alu_data     <= mem_wb.alu_data;
                 commit.branch_taken <= mem_wb.branch_taken;
                 commit.w_data       <= mem_wb.w_data;
-            end else begin
-                commit.valid        <= 1'b0;
             end
         end
     end

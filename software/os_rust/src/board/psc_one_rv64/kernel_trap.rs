@@ -274,6 +274,7 @@ unsafe extern "C" fn handle_trap(f: &mut TrapFrame) {
         super::kernel_syscall::handle_syscall(f);
         return;
     }
+    dump_trap(f);
     if f.sstatus & 256 == 0
         && f.scause & 0x8000000000000000 == 0
         && super::kernel_elf::elf_is_running()
@@ -285,4 +286,50 @@ unsafe extern "C" fn handle_trap(f: &mut TrapFrame) {
         "unexpected S trap {:x} pc={:x} value={:x}",
         f.scause, f.sepc, f.stval
     )
+}
+
+/// Print saved trap state before panic or foreground-process teardown.
+/// The software walk/memory word are diagnostic comparisons, not a bus trace.
+unsafe fn dump_trap(f: &TrapFrame) {
+    let satp: u64;
+    core::arch::asm!("csrr {}, satp", out(reg) satp);
+    crate::s_print!(
+        "RV64 TRAP sepc={:016x} scause={:016x} stval={:016x}\n\
+         sstatus={:016x} satp={:016x} fetch_va={:016x}\n",
+        f.sepc,
+        f.scause,
+        f.stval,
+        f.sstatus,
+        satp,
+        f.sepc
+    );
+    if f.scause == 2 {
+        // Updated PSC_RV64 RTL captures the fetched instruction in stval.
+        // Older RTL always reports zero, so zero alone does not prove a zero fetch.
+        crate::s_print!("illegal_instruction_bits(stval)={:08x}\n", f.stval as u32);
+    }
+    let root = (satp & ((1u64 << 44) - 1)) << 12;
+    let physical = match satp >> 60 {
+        0 => Some(f.sepc),
+        8 if root >= crate::board::KERNEL_BASE as u64
+            && root < crate::board::KERNEL_LIMIT as u64 =>
+        {
+            super::sv39::translate(root as *const u64, f.sepc).map(|t| t.physical)
+        }
+        _ => None,
+    };
+    if let Some(pa) = physical {
+        crate::s_print!("fetch_pa(software_walk)={:016x}\n", pa);
+        // Only dereference aligned, identity-mapped kernel/page-pool RAM.
+        // Never probe an unmapped VA or MMIO while handling an exception.
+        if pa & 3 == 0
+            && pa >= crate::board::KERNEL_BASE as u64
+            && pa <= crate::board::KERNEL_LIMIT as u64 - 4
+        {
+            let word = core::ptr::read_volatile(pa as *const u32);
+            crate::s_print!("instruction_memory_word={:08x}\n", word);
+        }
+    } else {
+        crate::s_print!("fetch_pa(software_walk)=unavailable\n");
+    }
 }

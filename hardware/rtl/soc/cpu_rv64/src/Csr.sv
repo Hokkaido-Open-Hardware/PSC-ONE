@@ -2,7 +2,8 @@
 module Csr #(
     // Peripheral observation ports expose the low bits of 64-bit CSRs.
     // Architectural CSR state/readback and status inputs remain XLEN=64.
-    parameter integer PERIPHERAL_CSR_WIDTH = 32
+    parameter integer PERIPHERAL_CSR_WIDTH = 32,
+    parameter integer PIPELINED_READ = 0
 ) (
     input  logic        clock,
     input  logic        reset_n,
@@ -165,11 +166,6 @@ module Csr #(
     function automatic logic [63:0] pack_epc(input logic [63:0] v);
       begin pack_epc = {v[63:2], 2'b00}; end   // 下位2bitゼロ固定
     endfunction
-    // Bare-only WARL satp: all writes read back as zero.
-    function automatic logic [63:0] pack_satp_bare(input logic [63:0] v);
-        pack_satp_bare = 64'b0;
-    endfunction
-
     // sip view（mip -> sip）
     function automatic logic [63:0] sip_view(input logic [63:0] mip);
         logic [63:0] v;
@@ -209,8 +205,18 @@ module Csr #(
 
     logic trap_to_s;
 
+    // Decode the cause in parallel instead of putting a variable 64:1 mux
+    // after the trap-cause priority encoder.  Preserve every delegation bit.
+    (* keep = "true" *) wire [63:0] delegated_cause;
+    genvar cause_bit;
+    generate
+        for (cause_bit = 0; cause_bit < 64; cause_bit = cause_bit + 1) begin : g_delegated_cause
+            assign delegated_cause[cause_bit] =
+                (trap_scause[5:0] == 6'(cause_bit)) && csr_medeleg[cause_bit];
+        end
+    endgenerate
     assign trap_to_s =
-        (priv_mode != PRIV_M) && (trap_scause < 64) && csr_medeleg[trap_scause[5:0]];
+        (priv_mode != PRIV_M) && !(|trap_scause[63:6]) && (|delegated_cause);
 
     // ---------------- outputs ----------------
     // The CSR registers are already the architectural state.  Driving a
@@ -258,41 +264,104 @@ module Csr #(
     end
 
     // ---------------- read mux ----------------
-    function automatic logic [63:0] csr_read_mux(input logic [11:0] a);
-        begin
-            case (a)
-                // Supervisor
-                12'h100: csr_read_mux = ((csr_sstatus & SSTATUS_MASK) | 64'h0000_0002_0000_0000); // sstatus
-                12'h104: csr_read_mux = (csr_sie     & SIRQ_MASK);    // sie
-                12'h105: csr_read_mux = csr_stvec;                    // stvec
-                12'h140: csr_read_mux = csr_sscratch;
-                12'h141: csr_read_mux = csr_sepc;
-                12'h142: csr_read_mux = csr_scause;
-                12'h143: csr_read_mux = csr_stval;
-                12'h144: csr_read_mux = sip_view(csr_mip);            // sip(view)
-                12'h180: csr_read_mux = csr_satp;
-                // Machine
-                12'h300: csr_read_mux = csr_mstatus;
-                12'h301: csr_read_mux = CSR_MISA;
-                12'h302: csr_read_mux = csr_medeleg;
-                12'h304: csr_read_mux = (csr_mie & MIRQ_MASK);
-                12'h305: csr_read_mux = csr_mtvec;
-                12'h340: csr_read_mux = csr_mscratch;
-                12'h341: csr_read_mux = csr_mepc;
-                12'h342: csr_read_mux = csr_mcause;
-                12'h343: csr_read_mux = csr_mtval;
-                12'h344: csr_read_mux = (csr_mip & MIRQ_MASK);
-                // DMA
-                12'h7F0: csr_read_mux = csr_DMA_STATUS;
-                // SynapEngine
-                12'h7C8: csr_read_mux = csr_SA_STATUS;
-                // CPU Monitor
-                12'hBC4: csr_read_mux = in_CPU_MON_CYCLE;
-
-                default: csr_read_mux = 64'b0;
-            endcase
+    // PIPELINED_READ=1 has two registered stages: address decode, then
+    // partial data selection. The consumer must hold the address for two
+    // edges before capturing csr_rdata. CSR serialization keeps architectural
+    // state stable; peripheral status is sampled at the data-selection edge.
+    (* keep = "true" *) wire [21:0] csr_read_decode;
+    assign csr_read_decode[0] = (csr_read_addr == 12'h100);
+    assign csr_read_decode[1] = (csr_read_addr == 12'h104);
+    assign csr_read_decode[2] = (csr_read_addr == 12'h105);
+    assign csr_read_decode[3] = (csr_read_addr == 12'h140);
+    assign csr_read_decode[4] = (csr_read_addr == 12'h141);
+    assign csr_read_decode[5] = (csr_read_addr == 12'h142);
+    assign csr_read_decode[6] = (csr_read_addr == 12'h143);
+    assign csr_read_decode[7] = (csr_read_addr == 12'h144);
+    assign csr_read_decode[8] = (csr_read_addr == 12'h180);
+    assign csr_read_decode[9] = (csr_read_addr == 12'h300);
+    assign csr_read_decode[10] = (csr_read_addr == 12'h301);
+    assign csr_read_decode[11] = (csr_read_addr == 12'h302);
+    assign csr_read_decode[12] = (csr_read_addr == 12'h304);
+    assign csr_read_decode[13] = (csr_read_addr == 12'h305);
+    assign csr_read_decode[14] = (csr_read_addr == 12'h340);
+    assign csr_read_decode[15] = (csr_read_addr == 12'h341);
+    assign csr_read_decode[16] = (csr_read_addr == 12'h342);
+    assign csr_read_decode[17] = (csr_read_addr == 12'h343);
+    assign csr_read_decode[18] = (csr_read_addr == 12'h344);
+    assign csr_read_decode[19] = (csr_read_addr == 12'h7F0);
+    assign csr_read_decode[20] = (csr_read_addr == 12'h7C8);
+    assign csr_read_decode[21] = (csr_read_addr == 12'hBC4);
+    wire [21:0] csr_read_select;
+    generate
+        if (PIPELINED_READ != 0) begin : g_read_pipeline
+            logic [21:0] select_q;
+            logic [63:0] group0_q, group1_q, group2_q, group3_q;
+            always_ff @(posedge clock or negedge reset_n) begin
+                if (!reset_n) begin
+                    select_q <= '0;
+                    group0_q <= '0;
+                    group1_q <= '0;
+                    group2_q <= '0;
+                    group3_q <= '0;
+                end else begin
+                    select_q <= csr_read_decode;
+                    group0_q <=
+                        ({64{select_q[0]}} & (((csr_sstatus & SSTATUS_MASK) | 64'h0000_0002_0000_0000))) |
+                        ({64{select_q[1]}} & ((csr_sie     & SIRQ_MASK))) |
+                        ({64{select_q[2]}} & (csr_stvec)) |
+                        ({64{select_q[3]}} & (csr_sscratch)) |
+                        ({64{select_q[4]}} & (csr_sepc)) |
+                        ({64{select_q[5]}} & (csr_scause));
+                    group1_q <=
+                        ({64{select_q[6]}} & (csr_stval)) |
+                        ({64{select_q[7]}} & (sip_view(csr_mip))) |
+                        ({64{select_q[8]}} & (csr_satp)) |
+                        ({64{select_q[9]}} & (csr_mstatus)) |
+                        ({64{select_q[10]}} & (CSR_MISA)) |
+                        ({64{select_q[11]}} & (csr_medeleg));
+                    group2_q <=
+                        ({64{select_q[12]}} & ((csr_mie & MIRQ_MASK))) |
+                        ({64{select_q[13]}} & (csr_mtvec)) |
+                        ({64{select_q[14]}} & (csr_mscratch)) |
+                        ({64{select_q[15]}} & (csr_mepc)) |
+                        ({64{select_q[16]}} & (csr_mcause)) |
+                        ({64{select_q[17]}} & (csr_mtval));
+                    group3_q <=
+                        ({64{select_q[18]}} & ((csr_mip & MIRQ_MASK))) |
+                        ({64{select_q[19]}} & (csr_DMA_STATUS)) |
+                        ({64{select_q[20]}} & (csr_SA_STATUS)) |
+                        ({64{select_q[21]}} & (in_CPU_MON_CYCLE));
+                end
+            end
+            assign csr_read_select = select_q;
+            assign csr_rdata = group0_q | group1_q | group2_q | group3_q;
+        end else begin : g_read_comb
+            assign csr_read_select = csr_read_decode;
+            assign csr_rdata =
+                ({64{csr_read_select[0]}} & (((csr_sstatus & SSTATUS_MASK) | 64'h0000_0002_0000_0000))) |
+                ({64{csr_read_select[1]}} & ((csr_sie     & SIRQ_MASK))) |
+                ({64{csr_read_select[2]}} & (csr_stvec)) |
+                ({64{csr_read_select[3]}} & (csr_sscratch)) |
+                ({64{csr_read_select[4]}} & (csr_sepc)) |
+                ({64{csr_read_select[5]}} & (csr_scause)) |
+                ({64{csr_read_select[6]}} & (csr_stval)) |
+                ({64{csr_read_select[7]}} & (sip_view(csr_mip))) |
+                ({64{csr_read_select[8]}} & (csr_satp)) |
+                ({64{csr_read_select[9]}} & (csr_mstatus)) |
+                ({64{csr_read_select[10]}} & (CSR_MISA)) |
+                ({64{csr_read_select[11]}} & (csr_medeleg)) |
+                ({64{csr_read_select[12]}} & ((csr_mie & MIRQ_MASK))) |
+                ({64{csr_read_select[13]}} & (csr_mtvec)) |
+                ({64{csr_read_select[14]}} & (csr_mscratch)) |
+                ({64{csr_read_select[15]}} & (csr_mepc)) |
+                ({64{csr_read_select[16]}} & (csr_mcause)) |
+                ({64{csr_read_select[17]}} & (csr_mtval)) |
+                ({64{csr_read_select[18]}} & ((csr_mip & MIRQ_MASK))) |
+                ({64{csr_read_select[19]}} & (csr_DMA_STATUS)) |
+                ({64{csr_read_select[20]}} & (csr_SA_STATUS)) |
+                ({64{csr_read_select[21]}} & (in_CPU_MON_CYCLE));
         end
-    endfunction
+    endgenerate
 
     // ---------------- main ----------------
     //reg [63:0] oldv, newv;
@@ -301,9 +370,6 @@ module Csr #(
     // Read the CSR before commit and register it in the pipeline.  This keeps
     // the address decoder and the read mux out of the commit-stage CSR update
     // and register-file write-back paths.
-    always_comb begin
-        csr_rdata = csr_read_mux(csr_read_addr);
-    end
 
     assign  oldv = csr_old_value;
     assign  newv = csr_apply(csr_cmd, side_effect_none_rs, oldv, csr_wr_val);
@@ -368,7 +434,14 @@ module Csr #(
                     12'h144: begin
                         if (!side_effect_none_rs) csr_mip[3] <= newv[1];
                     end
-                    12'h180: csr_satp     <= pack_satp_bare(newv);
+                    // Sv39 uses all 44 PPN bits; ASIDs are retained even though
+                    // the walker has no TLB. Unsupported MODE writes have no effect.
+                    12'h180: begin
+                        if (newv[63:60] == 4'd0)
+                            csr_satp <= 64'b0;
+                        else if (newv[63:60] == 4'd8)
+                            csr_satp <= newv;
+                    end
 
                     // ===== Machine =====
                     12'h300: csr_mstatus  <= (newv & ~64'h0000_000F_0000_0000) | 64'h0000_000A_0000_0000;                    // mstatus

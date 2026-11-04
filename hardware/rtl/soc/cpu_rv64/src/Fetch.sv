@@ -9,6 +9,7 @@ module Fetch #(
     input  logic [63:0] fetch_address,
     output logic        mmu_valid,
     input  logic        mmu_ready,
+    input  logic        access_fault,
     output logic [63:0] vaddr,
     input  logic [63:0] paddr,
     output logic        program_mem_burst_mode, program_mem_read_valid,
@@ -55,7 +56,8 @@ module Fetch #(
                 end
                 TRANSLATE: if (mmu_ready) begin
                     physical_address <= paddr;
-                    state <= REQUEST;
+                    // A failed translation must never issue a physical read.
+                    state <= access_fault ? FINISH : REQUEST;
                 end
                 REQUEST: if (program_mem_req_ready) begin
                     program_mem_read_address <= BURST_MODE

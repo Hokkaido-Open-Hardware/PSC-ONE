@@ -16,8 +16,8 @@ module PSC_ONE_RV64_core #(
     parameter PROTECT_ADDR         = 64'h0001_0000,
 `endif
     // Exclusive accelerator selection (default: existing NPU).
-    parameter bit ENABLE_NPU       = 1'b1,
-    parameter bit ENABLE_LPU       = 1'b0,
+    parameter bit ENABLE_NPU       = 1'b0,
+    parameter bit ENABLE_LPU       = 1'b1,
     // Parameter
     parameter integer ADDR_WIDTH   = 64,
     parameter integer ID_WIDTH     = 1,
@@ -307,7 +307,8 @@ module PSC_ONE_RV64_core #(
     // sa controll.
     wire sa_busy;
     wire sa_done;
-    assign csr_SA_STATUS = {62'b0, sa_busy, sa_done};
+    wire [31:0] sa_status_extra;
+    assign csr_SA_STATUS = {32'b0, sa_status_extra} | {62'b0, sa_busy, sa_done};
     wire sa_start         = csr_SA_CTRL[0];
     wire sa_state_reset   = csr_SA_CTRL[1];
     wire sa_clear         = csr_SA_CTRL[2];
@@ -385,6 +386,7 @@ module PSC_ONE_RV64_core #(
 
         // status
         .busy               (sa_busy),
+        .status_extra       (sa_status_extra),
         .done               (sa_done)
     );
 

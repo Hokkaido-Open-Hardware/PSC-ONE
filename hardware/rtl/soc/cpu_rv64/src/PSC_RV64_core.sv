@@ -192,6 +192,7 @@ module PSC_RV64_core #(
 
     assign trap_stval = i_pf_event ? pc :
                         d_pf_event ? data_fault_vaddr :
+                        decoder_ctrl.raise_illegal_instruction ? decoder_ctrl.imm :
                                64'h0;
 
     assign trap_scause =
@@ -256,7 +257,8 @@ module PSC_RV64_core #(
     assign csr_SA_ADDR_C[63:PERIPHERAL_CSR_WIDTH] = '0;
     assign csr_CPU_MON_CTRL[63:PERIPHERAL_CSR_WIDTH] = '0;
 
-    Csr #(.PERIPHERAL_CSR_WIDTH(PERIPHERAL_CSR_WIDTH)) u_csr (
+    Csr #(.PERIPHERAL_CSR_WIDTH(PERIPHERAL_CSR_WIDTH),
+          .PIPELINED_READ(1)) u_csr (
         .clock              (clock),
         .reset_n            (reset_n),
         .csr_enb            (csr_enb),

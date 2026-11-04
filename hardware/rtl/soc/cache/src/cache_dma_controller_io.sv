@@ -347,8 +347,10 @@ module cache_dma_controller_io #(
     wire selected_write = !select_mmu && (select_sa
         ? (sa_req_slot_valid ? sa_rw_latch : sa_rw)
         : (cpu_req_slot_valid ? cpu_rw_latch : cpu_rw));
-    wire selected_rw_double = !select_mmu && !select_sa &&
-        (cpu_req_slot_valid ? cpu_rw_double_latch : cpu_rw_double);
+    // Sv39 instruction walkers require the entire 64-bit PTE, including its
+    // high PPN/reserved bits. The RV32/Sv32 port remains a 32-bit access.
+    wire selected_rw_double = select_mmu ? (CPU_DATA_WIDTH == 64) :
+        !select_sa && (cpu_req_slot_valid ? cpu_rw_double_latch : cpu_rw_double);
     wire [63:0] selected_wdata = select_sa
         ? (sa_req_slot_valid ? sa_data_latch : sa_data)
         : (cpu_req_slot_valid ? cpu_data_latch : cpu_data);

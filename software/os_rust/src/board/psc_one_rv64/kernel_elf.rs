@@ -23,7 +23,8 @@ pub unsafe fn elf_is_running() -> bool {
 /// Switch the owner page table and synchronize both address translation and instruction fetch.
 unsafe fn activate(table: *mut u64) {
     (*CURRENT).page_table = table;
-    asm!("fence rw, rw","sfence.vma","csrw satp, {}","sfence.vma","fence.i",in(reg) super::sv39::satp(table as u64));
+    super::sv39::activate(table as u64);
+    asm!("fence.i");
 }
 
 /// Validate first, populate fixed ELF pages, and save the shell frame before entering user code.

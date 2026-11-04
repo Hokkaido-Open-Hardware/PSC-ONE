@@ -7,14 +7,16 @@ import re
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--os", type=Path, required=True)
+parser.add_argument("--build", type=Path, help="Firmware output directory (default: OS/build)")
 parser.add_argument("--bootrom", type=Path, required=True)
 parser.add_argument("--bootloader", type=Path, required=True, help="FAT32 loader ROM for SD boot")
 parser.add_argument("--run", type=Path, required=True)
 args = parser.parse_args()
+build = args.build if args.build is not None else args.os / "build"
 
 # Validate every input before replacing any staged image. SD image word counts
 # must match the linked image sizes; only boot ROMs have RTL capacities.
-config = (args.os / "build" / "image_layout.h").read_text()
+config = (build / "image_layout.h").read_text()
 expected = {}
 for name in ("kernel", "user"):
     match = re.search(rf"^#define IMAGE_{name.upper()}_WORDS (\d+)u$", config, re.M)
@@ -24,8 +26,8 @@ for name in ("kernel", "user"):
 images = {}
 inputs = [
     ("bootrom", args.bootrom, 128),
-    ("kernel", args.os / "build" / "kernel.mem", expected["kernel"]),
-    ("user", args.os / "build" / "user.mem", expected["user"]),
+    ("kernel", build / "kernel.mem", expected["kernel"]),
+    ("user", build / "user.mem", expected["user"]),
     ("bootloader_fat32", args.bootloader, 4500),
 ]
 for name, source, limit in inputs:

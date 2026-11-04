@@ -6,6 +6,7 @@ impl BootSd {
     pub unsafe fn init() -> Result<Self, i32> {
         mmio_w32(crate::board::SD_BASE + 0x8, 4);
         delay(100);
+        crate::s_print!("SD INIT start\n");
         mmio_w32(crate::board::SD_BASE + 0x8, 1);
         delay(100);
         let mut timeout = 50000;
@@ -13,6 +14,7 @@ impl BootSd {
             delay(100);
             timeout -= 1;
             if timeout == 0 {
+                crate::s_print!("SD INIT TIMEOUT\n");
                 return Err(-1);
             }
         }
@@ -41,18 +43,36 @@ impl BlockDevice for BootSd {
                 delay(50);
                 mmio_w32(crate::board::SD_BASE + 0x4, lba);
                 mmio_w32(crate::board::SD_BASE + 0x8, 2);
-                Self::wait(4, true)?;
-                Self::wait(4, false)?;
+                Self::wait(4, true).map_err(|e| {
+                    crate::s_print!("SD READ START TIMEOUT\n");
+                    e
+                })?;
+                Self::wait(4, false).map_err(|e| {
+                    crate::s_print!("SD READ TIMEOUT lba={:08X}\n", lba);
+                    e
+                })?;
                 delay(20);
                 for chunk in b.chunks_exact_mut(4) {
-                    Self::wait(8, true)?;
+                    Self::wait(8, true).map_err(|e| {
+                        crate::s_print!("FIFO EMPTY TIMEOUT lba={:08X}\n", lba);
+                        e
+                    })?;
                     chunk.copy_from_slice(&mmio_r32(crate::board::SD_BASE).to_le_bytes());
                 }
-                if sd_crc16(b) == (mmio_r32(crate::board::SD_BASE + 0x8) >> 16) as u16 {
+                let crc_sw = sd_crc16(b);
+                let crc_hw = (mmio_r32(crate::board::SD_BASE + 0x8) >> 16) as u16;
+                if crc_sw == crc_hw {
                     return Ok(());
                 }
+                crate::s_print!(
+                    "CRC NG lba={:08X} sw={:08X} hw={:08X}\n",
+                    lba,
+                    crc_sw,
+                    crc_hw
+                );
                 delay(100);
             }
+            crate::s_print!("CRC FAILED lba={:08X}\n", lba);
             Err(-1)
         }
     }
@@ -65,6 +85,7 @@ impl BlockDevice for BootSd {
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 /// Load CRC-verified KERNEL.MEM words, then jump to the supervisor entry address.
 pub unsafe extern "C" fn bootloader_main() -> ! {
+    crate::s_print!("bootloader FAT32 start\n");
     let mut dev = BootSd::init().expect("SD init failed");
     let fs = super::boot_fat32::BootFat32::mount(&mut dev).expect("FAT32 mount failed");
     // Bound every store to the board kernel region.
@@ -75,6 +96,17 @@ pub unsafe extern "C" fn bootloader_main() -> ! {
     let words = fs
         .load_mem_file_bounded(&mut dev, "KERNEL.MEM", dst)
         .expect("KERNEL.MEM load failed");
-    crate::s_print!("kernel words={}\nUSER.MEM deferred to kernel\n", words);
+    crate::s_print!("kernel words={:08X}\n", words);
+    for i in 0..3 {
+        crate::s_print!(
+            "kernel[{}]={:08X}\n",
+            i,
+            dst.as_ptr().add(i).read_volatile()
+        );
+    }
+    crate::s_print!(
+        "USER.MEM deferred to kernel\nJUMP TO {:08X}\n",
+        crate::board::KERNEL_BASE
+    );
     core::arch::asm!("fence rw, rw","fence.i","jr {entry}",entry=in(reg) crate::board::KERNEL_BASE,options(noreturn));
 }

@@ -1,9 +1,8 @@
 `timescale 1ns/1ps
-// Provisional Sv39 walker, based on cpu_v1/src/MMU.sv.
-// Profile: Sv39 + Svade, SUM=0, MXR=0, no translation/PTE cache.
+// Sv39 walker, based on cpu_v1/src/MMU.sv.
+// Profile: Sv39 + Svade, SUM/MXR, no translation/PTE cache.
 // priv_mode must be the effective privilege (resolve data MPRV externally).
 // No PMP/PMA or bus-error input exists yet; these need access-fault plumbing.
-// satp CSR is still Bare-only in the surrounding core: integration is TODO.
 //
 // MMU_enb is a one-cycle request, accepted only while idle. Context is latched.
 // mem_addr is stable before mem_valid. mem_req_ready grants a one-cycle
@@ -17,6 +16,7 @@ module MMU (
     input logic clk, reset_n, MMU_enb,
     input logic [63:0] vaddr, satp,
     input logic [1:0] priv_mode,
+    input logic status_sum, status_mxr,
     input logic access_r, access_w, access_x,
     input logic mem_req_ready,
     input logic [63:0] mem_rdata,
@@ -39,7 +39,7 @@ module MMU (
     logic [43:0] root_ppn;
     logic [3:0] req_mode;
     logic [1:0] req_priv, level;
-    logic req_r, req_w, req_x;
+    logic req_r, req_w, req_x, req_sum, req_mxr;
     logic [63:0] pte, translated_paddr;
     logic fence_pending;
     logic pte_leaf, pte_invalid, permission_ok, misaligned_leaf;
@@ -57,9 +57,10 @@ module MMU (
     assign pte_leaf = pte[1] || pte[3];
     assign pte_invalid = !pte[0] || (!pte[1] && pte[2]) || (|pte[63:54]);
     assign permission_ok =
-        (!req_r || pte[1]) && (!req_w || pte[2]) && (!req_x || pte[3]) &&
+        (!req_r || pte[1] || (req_mxr && pte[3])) &&
+        (!req_w || pte[2]) && (!req_x || pte[3]) &&
         (((req_priv == PRIV_U) && pte[4]) ||
-         ((req_priv == PRIV_S) && !pte[4])) &&
+         ((req_priv == PRIV_S) && (!pte[4] || (req_sum && !req_x)))) &&
         pte[6] && (!req_w || pte[7]); // Svade: fault instead of updating A/D
     assign misaligned_leaf = ((level == 2'd2) && (|pte[27:10])) ||
                              ((level == 2'd1) && (|pte[18:10]));
@@ -94,6 +95,8 @@ module MMU (
             req_r <= 1'b0;
             req_w <= 1'b0;
             req_x <= 1'b0;
+            req_sum <= 1'b0;
+            req_mxr <= 1'b0;
             level <= 2'd2;
             pte <= '0;
             fence_pending <= 1'b0;
@@ -122,6 +125,8 @@ module MMU (
                             req_r <= access_r;
                             req_w <= access_w;
                             req_x <= access_x;
+                            req_sum <= status_sum;
+                            req_mxr <= status_mxr;
                             translated_paddr <= '0;
                             state <= S_START;
                         end

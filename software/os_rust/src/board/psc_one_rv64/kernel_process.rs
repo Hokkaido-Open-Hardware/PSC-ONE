@@ -191,7 +191,8 @@ pub unsafe fn yield_now() {
     }
     let prev = CURRENT;
     CURRENT = next;
-    asm!("sfence.vma","csrw satp, {satp}","sfence.vma","csrw sscratch, {scratch}",satp=in(reg) super::sv39::satp((*next).page_table as u64),scratch=in(reg) addr_of_mut!((*next).stack.0).cast::<u8>().add(8192));
+    super::sv39::activate((*next).page_table as u64);
+    asm!("csrw sscratch, {scratch}",scratch=in(reg) addr_of_mut!((*next).stack.0).cast::<u8>().add(8192));
     switch_context(addr_of_mut!((*prev).sp), addr_of!((*next).sp));
 }
 
@@ -219,7 +220,7 @@ pub unsafe fn schedule_from_machine_trap(context: &mut MachineContext) {
     assert!((*next).context_valid != 0, "invalid process context");
     CURRENT = next;
     *context = (*next).context;
-    asm!("sfence.vma","csrw satp, {}","sfence.vma",in(reg) super::sv39::satp((*next).page_table as u64));
+    super::sv39::activate((*next).page_table as u64);
 }
 
 /// Install the full M-mode trap entry once, using the trusted MBIOS service.

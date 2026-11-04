@@ -8,7 +8,7 @@
 
 module PSC_SDCard #(
     parameter ADDR_WIDTH        = 32,
-    parameter FAST_SCK_MHz      = 10,             // 5MHz〜20MHz
+    parameter FAST_SCK_MHz      = 5,              // 5MHz〜20MHz
     parameter CLK_FREQ_MHz      = 80,
     parameter INIT_80CLK        = 80,
     parameter PROTECT_ADDRESS   = 32'h0000_1000,  // > 4098

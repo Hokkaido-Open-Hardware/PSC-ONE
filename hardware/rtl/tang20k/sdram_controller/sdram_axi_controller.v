@@ -717,8 +717,14 @@ module sdram_axi_controller #(
                             default: wbuf7 <= sel_wdata;
                         endcase
 
+                        // Gowin EDA V1.9.12.03 synthesis bug workaround:
+                        // In the multiport configuration, (sel_wstrb != 4'b1111)
+                        // was synthesized as constant 1 even when sel_wstrb=4'hf,
+                        // causing a writeback bus fault (RTL simulation passed).
+                        // Reduction NAND preserves the full-byte-enable check
+                        // for this 32-bit interface and avoids the miscompilation.
                         w_err <= w_err ||
-                                 (sel_wstrb != 4'b1111) ||
+                                 (~&sel_wstrb) ||
                                  (sel_wlast != (w_cnt == (w_beats_total - 1'b1)));
 
                         if (w_cnt == (w_beats_total - 1'b1)) begin

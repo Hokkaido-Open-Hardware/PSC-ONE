@@ -429,6 +429,9 @@ module Decorder #(
                                     raise_illegal_instruction_mw |
                                     raise_illegal_instruction_alu | illegal_pulp;
         if (decoder_ctrl_next.raise_illegal_instruction) begin
+            // Preserve the instruction actually delivered by Fetch for stval.
+            // Illegal instructions never consume the ALU immediate.
+            decoder_ctrl_next.imm = {32'b0, opcode};
             decoder_ctrl_next.rf_wen = 1'b0;
             decoder_ctrl_next.is_load = 1'b0;
             decoder_ctrl_next.is_store = 1'b0;

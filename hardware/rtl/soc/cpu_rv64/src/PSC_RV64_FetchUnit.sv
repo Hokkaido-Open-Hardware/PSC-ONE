@@ -200,7 +200,7 @@ module PSC_RV64_FetchUnit #(
     // Fetch
     logic opcode_read_valid, fetch_done, fetch_busy;
     logic [31:0] opcode_read_data;
-    logic mmu_valid, i_mmu_done;
+    logic mmu_valid, i_mmu_done, i_mmu_fault;
     logic [63:0] vaddr, i_paddr;
     logic [63:0] opcode_read_pc;
 
@@ -214,6 +214,7 @@ module PSC_RV64_FetchUnit #(
         .fetch_address            (fetch_pc),
         .mmu_valid                (mmu_valid),
         .mmu_ready                (i_mmu_done),
+        .access_fault             (i_mmu_fault),
         .vaddr                    (vaddr),
         .paddr                    (i_paddr),
         .program_mem_burst_mode   (program_mem_burst_mode),
@@ -238,7 +239,11 @@ module PSC_RV64_FetchUnit #(
         .clock                    (clock),
         .reset_n                  (reset_n),
         .cpu_stop                 (cpu_stop),
-        .fetch_valid              (fetch_valid),
+        // Without fault tokens in the FIFO, translated fetches must be demand
+        // requests after all older instructions retire. A speculative walk
+        // must not trap for an instruction on a discarded path.
+        .fetch_valid              (fetch_valid && ((csr_satp[63:60] == 0) ||
+                                   (!execute_task_busy && !fifo_req_ready))),
         .fetch_ready              (fetch_ready),
         .execute_task_busy        (execute_task_busy),
         .fifo_flush               (fifo_flush),
@@ -307,6 +312,7 @@ module PSC_RV64_FetchUnit #(
     // =====================================
     // Instruction-side MMU
     logic i_mode_translate;
+    assign i_pf = i_mmu_fault && i_mmu_done;
 
     MMU u_mmu_i(
         .clk                      (clock),
@@ -315,6 +321,8 @@ module PSC_RV64_FetchUnit #(
         .vaddr                    (vaddr),
         .satp                     (csr_satp),
         .priv_mode                (priv_mode),
+        .status_sum               (1'b0),
+        .status_mxr               (1'b0),
         .access_r                 (1'b0),
         .access_w                 (1'b0),
         .access_x                 (1'b1),
@@ -326,7 +334,7 @@ module PSC_RV64_FetchUnit #(
         .cpu_state_done           (cpu_state_done),
         .sfence_vma               (fifo_flush && is_sfence_vma),
         .paddr                    (i_paddr),
-        .page_fault               (i_pf),
+        .page_fault               (i_mmu_fault),
         .mode_translate                (i_mode_translate),
         .mmu_done                 (i_mmu_done)
     );
