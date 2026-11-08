@@ -20,6 +20,21 @@
 # FST Dump
 #make -f Makefile.pscos simulate_PSCOS DUMP_FST=1
 
+# GATE SIM
+#make -f Makefile.pscos simulate_PSCOS SIM_LEVEL=GATE
+
+# GATE SIM (SDF; Questa/ModelSim required)
+#make -f Makefile.pscos simulate_PSCOS SIM_LEVEL=TIMING
+# Optional: MODELSIM_BIN_DIR=/path/to/bin SDF_CORNER=max (default: typ)
+# GATE/TIMING boot from SD; the CPU and boot ROM come from the netlist.
+# Icarus 12 supports scalar SDF IOPATH delays, but not this full Gowin SDF.
+# See ../../../report/pscos-gate-timing-20261107.md for measured limitations.
+
+SIM_LEVEL ?= RTL
+ifeq ($(filter $(SIM_LEVEL),RTL GATE TIMING),)
+$(error SIM_LEVEL=$(SIM_LEVEL) is invalid; use RTL, GATE or TIMING)
+endif
+
 # ============================================================
 #  MODE で一括切り替え（verilator / icarus）
 # ============================================================
@@ -347,6 +362,136 @@ PSCOS_LOADER_BUILD = $(PSCOS_BUILD_ROOT)/loader
 # Allow Rust firmware builds to reuse source/tool configuration without C targets.
 ifndef PSCOS_CONFIG_ONLY
 
+# ============================================================
+# GATE / TIMING: netlist simulation (RTL targets follow below)
+# ============================================================
+ifneq ($(filter $(SIM_LEVEL),GATE TIMING),)
+# Gate-level configuration for SIM_LEVEL=GATE / TIMING.
+# Run from hardware/sim. The CPU and boot ROM are fixed by the Gowin netlist;
+# both modes boot the C OS from SD, without RTL hierarchical memory loading.
+PSCOS_SIM_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+GOWIN_IMPL ?= /home/haruhiko/Program/Gowin/PSC-ONE_RV32/impl
+GATE_CLOCK_PERIOD_NS ?= 37.038
+GATE_UART_BIT_NS ?= 8568
+GATE_SDRAM_TAC_NS ?= 5.4
+GATE_SDRAM_INIT_ZERO ?= 1
+GATE_RUN_DIR ?= $(PSCOS_SIM_DIR)/build/pscos-netlist/$(SIM_LEVEL)/$(if $(SIM_USER),$(SIM_USER),full)
+PSCOS_GATE_BUILD := $(abspath $(GATE_RUN_DIR))/sim_build
+PSCOS_GATE_OS_BUILD := $(abspath $(GATE_RUN_DIR))/os
+
+ifeq ($(SIM_LEVEL),GATE)
+GATE_NETLIST ?= $(GOWIN_IMPL)/gwsynthesis/PSC-ONE_RV32.vg
+GOWIN_SIMLIB ?= /opt/gowin/IDE/simlib/gw2a/prim_sim.v
+# Existing functional RV32 model workaround; see the SDRAM hold report.
+# No routing delays are present in the synthesis netlist.
+GATE_SDRAM_TOH_NS ?= 5.0
+PSCOS_GATE_SIM := icarus
+PSCOS_GATE_COMPILE_ARGS := -g2012 \
+	-PPSC_ONE_Chip_gate_sim.CLOCK_PERIOD_NS=$(GATE_CLOCK_PERIOD_NS) \
+	-PPSC_ONE_Chip_gate_sim.SDRAM_TAC_NS=$(GATE_SDRAM_TAC_NS) \
+	-PPSC_ONE_Chip_gate_sim.SDRAM_TOH_NS=$(GATE_SDRAM_TOH_NS)
+ifeq ($(GATE_SDRAM_INIT_ZERO),1)
+PSCOS_GATE_COMPILE_ARGS += -DINIT_CLEAR_MEM_BANKS
+endif
+ifeq ($(DUMP_FST),1)
+PSCOS_GATE_COMPILE_ARGS += -DDUMP_FST
+PSCOS_GATE_PLUSARGS := -fst
+endif
+else
+GATE_NETLIST ?= $(GOWIN_IMPL)/pnr/PSC-ONE_RV32.vo
+GATE_SDF ?= $(GOWIN_IMPL)/pnr/PSC-ONE_RV32.sdf
+GOWIN_SIMLIB ?= /opt/gowin/IDE/simlib/gw2a/prim_tsim.v
+# Use the original SDRAM timings for post-route simulation.
+GATE_SDRAM_TOH_NS ?= 3.0
+SDF_CORNER ?= typ
+ifeq ($(filter $(SDF_CORNER),min typ max),)
+$(error SDF_CORNER=$(SDF_CORNER) is invalid; use min, typ or max)
+endif
+ifeq ($(DUMP_FST),1)
+$(error TIMING uses Questa/ModelSim; use WAVES=1 for WLF instead of DUMP_FST=1)
+endif
+# Icarus 12 cannot compile Gowin's bit-selected specify paths, and cannot
+# provide complete SDF timing checks. Do not silently run a partial SDF model.
+PSCOS_GATE_SIM := questa-compat
+PSCOS_GATE_COMPILE_ARGS :=
+ifeq ($(GATE_SDRAM_INIT_ZERO),1)
+PSCOS_GATE_COMPILE_ARGS += +define+INIT_CLEAR_MEM_BANKS
+endif
+PSCOS_GATE_SIM_ARGS := -t 1ps \
+	-gCLOCK_PERIOD_NS=$(GATE_CLOCK_PERIOD_NS) \
+	-gSDRAM_TAC_NS=$(GATE_SDRAM_TAC_NS) \
+	-gSDRAM_TOH_NS=$(GATE_SDRAM_TOH_NS) \
+	-sdf$(SDF_CORNER) /PSC_ONE_Chip_gate_sim/u_chip=$(abspath $(GATE_SDF))
+PSCOS_GATE_SIM_DEPS := $(abspath $(GATE_SDF))
+endif
+
+# The SDRAM model inherits the harness timescale: preserve this source order.
+PSCOS_GATE_SOURCES := $(abspath $(GATE_NETLIST)) $(abspath $(GOWIN_SIMLIB)) \
+	$(PSCOS_SIM_DIR)/testbench/PSC_ONE_Chip_gate_sim.sv \
+	$(abspath $(PSCOS_SIM_DIR)/../rtl/model/SDRAM_model/GW2AR_sdram.v) \
+	$(abspath $(PSCOS_SIM_DIR)/../rtl/model/SDCARD_model/sdcard_spi_model.v)
+
+.PHONY: simulate_PSCOS simulate_SD_PSCOS check_pscos_gate_inputs \
+	prepare_pscos_gate pscos_gate_config run_pscos_gate
+
+# Keep the same default entry point as the RTL Makefile.
+simulate_PSCOS: prepare_pscos_gate
+	$(MAKE) -f $(PSCOS_SIM_DIR)/Makefile.pscos run_pscos_gate
+
+simulate_SD_PSCOS: simulate_PSCOS
+
+check_pscos_gate_inputs:
+	@test -r "$(GATE_NETLIST)" || { echo "Missing GATE_NETLIST: $(GATE_NETLIST)"; exit 1; }
+	@test -r "$(GOWIN_SIMLIB)" || { echo "Missing GOWIN_SIMLIB: $(GOWIN_SIMLIB)"; exit 1; }
+	@test -f "$(COCOTB_MAKEFILE)" || { echo "cocotb-config is not available; activate myenv."; exit 1; }
+ifeq ($(SIM_LEVEL),TIMING)
+	@test -r "$(GATE_SDF)" || { echo "Missing GATE_SDF: $(GATE_SDF)"; exit 1; }
+	@command -v $(if $(MODELSIM_BIN_DIR),$(MODELSIM_BIN_DIR)/)vsim >/dev/null && \
+	 command -v $(if $(MODELSIM_BIN_DIR),$(MODELSIM_BIN_DIR)/)vlog >/dev/null || \
+	 { echo "TIMING requires Questa/ModelSim (vsim/vlog). Set MODELSIM_BIN_DIR to its bin directory. Icarus 12 cannot run this Gowin timing library."; exit 1; }
+else
+	@command -v iverilog >/dev/null && command -v vvp >/dev/null
+endif
+
+prepare_pscos_gate: check_pscos_gate_inputs
+	$(MAKE) -C $(PSCOS_SIM_DIR)/../../software/os MODE=fpga_mem \
+		Build=$(PSCOS_GATE_OS_BUILD) KERNEL_USER_FROM_SD=1 \
+		$(if $(SIM_USER),SIM_USER=$(SIM_USER),) fpga_mem
+	$(MAKE) -C $(PSCOS_SIM_DIR) -f Makefile.sdcard \
+		INPUT_DIR=$(PSCOS_GATE_OS_BUILD) SDCARD_DIR=$(abspath $(GATE_RUN_DIR))/sdcard all
+
+# Track settings and source selection as well as file timestamps.
+pscos_gate_config: check_pscos_gate_inputs
+	@python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s="\n".join(sys.argv[2:])+"\n"; p.parent.mkdir(parents=True,exist_ok=True); p.write_text(s) if not p.exists() or p.read_text()!=s else None' "$(PSCOS_GATE_BUILD)/gate.config" "$(PSCOS_GATE_SOURCES)" "$(PSCOS_GATE_COMPILE_ARGS)" "$(PSCOS_GATE_SIM_ARGS)"
+
+# Re-run an already prepared SD image without rebuilding the OS.
+run_pscos_gate: pscos_gate_config
+	@test -r "$(GATE_RUN_DIR)/sdcard/sdcard.hex" || { echo "Run simulate_PSCOS first to prepare the SD image."; exit 1; }
+	mkdir -p $(GATE_RUN_DIR)/wave $(GATE_RUN_DIR)/log_uart
+	@echo "[PSC-OS $(SIM_LEVEL)] netlist=$(GATE_NETLIST) simulator=$(PSCOS_GATE_SIM)"
+	@echo "[PSC-OS $(SIM_LEVEL)] Boot ROM/CPU are fixed by the netlist; C OS boots from SD."
+	@echo "[PSC-OS $(SIM_LEVEL)] SDRAM tAC=$(GATE_SDRAM_TAC_NS) ns, tOH=$(GATE_SDRAM_TOH_NS) ns"
+ifeq ($(SIM_LEVEL),TIMING)
+	@echo "[PSC-OS TIMING] SDF=$(GATE_SDF) corner=$(SDF_CORNER) instance=/PSC_ONE_Chip_gate_sim/u_chip"
+endif
+	cd $(GATE_RUN_DIR) && \
+	PYTHONPATH=$(PSCOS_SIM_DIR):$(PYTHONPATH) \
+	COCOTB_TEST_MODULES=cocotb_tb.psc_os.test_gate_rv32 \
+	UART_BIT_NS=$(GATE_UART_BIT_NS) GATE_CLOCK_PERIOD_NS=$(GATE_CLOCK_PERIOD_NS) \
+	COCOTB_RESULTS_FILE=$(PSCOS_GATE_BUILD)/results.xml \
+	PSC_UART_LOGFILE=$(abspath $(GATE_RUN_DIR))/log_uart/uart.log \
+	TOPLEVEL=PSC_ONE_Chip_gate_sim TOPLEVEL_LANG=verilog \
+	SIM=$(PSCOS_GATE_SIM) SIM_BUILD=$(PSCOS_GATE_BUILD) \
+	VERILOG_SOURCES="$(PSCOS_GATE_SOURCES)" \
+	CUSTOM_COMPILE_DEPS="$(PSCOS_GATE_BUILD)/gate.config" \
+	CUSTOM_SIM_DEPS="$(PSCOS_GATE_SIM_DEPS)" \
+	COMPILE_ARGS="$(PSCOS_GATE_COMPILE_ARGS)" \
+	SIM_ARGS="$(PSCOS_GATE_SIM_ARGS)" EXTRA_ARGS= \
+	COCOTB_PLUSARGS="$(PSCOS_GATE_PLUSARGS)" \
+	$(MAKE) --silent -f $(COCOTB_MAKEFILE)
+
+else
+
 simulate_PSCOS: MODE = verilator
 simulate_PSCOS: SIM = verilator
 simulate_PSCOS: VDEF = -DFST_UART_MODE -DPSCOS_SIM -DPSCOS_NO_SDCARD
@@ -442,6 +587,8 @@ simulate_SD_PSCOS:
 	COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS) $(VDEF)" \
 	EXTRA_ARGS="$(EXTRA_ARGS)" \
 	$(MAKE) --silent -f $(COCOTB_MAKEFILE)
+
+endif # RTL / GATE / TIMING
 
 # ============================================================
 # PSC-OS preemptive two-process scheduler timer-IRQ test
