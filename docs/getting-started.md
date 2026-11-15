@@ -60,7 +60,7 @@ Gowin EDA can be used to synthesize, place-and-route, generate the FPGA bitstrea
 Clone the PSC-ONE repository:
 
 ```bash
-git clone https://github.com/QPSC-Design/PSC-ONE.git
+git clone https://github.com/Hokkaido-Open-Hardware/PSC-ONE.git
 cd PSC-ONE
 ```
 

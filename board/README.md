@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/QPSC-Design/PSC-ONE">
+  <a href="https://github.com/Hokkaido-Open-Hardware/PSC-ONE">
     <img src="../docs/images/PSC-ONE_Logo.png" width="640" alt="PSC-ONE Logo">
   </a>
 </p>

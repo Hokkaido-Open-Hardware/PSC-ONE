@@ -1,36 +1,36 @@
 // ============================================================================
-//  PSC_ONE_Chip  —  PSC-ONE SoC Top Module
+//  PSC_ONE_Chip  —  PSC-ONE SoC Top Module for Tang Mega 138K
 // ----------------------------------------------------------------------------
 //  Author : NISHIHARU
 //  File   : PSC_ONE_Chip.v
 //
 //  Brief
-//      PSC-ONE プロジェクト向け SoC トップレベルモジュール。
-//      RV32 CPU コア、SDRAM コントローラ、キャッシュ、Boot ROM、
-//      UART、Timer、LCD、SD Card、I2S、および SynapEngine AI
-//      アクセラレータを統合する。
+//      Tang Mega 138K 向け PSC-ONE SoC トップレベルモジュール。
+//      既存の PSC-ONE SoC を、外部 DDR3 メモリを使用する構成へ移植する。
 //
-//      本モジュールは FPGA 実装およびシミュレーションの双方を対象とし、
-//      外部 SDR SDRAM と各種メモリマップド I/O を接続する。
-//      また cocotb テストベンチからアクセス可能な AXI インタフェースを
-//      提供し、メモリ初期化やデバッグを容易にする。
+//      Gowin PLL および DDR3 Memory Interface IP を接続し、
+//      DDR3 のクロック生成、初期化、および物理インタフェースを構成する。
+//      CPU、キャッシュ、Boot ROM、各種周辺回路との統合に向けて、
+//      Program / Data / DMA / Boot ROM 用の AXI 配線を定義する。
 //
 //  Main Components
-//      - PSC RV32 CPU Core
-//      - SDR SDRAM Controller
-//      - DMA Cache Controller
-//      - Boot AXI Interface
-//      - UART
-//      - Timer
-//      - LCD Controller
-//      - SD Card Interface
-//      - I2S Audio Interface
-//      - SynapEngine AI Accelerator
+//      - Gowin PLL
+//      - DDR3 Memory Interface IP
+//      - Program / Data / DMA / Boot ROM AXI Wiring
+//      - UART Loopback Test
+//      - LED Output Test
+//
+//  Migration Status
+//      - DDR3 Memory Interface IP の接続を追加
+//      - 旧 SDR SDRAM コントローラと配線が残存
+//      - AXI と DDR3 ユーザーインタフェース間の接続は未実装
+//      - PSC_ONE_SOC のインスタンスは現在コメントアウト
+//      - UART は RX → TX のループバック、LED は固定パターンを出力
 //
 //  Notes
-//      - GW2AR 内蔵 SDR SDRAM (32bit) 対応
-//      - PSC-ONE FPGA プラットフォーム向け
-//      - cocotb / Verilator / Icarus Verilog シミュレーション対応
+//      - Tang Mega 138K FPGA プラットフォーム向け
+//      - DDR3 の信号幅とクロック構成は生成した IP の設定に依存
+//      - シミュレーション用の条件分岐は移植に合わせて整備が必要
 // ============================================================================
 `timescale 1ns / 1ps
 
@@ -131,6 +131,12 @@ module PSC_ONE_Chip #(
     // ------------------ LEDs ------------------
     output wire [5:0]   PSCONE_LED_OUT
 );
+
+    // UART TEST
+    assign UART_TXD = UART_RXD;
+
+    // LED TEST
+    assign led = 8'b1010_1010;
 
     // --------------------------------
     // define 確認
@@ -643,6 +649,7 @@ module PSC_ONE_Chip #(
         .sdram_init_fin     (sdram_init_fin)
     );
 
+/*
     //==========================================================
     // PSC-ONE SOC TOP
     //==========================================================
@@ -660,8 +667,8 @@ module PSC_ONE_Chip #(
         .Boot_rom_done      (Boot_rom_done),
 
         // UART
-        .UART_RXD           (UART_RXD),
-        .UART_TXD           (UART_TXD),
+        .UART_RXD           (),
+        .UART_TXD           (),
 
         // I2C
         .PSCONE_SCL         (lv_input[2]),
@@ -875,6 +882,7 @@ module PSC_ONE_Chip #(
         .bt_axi_rvalid      (bt_axi_rvalid),
         .bt_axi_rready      (bt_axi_rready)
     );
+*/
 
 endmodule
 

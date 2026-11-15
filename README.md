@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/QPSC-Design/PSC-ONE">
+  <a href="https://github.com/Hokkaido-Open-Hardware/PSC-ONE">
     <img src="docs/images/PSC-ONE_Logo.png" width="640" alt="PSC-ONE Logo">
   </a>
 </p>
@@ -76,7 +76,7 @@ The PSC-ONE boot logo rendered on the actual FPGA hardware during system startup
 
 ## What is PSC-ONE?
 
-PSC-ONE is an open-source full-stack RISC-V SoC project developed by QPSC-Design.
+PSC-ONE is an open-source full-stack RISC-V SoC project developed by Haruhiko Nishimura (Hokkaido-Open-Hardware).
 
 It aims to build a fully custom edge computing platform from the ground up, including the following components:
 

@@ -6265,7 +6265,7 @@
 			(justify left bottom)
 		)
 	)
-	(gr_text "QPSC-Design"
+	(gr_text "Haruhiko Nishimura (Hokkaido-Open-Hardware)"
 		(at 71.755 68.58 0)
 		(layer "F.SilkS")
 		(uuid "6d40f79e-9c7c-48fa-bcc8-06f9723a2ef2")

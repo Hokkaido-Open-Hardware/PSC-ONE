@@ -1714,4 +1714,4 @@ The `PSC_OS>` prompt indicates that this recorded run reached the shell.
 
 Hardware design files, schematics, PCB layouts, and related documentation are licensed under CERN-OHL-S v2.
 
-Copyright (c) 2026 QPSC-Design
+Copyright (c) 2026 Haruhiko Nishimura (Hokkaido-Open-Hardware)

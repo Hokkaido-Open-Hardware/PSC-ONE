@@ -1136,4 +1136,4 @@ Same as the PSC-ONE project.
 
 ## Author
 
-QPSC-Design
+Haruhiko Nishimura (Hokkaido-Open-Hardware)
