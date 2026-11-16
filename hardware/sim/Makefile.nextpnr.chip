@@ -136,13 +136,13 @@ endif
 # ============================================================
 
 CACHE_DIR := ../rtl/soc/cache/src
-MMIO_DIR  := ../rtl/soc/mmio/MMIO
+GPIO_DIR  := ../rtl/soc/mmio/GPIO
 UART_DIR  := ../rtl/soc/mmio/UART
 LED_DIR   := ../rtl/soc/mmio/LED
 
 CPU_FILES = \
 	$(SELECTED_CPU_CORE_FILES) \
-	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
+	$(GPIO_DIR)/PSC_RV32_GPIO.v \
 	$(UART_DIR)/PSC_RV32IS_UART.v \
 	$(LED_DIR)/PSC_RV32IS_LED.v \
 	$(CACHE_DIR)/cache_dma_controller.sv \

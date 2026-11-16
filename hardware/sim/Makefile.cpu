@@ -182,7 +182,7 @@ CPU_RV64_CORE_FILES = \
 	$(RV64_SRC_DIR)/PSC_RV64_Monitor.v \
 	$(RV64_SRC_DIR)/PSC_ONE_RV64_core.v
 
-MMIO_DIR	= ../rtl/soc/mmio/MMIO
+GPIO_DIR	= ../rtl/soc/mmio/GPIO
 UART_DIR	= ../rtl/soc/mmio/UART
 I2C_DIR		= ../rtl/soc/mmio/I2C
 LED_DIR		= ../rtl/soc/mmio/LED
@@ -210,7 +210,7 @@ endif
 # CPU core + Cache
 CPU_FILES = \
 	$(SELECTED_CPU_CORE_FILES) \
-	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
+	$(GPIO_DIR)/PSC_RV32_GPIO.v \
 	$(UART_DIR)/PSC_RV32IS_UART.v \
 	$(I2C_DIR)/PSC_I2C_capture.sv \
 	$(I2C_DIR)/PSC_RV32_I2C.sv \

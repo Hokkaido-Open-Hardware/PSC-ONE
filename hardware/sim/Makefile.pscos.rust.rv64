@@ -136,7 +136,7 @@ RUST_RTL_SOURCES := \
 	$(RTL_DIR)/soc/cpu_rv64/src/Csr.sv \
 	$(RTL_DIR)/soc/cpu_rv64/src/PSC_RV64_Monitor.v \
 	$(RTL_DIR)/soc/cpu_rv64/src/PSC_ONE_RV64_core.v \
-	$(RTL_DIR)/soc/mmio/MMIO/PSC_RV32IS_MMapped_IO.v \
+	$(RTL_DIR)/soc/mmio/GPIO/PSC_RV32_GPIO.v \
 	$(RTL_DIR)/soc/mmio/UART/PSC_RV32IS_UART.v \
 	$(RTL_DIR)/soc/mmio/I2C/PSC_I2C_capture.sv \
 	$(RTL_DIR)/soc/mmio/I2C/PSC_RV32_I2C.sv \

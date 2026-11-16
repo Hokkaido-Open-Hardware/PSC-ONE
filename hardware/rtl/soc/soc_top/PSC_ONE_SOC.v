@@ -839,12 +839,12 @@ module PSC_ONE_SOC #(
 
 
     // ==============================================
-    // MMapped IO インスタンス化
+    // GPIO
     // ==============================================
     wire [7:0]  PIO_external_out;
 
-    // MMIO インスタンス
-    PSC_RV32IS_MMapped_IO #(
+    // GPIO インスタンス
+    PSC_RV32_GPIO #(
         .PIO_DATA_WIDTH (8),
         .PIO_ADDRESS    (PIO_ADDRESS)
     ) u_mmap_io (

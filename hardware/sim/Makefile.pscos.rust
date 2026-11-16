@@ -180,7 +180,7 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/Csr.sv \
 	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
 
-MMIO_DIR	= ../rtl/soc/mmio/MMIO
+GPIO_DIR	= ../rtl/soc/mmio/GPIO
 UART_DIR	= ../rtl/soc/mmio/UART
 I2C_DIR		= ../rtl/soc/mmio/I2C
 LED_DIR		= ../rtl/soc/mmio/LED
@@ -208,7 +208,7 @@ endif
 # CPU_core + Cache
 CPU_FILES = \
 	$(SELECTED_CPU_CORE_FILES) \
-	$(MMIO_DIR)/PSC_RV32IS_MMapped_IO.v \
+	$(GPIO_DIR)/PSC_RV32_GPIO.v \
 	$(UART_DIR)/PSC_RV32IS_UART.v \
 	$(I2C_DIR)/PSC_I2C_capture.sv \
 	$(I2C_DIR)/PSC_RV32_I2C.sv \

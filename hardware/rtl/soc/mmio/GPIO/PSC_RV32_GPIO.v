@@ -1,6 +1,6 @@
 // NISHIHARU
 
-module PSC_RV32IS_MMapped_IO #(
+module PSC_RV32_GPIO #(
     parameter PIO_DATA_WIDTH     = 8,
     parameter integer ADDR_WIDTH = 32,
     parameter [ADDR_WIDTH-1:0] PIO_ADDRESS = 32'h000F_1000
