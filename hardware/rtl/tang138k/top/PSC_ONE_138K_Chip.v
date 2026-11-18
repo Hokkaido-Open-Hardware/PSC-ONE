@@ -109,15 +109,10 @@ module PSC_ONE_138K_Chip #(
     inout  [4-1:0]      ddr_dqs_n       //DQS_WIDTH=2
 );
 
-`ifdef COCOTB_SIM
+    // LED
     wire [5:0] soc_led;
     assign led = {2'b00, soc_led};
-`else
 
-    // LED TEST
-    assign led = 8'b1010_1010;
-
-`endif
     // --------------------------------
     // define 確認
     // --------------------------------
