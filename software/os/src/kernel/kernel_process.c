@@ -76,6 +76,20 @@ static void __attribute__((unused)) idle_entry(void) {
 #define KERNEL_MAP_SIZE (1 * 1024 * 1024)   // 1MB
 
 #if KERNEL_USER_FROM_SD
+/* The physical USER.MEM source reservation is free when reading from SD.
+   Clear it on every launch, including warm restart, before entering U-mode. */
+static void map_sd_shell_bss(uint32_t *root)
+{
+    extern char __user_image_base[];
+    extern char __shell_sd_bss_base[], __shell_sd_bss_end[];
+    uintptr_t base = (uintptr_t)__shell_sd_bss_base;
+    size_t size = (uintptr_t)__shell_sd_bss_end - base;
+    memset(__user_image_base, 0, size);
+    for (size_t off = 0; off < size; off += PAGE_SIZE)
+        map_page(root, base + off, (paddr_t)__user_image_base + off,
+                 PAGE_U | PAGE_R | PAGE_W);
+}
+
 struct sd_image_copy {
     uint32_t *page_table;
     paddr_t page;
@@ -180,6 +194,7 @@ static struct process *create_process_image(const void *image,
         s_printf("---- user image map start. ----\n");
 #if KERNEL_USER_FROM_SD
         if (from_sd) {
+            map_sd_shell_bss(page_table);
             uint32_t loaded_words = 0;
             uint32_t expected_words = (image_size + 3u) / 4u;
             struct sd_image_copy copy = {page_table, 0, 0};

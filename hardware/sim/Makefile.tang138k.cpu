@@ -1,0 +1,680 @@
+# ============================================================
+# Usage
+# ============================================================
+
+#make -f Makefile.tang138k.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=basic
+#make -f Makefile.tang138k.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=pulp
+#make -f Makefile.tang138k.cpu simulate_PSC_ONE_TESTS CPU_VERSION=rv64 TEST_PROGRAM_LIST=basic
+#or
+#make -f Makefile.tang138k.cpu simulate_PSC_ONE_TESTS CPU_VERSION=legacy TEST_PROGRAM_LIST=basic
+#or
+#make -f Makefile.tang138k.cpu simulate_PSC_ONE_TESTS CPU_VERSION=v1 TEST_PROGRAM_LIST=basic RUN_CYCLES=30000
+
+#Rust
+#make -f simulate_PSC_ONE_RUST
+
+#make -f Makefile.tang138k.cpu simulate_PSC_ONE_RUST \
+#  RUST_TESTS="add_test1 mmu_test1" \
+#  RUST_EXPECTED_add_test1=0x12345678 \
+#  RUST_EXPECTED_mmu_test1=0x33
+
+# ============================================================
+#  MODE で一括切り替え（verilator / icarus）
+# ============================================================
+# デフォルトはVerilator
+MODE = verilator
+#MODE = icarus
+
+# ============================================================
+#  シミュレーションモードに応じた設定
+# ============================================================
+ifeq ($(MODE),verilator)
+SIM          		= verilator
+SDCARD_MODEL 		= ../rtl/model/SDCARD_model/sdcard_spi_model.v
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_FST
+
+ifeq ($(SIM_FAST),1)
+VCD_COMPILE_ARGS =
+EXTRA_ARGS = \
+	-O3 --bbox-sys --x-assign fast --x-initial fast \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
+else
+EXTRA_ARGS = \
+	-O3 --trace --trace-fst \
+	--Wno-ASCRANGE --Wno-INITIALDLY --Wno-COMBDLY \
+	--Wno-WIDTHEXPAND --Wno-WIDTHTRUNC --Wno-REALCVT \
+	--Wno-MULTIDRIVEN
+endif
+
+endif
+
+ifeq ($(MODE),icarus)
+SIM          		= icarus
+SDCARD_MODEL		= ../rtl/model/SDCARD_model/sdcard_spi_model.v 
+EXTRA_ARGS =   # Icarus は基本オプション不要（必要なら -g2012 など）
+TOP_COMPILE_ARGS 	= -DTOP_SIM
+VCD_COMPILE_ARGS 	= -DDUMP_VCD
+
+endif
+
+ifeq ($(filter verilator icarus,$(MODE)),)
+$(error MODE=$(MODE) は不正です。MODE=verilator または MODE=icarus を指定してください)
+endif
+
+# ============================================================
+#  Tang138K SoC と DDR3 application-port モデル
+# ============================================================
+
+PSCONE_TOP   = PSC_ONE_138K_Chip_sim
+
+CPU_SRC_DIR  = ../rtl/soc/cpu/src
+TOP_SRC_DIR  = ../rtl/tang138k/top
+CACHE_DIR    = ../rtl/soc/cache/src
+SOC_TOP_SRC_DIR  = ../rtl/soc/soc_top
+USER_SRC_DIR  = ../rtl/tang138k/user_logic
+
+PSCONE_SIM_TOP_FILE = \
+	$(TOP_SRC_DIR)/PSC_ONE_138K_Chip_sim.v \
+
+PSCONE_TOP_FILE = \
+	$(TOP_SRC_DIR)/PSC_ONE_138K_Chip.v
+
+PSCONE_SOC_TOP_FILE = \
+	$(SOC_TOP_SRC_DIR)/PSC_ONE_SOC.v
+
+# USER_LOGIC
+USER_LOGIC_FILE = \
+	$(USER_SRC_DIR)/USER_LOGIC.v
+
+# RV32_core
+CPU_CORE_FILES = \
+	$(CPU_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_core.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Fetch.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Execute.v \
+	$(CPU_SRC_DIR)/Fetch_Fifo.v \
+	$(CPU_SRC_DIR)/Fetch.v \
+	$(CPU_SRC_DIR)/Decorder.v \
+	$(CPU_SRC_DIR)/Execute.v \
+	$(CPU_SRC_DIR)/Execute_Divider.v \
+	$(CPU_SRC_DIR)/Execute_Mul.v \
+	$(CPU_SRC_DIR)/Branch.v \
+	$(CPU_SRC_DIR)/MemoryStore.v \
+	$(CPU_SRC_DIR)/Register.v \
+	$(CPU_SRC_DIR)/MMU.v \
+	$(CPU_SRC_DIR)/Csr.v \
+	$(CPU_SRC_DIR)/PSC_RV32_Monitor.v
+
+CPU_V1_SRC_DIR  = ../rtl/soc/cpu_v1/src
+
+# RV32_core(v1)
+CPU_V1_CORE_FILES = \
+	$(CPU_V1_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_V1_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_FetchUnit.sv \
+	$(CPU_V1_SRC_DIR)/PSC_FetchPredict.sv \
+	$(CPU_V1_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
+	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V1_SRC_DIR)/Fetch.sv \
+	$(CPU_V1_SRC_DIR)/Decorder.sv \
+	$(CPU_V1_SRC_DIR)/Execute.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V1_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V1_SRC_DIR)/Branch.sv \
+	$(CPU_V1_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V1_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V1_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V1_SRC_DIR)/MMU.sv \
+	$(CPU_V1_SRC_DIR)/Csr.sv \
+	$(CPU_V1_SRC_DIR)/PSC_RV32_Monitor.v
+
+CPU_V2_SRC_DIR  = ../rtl/soc/cpu_v2_experimental/src
+
+# RV32_core(v2)
+CPU_V2_CORE_FILES = \
+	$(CPU_V2_SRC_DIR)/PSC_ONE_RV32_core.v \
+	$(CPU_V2_SRC_DIR)/PSC_Types.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_core.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_FetchUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch_Fifo.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
+	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(CPU_V2_SRC_DIR)/Fetch.sv \
+	$(CPU_V2_SRC_DIR)/Decorder.sv \
+	$(CPU_V2_SRC_DIR)/Execute.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Divider.sv \
+	$(CPU_V2_SRC_DIR)/Execute_Mul.sv \
+	$(CPU_V2_SRC_DIR)/Branch.sv \
+	$(CPU_V2_SRC_DIR)/MemoryStore.sv \
+	$(CPU_V2_SRC_DIR)/PSC_Register.sv \
+	$(CPU_V2_SRC_DIR)/PSC_PC.sv \
+	$(CPU_V2_SRC_DIR)/MMU.sv \
+	$(CPU_V2_SRC_DIR)/Csr.sv \
+	$(CPU_V2_SRC_DIR)/PSC_RV32_Monitor.v
+
+RV64_SRC_DIR = ../rtl/soc/cpu_rv64/src
+
+# RV64_core
+CPU_RV64_CORE_FILES = \
+	$(RV64_SRC_DIR)/PSC_Types.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_core.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_FetchUnit.sv \
+	$(RV64_SRC_DIR)/PSC_FetchPredict.sv \
+	$(RV64_SRC_DIR)/Fetch_Fifo.sv \
+	$(RV64_SRC_DIR)/Fetch.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_InstructionEngine.sv \
+	$(RV64_SRC_DIR)/PSC_InstructionUnit.sv \
+	$(RV64_SRC_DIR)/Decorder.sv \
+	$(RV64_SRC_DIR)/Execute.sv \
+	$(RV64_SRC_DIR)/Execute_ByteALU.sv \
+	$(RV64_SRC_DIR)/Execute_Divider.sv \
+	$(RV64_SRC_DIR)/Execute_Mul.sv \
+	$(RV64_SRC_DIR)/Branch.sv \
+	$(RV64_SRC_DIR)/MemoryStore.sv \
+	$(RV64_SRC_DIR)/PSC_Register.sv \
+	$(RV64_SRC_DIR)/PSC_PC.sv \
+	$(RV64_SRC_DIR)/MMU.sv \
+	$(RV64_SRC_DIR)/Csr.sv \
+	$(RV64_SRC_DIR)/PSC_RV64_Monitor.v \
+	$(RV64_SRC_DIR)/PSC_ONE_RV64_core.v
+
+GPIO_DIR	= ../rtl/soc/mmio/GPIO
+UART_DIR	= ../rtl/soc/mmio/UART
+I2C_DIR		= ../rtl/soc/mmio/I2C
+LED_DIR		= ../rtl/soc/mmio/LED
+
+# ============================================================
+# CPUコアの切り替え（v1 / legacy）
+# ============================================================
+# デフォルトはV1
+CPU_VERSION ?= v1
+
+ifeq ($(CPU_VERSION),v1)
+SELECTED_CPU_CORE_FILES = $(CPU_V1_CORE_FILES)
+else ifeq ($(CPU_VERSION),v2)
+SELECTED_CPU_CORE_FILES = $(CPU_V2_CORE_FILES)
+else ifeq ($(CPU_VERSION),rv64)
+SELECTED_CPU_CORE_FILES = $(CPU_RV64_CORE_FILES)
+CPU_CPP_FLAGS = ARCH=rv64im_zicsr_zifencei ABI=lp64
+TOP_COMPILE_ARGS += -DCPU_RV64
+else ifeq ($(CPU_VERSION),legacy)
+SELECTED_CPU_CORE_FILES = $(CPU_CORE_FILES)
+else
+$(error CPU_VERSION=$(CPU_VERSION) は不正です。v1 / v2 / rv64 / legacy を指定してください)
+endif
+
+# CPU core + Cache
+CPU_FILES = \
+	$(SELECTED_CPU_CORE_FILES) \
+	$(GPIO_DIR)/PSC_RV32_GPIO.v \
+	$(UART_DIR)/PSC_RV32IS_UART.v \
+	$(I2C_DIR)/PSC_I2C_capture.sv \
+	$(I2C_DIR)/PSC_RV32_I2C.sv \
+	$(LED_DIR)/PSC_RV32IS_LED.v \
+	$(CACHE_DIR)/cache_dma_controller.sv \
+	$(CACHE_DIR)/cache_dma_controller_io.sv \
+	$(CACHE_DIR)/dm_cache_data.v \
+	$(CACHE_DIR)/dm_cache_tag.v \
+	$(TOP_SRC_DIR)/Delay_N.v
+
+AXI_DIR			= ../rtl/soc/axi
+SDRAM_CNT_DIR	= ../rtl/tang138k/ddr3_sdram_controller
+BOOT_SRC_DIR	= ../rtl/soc/boot
+DMA_SRC_DIR		= ../rtl/soc/dma
+
+DDR3_AXI_FILES = \
+	$(AXI_DIR)/PSC_RV32_CacheAXI.v \
+	$(AXI_DIR)/PSC_RV64_CacheAXI.sv \
+	$(SDRAM_CNT_DIR)/ddr3_axi_controller.v \
+	$(SDRAM_CNT_DIR)/ddr3_controller_if.sv \
+	../rtl/model/DDR3_SDRAM_model/ddr3_app_model.sv
+
+PSC_ONE_BOOT_FILE = $(BOOT_SRC_DIR)/PSC_ONE_Boot_axi.v
+
+PSC_ONE_DMA_FILE =  $(DMA_SRC_DIR)/PSC_ONE_DMA_axi.v
+
+# ============================================================
+# NPU implementation selection (v1 / v2 / legacy)
+# ============================================================
+
+# デフォルトはlegacy
+NPU_VERSION ?= legacy
+
+NPU_LEGACY_DIR = ../rtl/soc/npu/src
+NPU_V1_DIR     = ../rtl/soc/npu_v1/src
+NPU_V2_DIR     = ../rtl/soc/npu_v2/src
+
+# NPU V1: 4 MUL -> 4 fixed WB lanes -> 16 ACC bank
+NPU_V1_FILES = \
+	$(NPU_V1_DIR)/PSC_NPU_Controller.v \
+	$(NPU_V1_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_V1_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_V1_DIR)/PSC_NPU_MACScheduler.sv \
+	$(NPU_V1_DIR)/PSC_NPU_Mul4.sv \
+	$(NPU_V1_DIR)/PSC_NPU_AccBank.sv
+
+# NPU V2: selector 8 lanes, two signed power-of-two terms per weight byte.
+NPU_V2_FILES = \
+	$(NPU_V2_DIR)/PSC_NPU_Controller.v \
+	$(NPU_V2_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_V2_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_V2_DIR)/PSC_NPU_MACScheduler.sv \
+	$(NPU_V2_DIR)/PSC_NPU_PotLanes.sv \
+	$(NPU_V2_DIR)/PSC_NPU_AccBank.sv
+
+# Legacy NPU
+NPU_LEGACY_FILES = \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Controller.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Engine.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_Requantize.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_TilePost.sv \
+	$(NPU_LEGACY_DIR)/PSC_LPU_Controller.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_ReadController.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_SystolicArray4x4.v \
+	$(NPU_LEGACY_DIR)/PSC_NPU_PE_INT.sv \
+	$(NPU_LEGACY_DIR)/PSC_NPU_PE_Mult.sv
+
+ifeq ($(NPU_VERSION),v1)
+SA_DIR  = $(NPU_V1_DIR)
+SA_FILE = $(NPU_V1_FILES)
+else ifeq ($(NPU_VERSION),v2)
+SA_DIR  = $(NPU_V2_DIR)
+SA_FILE = $(NPU_V2_FILES)
+else ifeq ($(NPU_VERSION),legacy)
+SA_DIR  = $(NPU_LEGACY_DIR)
+SA_FILE = $(NPU_LEGACY_FILES)
+else
+$(error NPU_VERSION=$(NPU_VERSION) は不正です。v1 / v2 / legacy を指定してください)
+endif
+
+MMIO_BASE_DIR	= ../rtl/soc/mmio
+
+# LCD
+PSCONELCD_FILE = \
+	$(MMIO_BASE_DIR)/LCD/PSC_ONE_LCD.v \
+	$(MMIO_BASE_DIR)/LCD/tft_clock_divider.v \
+	$(MMIO_BASE_DIR)/LCD/tft_ili9488.v \
+	$(MMIO_BASE_DIR)/LCD/tft_ili9488_spi.v
+
+# SD Card Reader
+SD_READER_FILE = \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard.sv \
+	$(MMIO_BASE_DIR)/PSC_SDCARD/src/PSC_SDCard_SPI.sv 
+
+# PSC Phase Flow Engine
+FPE_DIR  = ../rtl/soc/pfe/src
+FPE_FILE = \
+	$(FPE_DIR)/PSC_PFE.v
+
+# Timer
+TIMER_FILE = $(MMIO_BASE_DIR)/TIMER/PSC_RV32IS_TIMER.v
+
+# I2S Rx
+I2S_RX_FILE = \
+	$(MMIO_BASE_DIR)/I2S_RX/PSC_I2SRX.sv \
+
+I2S_MIC_MODEL = ../rtl/model/I2S_MIC_MODEL/PSC_I2S_MIC_MODEL.v 
+
+LCD_ILI9488_MODEL = ../rtl/model/LCD_model/PSC_LCD_ILI9488_MODEL.v 
+
+INPUT_PSCONE_SIM_FILE = \
+	$(PSCONE_SIM_TOP_FILE) $(PSCONE_TOP_FILE) $(PSCONE_SOC_TOP_FILE) \
+	$(USER_LOGIC_FILE) \
+	$(CPU_FILES) $(DDR3_AXI_FILES) \
+	$(PSC_ONE_BOOT_FILE) $(PSC_ONE_DMA_FILE) \
+	$(SA_FILE) $(PSCONELCD_FILE) $(SD_READER_FILE) $(TIMER_FILE) \
+	$(I2S_RX_FILE) $(I2S_MIC_MODEL) $(LCD_ILI9488_MODEL) \
+	$(FPE_FILE) \
+	$(SDCARD_MODEL)
+
+INPUT_FILE_PSCONE = \
+	$(INPUT_PSCONE_SIM_FILE)
+
+# Prefer the active environment; fall back to the repository's Python environment.
+COCOTB_CFG := $(or $(shell command -v cocotb-config),$(abspath ../../../myenv/bin/cocotb-config))
+export PATH := $(dir $(COCOTB_CFG)):$(PATH)
+COCOTB_MAKEFILE := $(shell $(COCOTB_CFG) --makefiles)/Makefile.sim
+.DEFAULT_GOAL := simulate_PSC_ONE_TESTS
+SIM_BUILD        ?= sim_build
+
+.PHONY: compile_cpp
+
+# ============================================================
+# 単体テスト定義
+# Tang 138K
+# ============================================================
+# PSC-ONE テスト
+
+PSCONE_SINGLE_TEST = \
+	sd_card_test1:RV32_chip_test:./mem/sd_card_test1.mem:0x000000e0 \
+
+# ============================================================
+# 複数テスト定義
+# format:
+#   test_name:cocotb_module:mem_file:expected
+# ============================================================
+# List
+
+PSCONE_BASIC_TESTS = \
+	add_test1:RV32_chip_test:./mem/add_test1.mem:0xff00ff0b \
+	add_test2:RV32_chip_test:./mem/add_test2.mem:0x00000000 \
+	i2c_test1:RV32_chip_test:./mem/i2c_test1.mem:0x600dcafe \
+	lpu_test1:RV32_chip_test:./mem/lpu_test1.mem:0x0000beef \
+	timer_irq_test1:RV32_chip_test:./mem/timer_irq_test1.mem:0x00000321 \
+	timer_irq_test2:RV32_chip_test:./mem/timer_irq_test2.mem:0x00000322 \
+	forwarding_test1:RV32_chip_test:./mem/forwarding_test1.mem:0x00000011 \
+	forwarding_timing_test1:RV32_chip_test:./mem/forwarding_timing_test1.mem:0x00008000 \
+	pfe_test1:RV32_chip_test:./mem/pfe_test1.mem:0x00000000 \
+	fetch_test1:RV32_chip_test:./mem/fetch_test1.mem:0xcd1023bb \
+	csr_test1:RV32_chip_test:./mem/csr_test1.mem:0x00000022 \
+	timer_test1:RV32_chip_test:./mem/timer_test1.mem:0x00000123 \
+	sub_test1:RV32_chip_test:./mem/sub_test1.mem:0x0000006e \
+	mem_write1:RV32_chip_test:./mem/mem_write1.mem:0x00000037 \
+	trap_test1:RV32_chip_test:./mem/trap_test1.mem:0xCAFEBABE \
+	shift_test1:RV32_chip_test:./mem/shift_test1.mem:0x00001234 \
+	jump_test1:RV32_chip_test:./mem/jump_test1.mem:0x12345678 \
+	lui_test1:RV32_chip_test:./mem/lui_test1.mem:0x12345000 \
+	prime_test1:RV32_chip_test:./mem/prime_test1.mem:0x00000061 \
+	divmod_test1:RV32_chip_test:./mem/divmod_test1.mem:0x00000e02 \
+	ecall_test1:RV32_chip_test:./mem/ecall_test1.mem:0x00000321 \
+	audipc_test1:RV32_chip_test:./mem/audipc_test1.mem:0xFFFFFFF8 \
+	fft_test1:RV32_chip_test:./mem/fft_test1.mem:0x0000beef \
+	q15_fft_test1:RV32_chip_test:./mem/q15_fft_test1.mem:0x0000beef \
+	fft_N8_test1:RV32_chip_test:./mem/fft_N8_test1.mem:0x0000beef \
+	sbwrite_test1:RV32_chip_test:./mem/sbwrite_test1.mem:0xE500000F \
+	jal_test1:RV32_chip_test:./mem/jal_test1.mem:0x12345678 \
+	jalr_test1:RV32_chip_test:./mem/jalr_test1.mem:0x00005AA5 \
+	mul_test1:RV32_chip_test:./mem/mul_test1.mem:0x00000063 \
+	mul_test2:RV32_chip_test:./mem/mul_test2.mem:0x00000033 \
+	nn_test1:RV32_chip_test:./mem/nn_test1.mem:0x00000170 \
+	nn_test2:RV32_chip_test:./mem/nn_test2.mem:0x00000170 \
+	nn_test3:RV32_chip_test:./mem/nn_test3.mem:0x00000170 \
+	sa_test4:RV32_chip_test:./mem/sa_test4.mem:0x0000BEEF \
+	sa_test3:RV32_chip_test:./mem/sa_test3.mem:0x0000BEEF \
+	sa_test2:RV32_chip_test:./mem/sa_test2.mem:0x0000BEEF \
+	sa_test1:RV32_chip_test:./mem/sa_test1.mem:0x0000BEEF \
+	matrix_test1:RV32_chip_test:./mem/matrix_test1.mem:0x0000ABCD \
+	montepi_test1:RV32_chip_test:./mem/montepi_test1.mem:0x0000beef \
+	uart_tx:RV32_chip_test:./mem/uart_tx.mem:0x00000123 \
+	mret_test1:RV32_chip_test:./mem/mret_test1.mem:0x0000DCBA \
+	rem_test1:RV32_chip_test:./mem/rem_test1.mem:0x00000001 \
+	sa_matrix_test1:RV32_chip_test:./mem/sa_matrix_test1.mem:0x0000BEEF \
+	mulsi3_test1:RV32_chip_test:./mem/mulsi3_test1.mem:0x00000015 \
+	xor_test1:RV32_chip_test:./mem/xor_test1.mem:0x00003344 \
+	cachewb_test1:RV32_chip_test:./mem/cachewb_test1.mem:0x00000000 \
+	ret_test1:RV32_chip_test:./mem/ret_test1.mem:0x12345678 \
+	led_test1:RV32_chip_test:./mem/led_test1.mem:0x00000022 \
+	lw_test1:RV32_chip_test:./mem/lw_test1.mem:0xC0DEC0DE \
+	cache_RW_test1:RV32_chip_test:./mem/cache_RW_test1.mem:0x600DCAFE \
+	pio_test1:RV32_chip_test:./mem/pio_test1.mem:0x00000022 \
+	uart_test1:RV32_chip_test:./mem/uart_test1.mem:0x00000077 \
+	sp_test1:RV32_chip_test:./mem/sp_test1.mem:0x00005AA5 \
+	csr_test2:RV32_chip_test:./mem/csr_test2.mem:0x00000321 \
+	alu_mul_test1:RV32_chip_test:./mem/alu_mul_test1.mem:0x00000000 \
+
+# ============================================================
+# PULP Test List (CPU_VERSION=v1)
+# ============================================================
+
+PSCONE_PULP_TESTS = \
+	cv_pulp_test1:RV32_chip_test:./mem/cv_pulp_test1.mem:0x600D600D \
+	cv_pulp_test2:RV32_chip_test:./mem/cv_pulp_test2.mem:0x600D600D \
+	nn_pulp_test1:RV32_chip_test:./mem/nn_pulp_test1.mem:0x600D600D \
+	nn_pulp_test2:RV32_chip_test:./mem/nn_pulp_test2.mem:0x600D600D
+
+# ============================================================
+# Long Test List
+# ============================================================
+
+PSCONE_LONG_TESTS = \
+	robot_mujoco_test1:RV32_chip_test:./mem/robot_mujoco_test1.mem:0x600dcafe \
+	pio_uart_test1:RV32_chip_test:./mem/pio_uart_test1.mem:0x00001212 \
+	fencei_test1:RV32_chip_test:./mem/fencei_test1.mem:0xabcd5678 \
+	sret_test1:RV32_chip_test:./mem/sret_test1.mem:0x0000DC12 \
+	nn_64x16x1_test1:RV32_chip_test:./mem/nn_64x16x1_test1.mem:0x00000780 \
+	mmu_test1:RV32_chip_test:./mem/mmu_test1.mem:0x00000033 \
+	nn_test4:RV32_chip_test:./mem/nn_test4.mem:0x001c2000 \
+	npu_test1:RV32_chip_test:./mem/npu_test1.mem:0x0000beef \
+	memcpy_test1:RV32_chip_test:./mem/memcpy_test1.mem:0x00002521 \
+	pipeline_test1:RV32_chip_test:./mem/pipeline_test1.mem:0x0000009d \
+	pipeline_test2:RV32_chip_test:./mem/pipeline_test2.mem:0xfc1667c7 \
+	boot_test1:RV32_chip_test:./mem/boot_test1.mem:0x00001321 \
+	boot_test2:RV32_chip_test:./mem/boot_test2.mem:0x00002321 \
+	pagefault_test1:RV32_chip_test:./mem/pagefault_test1.mem:0x0000EF99 \
+	sfence_test1:RV32_chip_test:./mem/sfence_test1.mem:0x00000F01 \
+	lcd_test1:RV32_chip_test:./mem/lcd_test1.mem:0x00000012 \
+	dma_test1:RV32_chip_test:./mem/dma_test1.mem:0x00000000 \
+	sd_card_test1:RV32_chip_test:./mem/sd_card_test1.mem:0x000000e0 \
+	cpu_monitor_test1:RV32_chip_test:./mem/cpu_monitor_test1.mem:0x00000022 \
+	i2s_test1:RV32_chip_test:./mem/i2s_test1.mem:0x0abc0123 \
+
+# ============================================================
+# Voice Test List
+# ============================================================
+
+PSCONE_VOICE_TESTS = \
+	speech_recog_test1:RV32_chip_test:./mem/speech_recog_test1.mem:0x00000002 \
+	speech_recog_down_test1:RV32_chip_test:./mem/speech_recog_down_test1.mem:0x00000001 \
+	speech_recog_down_sa_test1:RV32_chip_test:./mem/speech_recog_down_sa_test1.mem:0x00000001 \
+	audio_feature_test1:RV32_chip_test:./mem/audio_feature_test1.mem:0x00001212 \
+	audio_nn_test1:RV32_chip_test:./mem/audio_nn_test1.mem:0x00001213 \
+	voice_test1:RV32_chip_test:./mem/voice_test1.mem:0x00001214 \
+	voice_test2:RV32_chip_test:./mem/voice_test2.mem:0x00001215 \
+	voice_test3:RV32_chip_test:./mem/voice_test3.mem:0x00001216 \
+
+# ============================================================
+# Rust test settings
+# ============================================================
+# hardware/sim/rust/*.rs を自動検出して順番に実行する。
+# 例: RUST_TESTS="add_test1 add_test2" と指定して絞り込み可能。
+RUST_DIR            ?= ./rust
+RUST_MAKEFILE       ?= Makefile.rust
+RUST_TESTS          ?= $(basename $(notdir $(wildcard $(RUST_DIR)/*.rs)))
+RUST_COCOTB_MODULE  ?= RV32_chip_test
+# 個別指定がないテストの共通期待値。
+RUST_EXPECTED       ?= 0x12345678
+# 個別期待値（共通値より優先）。コマンドラインからも上書き可能。
+RUST_EXPECTED_add_test1    ?= $(RUST_EXPECTED)
+RUST_EXPECTED_rv32im_test1 ?= $(RUST_EXPECTED)
+RUST_EXPECTED_mmu_test1    ?= 0x00000033
+# 新しいテストは RUST_EXPECTED_<テスト名> を追加すれば設定可能。
+rust_expected = $(if $(strip $(RUST_EXPECTED_$(1))),$(strip $(RUST_EXPECTED_$(1))),$(RUST_EXPECTED))
+
+
+# ============================================================
+# テストプログラムの切り替え（basic / pulp / long / voice / single）
+# ============================================================
+# デフォルトはbasic
+TEST_PROGRAM_LIST ?= basic
+
+ifeq ($(TEST_PROGRAM_LIST),basic)
+PSCONE_TESTS = $(PSCONE_BASIC_TESTS)
+else ifeq ($(TEST_PROGRAM_LIST),pulp)
+PSCONE_TESTS = $(PSCONE_PULP_TESTS)
+else ifeq ($(TEST_PROGRAM_LIST),long)
+PSCONE_TESTS = $(PSCONE_LONG_TESTS)
+else ifeq ($(TEST_PROGRAM_LIST),voice)
+PSCONE_TESTS = $(PSCONE_VOICE_TESTS)
+else ifeq ($(TEST_PROGRAM_LIST),single)
+PSCONE_TESTS = $(PSCONE_SINGLE_TEST)
+else
+$(error TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST) は不正です。basic, pulp, long, voice, single を指定してください)
+endif
+
+# run test
+TEST_BUILD_ROOT ?= /tmp
+
+.PHONY: simulate_PSC_ONE_TESTS
+# SD and SPI-bypass models both open this image at startup.
+sdcard/sdcard.hex:
+	if test -f sdcard/sdcard.img; then $(MAKE) -f Makefile.sdcard hex; else $(MAKE) -f Makefile.sdcard all; fi
+
+simulate_PSC_ONE_TESTS: sdcard/sdcard.hex
+	@mkdir -p ./wave
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "NPU_VERSION=$(NPU_VERSION)"
+	@echo "TEST_PROGRAM_LIST=$(TEST_PROGRAM_LIST)"
+	@set -e; \
+	mkdir -p "$(TEST_BUILD_ROOT)"; \
+	build_dir=$$(mktemp -d "$(TEST_BUILD_ROOT)/psc-tang138k-XXXXXX"); \
+	mkdir -p log; \
+	run_log=log/tang138k_test_result_$$(date +%Y%m%d_%H%M%S).log; \
+	echo "[INFO] LOG FILE = $$run_log"; \
+	passed=0; failed=0; failed_tests=""; \
+	for t in $(PSCONE_TESTS); do \
+		name=$$(echo $$t | cut -d: -f1); \
+		cocotb_file=$$(echo $$t | cut -d: -f2); \
+		mem_file=$$(echo $$t | cut -d: -f3); \
+		expected=$$(echo $$t | cut -d: -f4); \
+		echo ""; \
+		echo "========================================"; \
+		echo "[TEST] $$name"; \
+		echo "[MEM ] $$mem_file"; \
+		echo "[EXP ] $$expected"; \
+		echo "[LOG ] $$run_log"; \
+		echo "========================================"; \
+		if ! $(MAKE) -B -C ./cpp $$name $(CPU_CPP_FLAGS); then \
+			echo "[FAIL] $$name (program build)" | tee -a "$$run_log"; \
+			failed=$$((failed + 1)); failed_tests="$$failed_tests $$name"; \
+			continue; \
+		fi; \
+		if ! head -n 4096 "$$mem_file" > ./mem/test_program.mem; then \
+			echo "[FAIL] $$name (program image)" | tee -a "$$run_log"; \
+			failed=$$((failed + 1)); failed_tests="$$failed_tests $$name"; \
+			continue; \
+		fi; \
+		sources="$(INPUT_FILE_PSCONE)"; sim_build=$$build_dir/sim_build; \
+		if [ "$$name" = lpu_test1 ] && [ "$(NPU_VERSION)" = legacy ]; then \
+			: "lpu_test1 requires the exclusive LPU configuration (see npu/tests/run_lpu_chip.py)"; \
+			sed -e "s/parameter bit ENABLE_NPU = 1'b1/parameter bit ENABLE_NPU = 1'b0/" \
+			    -e "s/parameter bit ENABLE_LPU = 1'b0/parameter bit ENABLE_LPU = 1'b1/" \
+			    $(NPU_LEGACY_DIR)/PSC_NPU_Controller.v > "$$build_dir/PSC_NPU_Controller.v"; \
+			sources="$(filter-out $(NPU_LEGACY_DIR)/PSC_NPU_Controller.v,$(INPUT_FILE_PSCONE)) $$build_dir/PSC_NPU_Controller.v"; \
+			sim_build=$$build_dir/sim_build_lpu; \
+		fi; \
+		if SIM_BUILD=$$sim_build \
+		COCOTB_RESULTS_FILE=$$build_dir/$$name-results.xml \
+		COCOTB_TEST_MODULES=cocotb_tb.cpu.$$cocotb_file \
+		TEST_NAME=$$name \
+		PSC_LOGFILE=$$run_log \
+		PROGRAM_FILE=$$mem_file \
+		EXPECTED_RESULT=$$expected \
+		TOPLEVEL=$(PSCONE_TOP) \
+		TOPLEVEL_LANG=verilog \
+		SIM=$(SIM) \
+		VERILOG_SOURCES="$$sources" \
+		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+		make --silent -f $(COCOTB_MAKEFILE); then \
+			passed=$$((passed + 1)); \
+		else \
+			echo "[FAIL] $$name (simulation)" | tee -a "$$run_log"; \
+			failed=$$((failed + 1)); failed_tests="$$failed_tests $$name"; \
+		fi; \
+	done; \
+	printf '\a'; \
+	echo ""; \
+	echo "========================================"; \
+	echo "[SUMMARY] PASS=$$passed FAIL=$$failed" | tee -a "$$run_log"; \
+	if [ "$$failed" -ne 0 ]; then \
+		echo "[FAILED TESTS]$$failed_tests" | tee -a "$$run_log"; \
+	fi; \
+	echo "📄 Log : $$run_log"; \
+	echo "========================================"; \
+	test "$$failed" -eq 0
+
+
+
+# ============================================================
+# Rust tests
+#
+# rust/ 内の *.rs を
+#   Rust -> ELF -> BIN -> MEM
+# に変換し、その MEM を既存の PSC-ONE cocotb テストで実行する。
+#
+# Usage:
+#   make -f Makefile.tang138k.cpu simulate_PSC_ONE_RUST CPU_VERSION=v2
+#
+# 1本だけ実行:
+#   make -f Makefile.tang138k.cpu simulate_PSC_ONE_RUST \
+#       CPU_VERSION=v2 RUST_TESTS=add_test1
+#
+# 共通期待値を変更（個別指定がないテストに適用）:
+#   make -f Makefile.tang138k.cpu simulate_PSC_ONE_RUST \
+#       CPU_VERSION=v2 RUST_TESTS=add_test1 RUST_EXPECTED=0x12345678
+#
+# テストごとに期待値を指定:
+#   make -f Makefile.tang138k.cpu simulate_PSC_ONE_RUST \
+#       RUST_TESTS="add_test1 mmu_test1" \
+#       RUST_EXPECTED_add_test1=0x12345678 RUST_EXPECTED_mmu_test1=0x33
+# ============================================================
+.PHONY: simulate_PSC_ONE_RUST
+simulate_PSC_ONE_RUST:
+	@mkdir -p ./wave ./log ./mem
+	@echo "MODE=$(MODE)"
+	@echo "CPU_VERSION=$(CPU_VERSION)"
+	@echo "RUST_TESTS=$(RUST_TESTS)"
+	@echo "RUST_EXPECTED=$(RUST_EXPECTED)"
+	@set -e; \
+	if [ -z "$(strip $(RUST_TESTS))" ]; then \
+		echo "[ERROR] $(RUST_DIR) に *.rs がありません"; \
+		exit 1; \
+	fi; \
+	run_log=log/rust_test_result_$$(date +%Y%m%d_%H%M%S).log; \
+	echo "[INFO] LOG FILE = $$run_log"; \
+	for spec in $(foreach name,$(RUST_TESTS),$(name):$(call rust_expected,$(name))); do \
+		name=$${spec%%:*}; \
+		expected=$${spec#*:}; \
+		echo ""; \
+		echo "========================================"; \
+		echo "[RUST TEST] $$name"; \
+		echo "[SRC ] $(RUST_DIR)/$$name.rs"; \
+		echo "[MEM ] ./mem/$$name.mem"; \
+		echo "[EXP ] $$expected"; \
+		echo "[LOG ] $$run_log"; \
+		echo "========================================"; \
+		if [ ! -f "$(RUST_DIR)/$$name.rs" ]; then \
+			echo "[ERROR] Rust source not found: $(RUST_DIR)/$$name.rs"; \
+			exit 1; \
+		fi; \
+		if [ ! -f "$(RUST_DIR)/rust_tests.x" ]; then \
+			echo "[ERROR] Linker script not found: $(RUST_DIR)/rust_tests.x"; \
+			exit 1; \
+		fi; \
+		$(MAKE) -C $(RUST_DIR) -f $(RUST_MAKEFILE) clean TARGET=$$name; \
+		$(MAKE) -C $(RUST_DIR) -f $(RUST_MAKEFILE) mem TARGET=$$name; \
+		mem_file=./mem/$$name.mem; \
+		if [ ! -f "$$mem_file" ]; then \
+			echo "[ERROR] MEM file was not generated: $$mem_file"; \
+			exit 1; \
+		fi; \
+		tmp=$$(mktemp); \
+		head -n 4096 "$$mem_file" > $$tmp; \
+		cp $$tmp ./mem/test_program.mem; \
+		rm -f $$tmp; \
+		$(MAKE) clean; \
+		COCOTB_TEST_MODULES=cocotb_tb.cpu.$(RUST_COCOTB_MODULE) \
+		TEST_NAME=$$name \
+		PSC_LOGFILE=$$run_log \
+		PROGRAM_FILE=$$mem_file \
+		EXPECTED_RESULT="$$expected" \
+		TOPLEVEL=$(PSCONE_TOP) \
+		TOPLEVEL_LANG=verilog \
+		SIM=$(SIM) \
+		VERILOG_SOURCES="$(INPUT_FILE_PSCONE)" \
+		COMPILE_ARGS="$(TOP_COMPILE_ARGS) $(VCD_COMPILE_ARGS)" \
+		EXTRA_ARGS="$(EXTRA_ARGS) $(VDEF)" \
+		make --silent -f $(COCOTB_MAKEFILE); \
+	done; \
+	printf '\a'; \
+	echo ""; \
+	echo "========================================"; \
+	echo "✅ All PSC-ONE Rust tests completed"; \
+	echo "📄 Log : $$run_log"; \
+	echo "========================================"

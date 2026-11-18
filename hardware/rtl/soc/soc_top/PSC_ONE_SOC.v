@@ -126,37 +126,6 @@ module PSC_ONE_SOC #(
     input  wire                      p_axi_rvalid,
     output wire                      p_axi_rready,
 
-    // ---------------- Data AXI I/F ----------------
-    output wire [ID_WIDTH-1:0]       d_axi_awid,
-    output wire [ADDR_WIDTH-1:0]     d_axi_awaddr,
-    output wire [7:0]                d_axi_awlen,
-    output wire [2:0]                d_axi_awsize,
-    output wire [1:0]                d_axi_awburst,
-    output wire                      d_axi_awvalid,
-    input  wire                      d_axi_awready,
-    output wire [DATA_WIDTH-1:0]     d_axi_wdata,
-    output wire [(DATA_WIDTH/8)-1:0] d_axi_wstrb,
-    output wire                      d_axi_wlast,
-    output wire                      d_axi_wvalid,
-    input  wire                      d_axi_wready,
-    input  wire [ID_WIDTH-1:0]       d_axi_bid,
-    input  wire [1:0]                d_axi_bresp,
-    input  wire                      d_axi_bvalid,
-    output wire                      d_axi_bready,
-    output wire [ID_WIDTH-1:0]       d_axi_arid,
-    output wire [ADDR_WIDTH-1:0]     d_axi_araddr,
-    output wire [7:0]                d_axi_arlen,
-    output wire [2:0]                d_axi_arsize,
-    output wire [1:0]                d_axi_arburst,
-    output wire                      d_axi_arvalid,
-    input  wire                      d_axi_arready,
-    input  wire [ID_WIDTH-1:0]       d_axi_rid,
-    input  wire [DATA_WIDTH-1:0]     d_axi_rdata,
-    input  wire [1:0]                d_axi_rresp,
-    input  wire                      d_axi_rlast,
-    input  wire                      d_axi_rvalid,
-    output wire                      d_axi_rready,
-
     // ---------------- DMA / SA AXI I/F ----------------
     output wire [ID_WIDTH-1:0]       dma_axi_awid,
     output wire [ADDR_WIDTH-1:0]     dma_axi_awaddr,
@@ -421,42 +390,7 @@ module PSC_ONE_SOC #(
         .p_axi_rresp        (p_axi_rresp),
         .p_axi_rlast        (p_axi_rlast),
         .p_axi_rvalid       (p_axi_rvalid),
-        .p_axi_rready       (p_axi_rready),
-
-        // ---- Data AXI (SLAVE interface of this module) ----
-        .d_axi_awid         (d_axi_awid),
-        .d_axi_awaddr       (d_axi_awaddr),
-        .d_axi_awlen        (d_axi_awlen),
-        .d_axi_awsize       (d_axi_awsize),
-        .d_axi_awburst      (d_axi_awburst),
-        .d_axi_awvalid      (d_axi_awvalid),
-        .d_axi_awready      (d_axi_awready),
-
-        .d_axi_wdata        (d_axi_wdata),
-        .d_axi_wstrb        (d_axi_wstrb),
-        .d_axi_wlast        (d_axi_wlast),
-        .d_axi_wvalid       (d_axi_wvalid),
-        .d_axi_wready       (d_axi_wready),
-
-        .d_axi_bid          (d_axi_bid),
-        .d_axi_bresp        (d_axi_bresp),
-        .d_axi_bvalid       (d_axi_bvalid),
-        .d_axi_bready       (d_axi_bready),
-
-        .d_axi_arid         (d_axi_arid),
-        .d_axi_araddr       (d_axi_araddr),
-        .d_axi_arlen        (d_axi_arlen),
-        .d_axi_arsize       (d_axi_arsize),
-        .d_axi_arburst      (d_axi_arburst),
-        .d_axi_arvalid      (d_axi_arvalid),
-        .d_axi_arready      (d_axi_arready),
-
-        .d_axi_rid          (d_axi_rid),
-        .d_axi_rdata        (d_axi_rdata),
-        .d_axi_rresp        (d_axi_rresp),
-        .d_axi_rlast        (d_axi_rlast),
-        .d_axi_rvalid       (d_axi_rvalid),
-        .d_axi_rready       (d_axi_rready)
+        .p_axi_rready       (p_axi_rready)
     );
 
     //==========================================================

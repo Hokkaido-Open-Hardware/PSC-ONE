@@ -24,6 +24,12 @@ int user_accessible(uint32_t address, uint32_t bytes, uint32_t access)
 {
     int shell_range = address >= USER_BASE && address < USER_STACK_TOP &&
                       bytes <= USER_STACK_TOP - address;
+#if KERNEL_USER_FROM_SD
+    extern char __shell_sd_bss_base[], __shell_sd_bss_end[];
+    uintptr_t bss_end = (uintptr_t)__shell_sd_bss_end;
+    shell_range |= address >= (uintptr_t)__shell_sd_bss_base && address < bss_end &&
+                   bytes <= bss_end - address;
+#endif
     int model_range = address >= USER_MODEL_BASE && address < USER_MODEL_BASE + USER_MODEL_SIZE &&
                       bytes <= USER_MODEL_BASE + USER_MODEL_SIZE - address;
     int arena_range = address >= USER_ARENA_BASE && address < USER_ARENA_BASE + USER_ARENA_SIZE &&

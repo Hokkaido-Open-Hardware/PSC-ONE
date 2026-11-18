@@ -117,7 +117,11 @@ CFLAGS ?= \
 	-fomit-frame-pointer \
 	-mstrict-align
 
-LDFLAGS_USER := \
+ifeq ($(KERNEL_USER_FROM_SD),1)
+USER_SD_LD := $(Src)/shell/user_sd_bss.ld
+LDFLAGS_USER := -Wl,-T$(USER_SD_LD)
+endif
+LDFLAGS_USER += \
 	-Wl,-T$(Src)/shell/user.ld \
 	-Wl,-Map=$(Build)/shell.map \
 	-Wl,--no-relax
@@ -476,6 +480,7 @@ $(MICROPY_LIB): $(MICROPY_DEPS)
 # ------------------------------------------------------------
 $(USER_ELF): \
 	$(Build) \
+	$(USER_SD_LD) $(Build)/kernel.config \
 	$(USER_DEPS) \
 	$(Build)/divmodsi3.o
 
@@ -546,8 +551,13 @@ $(KERNEL_ELF): \
 	$(Build)/divmodsi3.o $(KERNEL_BUILTINS) Makefile $(Build)/kernel.config
 
 	@USER_SIZE=$$(stat -c%s $(USER_BIN)); \
+	SD_BSS_SYMBOLS=""; \
+	if [ -n "$(USER_SD_LD)" ]; then \
+		SD_BSS_SYMBOLS=$$($(GCC_PREFIX)-nm -P $(USER_ELF) | awk \
+			'/^__shell_sd_bss_(base|end) / { print "-Wl,--defsym," $$1 "=0x" $$3; n++ } END { if (n != 2) exit 1 }') || exit 1; \
+	fi; \
 	echo "[USER] KERNEL_USER_FROM_SD=$(KERNEL_USER_FROM_SD) VA=$(USER_BASE_VAL) size=$$USER_SIZE"; \
-	$(CC) $(KERNEL_CFLAGS) $(KCPPFLAGS) $(USER_LOAD_CPPFLAGS) $(DUSERBASE) $(DEFUSERBASE) \
+	$(CC) $(KERNEL_CFLAGS) $(KCPPFLAGS) $(USER_LOAD_CPPFLAGS) $(DUSERBASE) $(DEFUSERBASE) $$SD_BSS_SYMBOLS \
 		-Wl,-T$(KERNEL_LD) \
 		$(LDFLAGS_KERNEL) \
 		-Wl,--defsym,__shell_image_size=$$USER_SIZE \

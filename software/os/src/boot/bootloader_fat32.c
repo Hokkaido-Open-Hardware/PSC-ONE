@@ -247,17 +247,15 @@ void bootloader_main(void)
     bl_print_hex(kernel_words);
     bl_print("\n");
 
-    bl_print("kernel[0]=");
-    bl_print_hex(*(volatile uint32_t *)(PSC_BOARD_KERNEL_BASE + 0u));
-    bl_print("\n");
-
-    bl_print("kernel[1]=");
-    bl_print_hex(*(volatile uint32_t *)(PSC_BOARD_KERNEL_BASE + 4u));
-    bl_print("\n");
-
-    bl_print("kernel[2]=");
-    bl_print_hex(*(volatile uint32_t *)(PSC_BOARD_KERNEL_BASE + 8u));
-    bl_print("\n");
+    const volatile uint32_t *kernel =
+        (const volatile uint32_t *)KERNEL_LOAD_ADDR;
+    for (unsigned i = 0; i < 4; ++i) {
+        bl_print("kernel[");
+        putchar((char)('0' + i));
+        bl_print("]=");
+        bl_print_hex(kernel[i]);
+        bl_print("\n");
+    }
 
     bl_print("USER.MEM deferred to kernel\n");
 

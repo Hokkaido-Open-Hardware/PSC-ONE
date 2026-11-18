@@ -285,6 +285,27 @@ module PSC_ONE_Chip #(
     wire                    d_axi_rvalid;
     wire                    d_axi_rready;
 
+    // Compatibility only: the former D-Cache AXI master is inactive.
+    // No d_axi_* input participates in the shared bridge's control.
+    assign d_axi_awid    = '0;
+    assign d_axi_awaddr  = '0;
+    assign d_axi_awlen   = '0;
+    assign d_axi_awsize  = '0;
+    assign d_axi_awburst = '0;
+    assign d_axi_awvalid = '0;
+    assign d_axi_wdata   = '0;
+    assign d_axi_wstrb   = '0;
+    assign d_axi_wlast   = '0;
+    assign d_axi_wvalid  = '0;
+    assign d_axi_bready  = '0;
+    assign d_axi_arid    = '0;
+    assign d_axi_araddr  = '0;
+    assign d_axi_arlen   = '0;
+    assign d_axi_arsize  = '0;
+    assign d_axi_arburst = '0;
+    assign d_axi_arvalid = '0;
+    assign d_axi_rready  = '0;
+
     // =========================================================
     // SA module to AXI
     // =========================================================
@@ -662,49 +683,6 @@ module PSC_ONE_Chip #(
         .p_axi_rlast        (p_axi_rlast),
         .p_axi_rvalid       (p_axi_rvalid),
         .p_axi_rready       (p_axi_rready),
-
-        // =========================================================
-        // Data AXI
-        // =========================================================
-
-        // Write Address
-        .d_axi_awid         (d_axi_awid),
-        .d_axi_awaddr       (d_axi_awaddr),
-        .d_axi_awlen        (d_axi_awlen),
-        .d_axi_awsize       (d_axi_awsize),
-        .d_axi_awburst      (d_axi_awburst),
-        .d_axi_awvalid      (d_axi_awvalid),
-        .d_axi_awready      (d_axi_awready),
-
-        // Write Data
-        .d_axi_wdata        (d_axi_wdata),
-        .d_axi_wstrb        (d_axi_wstrb),
-        .d_axi_wlast        (d_axi_wlast),
-        .d_axi_wvalid       (d_axi_wvalid),
-        .d_axi_wready       (d_axi_wready),
-
-        // Write Response
-        .d_axi_bid          (d_axi_bid),
-        .d_axi_bresp        (d_axi_bresp),
-        .d_axi_bvalid       (d_axi_bvalid),
-        .d_axi_bready       (d_axi_bready),
-
-        // Read Address
-        .d_axi_arid         (d_axi_arid),
-        .d_axi_araddr       (d_axi_araddr),
-        .d_axi_arlen        (d_axi_arlen),
-        .d_axi_arsize       (d_axi_arsize),
-        .d_axi_arburst      (d_axi_arburst),
-        .d_axi_arvalid      (d_axi_arvalid),
-        .d_axi_arready      (d_axi_arready),
-
-        // Read Data
-        .d_axi_rid          (d_axi_rid),
-        .d_axi_rdata        (d_axi_rdata),
-        .d_axi_rresp        (d_axi_rresp),
-        .d_axi_rlast        (d_axi_rlast),
-        .d_axi_rvalid       (d_axi_rvalid),
-        .d_axi_rready       (d_axi_rready),
 
         // =========================================================
         // DMA / SA AXI

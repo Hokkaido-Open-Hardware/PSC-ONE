@@ -6,7 +6,7 @@ ENTRY(boot)
  *   00100000..00140000  FAT32 bootloader and its stack/reserve
  *   00140000..00200000  model backing, low part
  *   00200000..00400000  kernel, S stack and process page pool
- *   00400000..004c0000  direct-boot USER.MEM source reservation
+ *   00400000..004c0000  direct-boot USER.MEM source or SD shell BSS
  *   004c0000..00800000  model backing, high part
  *
  * Model VA 00800000..00c00000 is stitched from the two model ranges.
@@ -86,6 +86,9 @@ ASSERT(__kernel_base >= __model_low_end, "kernel overlaps model backing")
 ASSERT(__model_high_end == __sdram_end, "model backing exceeds 8MiB SDRAM")
 ASSERT(__shell_image_size <= __user_image_limit - __user_image_base,
        "USER.MEM overlaps model backing")
+__sd_bss_size = DEFINED(__shell_sd_bss_end) ? __shell_sd_bss_end - __shell_sd_bss_base : 0;
+ASSERT(__sd_bss_size <= __user_image_limit - __user_image_base,
+       "SD shell BSS overlaps model backing")
 
 /* Kernel/process boot budget, including page rounding and separate stack. */
 ASSERT(__free_ram < __free_ram_end, "kernel overlaps user virtual range")

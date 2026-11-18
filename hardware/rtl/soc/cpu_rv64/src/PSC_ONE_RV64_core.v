@@ -121,50 +121,7 @@ module PSC_ONE_RV64_core #(
     input  wire [1:0]                p_axi_rresp,
     input  wire                      p_axi_rlast,
     input  wire                      p_axi_rvalid,
-    output wire                      p_axi_rready,
-
-    // -------------------------------
-    // 外部：Unused compatibility AXI IF (d_axi_*)
-    // -------------------------------
-    // ===== AXI4 Master (64-bit) =====
-    // Write Address
-    output wire  [ID_WIDTH-1:0]      d_axi_awid,
-    output wire  [ADDR_WIDTH-1:0]    d_axi_awaddr,
-    output wire  [7:0]               d_axi_awlen,         // burst length minus one
-    output wire  [2:0]               d_axi_awsize,        // log2(bytes)
-    output wire  [1:0]               d_axi_awburst,       // INCR=01
-    output wire                      d_axi_awvalid,
-    input  wire                      d_axi_awready,
-
-    // Write Data
-    output wire  [DATA_WIDTH-1:0]    d_axi_wdata,
-    output wire  [(DATA_WIDTH/8)-1:0]d_axi_wstrb,         // byte lanes
-    output wire                      d_axi_wlast,
-    output wire                      d_axi_wvalid,
-    input  wire                      d_axi_wready,
-
-    // Write Response
-    input  wire [ID_WIDTH-1:0]       d_axi_bid,
-    input  wire [1:0]                d_axi_bresp,
-    input  wire                      d_axi_bvalid,
-    output wire                      d_axi_bready,
-
-    // Read Address
-    output wire  [ID_WIDTH-1:0]      d_axi_arid,
-    output wire  [ADDR_WIDTH-1:0]    d_axi_araddr,
-    output wire  [7:0]               d_axi_arlen,         // burst length minus one
-    output wire  [2:0]               d_axi_arsize,        // 1
-    output wire  [1:0]               d_axi_arburst,       // INCR
-    output wire                      d_axi_arvalid,
-    input  wire                      d_axi_arready,
-
-    // Read Data
-    input  wire [ID_WIDTH-1:0]       d_axi_rid,
-    input  wire [DATA_WIDTH-1:0]     d_axi_rdata,
-    input  wire [1:0]                d_axi_rresp,
-    input  wire                      d_axi_rlast,
-    input  wire                      d_axi_rvalid,
-    output wire                      d_axi_rready
+    output wire                      p_axi_rready
 );
 
     initial begin
@@ -563,27 +520,6 @@ module PSC_ONE_RV64_core #(
     wire d_cache_rd_ready;
     wire d_cache_wr_ready;
     assign d_mem_ready256 = d_cache_rd_ready | d_cache_wr_ready;
-
-    // Compatibility only: the former D-Cache AXI master is inactive.
-    // No d_axi_* input participates in the shared bridge's control.
-    assign d_axi_awid    = '0;
-    assign d_axi_awaddr  = '0;
-    assign d_axi_awlen   = '0;
-    assign d_axi_awsize  = '0;
-    assign d_axi_awburst = '0;
-    assign d_axi_awvalid = '0;
-    assign d_axi_wdata   = '0;
-    assign d_axi_wstrb   = '0;
-    assign d_axi_wlast   = '0;
-    assign d_axi_wvalid  = '0;
-    assign d_axi_bready  = '0;
-    assign d_axi_arid    = '0;
-    assign d_axi_araddr  = '0;
-    assign d_axi_arlen   = '0;
-    assign d_axi_arsize  = '0;
-    assign d_axi_arburst = '0;
-    assign d_axi_arvalid = '0;
-    assign d_axi_rready  = '0;
 
     // ============================================================
     // Bridge (256b ⇄ AXI4-M(32b)) と AXI配線
