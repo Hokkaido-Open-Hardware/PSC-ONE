@@ -314,7 +314,7 @@ module PSC_RV32_Execute #(
 
     assign csr_reg_data_1       = reg_data_1;
 
-    Decorder u_decorder (
+    Decoder u_decorder (
         .clock              (clock),       // クロック
         .reset_n            (reset_n),     // リセット（負論理）
         .decode_enb         (execute_state==DECODE & fifo_read_ready),   // デコード有効信号. 
@@ -373,14 +373,14 @@ module PSC_RV32_Execute #(
         .clock              (clock),             // クロック
         .reset_n            (reset_n),           // リセット（負論理）
         .execute_enb        (execute_state==EXECUTE),    // 実行有効信号 1
-        .r_addr1            (r_addr1),           // レジスタアドレス1（Decorder出力）
-        .r_addr2            (r_addr2),           // レジスタアドレス2（Decorder出力）
+        .r_addr1            (r_addr1),           // レジスタアドレス1（Decoder出力）
+        .r_addr2            (r_addr2),           // レジスタアドレス2（Decoder出力）
         .reg_data_addr1     (reg_data_1),        // レジスタデータ1入力
         .reg_data_addr2     (reg_data_2),        // レジスタデータ2入力
-        .op1sel             (op1sel),            // オペランド1選択（Decorder出力）
-        .op2sel             (op2sel),            // オペランド2選択（Decorder出力）
-        .alucon             (alucon),            // ALU制御コード（Decorder出力）
-        .imm                (imm),               // 即値（Decorder出力）
+        .op1sel             (op1sel),            // オペランド1選択（Decoder出力）
+        .op2sel             (op2sel),            // オペランド2選択（Decoder出力）
+        .alucon             (alucon),            // ALU制御コード（Decoder出力）
+        .imm                (imm),               // 即値（Decoder出力）
         .in_pc              (pc),                // 現在のPC値
 
         .alu_data           (alu_data),          // ALU演算結果
@@ -440,10 +440,10 @@ module PSC_RV32_Execute #(
         // ブランチ有効信号. pc_sel2更新のためpipeline_modeはEXECUTEで更新
         .branch_enb             (!d_pf && (execute_state==BRANCH | (execute_state==EXECUTE & pipeline_mode))),
         .is_load_store          (is_load | is_store),
-        .funct3                 (funct3),           // funct3（Decorder出力）
+        .funct3                 (funct3),           // funct3（Decoder出力）
         .r_data1                (r_data1),          // レジスタデータ1（Execute出力）
         .r_data2                (r_data2),          // レジスタデータ2（Execute出力）
-        .pc_sel                 (pc_sel),           // PC選択（Decorder出力）
+        .pc_sel                 (pc_sel),           // PC選択（Decoder出力）
         .in_pc                  (execute_pc),       // PC
         .d_paddr                (d_paddr),
 
@@ -477,11 +477,11 @@ module PSC_RV32_Execute #(
         .clock                      (clock),                  // クロック
         .reset_n                    (reset_n),                // リセット（負論理）
         .store_enb                  (execute_state==STORE & !pipeline_mode & !d_pf),   // ストア有効
-        .mem_rw                     (mem_rw),                 // メモリR/W制御（Decorder出力）
-        .wb_sel                     (wb_sel),                 // Write Back 選択（Decorder出力）
+        .mem_rw                     (mem_rw),                 // メモリR/W制御（Decoder出力）
+        .wb_sel                     (wb_sel),                 // Write Back 選択（Decoder出力）
         .pc_sel2                    (pc_sel2),                // ブランチ判定結果（Branch出力）
         .alu_data                   (alu_data),               // ALU結果（Execute出力）
-        .mem_val                    (mem_val),                // メモリ値の制御（必要に応じてDecorder等から）
+        .mem_val                    (mem_val),                // メモリ値の制御（必要に応じてDecoder等から）
         .mem_read_data              (data_mem_read_data_reg),     // メモリ読み出しデータ
         .r_data2                    (r_data2),                // レジスタデータ2（Execute出力）
         .in_pc                      (branch_pc),              // 現在PC値

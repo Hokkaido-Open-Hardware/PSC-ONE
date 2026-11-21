@@ -113,7 +113,7 @@ CPU_CORE_FILES = \
 	$(CPU_SRC_DIR)/PSC_RV32_Execute.v \
 	$(CPU_SRC_DIR)/Fetch_Fifo.v \
 	$(CPU_SRC_DIR)/Fetch.v \
-	$(CPU_SRC_DIR)/Decorder.v \
+	$(CPU_SRC_DIR)/Decoder.v \
 	$(CPU_SRC_DIR)/Execute.v \
 	$(CPU_SRC_DIR)/Execute_Divider.v \
 	$(CPU_SRC_DIR)/Execute_Mul.v \
@@ -137,7 +137,7 @@ CPU_V1_CORE_FILES = \
 	$(CPU_V1_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
 	$(CPU_V1_SRC_DIR)/PSC_InstructionUnit.sv \
 	$(CPU_V1_SRC_DIR)/Fetch.sv \
-	$(CPU_V1_SRC_DIR)/Decorder.sv \
+	$(CPU_V1_SRC_DIR)/Decoder.sv \
 	$(CPU_V1_SRC_DIR)/Execute.sv \
 	$(CPU_V1_SRC_DIR)/Execute_Divider.sv \
 	$(CPU_V1_SRC_DIR)/Execute_Mul.sv \
@@ -161,7 +161,7 @@ CPU_V2_CORE_FILES = \
 	$(CPU_V2_SRC_DIR)/PSC_RV32_InstructionEngine.sv \
 	$(CPU_V2_SRC_DIR)/PSC_InstructionUnit.sv \
 	$(CPU_V2_SRC_DIR)/Fetch.sv \
-	$(CPU_V2_SRC_DIR)/Decorder.sv \
+	$(CPU_V2_SRC_DIR)/Decoder.sv \
 	$(CPU_V2_SRC_DIR)/Execute.sv \
 	$(CPU_V2_SRC_DIR)/Execute_Divider.sv \
 	$(CPU_V2_SRC_DIR)/Execute_Mul.sv \

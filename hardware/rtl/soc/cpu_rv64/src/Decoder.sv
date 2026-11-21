@@ -1,18 +1,20 @@
+`timescale 1ns/1ps
 // NISHIHARU
 
 import PSC_Types::*;
 
-module Decorder (
-    input  logic          clock,
-    input  logic          reset_n,
-    input  logic          decode_enb,
-    input  logic [31:0]   opcode,
-    input  logic [31:0]   in_pc,
-    input  logic [1:0]    current_priv,
-    input wire             tvm,
-    output logic          decode_done,
+module Decoder #(
+    parameter bit ENABLE_PULP = 1'b0
+)(
+    input  logic        clock,
+    input  logic        reset_n,
+    input  logic        decode_enb,
+    input  logic [31:0] opcode,
+    input  logic [63:0] in_pc,
+    input  logic [1:0]  current_priv,
+    output logic        decode_done,
 
-    output dec_ctrl_t     decoder_ctrl
+    output dec_ctrl_t   decoder_ctrl
 );
 
     // Privilege level encoding (RISC-V spec)
@@ -22,7 +24,7 @@ module Decorder (
 
     // 内部配線（組合せ）
     wire [4:0]  r_addr1_w, r_addr2_w, w_addr_w;
-    wire [31:0] imm_w;
+    wire [63:0] imm_w;
     wire [4:0]  alucon_w;
     wire [2:0]  funct3_w;
     wire        op1sel_w, op2sel_w, mem_rw_w, rf_wen_w;
@@ -44,11 +46,24 @@ module Decorder (
     localparam [6:0] FENCE         = 7'b0001111;
     localparam [6:0] MULDIV        = 7'b0110011; // (未使用なら無視)
 
+    localparam [6:0] RFORMAT_W = 7'b0111011;
+    localparam [6:0] IFORMAT_W = 7'b0011011;
+    wire is_reg_op = (op == RFORMAT) || (op == RFORMAT_W);
+    wire is_imm_op = (op == IFORMAT_ALU) || (op == IFORMAT_W);
+    wire word_op = (op == RFORMAT_W) || (op == IFORMAT_W);
+
+    // RV32 PULP custom encodings are intentionally unsupported in this RV64 ISA.
+    // Exact register/register forms only; all other custom-3 encodings trap.
+    wire is_cv_dotup_h = 1'b0 && ((opcode & 32'hfe00_707f) == 32'h8000_007b);
+    wire is_cv_dotsp_b = 1'b0 && ((opcode & 32'hfe00_707f) == 32'h9000_107b);
+    wire is_pulp = is_cv_dotup_h || is_cv_dotsp_b;
+    wire illegal_pulp = (op == 7'h7b) && !is_pulp;
+
     // ---- SYSTEM / CSR detection ----
     wire        is_sfence_vma_w =
                             is_system &&
                             (sys_f3 == 3'b000) &&
-                            (opcode[31:25] == 7'b0001001) && (opcode[11:7] == 5'b0);
+                            (opcode[31:25] == 7'b0001001);
     wire        is_system  = (op == ECALLEBREAK);
     wire [2:0]  sys_f3     = opcode[14:12];
     //wire        is_priv    = is_system && (sys_f3 == 3'b000); // ECALL/EBREAK/MRET/WFI
@@ -57,7 +72,7 @@ module Decorder (
     // ecall 判定
     wire        is_ecall_w = is_system &&
                              (sys_f3 == 3'b000) &&
-                             (opcode[31:20] == 12'h000);  
+                             (opcode[31:20] == 12'h000);
 
     // sret/mret 判定
     // instruction detect
@@ -100,9 +115,6 @@ module Decorder (
 
     // CSR命令か？
     wire        is_csr_any = is_csrrw | is_csrrs | is_csrrc | is_csri;
-    wire illegal_vm = (is_sfence_vma_w || (is_csr_any && opcode[31:20] == 12'h180)) &&
-                      (current_priv == PRIV_U || (current_priv == PRIV_S && tvm));
-
 
     // funct3 → Csr.v のコマンド(0:RW,1:RS,2:RC) に正規化
     //   001/101 → RW(00), 010/110 → RS(01), 011/111 → RC(10)
@@ -120,20 +132,20 @@ module Decorder (
     assign w_addr_w  = opcode[11:7];
 
     // ---- 即値生成 ----
-    wire [31:0] imm_i;
-    wire [31:0] imm_s;
-    wire [31:0] imm_b;
-    wire [31:0] imm_u;
-    wire [31:0] imm_j;
+    wire [63:0] imm_i;
+    wire [63:0] imm_s;
+    wire [63:0] imm_b;
+    wire [63:0] imm_u;
+    wire [63:0] imm_j;
 
     // I-type
-    assign imm_i = {{20{opcode[31]}}, opcode[31:20]};
+    assign imm_i = {{52{opcode[31]}}, opcode[31:20]};
 
     // S-type
-    assign imm_s = {{20{opcode[31]}}, opcode[31:25], opcode[11:7]};
+    assign imm_s = {{52{opcode[31]}}, opcode[31:25], opcode[11:7]};
 
     // B-type
-    assign imm_b = {{19{opcode[31]}},
+    assign imm_b = {{51{opcode[31]}},
                     opcode[31],
                     opcode[7],
                     opcode[30:25],
@@ -141,10 +153,10 @@ module Decorder (
                     1'b0};
 
     // U-type
-    assign imm_u = {opcode[31:12], 12'b0};
+    assign imm_u = {{32{opcode[31]}}, opcode[31:12], 12'b0};
 
     // J-type (JAL)
-    assign imm_j = {{11{opcode[31]}},
+    assign imm_j = {{43{opcode[31]}},
                     opcode[31],
                     opcode[19:12],
                     opcode[20],
@@ -155,9 +167,9 @@ module Decorder (
     assign imm_w =  (op == UJFORMAT) ? imm_j :
                     (op == SBFORMAT) ? imm_b :
                     (op == SFORMAT)  ? imm_s :
-                    ((op == IFORMAT_ALU) || (op == IFORMAT_LOAD) || (op == IFORMAT_JALR)) ? imm_i :
+                    (is_imm_op || (op == IFORMAT_LOAD) || (op == IFORMAT_JALR)) ? imm_i :
                     ((op == UFORMAT_LUI) || (op == UFORMAT_AUIPC)) ? imm_u :
-                    32'b0;
+                    64'b0;
 
     // ---- ALU制御 ----
     wire is_mul;
@@ -169,47 +181,83 @@ module Decorder (
     wire is_rem;
     wire is_remu;
 
-    assign is_mul  = (op == RFORMAT) &&
+    assign is_mul  = is_reg_op &&
                     (opcode[31:25] == 7'b0000001) &&
                     (opcode[14:12] == 3'b000);
 
     assign is_mulh =
-                    (op == RFORMAT) &&
+                    is_reg_op &&
                     (opcode[31:25] == 7'b0000001) &&
                     (opcode[14:12] == 3'b001);
 
     assign is_mulhsu =
-                    (op == RFORMAT) &&
+                    is_reg_op &&
                     (opcode[31:25] == 7'b0000001) &&
                     (opcode[14:12] == 3'b010);
 
     assign is_mulhu =
-                    (op == RFORMAT) &&
+                    is_reg_op &&
                     (opcode[31:25] == 7'b0000001) &&
                     (opcode[14:12] == 3'b011);
 
-    assign is_div  = (op == RFORMAT) &&
+    assign is_div  = is_reg_op &&
                     (opcode[31:25] == 7'b0000001) &&
                     (opcode[14:12] == 3'b100);
 
-    assign is_divu = (op == RFORMAT) &&
+    assign is_divu = is_reg_op &&
                     (opcode[31:25] == 7'b0000001) &&
                     (opcode[14:12] == 3'b101);
 
-    assign is_rem  = (op == RFORMAT) &&
+    assign is_rem  = is_reg_op &&
                     (opcode[31:25] == 7'b0000001) &&
                     (opcode[14:12] == 3'b110);
 
-    assign is_remu = (op == RFORMAT) &&
+    assign is_remu = is_reg_op &&
                     (opcode[31:25] == 7'b0000001) &&
                     (opcode[14:12] == 3'b111);
 
     // illegal checks
-    // DIV以下は未対応
-    //wire raise_illegal_instruction_alu = is_div | is_divu | is_rem | is_remu;
-    wire raise_illegal_instruction_alu = 0;
+    logic legal_encoding;
+    always_comb begin
+        legal_encoding = 1'b0;
+        case (op)
+            RFORMAT: legal_encoding = (opcode[31:25] == 7'h00) ||
+                (opcode[31:25] == 7'h01) ||
+                ((opcode[31:25] == 7'h20) &&
+                 ((opcode[14:12] == 0) || (opcode[14:12] == 5)));
+            RFORMAT_W: legal_encoding =
+                ((opcode[31:25] == 0) && ((opcode[14:12] == 0) ||
+                  (opcode[14:12] == 1) || (opcode[14:12] == 5))) ||
+                ((opcode[31:25] == 7'h20) && ((opcode[14:12] == 0) ||
+                  (opcode[14:12] == 5))) ||
+                ((opcode[31:25] == 1) && ((opcode[14:12] == 0) || opcode[14]));
+            IFORMAT_ALU: legal_encoding =
+                (opcode[14:12] == 1) ? (opcode[31:26] == 0) :
+                (opcode[14:12] == 5) ? ((opcode[31:26] == 0) ||
+                                               (opcode[31:26] == 6'h10)) : 1'b1;
+            IFORMAT_W: legal_encoding = (opcode[14:12] == 0) ||
+                ((opcode[14:12] == 1) && (opcode[31:25] == 0)) ||
+                ((opcode[14:12] == 5) && ((opcode[31:25] == 0) ||
+                                               (opcode[31:25] == 7'h20)));
+            IFORMAT_LOAD: legal_encoding = opcode[14:12] != 7;
+            SFORMAT: legal_encoding = opcode[14:12] <= 3;
+            SBFORMAT: legal_encoding = (opcode[14:12] < 2) || opcode[14];
+            UFORMAT_LUI, UFORMAT_AUIPC, UJFORMAT: legal_encoding = 1'b1;
+            IFORMAT_JALR: legal_encoding = opcode[14:12] == 0;
+            FENCE: legal_encoding = is_fence_w || is_fence_i_w;
+            ECALLEBREAK: legal_encoding = is_csr_any ||
+                (opcode == 32'h00000073) || (opcode == 32'h00100073) ||
+                (opcode == 32'h10200073) || (opcode == 32'h30200073) ||
+                (opcode == 32'h10500073) ||
+                (is_sfence_vma_w && opcode[11:7] == 0 && current_priv != PRIV_U);
+            default: legal_encoding = 1'b0;
+        endcase
+    end
+    wire raise_illegal_instruction_alu = !legal_encoding;
 
     assign alucon_w =
+                    is_cv_dotup_h ? ALU_CV_DOTUP_H :
+                    is_cv_dotsp_b ? ALU_CV_DOTSP_B :
                     is_mul    ? 5'b1_1000 :
                     is_mulh   ? 5'b1_1001 :
                     is_mulhsu ? 5'b1_1010 :
@@ -218,13 +266,13 @@ module Decorder (
                     is_divu   ? 5'b1_1101 :
                     is_rem    ? 5'b1_1110 :
                     is_remu   ? 5'b1_1111 :
-                    (op == RFORMAT)
-                        ? {opcode[30], opcode[25], opcode[14:12]}
+                    is_reg_op
+                        ? {opcode[30], 1'b0, opcode[14:12]}
                     :
-                    ((op == IFORMAT_ALU) && (opcode[14:12] == 3'b101))
-                        ? {opcode[30], opcode[25], opcode[14:12]}
+                    (is_imm_op && (opcode[14:12] == 3'b101))
+                        ? {opcode[30], 1'b0, opcode[14:12]}
                     :
-                    (op == IFORMAT_ALU)
+                    is_imm_op
                         ? {2'b00, opcode[14:12]}
                     :
                     5'b00000;
@@ -233,7 +281,7 @@ module Decorder (
 
     // ---- オペランドセレクタ / メモリアクセス ----
     assign op1sel_w = ((op == SBFORMAT) || (op == UFORMAT_AUIPC) || (op == UJFORMAT)) ? 1'b1 : 1'b0;
-    assign op2sel_w = ((op == RFORMAT) || (op == MULDIV)) ? 1'b0 : 1'b1;
+    assign op2sel_w = (is_reg_op || (op == MULDIV) || is_pulp) ? 1'b0 : 1'b1;
 
     // メモリアクセス（CSRはメモリに行かない）
     assign mem_rw_w = (op == SFORMAT) ? 1'b1 : 1'b0;
@@ -247,15 +295,7 @@ module Decorder (
 
     // ---- レジスタ書き込み許可信号 ----
     // CSR時は rd!=x0 のときのみ書く（rd==x0 なら破棄）
-    wire rf_wen_noncsr =
-        ((op == RFORMAT) && ({opcode[31], opcode[29:25]} == 6'b000000)) ||
-        ((op == MULDIV)  && (opcode[31:25] == 7'b000001)) ||
-        ((op == IFORMAT_ALU) &&
-           ( ({opcode[31:25], opcode[14:12]} == 10'b00000_00_001) ||
-             ({opcode[31], opcode[29:25], opcode[14:12]} == 9'b0_000_00_101) || // SLLI/SRLI/SRAI
-             (opcode[14:12] == 3'b000) || (opcode[14:12] == 3'b010) ||
-             (opcode[14:12] == 3'b011) || (opcode[14:12] == 3'b100) ||
-             (opcode[14:12] == 3'b110) || (opcode[14:12] == 3'b111) )) ||
+    wire rf_wen_noncsr = is_reg_op || is_imm_op ||
         (op == IFORMAT_LOAD) || (op == UFORMAT_LUI) || (op == UFORMAT_AUIPC) ||
         (op == UJFORMAT) || (op == IFORMAT_JALR);
 
@@ -264,19 +304,19 @@ module Decorder (
     // ---- PC セレクト ----
     // ECALL/EBREAK/MRET/WFI は分岐扱い（コア側でトラップ/戻りへ）
     assign pc_sel_w = (op == SBFORMAT) ? 2'b01 :
-                      ((op == UJFORMAT) || (op == IFORMAT_JALR) || (is_trap_like)) ? 2'b10 :
+                      ((op == UJFORMAT) || (op == IFORMAT_JALR) || (is_ecall_w || is_sret_w || is_mret_w)) ? 2'b10 :
                       2'b00;
 
     // ---- CSR新規出力（組合せ値）----
-    wire        csr_wr_w       = is_csr_any && !illegal_vm;
+    wire        csr_wr_w       = is_csr_any;
     wire [1:0]  csr_cmd_w      = csr_cmd_norm; // 0:RW,1:RS,2:RC
     wire        csr_use_imm_w  = is_csri;
     wire [11:0] csr_addr_mux   = csr_addr_w;
     wire [4:0]  csr_zimm_w     = opcode[19:15];
 
     // ロード/ストア判定
-    wire is_load_w  = (op == IFORMAT_LOAD); // IFORMAT_LOAD : LB/LH/LW/LBU/LHU
-    wire is_store_w = (op == SFORMAT);       // SFORMAT      : SB/SH/SW
+    wire is_load_w  = (op == IFORMAT_LOAD); // LB/LH/LW/LD/LBU/LHU/LWU
+    wire is_store_w = (op == SFORMAT);       // SB/SH/SW/SD
 
     // ============================================================
     // ソースレジスタ使用判定
@@ -284,8 +324,9 @@ module Decorder (
 
     // rs1を実際に使用する命令
     wire use_rs1_w =
-            (op == RFORMAT)       || // R-type、M拡張
-            (op == IFORMAT_ALU)   || // ADDIなど
+            is_pulp ||
+            is_reg_op       || // R-type、M拡張
+            is_imm_op   || // ADDIなど
             (op == IFORMAT_LOAD)  || // LOADアドレス
             (op == SFORMAT)       || // STOREアドレス
             (op == SBFORMAT)      || // BRANCH比較
@@ -297,16 +338,17 @@ module Decorder (
 
     // rs2を実際に使用する命令
     wire use_rs2_w =
-            (op == RFORMAT)      || // R-type、M拡張
+            is_pulp ||
+            is_reg_op      || // R-type、M拡張
             (op == SFORMAT)      || // STOREデータ
             (op == SBFORMAT)     || // BRANCH比較
             is_sfence_vma_w;
 
     // パイプライン処理 R-type判定
-    wire is_R_type_w = (op == RFORMAT);
+    wire is_R_type_w = is_reg_op || is_pulp;
 
     // パイプライン処理 IMM判定
-    wire is_op_imm_w = (op == IFORMAT_ALU);
+    wire is_op_imm_w = is_imm_op;
 
     // NOP
     logic is_nop;
@@ -325,20 +367,23 @@ module Decorder (
         is_remu;
         //is_nop;
 
-    // Pipeline execution instructions
-    //
-    // R-Type     : ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND
-    //              MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU (M lane)
-    // I-Type ALU : ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI
-    // Load       : LB, LH, LW, LBU, LHU
-    // Store      : SB, SH, SW
-    //
-    // LUI/AUIPC also retain their existing integer-ALU issue path in v2.
-    // Other control/system instructions use the existing serialized ROB path.
-    // pipeline_type classifies the groups above; v2 has no separate legacy
-    // instruction execution pipeline.
-    wire pipeline_type_w =
-        is_R_type_w || is_op_imm_w || is_load_w || is_store_w;
+    // -------------------------------------------------------------------------
+    // Pipeline execution instructions (single-cycle EX, blocking memory):
+    // R-Type : ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND
+    // I-Type : ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI
+    // Load   : LB, LH, LW, LBU, LHU
+    // Store  : SB, SH, SW
+    // -------------------------------------------------------------------------
+    wire is_pipeline_memory_w =
+        (is_load_w && ((funct3_w == 3'b000) || (funct3_w == 3'b001) ||
+                       (funct3_w == 3'b010) || (funct3_w == 3'b100) ||
+                       (funct3_w == 3'b101) || (funct3_w == 3'b011) ||
+                       (funct3_w == 3'b110))) ||
+        (is_store_w && ((funct3_w == 3'b000) || (funct3_w == 3'b001) ||
+                        (funct3_w == 3'b010) || (funct3_w == 3'b011)));
+    wire pipeline_type_w      =
+            //(is_R_type_w && !is_mul_div_w) || is_op_imm_w || is_pipeline_memory_w;
+            is_R_type_w || is_op_imm_w || is_pipeline_memory_w;
 
     // =============================================================================
     // 構造体へまとめた次段デコード結果
@@ -360,7 +405,7 @@ module Decorder (
         decoder_ctrl_next.pc_sel                   = pc_sel_w;
         decoder_ctrl_next.is_fence                 = is_fence_w;
         decoder_ctrl_next.is_fence_i               = is_fence_i_w;
-        decoder_ctrl_next.is_sfence_vma            = is_sfence_vma_w && !illegal_vm;
+        decoder_ctrl_next.is_sfence_vma            = is_sfence_vma_w;
         decoder_ctrl_next.csr_wr                   = csr_wr_w;
         decoder_ctrl_next.csr_cmd                  = csr_cmd_w;
         decoder_ctrl_next.csr_use_imm              = csr_use_imm_w;
@@ -375,28 +420,33 @@ module Decorder (
         decoder_ctrl_next.use_rs2                  = use_rs2_w;
         decoder_ctrl_next.is_R_type                = is_R_type_w;
         decoder_ctrl_next.is_op_imm                = is_op_imm_w;
+        decoder_ctrl_next.word_op                  = word_op;
+        decoder_ctrl_next.is_ebreak                = opcode == 32'h00100073;
         decoder_ctrl_next.pipeline_type            = pipeline_type_w;
         decoder_ctrl_next.out_pc                   = in_pc;
         decoder_ctrl_next.raise_illegal_instruction =
                                     raise_illegal_instruction_sw |
                                     raise_illegal_instruction_mw |
-                                    raise_illegal_instruction_alu | illegal_vm;
+                                    raise_illegal_instruction_alu | illegal_pulp;
+        if (decoder_ctrl_next.raise_illegal_instruction) begin
+            // Preserve the instruction actually delivered by Fetch for stval.
+            // Illegal instructions never consume the ALU immediate.
+            decoder_ctrl_next.imm = {32'b0, opcode};
+            decoder_ctrl_next.rf_wen = 1'b0;
+            decoder_ctrl_next.is_load = 1'b0;
+            decoder_ctrl_next.is_store = 1'b0;
+            decoder_ctrl_next.mem_rw = 1'b0;
+            decoder_ctrl_next.csr_wr = 1'b0;
+            decoder_ctrl_next.pc_sel = 2'b00;
+        end
     end
 
-    // Register the full decode result before rename.  This separates the
-    // Fetch FIFO read mux and opcode decode from the RAT lookup/rename path.
-    // decode_done remains asserted until the requester drops decode_enb, so
-    // the FIFO head is consumed exactly once.
-    always_ff @(posedge clock or negedge reset_n) begin
-        if (!reset_n) begin
-            decoder_ctrl <= '0;
-            decode_done  <= 1'b0;
-        end else if (!decode_enb) begin
-            decode_done <= 1'b0;
-        end else if (!decode_done) begin
-            decoder_ctrl <= decoder_ctrl_next;
-            decode_done  <= 1'b1;
-        end
+    // The v2 issue stage consumes the FIFO head directly.  Keep decode
+    // combinational so a new independent R/I instruction can be dispatched
+    // on every clock; the issue/slow-path registers provide the state hold.
+    always_comb begin
+        decoder_ctrl = decoder_ctrl_next;
+        decode_done  = decode_enb;
     end
 
 endmodule

@@ -1,6 +1,6 @@
 // NISHIHARU
 
-module Decorder(
+module Decoder(
     input wire              clock,
     input  wire             reset_n,
     input  wire             decode_enb,

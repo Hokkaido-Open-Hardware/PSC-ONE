@@ -209,7 +209,7 @@ instructions. Examples are [cv_pulp_test1.cpp](../hardware/sim/cpp/cv_pulp_test1
 ## 9. CPU v1 implementation and SDOTSP removal record
 
 The following describes the implementation at removal time. Consult
-[Decorder.sv](../hardware/rtl/soc/cpu_v1/src/Decorder.sv),
+[Decoder.sv](../hardware/rtl/soc/cpu_v1/src/Decoder.sv),
 [Execute.sv](../hardware/rtl/soc/cpu_v1/src/Execute.sv), and
 [Execute_Mul.sv](../hardware/rtl/soc/cpu_v1/src/Execute_Mul.sv)
 for current internal states.

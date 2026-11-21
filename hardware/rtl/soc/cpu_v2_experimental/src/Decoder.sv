@@ -2,19 +2,17 @@
 
 import PSC_Types::*;
 
-module Decorder #(
-    parameter bit ENABLE_PULP = 1'b1
-)(
-    input  logic        clock,
-    input  logic        reset_n,
-    input  logic        decode_enb,
-    input  logic [31:0] opcode,
-    input  logic [31:0] in_pc,
-    input  logic [1:0]  current_priv,
+module Decoder (
+    input  logic          clock,
+    input  logic          reset_n,
+    input  logic          decode_enb,
+    input  logic [31:0]   opcode,
+    input  logic [31:0]   in_pc,
+    input  logic [1:0]    current_priv,
     input wire             tvm,
-    output logic        decode_done,
+    output logic          decode_done,
 
-    output dec_ctrl_t   decoder_ctrl
+    output dec_ctrl_t     decoder_ctrl
 );
 
     // Privilege level encoding (RISC-V spec)
@@ -45,12 +43,6 @@ module Decorder #(
     localparam [6:0] ECALLEBREAK   = 7'b1110011; // SYSTEM
     localparam [6:0] FENCE         = 7'b0001111;
     localparam [6:0] MULDIV        = 7'b0110011; // (未使用なら無視)
-
-    // Exact register/register forms only; all other custom-3 encodings trap.
-    wire is_cv_dotup_h = ENABLE_PULP && ((opcode & 32'hfe00_707f) == 32'h8000_007b);
-    wire is_cv_dotsp_b = ENABLE_PULP && ((opcode & 32'hfe00_707f) == 32'h9000_107b);
-    wire is_pulp = is_cv_dotup_h || is_cv_dotsp_b;
-    wire illegal_pulp = (op == 7'h7b) && !is_pulp;
 
     // ---- SYSTEM / CSR detection ----
     wire        is_sfence_vma_w =
@@ -218,8 +210,6 @@ module Decorder #(
     wire raise_illegal_instruction_alu = 0;
 
     assign alucon_w =
-                    is_cv_dotup_h ? ALU_CV_DOTUP_H :
-                    is_cv_dotsp_b ? ALU_CV_DOTSP_B :
                     is_mul    ? 5'b1_1000 :
                     is_mulh   ? 5'b1_1001 :
                     is_mulhsu ? 5'b1_1010 :
@@ -243,7 +233,7 @@ module Decorder #(
 
     // ---- オペランドセレクタ / メモリアクセス ----
     assign op1sel_w = ((op == SBFORMAT) || (op == UFORMAT_AUIPC) || (op == UJFORMAT)) ? 1'b1 : 1'b0;
-    assign op2sel_w = ((op == RFORMAT) || (op == MULDIV) || is_pulp) ? 1'b0 : 1'b1;
+    assign op2sel_w = ((op == RFORMAT) || (op == MULDIV)) ? 1'b0 : 1'b1;
 
     // メモリアクセス（CSRはメモリに行かない）
     assign mem_rw_w = (op == SFORMAT) ? 1'b1 : 1'b0;
@@ -258,7 +248,6 @@ module Decorder #(
     // ---- レジスタ書き込み許可信号 ----
     // CSR時は rd!=x0 のときのみ書く（rd==x0 なら破棄）
     wire rf_wen_noncsr =
-        is_pulp ||
         ((op == RFORMAT) && ({opcode[31], opcode[29:25]} == 6'b000000)) ||
         ((op == MULDIV)  && (opcode[31:25] == 7'b000001)) ||
         ((op == IFORMAT_ALU) &&
@@ -295,7 +284,6 @@ module Decorder #(
 
     // rs1を実際に使用する命令
     wire use_rs1_w =
-            is_pulp ||
             (op == RFORMAT)       || // R-type、M拡張
             (op == IFORMAT_ALU)   || // ADDIなど
             (op == IFORMAT_LOAD)  || // LOADアドレス
@@ -309,14 +297,13 @@ module Decorder #(
 
     // rs2を実際に使用する命令
     wire use_rs2_w =
-            is_pulp ||
             (op == RFORMAT)      || // R-type、M拡張
             (op == SFORMAT)      || // STOREデータ
             (op == SBFORMAT)     || // BRANCH比較
             is_sfence_vma_w;
 
     // パイプライン処理 R-type判定
-    wire is_R_type_w = (op == RFORMAT) || is_pulp;
+    wire is_R_type_w = (op == RFORMAT);
 
     // パイプライン処理 IMM判定
     wire is_op_imm_w = (op == IFORMAT_ALU);
@@ -338,22 +325,20 @@ module Decorder #(
         is_remu;
         //is_nop;
 
-    // -------------------------------------------------------------------------
-    // Pipeline execution instructions (single-cycle EX, blocking memory):
-    // R-Type : ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND
-    // I-Type : ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI
-    // Load   : LB, LH, LW, LBU, LHU
-    // Store  : SB, SH, SW
-    // -------------------------------------------------------------------------
-    wire is_pipeline_memory_w =
-        (is_load_w && ((funct3_w == 3'b000) || (funct3_w == 3'b001) ||
-                       (funct3_w == 3'b010) || (funct3_w == 3'b100) ||
-                       (funct3_w == 3'b101))) ||
-        (is_store_w && ((funct3_w == 3'b000) || (funct3_w == 3'b001) ||
-                        (funct3_w == 3'b010)));
-    wire pipeline_type_w      =
-            //(is_R_type_w && !is_mul_div_w) || is_op_imm_w || is_pipeline_memory_w;
-            is_R_type_w || is_op_imm_w || is_pipeline_memory_w;
+    // Pipeline execution instructions
+    //
+    // R-Type     : ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND
+    //              MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU (M lane)
+    // I-Type ALU : ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI
+    // Load       : LB, LH, LW, LBU, LHU
+    // Store      : SB, SH, SW
+    //
+    // LUI/AUIPC also retain their existing integer-ALU issue path in v2.
+    // Other control/system instructions use the existing serialized ROB path.
+    // pipeline_type classifies the groups above; v2 has no separate legacy
+    // instruction execution pipeline.
+    wire pipeline_type_w =
+        is_R_type_w || is_op_imm_w || is_load_w || is_store_w;
 
     // =============================================================================
     // 構造体へまとめた次段デコード結果
@@ -395,15 +380,23 @@ module Decorder #(
         decoder_ctrl_next.raise_illegal_instruction =
                                     raise_illegal_instruction_sw |
                                     raise_illegal_instruction_mw |
-                                    raise_illegal_instruction_alu | illegal_pulp | illegal_vm;
+                                    raise_illegal_instruction_alu | illegal_vm;
     end
 
-    // The v2 issue stage consumes the FIFO head directly.  Keep decode
-    // combinational so a new independent R/I instruction can be dispatched
-    // on every clock; the issue/slow-path registers provide the state hold.
-    always_comb begin
-        decoder_ctrl = decoder_ctrl_next;
-        decode_done  = decode_enb;
+    // Register the full decode result before rename.  This separates the
+    // Fetch FIFO read mux and opcode decode from the RAT lookup/rename path.
+    // decode_done remains asserted until the requester drops decode_enb, so
+    // the FIFO head is consumed exactly once.
+    always_ff @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            decoder_ctrl <= '0;
+            decode_done  <= 1'b0;
+        end else if (!decode_enb) begin
+            decode_done <= 1'b0;
+        end else if (!decode_done) begin
+            decoder_ctrl <= decoder_ctrl_next;
+            decode_done  <= 1'b1;
+        end
     end
 
 endmodule

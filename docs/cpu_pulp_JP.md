@@ -267,12 +267,12 @@ static inline uint32_t cv_dotup_h_ref(uint32_t rs1, uint32_t rs2)
 ## 9. CPU v1の実装とSDOTSP撤去記録
 
 以下は撤去時の構成の記録。最新の内部ステートは
-[Decorder.sv](../hardware/rtl/soc/cpu_v1/src/Decorder.sv)、
+[Decoder.sv](../hardware/rtl/soc/cpu_v1/src/Decoder.sv)、
 [Execute.sv](../hardware/rtl/soc/cpu_v1/src/Execute.sv)、
 [Execute_Mul.sv](../hardware/rtl/soc/cpu_v1/src/Execute_Mul.sv)を参照。
 
 - `PSC_Types.sv`: ALU制御DOTUP_H=01000、DOTSP_B=01001。
-- `Decorder.sv`: opcode/funct3/funct7の完全一致。2形式以外のcustom-3は例外。
+- `Decoder.sv`: opcode/funct3/funct7の完全一致。2形式以外のcustom-3は例外。
 - レジスタファイルは従来の2 read port、書込みは既存commitのみ。
   ISSUE/EX、EX/MEMでrs1/rs2と先行書込みが一致すればstall、MEM/WBはforwardする。
   CSR等でMEM/WBの値が使えない場合およびcommit競合ではstallする。
@@ -309,7 +309,7 @@ RTL撤去時はMakefileを維持。その後のユーザー指示により、`Ma
 
 | 検証 | 結果 |
 | --- | --- |
-| Decorder + Execute | PASS: 79,120ベクタ、custom-3全1,024形式（有効2、illegal 1,022） |
+| Decoder + Execute | PASS: 79,120ベクタ、custom-3全1,024形式（有効2、illegal 1,022） |
 | signed byte乗算 | PASS: 全256×256 byte対、乱数4,096、符号境界重点4,096 |
 | 既存DOTUP.H単体 | PASS: 境界1,296＋乱数4,096 |
 | stall/reset/latency | PASS: 結果受理stall、二重完了なし、2命令×10 reset位相、上記遅延 |

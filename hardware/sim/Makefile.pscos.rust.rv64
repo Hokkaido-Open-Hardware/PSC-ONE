@@ -123,7 +123,7 @@ RUST_RTL_SOURCES := \
 	$(RTL_DIR)/soc/cpu_rv64/src/Fetch.sv \
 	$(RTL_DIR)/soc/cpu_rv64/src/PSC_RV64_InstructionEngine.sv \
 	$(RTL_DIR)/soc/cpu_rv64/src/PSC_InstructionUnit.sv \
-	$(RTL_DIR)/soc/cpu_rv64/src/Decorder.sv \
+	$(RTL_DIR)/soc/cpu_rv64/src/Decoder.sv \
 	$(RTL_DIR)/soc/cpu_rv64/src/Execute.sv \
 	$(RTL_DIR)/soc/cpu_rv64/src/Execute_ByteALU.sv \
 	$(RTL_DIR)/soc/cpu_rv64/src/Execute_Divider.sv \

@@ -224,7 +224,7 @@ module PSC_RV32_InstructionEngine #(
         .execute_task_done      (execute_task_done)
     );
 
-    Decorder u_Decorder (
+    Decoder u_Decorder (
         .clock        (clock),
         .reset_n      (reset_n),
         .decode_enb   (decode_enb),

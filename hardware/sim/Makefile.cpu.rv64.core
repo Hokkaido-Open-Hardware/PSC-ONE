@@ -71,7 +71,7 @@ RV64_SOURCES         := \
 	$(RV64_SRC_DIR)/Fetch.sv \
 	$(RV64_SRC_DIR)/PSC_RV64_InstructionEngine.sv \
 	$(RV64_SRC_DIR)/PSC_InstructionUnit.sv \
-	$(RV64_SRC_DIR)/Decorder.sv \
+	$(RV64_SRC_DIR)/Decoder.sv \
 	$(RV64_SRC_DIR)/Execute.sv \
 	$(RV64_SRC_DIR)/Execute_ByteALU.sv \
 	$(RV64_SRC_DIR)/Execute_Divider.sv \

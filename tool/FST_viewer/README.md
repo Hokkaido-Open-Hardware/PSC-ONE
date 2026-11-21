@@ -89,7 +89,7 @@ make -f Makefile.cpu simulate_PSC_ONE_TESTS TEST_PROGRAM_LIST=single CPU_VERSION
 
 ### legacy
 
-参照RTL: `PSC-ONE/hardware/rtl/soc/cpu/src/` の `PSC_RV32_Execute.v`、`Execute.v`、`Decorder.v`、`Branch.v`、`MemoryStore.v` 等。
+参照RTL: `PSC-ONE/hardware/rtl/soc/cpu/src/` の `PSC_RV32_Execute.v`、`Execute.v`、`Decoder.v`、`Branch.v`、`MemoryStore.v` 等。
 
 検出anchor: `u_execute_state.execute_state`（4bit）。packed pipelineはありません。
 

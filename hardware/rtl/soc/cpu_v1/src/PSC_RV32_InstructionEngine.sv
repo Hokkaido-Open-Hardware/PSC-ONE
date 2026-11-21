@@ -247,7 +247,7 @@ module PSC_RV32_InstructionEngine #(
         .execute_task_done    (execute_task_done)
     );
 
-    Decorder #(.ENABLE_PULP(ENABLE_PULP)) u_Decorder (
+    Decoder #(.ENABLE_PULP(ENABLE_PULP)) u_Decorder (
         .clock                (clock),
         .reset_n              (reset_n),
         .decode_enb           (decode_enb),

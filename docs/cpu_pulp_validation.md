@@ -145,7 +145,7 @@ Yosysでproc/flatten/opt後に `scc -expect 0`、
 
 - `.gitignore`: 新規テストディレクトリとtraps.Sの無視除外。
 - `hardware/rtl/soc/cpu_v1/src/PSC_Types.sv`: ALU制御定数。
-- `hardware/rtl/soc/cpu_v1/src/Decorder.sv`: 完全デコード、ソース使用、illegal。
+- `hardware/rtl/soc/cpu_v1/src/Decoder.sv`: 完全デコード、ソース使用、illegal。
 - `hardware/rtl/soc/cpu_v1/src/Execute.sv`: 既存乗算待機経路への接続。
 - `hardware/rtl/soc/cpu_v1/src/Execute_Mul.sv`: unsigned lane積と33-bit和。
 
