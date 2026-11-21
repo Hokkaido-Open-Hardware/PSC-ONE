@@ -789,6 +789,8 @@ FST Viewer is intended to make PSC_RV32 CPU development and verification easier 
 
 #### FPGA
 - [x] Tang 20K
+- [x] Tang Mega 138K
+  - [x] DDR3 Memory Test
 - [x] SDRAM Boot
 - [x] PSC-OS Boot
 - [x] UART Console

@@ -57,6 +57,10 @@ module PSC_ONE_138K_Chip #(
     output wire         SD_CMD,
     input  wire         SD_D0,  // sd_miso
 
+    // ---- HDMI ----
+    output wire [2:0]   tmds_d_p_0,
+    output wire         tmds_clk_p_0,
+
 `ifdef COCOTB_SIM
     // ---------------- PSC-ONE SW ----------------
     input wire          PSCONE_SW1,
@@ -130,9 +134,6 @@ module PSC_ONE_138K_Chip #(
 `ifdef PSCOS_SIM
     wire os_sim_mode = 1'b1;
     initial $display("PSCOS_SIM ENABLE");
-`endif
-`ifdef FPGA_BOOT_LOADER_MODE
-    initial $display("FPGA_BOOT_LOADER_MODE ENABLE");
 `endif
 `ifdef FST_UART_MODE
     wire fst_uart_mode = 1'b1;
@@ -462,6 +463,7 @@ module PSC_ONE_138K_Chip #(
     //==========================================================
     wire sdram_init_fin = init_calib_complete;
     ddr3_axi_controller #(
+        .CLK_FREQ_MHz       (CLK_FREQ),
         .ADDR_WIDTH         (24),
         .DATA_WIDTH         (DATA_WIDTH),
         .ID_WIDTH           (ID_WIDTH)

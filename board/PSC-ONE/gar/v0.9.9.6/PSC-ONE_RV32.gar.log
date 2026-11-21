@@ -1,4 +1,4 @@
-********* Archive Project on 2026-11-20 18:48:55 *********
+********* Archive Project on 2026-11-21 18:35:59 *********
 Tool Version: V1.9.12.03
 Archive file: /home/haruhiko/Program/Gowin/PSC-ONE_RV32/PSC-ONE_RV32.gar
 Archive files successfully
@@ -8,10 +8,6 @@ Archive files successfully
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/PSC-ONE_RV32.gprj
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/PSC-ONE_RV32.gprj.user
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/impl/PSC-ONE_RV32_process_config.json
-/home/haruhiko/Program/Gowin/PSC-ONE_RV32/impl/gwsynthesis/PSC-ONE_RV32.prj
-/home/haruhiko/Program/Gowin/PSC-ONE_RV32/impl/gwsynthesis/PSC-ONE_RV32.vg
-/home/haruhiko/Program/Gowin/PSC-ONE_RV32/impl/gwsynthesis/PSC-ONE_RV32_syn.rpt.html
-/home/haruhiko/Program/Gowin/PSC-ONE_RV32/impl/gwsynthesis/PSC-ONE_RV32_syn_rsc.xml
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/PSC_ONE_tang20k_cst.cst
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/PSC_ONE_tang20k_sdc.sdc
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/soc/axi/PSC_RV32_CacheAXI.v
@@ -28,7 +24,7 @@ Archive files successfully
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/soc/cache/src/dm_cache_tag.v
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/soc/cpu_v1/Branch.sv
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/soc/cpu_v1/Csr.sv
-/home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/soc/cpu_v1/Decorder.sv
+/home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/soc/cpu_v1/Decoder.sv
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/soc/cpu_v1/Execute.sv
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/soc/cpu_v1/Execute_Divider.sv
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/soc/cpu_v1/Execute_Mul.sv
@@ -92,5 +88,5 @@ Archive files successfully
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/tang20k/top/Delay_N.v
 /home/haruhiko/Program/Gowin/PSC-ONE_RV32/src/tang20k/top/PSC_ONE_Chip.v
 
-********* Total 86 files to archive *********
+********* Total 82 files to archive *********
 
