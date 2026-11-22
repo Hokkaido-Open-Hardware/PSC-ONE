@@ -54,7 +54,9 @@ module PSC_ONE_RV64_core #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 64'h1000_9010,
     parameter ICACHE_TAGLSB = 11, // 2 KiB (64 x 32-byte lines)
     parameter DCACHE_TAGLSB = 9,  // 512 B (16 x 32-byte lines)
-    parameter ENABLE_PULP = 1'b0
+    parameter ENABLE_PULP = 1'b0,
+    parameter integer PSC_CACHE_2WAY = 0,
+    parameter integer PSC_CACHE_IO_2WAY = 0
 )(
     // CLK, RESET
     input  wire                         clock,
@@ -362,6 +364,7 @@ module PSC_ONE_RV64_core #(
     wire         program_cache_miss_pulse;
 
     cache_dma_controller #(
+        .PSC_CACHE_2WAY      (PSC_CACHE_2WAY),
         .ADDR_WIDTH          (64),
         .CPU_DATA_WIDTH      (32),
         .CACHE_DATA_WIDTH    (256),
@@ -426,6 +429,7 @@ module PSC_ONE_RV64_core #(
     wire    cpu_cache_wb    = csr_DCACHE_CTRL[1];
 
     cache_dma_controller_io #(
+        .PSC_CACHE_IO_2WAY   (PSC_CACHE_IO_2WAY),
         .PROTECT_MODE        (PROTECT_MODE),
         .PROTECT_ADDR        (PROTECT_ADDR),
         .ADDR_WIDTH          (64),

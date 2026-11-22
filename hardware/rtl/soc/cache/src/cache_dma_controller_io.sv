@@ -1,6 +1,6 @@
 // ===================================================================
 // cache_dma_controller_io  (for packed dm_cache_tag / write-first RAMs)
-//   - 32B line, Direct-Mapped, Write-back / Write-allocate
+//   - 32B line, direct-mapped or two-way, write-back / write-allocate
 //   - Sync-read 1clk (tag/data) に整合（ISSUE → COMPARE）
 //   - mem_req_ready で外部要求をゲート
 //   - 単一 PIO アドレスはキャッシュ迂回で即応答
@@ -10,6 +10,7 @@
 // ===================================================================
 `timescale 1ns/1ps
 module cache_dma_controller_io #(
+    parameter int PSC_CACHE_IO_2WAY = 0, // 1: two ways at the same total capacity
     parameter PROTECT_MODE        = 1,
     parameter PROTECT_ADDR        = 32'h0001_0000,
     parameter ADDR_WIDTH          = 32,
@@ -120,7 +121,13 @@ module cache_dma_controller_io #(
     localparam integer WORD_BITS = $clog2(LINE_WORDS);
 
     localparam integer INDEX_WIDTH_BA = TAGLSB - OFFSET_BITS;   // 例:9（index=[13:5]）
-    localparam integer USED_BITS_BA   = TAG_WIDTH + INDEX_WIDTH_BA + OFFSET_BITS;
+    localparam integer WAY_BITS       = (PSC_CACHE_IO_2WAY == 1) ? 1 : 0;
+    localparam integer TAG_LOW        = TAGLSB - WAY_BITS;
+    localparam integer SET_BITS       = INDEX_WIDTH_BA - WAY_BITS;
+    localparam integer SET_COUNT      = 1 << SET_BITS;
+    localparam integer SET_ADDR_WIDTH = SET_BITS > 0 ? SET_BITS : 1;
+    localparam integer LINE_TAG_WIDTH = TAG_WIDTH + WAY_BITS;
+    localparam integer ENTRY_WIDTH    = TAG_ENTRY_WIDTH + WAY_BITS;
     localparam integer DEPTH          = (1 << INDEX_WIDTH_BA);
 
     // Req Ready
@@ -201,15 +208,15 @@ module cache_dma_controller_io #(
 
     // ルックアップ（次拍でBRAM出力）
     logic  [INDEX_WIDTH_BA-1:0] cur_index_r;      // RAM アドレス
-    logic  [TAG_WIDTH-1:0]      cur_tag_r;        // 比較用タグ
+    logic  [LINE_TAG_WIDTH-1:0] cur_tag_r;        // 比較用タグ
 
     // Tag RAM I/F（パック形式）
     logic                           tag_we;
-    logic  [TAG_ENTRY_WIDTH-1:0]    tag_write;
-    wire [TAG_ENTRY_WIDTH-1:0]      tag_read;
+    logic  [ENTRY_WIDTH-1:0]    tag_write;
+    wire [ENTRY_WIDTH-1:0]      tag_read;
 
     // アンパック
-    wire [TAG_WIDTH-1:0] tag_read_tag = tag_read[TAG_ENTRY_WIDTH-1:2];
+    wire [LINE_TAG_WIDTH-1:0] tag_read_tag = tag_read[ENTRY_WIDTH-1:2];
     wire tag_read_valid = tag_read[1];
     wire tag_read_dirty = tag_read[0];
 
@@ -288,12 +295,12 @@ module cache_dma_controller_io #(
     function [ADDR_WIDTH-1:0] alloc_addr_ba_f(input [ADDR_WIDTH-1:0] addr);
         alloc_addr_ba_f = { addr[ADDR_WIDTH-1:OFFSET_BITS], {OFFSET_BITS{1'b0}} };
     endfunction
-    function [ADDR_WIDTH-1:0] wb_addr_ba_f(
-        input [TAG_WIDTH-1:0] tag_i, input [INDEX_WIDTH_BA-1:0] index_i
-    );
-        wb_addr_ba_f = { {(ADDR_WIDTH-USED_BITS_BA){1'b0}}, tag_i, index_i, {OFFSET_BITS{1'b0}} };
-    endfunction
-    wire [ADDR_WIDTH-1:0] victim_addr_ba = wb_addr_ba_f(tag_read_tag, cur_index_r);
+    // The physical line index includes the way. Only its set bits belong
+    // in the external writeback address, including for a single-set cache.
+    wire [SET_ADDR_WIDTH-1:0] cur_set = SET_BITS == 0 ? '0 : SET_ADDR_WIDTH'(cur_index_r);
+    wire [SET_ADDR_WIDTH-1:0] req_set = SET_BITS == 0 ? '0 : SET_ADDR_WIDTH'(req_addr_b >> OFFSET_BITS);
+    wire [ADDR_WIDTH-1:0] victim_addr_ba =
+        (ADDR_WIDTH'(tag_read_tag) << TAG_LOW) | (ADDR_WIDTH'(cur_set) << OFFSET_BITS);
 
     // MMIO（一致かつ0以外で有効）
     function mmio_hit(input [ADDR_WIDTH-1:0] addr_mmio);
@@ -423,7 +430,7 @@ module cache_dma_controller_io #(
     wire writeback_request  = eviction_request || sweep_request;
     wire memory_request     = miss_request || post_alloc_request || sweep_request;
     wire [ADDR_WIDTH-1:0] memory_request_addr = writeback_request
-        ? wb_addr_ba_f(tag_read_tag, cur_index_r) : alloc_addr_ba_f(req_addr_b);
+        ? victim_addr_ba : alloc_addr_ba_f(req_addr_b);
 
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n) begin
@@ -458,8 +465,59 @@ module cache_dma_controller_io #(
         line_cache_fill_match[1] ? 1'b1 : !line_cache_valid[0] ? 1'b0 :
         !line_cache_valid[1] ? 1'b1 : line_cache_lru;
 
+    wire [1:0] reg_victim_match;
+    wire [INDEX_WIDTH_BA-1:0] data_index;
+    wire [ENTRY_WIDTH-1:0] tag0;
+    wire write_tag0;
+
+    if (PSC_CACHE_IO_2WAY == 1) begin : g_two_way
+        wire [ENTRY_WIDTH-1:0] tag1;
+        wire hit0 = tag0[1] && tag0[ENTRY_WIDTH-1:2] == cur_tag_r;
+        wire hit1 = tag1[1] && tag1[ENTRY_WIDTH-1:2] == cur_tag_r;
+        logic lru_way [0:SET_COUNT-1];
+        logic lru_read;
+        logic [1:0] reg_way;
+        wire current_way = cur_index_r[INDEX_WIDTH_BA-1];
+        wire reg_hit_way = line_cache_match[0] ? reg_way[0] : reg_way[1];
+        // On a miss choose an invalid way first, then the least recently used.
+        wire lookup_way = hit1 || (!hit0 && tag0[1] && (!tag1[1] || lru_read));
+        // ISSUE drives the selected line into the synchronous data RAM.
+        // Latch its physical index for compare, backpressure and delayed writes.
+        wire ram_way = state == S_LOOKUP_ISSUE ? lookup_way : current_way;
+        assign data_index = (INDEX_WIDTH_BA'(ram_way) << SET_BITS) | INDEX_WIDTH_BA'(cur_set);
+        assign tag_read = ram_way ? tag1 : tag0;
+        assign write_tag0 = tag_we && !current_way;
+
+        always_ff @(posedge clock) begin
+            lru_read <= lru_way[cur_set];
+            if (read_hit || read_fill)
+                reg_way[line_cache_fill_slot] <= current_way;
+            if (line_cache_hit || read_hit || cache_write_hit || cache_fill)
+                lru_way[req_set] <= !(line_cache_hit ? reg_hit_way : current_way);
+        end
+
+        for (genvar i = 0; i < 2; i = i + 1) begin : g_reg_victim
+            assign reg_victim_match[i] = (reg_way[i] == current_way) &&
+                (SET_BITS == 0 || SET_ADDR_WIDTH'(line_cache_addr[i]) == cur_set);
+        end
+
+        dm_cache_tag #(
+            .TAG_WIDTH(ENTRY_WIDTH), .INDEX_WIDTH(SET_ADDR_WIDTH), .DEPTH(SET_COUNT)
+        ) u_tag_way1 (
+            .clk(clock), .we(tag_we && current_way), .index(cur_set),
+            .tag_write(tag_write), .tag_read(tag1)
+        );
+    end else begin : g_direct_mapped
+        assign data_index = cur_index_r;
+        assign tag_read = tag0;
+        assign write_tag0 = tag_we;
+        for (genvar i = 0; i < 2; i = i + 1) begin : g_reg_victim
+            assign reg_victim_match[i] = line_cache_addr[i][INDEX_WIDTH_BA-1:0] == cur_index_r;
+        end
+    end
+
     // Stores and maintenance conservatively invalidate both entries. A
-    // backing-cache replacement invalidates only copies of its index, so a
+    // backing-cache replacement invalidates only copies of its physical line, so a
     // fill at another index can keep the other REG line. External DMA still
     // uses the existing WB/clear software protocol. Maintenance wins over fill.
     always_ff @(posedge clock or negedge reset_n) begin
@@ -471,9 +529,9 @@ module cache_dma_controller_io #(
             line_cache_valid <= 2'b00;
             line_cache_lru <= 1'b0;
         end else if (miss_request) begin
-            if (line_cache_addr[0][INDEX_WIDTH_BA-1:0] == cur_index_r)
+            if (reg_victim_match[0])
                 line_cache_valid[0] <= 1'b0;
-            if (line_cache_addr[1][INDEX_WIDTH_BA-1:0] == cur_index_r)
+            if (reg_victim_match[1])
                 line_cache_valid[1] <= 1'b0;
         end else if (read_hit || read_fill) begin
             line_cache_valid[line_cache_fill_slot] <= 1'b1;
@@ -504,16 +562,15 @@ module cache_dma_controller_io #(
         end
     end
 
-    // Both RAMs see only cur_index_r. It changes for a demand lookup only
-    // after a registered REG-cache miss; REG hits leave RAM addresses held.
+    // REG hits leave the backing RAM addresses held.
     // READ waits for the synchronous RAM, ISSUE captures its small tag result.
-    logic [TAG_ENTRY_WIDTH-1:0] lookup_tag_r;
-    wire [TAG_WIDTH-1:0] lookup_tag = lookup_tag_r[TAG_ENTRY_WIDTH-1:2];
+    logic [ENTRY_WIDTH-1:0] lookup_tag_r;
+    wire [LINE_TAG_WIDTH-1:0] lookup_tag = lookup_tag_r[ENTRY_WIDTH-1:2];
     wire lookup_valid = lookup_tag_r[1];
     wire lookup_dirty = lookup_tag_r[0];
     always_ff @(posedge clock or negedge reset_n) begin
         if (!reset_n)
-            lookup_tag_r <= {TAG_ENTRY_WIDTH{1'b0}};
+            lookup_tag_r <= {ENTRY_WIDTH{1'b0}};
         else if (state == S_LOOKUP_ISSUE)
             lookup_tag_r <= tag_read;
     end
@@ -575,7 +632,7 @@ module cache_dma_controller_io #(
             req_word_sel_r<= '0;
 
             cur_index_r   <= {INDEX_WIDTH_BA{1'b0}};
-            cur_tag_r     <= {TAG_WIDTH{1'b0}};
+            cur_tag_r     <= {LINE_TAG_WIDTH{1'b0}};
 
             mmu_ready     <= 1'b0;
 
@@ -647,7 +704,7 @@ module cache_dma_controller_io #(
                 // state = 0
                 S_INIT: begin
                     cur_index_r <= init_idx;
-                    tag_write   <= {TAG_ENTRY_WIDTH{1'b0}}; // {tag=0, valid=0, dirty=0}
+                    tag_write   <= {ENTRY_WIDTH{1'b0}}; // {tag=0, valid=0, dirty=0}
                     tag_we      <= 1'b1;
 
                     if (init_idx == DEPTH-1) begin
@@ -672,7 +729,7 @@ module cache_dma_controller_io #(
                         req_write_sel_r <= selected_write_sel;
                         byte_sel        <= selected_addr[1:0];
                         half_sel        <= selected_addr[1];
-                        cur_tag_r       <= selected_addr[TAGMSB:TAGLSB];
+                        cur_tag_r       <= selected_addr[TAGMSB:TAG_LOW];
                         if (select_mmu) mmu_req_slot_valid <= 1'b0;
                         else if (select_sa) sa_req_slot_valid <= 1'b0;
                         else cpu_req_slot_valid <= 1'b0;
@@ -705,7 +762,7 @@ module cache_dma_controller_io #(
                         mmio_wdata <= req_rw_double ? req_wdata : {32'b0, req_wdata[31:0]};
                         state <= S_MMIO_WAIT;
                     end else begin
-                        cur_index_r <= req_addr_b[TAGLSB-1:OFFSET_BITS];
+                        cur_index_r <= INDEX_WIDTH_BA'(req_set);
                         state <= S_LOOKUP_READ;
                     end
                 end
@@ -726,6 +783,7 @@ module cache_dma_controller_io #(
                 // ---- index提示（1clk 後に tag/data が有効） ----
                 // state = 4
                 S_LOOKUP_ISSUE: begin
+                    cur_index_r <= data_index;
                     state <= S_COMPARE;
                 end
 
@@ -906,14 +964,15 @@ module cache_dma_controller_io #(
     // -------------------- RAM インスタンス --------------------
     // TAG（パック：{tag, valid, dirty}）
     dm_cache_tag #(
-        .TAG_WIDTH  (TAG_ENTRY_WIDTH),      // ★パック幅を指定
-        .INDEX_WIDTH(INDEX_WIDTH_BA)
+        .TAG_WIDTH  (ENTRY_WIDTH),      // ★パック幅を指定
+        .INDEX_WIDTH(SET_ADDR_WIDTH),
+        .DEPTH      (SET_COUNT)
     ) u_tag (
         .clk       (clock),
-        .we        (tag_we),
-        .index     (cur_index_r),
+        .we        (write_tag0),
+        .index     (cur_set),
         .tag_write (tag_write),
-        .tag_read  (tag_read)
+        .tag_read  (tag0)
     );
 
     // DATA（write-first 同期読み）
@@ -923,7 +982,7 @@ module cache_dma_controller_io #(
     ) u_data (
         .clk        (clock),
         .we         (data_we),
-        .index      (cur_index_r),
+        .index      (data_index),
         .data_write (data_write),
         .data_read  (data_read)
     );

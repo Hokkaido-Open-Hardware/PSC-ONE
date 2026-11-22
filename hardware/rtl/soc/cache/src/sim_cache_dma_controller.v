@@ -28,7 +28,9 @@ module sim_cache_dma_controller #(
     parameter [ADDR_WIDTH-1:0]  PSC_SD_IF_SECTOR    = 32'h1000_6004,
     parameter [ADDR_WIDTH-1:0]  PSC_SD_IF_CTRL      = 32'h1000_6008,
     parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_RX     = 32'h1000_7000,
-    parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_ST     = 32'h1000_7004
+    parameter [ADDR_WIDTH-1:0]  PSC_I2S_ADDR_ST     = 32'h1000_7004,
+    parameter integer PSC_CACHE_2WAY = 0,
+    parameter integer PSC_CACHE_IO_2WAY = 0
 )(
     input                   clock,
     input                   reset_n,
@@ -104,6 +106,7 @@ module sim_cache_dma_controller #(
 
     /* cache controller */
     cache_dma_controller #(
+        .PSC_CACHE_2WAY      (PSC_CACHE_2WAY),
         .ADDR_WIDTH          (32),
         .CPU_DATA_WIDTH      (32),
         .CACHE_DATA_WIDTH    (256),
@@ -234,6 +237,7 @@ module sim_cache_dma_controller #(
     assign data_mem_write_ready = dcache_ready;
 
     cache_dma_controller_io #(
+        .PSC_CACHE_IO_2WAY   (PSC_CACHE_IO_2WAY),
         .PROTECT_MODE        (PROTECT_MODE),
         .PROTECT_ADDR        (PROTECT_ADDR),
         .ADDR_WIDTH          (32),

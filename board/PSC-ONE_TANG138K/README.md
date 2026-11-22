@@ -10,6 +10,13 @@ The PSC_RV32 CPU uses separate instruction and data caches and controls peripher
 The AXI4 arbiter gives the CPU, DMA engine, and boot ROM loader shared access to external DDR3 memory.<br>
 Custom hardware in `USER_LOGIC` can access the same memory through its own 32-bit AXI4 port.
 
+### RV32 v1 address translation
+
+The board top defaults to `ENABLE_SV32_TLB=1`. This gives each RV32 v1 MMU
+an independent eight-entry TLB for 4 KiB pages. Set the parameter to `0` on
+`PSC_ONE_138K_Chip` before synthesis to use the original page-table walker
+and its one-entry caches. Both configurations handle 4 MiB pages in the walker.
+
 ## USER_LOGIC
 
 `USER_LOGIC` is an FPGA region connected to the PSC-ONE AXI bus. You can use it to implement your own logic. I plan to use this region for an AI accelerator and confidential company logic.

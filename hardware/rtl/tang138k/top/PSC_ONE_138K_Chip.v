@@ -35,7 +35,10 @@
 module PSC_ONE_138K_Chip #(
     parameter integer CLK_FREQ           = 100,
     parameter integer ID_WIDTH           = 1,
-    parameter integer DATA_WIDTH         = 32    // AXI Data bus. fixed 32bit Bus
+    parameter integer DATA_WIDTH         = 32,   // AXI Data bus. fixed 32bit Bus
+    parameter integer PSC_CACHE_2WAY     = 1,
+    parameter integer PSC_CACHE_IO_2WAY  = 1,
+    parameter ENABLE_SV32_TLB = 1'b1
 )(
     // ==== RV32IS CPU IF ====
     input  wire         sys_clk,
@@ -463,7 +466,6 @@ module PSC_ONE_138K_Chip #(
     //==========================================================
     wire sdram_init_fin = init_calib_complete;
     ddr3_axi_controller #(
-        .CLK_FREQ_MHz       (CLK_FREQ),
         .ADDR_WIDTH         (24),
         .DATA_WIDTH         (DATA_WIDTH),
         .ID_WIDTH           (ID_WIDTH)
@@ -655,6 +657,9 @@ module PSC_ONE_138K_Chip #(
     // PSC-ONE SOC TOP
     //==========================================================
     PSC_ONE_SOC #(
+        .ENABLE_SV32_TLB    (ENABLE_SV32_TLB),
+        .PSC_CACHE_IO_2WAY  (PSC_CACHE_IO_2WAY),
+        .PSC_CACHE_2WAY     (PSC_CACHE_2WAY),
         .CLK_FREQ           (CLK_FREQ),
         .ADDR_WIDTH         (32),
         .ID_WIDTH           (ID_WIDTH),

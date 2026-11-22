@@ -99,6 +99,10 @@ module PSC_ONE_138K_Chip_sim #(
         .gpio_uart_rx        (),
         .gpio_uart_tx        (),
 
+        // ---- HDMI ----
+        .tmds_d_p_0          (),
+        .tmds_clk_p_0        (),
+
         // ---------------- PSC-ONE SW ----------------
         .PSCONE_SW1          (PSCONE_SW1),
         .PSCONE_SW2          (PSCONE_SW2),

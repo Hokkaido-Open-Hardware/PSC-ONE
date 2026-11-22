@@ -44,7 +44,9 @@ module PSC_ONE_Chip #(
     parameter integer CLK_FREQ           = 80,
     parameter integer SDRAM_ADDR_WIDTH   = 24,
     parameter integer ID_WIDTH           = 1,
-    parameter integer DATA_WIDTH         = 32    // AXI Data bus. fixed 32bit Bus
+    parameter integer DATA_WIDTH         = 32,   // AXI Data bus. fixed 32bit Bus
+    parameter integer PSC_CACHE_IO_2WAY  = 0,
+    parameter integer PSC_CACHE_2WAY     = 0
 )(
     // ==== RV32IS CPU IF ====
     input  wire         sys_clk,
@@ -585,6 +587,8 @@ module PSC_ONE_Chip #(
     // PSC-ONE SOC TOP
     //==========================================================
     PSC_ONE_SOC #(
+        .PSC_CACHE_2WAY     (PSC_CACHE_2WAY),
+        .PSC_CACHE_IO_2WAY  (PSC_CACHE_IO_2WAY),
         .CLK_FREQ           (CLK_FREQ),
         .ADDR_WIDTH         (32),
         .ID_WIDTH           (ID_WIDTH),

@@ -42,7 +42,10 @@ module PSC_ONE_SOC #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_STATUS     = 32'h1000_9004,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT     = 32'h1000_9008,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL    = 32'h1000_900C,
-    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ        = 32'h1000_9010
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ        = 32'h1000_9010,
+    parameter integer PSC_CACHE_2WAY                = 0,
+    parameter integer PSC_CACHE_IO_2WAY             = 0,
+    parameter ENABLE_SV32_TLB = 1'b0
 )(
     // ==== RV32IS CPU IF ====
     input  wire         clock,
@@ -304,7 +307,10 @@ module PSC_ONE_SOC #(
         .CPU_DATA_WIDTH      (32), // Existing MMIO/DMA peripherals are 32-bit.
 `else
     PSC_ONE_RV32_core #(
+        .ENABLE_SV32_TLB     (ENABLE_SV32_TLB),
 `endif
+        .PSC_CACHE_2WAY      (PSC_CACHE_2WAY),
+        .PSC_CACHE_IO_2WAY   (PSC_CACHE_IO_2WAY),
         .ADDR_WIDTH          (ADDR_WIDTH),
         .ID_WIDTH            (ID_WIDTH),
         .DATA_WIDTH          (DATA_WIDTH),

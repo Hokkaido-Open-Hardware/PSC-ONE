@@ -5,6 +5,9 @@ module cache_regression;
     parameter integer TAGLSB = 6;
     parameter integer STALL  = 1;
     localparam integer DEPTH = 1 << (TAGLSB - 5);
+    parameter integer PSC_CACHE_2WAY = 0;
+    localparam integer WAYS = PSC_CACHE_2WAY ? 2 : 1;
+    localparam integer SETS = DEPTH / WAYS;
     reg clock                = 0;
     always #5 clock = !clock;
     reg reset_n              = 0;
@@ -15,11 +18,18 @@ module cache_regression;
     wire [255:0] mem_data_out;
     reg mem_ready            = 0, mem_req_ready = 0;
     reg [255:0] mem_data_in  = 0;
-    cache_dma_controller #(.TAGLSB(TAGLSB)) dut (.*);
+    cache_dma_controller #(
+`ifndef CACHE_TEST_LEGACY_RTL
+        .PSC_CACHE_2WAY(PSC_CACHE_2WAY),
+`endif
+        .TAGLSB(TAGLSB)
+    ) dut (.*);
 
     reg [255:0] memory [0:8191];
     reg [255:0] model_data [0:DEPTH-1];
-    integer model_tag [0:DEPTH-1];
+    integer model_line [0:DEPTH-1];
+    integer last_access [0:DEPTH-1];
+    integer access_number = 0;
     reg model_valid [0:DEPTH-1], model_dirty [0:DEPTH-1];
     reg [31:0] expected_addr [0:1];
     reg expected_rw [0:1];
@@ -72,6 +82,30 @@ module cache_regression;
         end
     end
 
+    // Reference replacement uses timestamps independent of the RTL LRU bit.
+    function integer model_slot(input integer line);
+        integer w, slot, oldest;
+        begin
+            oldest = line % SETS;
+            for (w = 0; w < WAYS; w = w + 1) begin
+                slot = line % SETS + w * SETS;
+                if (model_valid[slot] && model_line[slot] == line)
+                    return slot;
+                if (model_valid[oldest] &&
+                    (!model_valid[slot] || last_access[slot] < last_access[oldest]))
+                    oldest = slot;
+            end
+            return oldest;
+        end
+    endfunction
+
+    task touch_slot(input integer slot);
+        begin
+            access_number = access_number + 1;
+            last_access[slot] = access_number;
+        end
+    endtask
+
     task invalidate_model;
         integer k;
         begin
@@ -95,21 +129,20 @@ module cache_regression;
 
     task access_cache(input reg wr, input integer addr, input reg [31:0] data,
                       input reg burst, input reg clear_busy, input reg report_latency);
-        integer index, tag, line, word_sel, count, cycle, start_tick, first_tick;
+        integer index, line, word_sel, count, cycle, start_tick, first_tick;
         integer old_hits, old_misses;
         reg hit, dirty;
         reg [255:0] expected_line;
         begin
-            index                                 = (addr >> 5) % DEPTH;
-            tag                                   = addr >> TAGLSB;
             line                                  = addr >> 5;
+            index                                 = model_slot(line);
             word_sel                              = (addr >> 2) % 8;
-            hit                                   = model_valid[index] && model_tag[index] == tag;
+            hit                                   = model_valid[index] && model_line[index] == line;
             dirty                                 = model_valid[index] && model_dirty[index];
             expected_count                        = 0;
             seen_count                            = 0;
             if (!hit && dirty) begin
-                expected_addr[expected_count] = (model_tag[index] << TAGLSB) | (index << 5);
+                expected_addr[expected_count] = model_line[index] << 5;
                 expected_rw[expected_count]   = 1;
                 expected_data[expected_count] = model_data[index];
                 expected_count                = expected_count + 1;
@@ -122,7 +155,8 @@ module cache_regression;
             expected_line                         = hit ? model_data[index] : (wr ? 256'b0 : memory[line]);
             if (wr) expected_line[word_sel*32 +: 32] = data;
             model_data[index]                     = expected_line;
-            model_tag[index]                      = tag;
+            model_line[index]                     = line;
+            touch_slot(index);
             model_valid[index]                    = 1;
             model_dirty[index]                    = wr || (hit && dirty);
             old_hits                              = hits;
@@ -179,16 +213,20 @@ module cache_regression;
     // The existing one-entry slot accepts a pulse while another request is
     // active. Check that shortening the FSM does not lose that queued pulse.
     task queued_requests(input reg first_write);
-        integer n, k, old_hits;
+        integer n, k, old_hits, first_slot, second_slot;
         reg [31:0] expected_word [0:1];
         begin
             access_cache(0, 0, 0, 0, 0, 0);
             access_cache(0, 32, 0, 0, 0, 0);
-            expected_word[0]                      = model_data[0][31:0];
-            expected_word[1]                      = first_write ? 32'hface1234 : model_data[1][31:0];
+            first_slot = model_slot(0);
+            second_slot = first_write ? first_slot : model_slot(1);
+            touch_slot(first_slot);
+            touch_slot(second_slot);
+            expected_word[0] = model_data[first_slot][31:0];
+            expected_word[1] = first_write ? 32'hface1234 : model_data[second_slot][31:0];
             if (first_write) begin
-                model_data[0][31:0]           = 32'hface1234;
-                model_dirty[0]                = 1;
+                model_data[first_slot][31:0]  = 32'hface1234;
+                model_dirty[first_slot]       = 1;
             end
             expected_count                        = 0;
             seen_count                            = 0;
@@ -244,6 +282,17 @@ module cache_regression;
         queued_requests(0);
         queued_requests(1);
         clear_cache();
+        if (WAYS == 2) begin
+            // Rival lines at the same set. A hit on A must keep it resident
+            // while a third line C evicts dirty B, including B's upper tag bit.
+            access_cache(0, 0, 0, 0, 0, 0);                     // A
+            access_cache(1, SETS*32+4, 32'hc001cafe, 0, 0, 0);  // B
+            access_cache(0, 0, 0, 1, 0, 0);                     // A hit
+            access_cache(0, 2*SETS*32, 0, 0, 0, 0);             // C
+            access_cache(0, 0, 0, 0, 0, 0);                     // A still hits
+            access_cache(0, SETS*32+4, 0, 1, 0, 0);             // B reload
+            clear_cache();
+        end
         for (i = 0; i < 600; i = i + 1) begin
             rng                                   = (rng >> 1) ^ (32'hd0000001 & {32{rng[0]}});
             access_cache(rng[0], ((rng >> 5) % (DEPTH*16))*4, rng,
@@ -274,10 +323,12 @@ module cache_regression;
         end
         if (!cpu_ready || cpu_data_out !== memory[0][31:0] || seen_count != 1)
             $fatal(1, "INIT queued request lost/corrupted");
-        model_valid[0]                  = 1;
-        model_tag[0]                    = 0;
-        model_dirty[0]                  = 0;
-        model_data[0]                   = memory[0];
+        i = model_slot(0);
+        model_valid[i] = 1;
+        model_line[i] = 0;
+        model_dirty[i] = 0;
+        model_data[i] = memory[0];
+        touch_slot(i);
         transactions                    = transactions + 1;
         @(negedge clock); #2;
         access_cache(0, (DEPTH-1)*32, 0, 1, 0, 0);

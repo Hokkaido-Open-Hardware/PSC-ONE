@@ -8,7 +8,8 @@
 
 module PSC_RV32_FetchUnit #(
     parameter logic BURST_MODE = 1'b1,
-    parameter int   FIFO_DEPTH = 16
+    parameter int   FIFO_DEPTH = 16,
+    parameter bit ENABLE_SV32_TLB = 1'b0
 )(
     input  logic        clock,
     input  logic        reset_n,
@@ -336,7 +337,9 @@ module PSC_RV32_FetchUnit #(
         end
     end
 
-    MMU u_mmu_i(
+    MMU #(
+        .ENABLE_SV32_TLB (ENABLE_SV32_TLB)
+    ) u_mmu_i(
         .clk                      (clock),
         .reset_n                  (reset_n),
         .MMU_enb                  (mmu_valid),

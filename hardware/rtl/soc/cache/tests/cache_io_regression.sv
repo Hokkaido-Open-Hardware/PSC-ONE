@@ -1,7 +1,16 @@
 `timescale 1ns/1ps
 // Standalone transaction/latency regression, including the 2-line REG cache.
-// Two backing-cache lines make exhaustive conflict/WB tests fast.
-module cache_io_regression;
+module cache_io_regression #(
+    parameter int PSC_CACHE_IO_2WAY = 0,
+    parameter int TAGLSB = 6
+);
+    localparam int CAPACITY = 1 << TAGLSB;
+    localparam int SET_COUNT = CAPACITY / (32 * (1 + PSC_CACHE_IO_2WAY));
+    // In direct mode B has a different index. In two-way mode all three
+    // lines share a set, with B most recently used before C replaces A.
+    localparam int LINE_A = 'h1000;
+    localparam int LINE_B = LINE_A + CAPACITY / 2;
+    localparam int LINE_C = LINE_A + CAPACITY;
     reg clock = 0; always #5 clock = ~clock;
     reg reset_n = 0;
     reg cpu_rvalid = 0;
@@ -44,7 +53,11 @@ module cache_io_regression;
     wire [255:0] mem_data_out;
     wire cache_hit_pulse;
     wire cache_miss_pulse;
-    cache_dma_controller_io #(.TAGLSB(6), .PROTECT_ADDR(32'h100),
+    cache_dma_controller_io #(
+`ifndef CACHE_TEST_LEGACY_RTL
+        .PSC_CACHE_IO_2WAY(PSC_CACHE_IO_2WAY),
+`endif
+        .TAGLSB(TAGLSB), .PROTECT_ADDR(32'h100),
         .PIO_ADDRESS(32'h10000001)) dut (.*);
 
     reg [255:0] memory [0:4095];
@@ -205,7 +218,8 @@ module cache_io_regression;
            dut.line_cache_addr[0] == dut.line_cache_addr[1])
             $fatal(1,"duplicate REG entries for the same line");
         if(reset_n && dut.line_cache_hit) begin
-            if(dut.u_tag.index !== dut.cur_index_r || dut.u_data.index !== dut.cur_index_r || dut.tag_we || dut.data_we || mem_valid || mmio_valid)
+            if(dut.u_tag.index !== (dut.cur_index_r & (SET_COUNT-1)) ||
+               dut.u_data.index !== dut.cur_index_r || dut.tag_we || dut.data_we || mem_valid || mmio_valid)
                 $fatal(1,"REG hit accessed backing cache/memory");
             if(dut.req_is_write || dut.line_cache_maintenance)
                 $fatal(1,"REG hit bypassed store/maintenance");
@@ -222,37 +236,74 @@ module cache_io_regression;
         if(cpu_ready || sa_ready || mmu_ready || mem_valid || mmio_valid)
             $fatal(1,"reset output mismatch");
         @(negedge clock); reset_n=1; mem_req_ready=1;
-        transact(0,0,'h1000,2,0,"CPU_read_clean_miss");
+        transact(0,0,LINE_A,2,0,"CPU_read_clean_miss");
         for(j=0;j<3;j=j+1)
-            for(k=0;k<8;k=k+1) reg_read(j,'h1000+4*k);
-        // Both backing indices must coexist in REG and hit within two clocks of the sampling
+            for(k=0;k<8;k=k+1) reg_read(j,LINE_A+4*k);
+        // Both backing lines must coexist in REG and hit within two clocks of the sampling
         // edge for all words and ports, even when alternating lines.
-        transact(0,0,'h1020,2,0,"");
+        transact(0,0,LINE_B,2,0,"");
         for(j=0;j<3;j=j+1)
             for(k=0;k<8;k=k+1) begin
-                reg_read(j,'h1000+4*k);
-                reg_read(j,'h1020+4*k);
+                reg_read(j,LINE_A+4*k);
+                reg_read(j,LINE_B+4*k);
             end
         // A conflicting backing-cache fill must invalidate A's REG copy,
         // but leave B available in REG. Reading A again must access memory.
         old_reads=reads;
-        transact(0,0,'h1040,2,0,"REG_backing_index_conflict");
+        transact(0,0,LINE_C,2,0,"REG_backing_index_conflict");
         if(reads!=old_reads+1) $fatal(1,"conflict did not fill from memory");
-        reg_read(0,'h1020);
+        reg_read(0,LINE_B);
         old_reads=reads;
-        transact(0,0,'h1000,2,0,"REG_after_backing_eviction");
+        transact(0,0,LINE_A,2,0,"REG_after_backing_eviction");
         if(reads!=old_reads+1) $fatal(1,"evicted line survived in REG");
-        reg_read(0,'h1020);
-        reg_read(0,'h1000);
+        reg_read(0,LINE_B);
+        reg_read(0,LINE_A);
         // A store invalidates both copies. Read hits on both backing lines
         // must repopulate the REG entries without external memory traffic.
-        transact(0,1,'h1004,2,expected['h1004/4],"");
+        transact(0,1,LINE_A+4,2,expected[(LINE_A+4)/4],"");
         if(dut.line_cache_valid) $fatal(1,"store did not invalidate both REG lines");
-        transact(0,0,'h1020,2,0,"");
+        transact(0,0,LINE_B,2,0,"");
         old_reads=reads;
-        transact(0,0,'h1000,2,0,"CPU_backing_read_hit");
+        transact(0,0,LINE_A,2,0,"CPU_backing_read_hit");
         if(latency!=4 || reads!=old_reads) $fatal(1,"backing hit did not use RAM");
-        reg_read(0,'h101c);
+        reg_read(0,LINE_A+28);
+        if (PSC_CACHE_IO_2WAY == 1) begin
+            // Two dirty lines must coexist. Touch A via REG after reading B
+            // so the next miss writes back B, including its partial store.
+            clear_cache();
+            old_writes = writes;
+            transact(0,1,LINE_A,2,32'h12345678,"");
+            transact(1,1,LINE_B,2,32'habcdef01,"");
+            transact(0,1,LINE_B+1,0,32'h55,"");
+            old_reads = reads;
+            transact(2,0,LINE_A,2,0,"");
+            transact(0,0,LINE_B,2,0,"");
+            reg_read(1,LINE_A);
+            if (writes != old_writes || reads != old_reads)
+                $fatal(1,"two dirty lines did not coexist");
+            if (SET_COUNT > 1) begin
+                // Leave way 1 most recent in a different set. This set's
+                // independent LRU bit must still choose B (way 1) below.
+                transact(2,0,LINE_A+32,2,0,"");
+                transact(2,0,LINE_B+32,2,0,"");
+                if (reads != old_reads+2) $fatal(1,"other set did not fill both ways");
+                old_reads = reads;
+            end
+            transact(0,1,LINE_C,2,32'hdcba4321,"");
+            if (writes != old_writes+1 || reads != old_reads+1 ||
+                memory[LINE_B/32][31:0] !== expected[LINE_B/4] ||
+                memory[LINE_A/32][31:0] === expected[LINE_A/4])
+                $fatal(1,"wrong dirty LRU victim");
+            old_writes = writes;
+            writeback("WB_two_dirty_ways");
+            if (writes != old_writes+2) $fatal(1,"WB did not visit both dirty ways");
+            clear_cache();
+            if (dut.line_cache_valid) $fatal(1,"clear retained REG lines");
+            old_reads = reads;
+            transact(0,0,LINE_A,2,0,"");
+            transact(0,0,LINE_C,2,0,"");
+            if (reads != old_reads+2) $fatal(1,"clear did not invalidate both ways");
+        end
         // Restore the original cold/hot sequence below after the added checks.
         clear_cache();
         transact(0,0,'h1000,2,0,"");

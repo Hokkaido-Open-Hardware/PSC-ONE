@@ -4,7 +4,9 @@
 
 `timescale 1ns/1ps
 
-module MMU (
+module MMU #(
+    parameter bit ENABLE_SV32_TLB = 1'b0
+) (
     input  logic            clk,
     input  logic            reset_n,
     input  logic            MMU_enb,
@@ -96,7 +98,8 @@ module MMU (
         S_L0_REQ   = 4'd5,
         S_L0_WAIT  = 4'd6,
         S_L0_CHECK = 4'd7,
-        S_DONE     = 4'd8
+        S_DONE     = 4'd8,
+        S_TLB_READ = 4'd9
     } state_t;
 
     state_t state;
@@ -162,6 +165,77 @@ module MMU (
                 (!pte[4] || (!x && req_mstatus[18]))) &&
                pte[6] && (!w || pte[7]);
     endfunction
+
+    // Eight fully associative translations for 4 KiB pages. All entries share
+    // one address space. The first fill in a new address space drops the old set.
+    wire tlb_hit;
+    wire [31:0] tlb_pte;
+    if (ENABLE_SV32_TLB) begin : g_tlb
+        logic [30:0] context_tag;
+        logic [7:0] valid, read_select;
+        logic [19:0] vpn [0:7];
+        logic [31:0] pte [0:7];
+        wire same_context = context_tag == req_satp[30:0];
+        wire [7:0] matches_vpn, oldest;
+        wire [7:0] newer [0:7];
+        assign tlb_hit = same_context && (|matches_vpn) &&
+                         !sfence_vma && !sfence_vma_req;
+
+        // S_L0_CHECK handles walked leaves and TLB hits with the same checks.
+        wire fill = state == S_L0_CHECK && !sfence_vma && !sfence_vma_req &&
+                    !tlb_hit && pte_valid(l0_pte) &&
+                    is_leaf(l0_pte) && perm_ok(l0_pte, req_r, req_w, req_x) &&
+                    !(|l0_pte[31:30]);
+        wire [7:0] touched = fill ? oldest :
+                             state == S_TLB_READ ? read_select : 8'b0;
+        always_ff @(posedge clk or negedge reset_n) begin
+            if (!reset_n) begin
+                valid <= 0;
+                context_tag <= 0;
+            end else if (sfence_vma || sfence_vma_req) begin
+                valid <= 0;
+            end else if (fill) begin
+                valid <= (same_context ? valid : 8'b0) | oldest;
+                context_tag <= req_satp[30:0];
+            end
+        end
+
+        // Register the one-hot match before selecting the 32-bit PTE.
+        always_ff @(posedge clk)
+            if (state == S_START) read_select <= matches_vpn;
+        logic [31:0] selected_pte;
+        always_comb begin
+            selected_pte = 0;
+            for (integer i = 0; i < 8; i = i + 1)
+                selected_pte = selected_pte | (pte[i] & {32{read_select[i]}});
+        end
+        assign tlb_pte = selected_pte;
+
+        // Pairwise LRU: one bit per pair. The oldest way loses all comparisons.
+        for (genvar i = 0; i < 8; i = i + 1) begin : way
+            assign matches_vpn[i] = valid[i] && vpn[i] == req_vaddr[31:12];
+            assign newer[i][i] = 1'b0;
+            assign oldest[i] = ~|newer[i];
+            for (genvar j = 0; j < i; j = j + 1) begin : pair
+                logic more_recent;
+                always_ff @(posedge clk or negedge reset_n) begin
+                    if (!reset_n) more_recent <= 1'b1;
+                    else if (touched[i] || touched[j]) more_recent <= touched[i];
+                end
+                assign newer[i][j] = more_recent;
+                assign newer[j][i] = !more_recent;
+            end
+            always_ff @(posedge clk) begin
+                if (fill && oldest[i]) begin
+                    vpn[i] <= req_vaddr[31:12];
+                    pte[i] <= l0_pte;
+                end
+            end
+        end
+    end else begin : g_no_tlb
+        assign tlb_hit = 1'b0;
+        assign tlb_pte = 32'b0;
+    end
 
     // ===== MMU main =====
     always_ff @(posedge clk or negedge reset_n) begin
@@ -238,6 +312,8 @@ module MMU (
                         if (|root_ppn[21:20]) begin
                             access_fault <= 1'b1;
                             state <= S_DONE;
+                        end else if (tlb_hit) begin
+                            state <= S_TLB_READ;
                         end else if (l1_cache_hit) begin
                             l1_pte <= l1_cache_pte;
                             state <= S_L1_CHECK;
@@ -333,6 +409,11 @@ module MMU (
                         l0_cache_valid <= 1'b1;
                         state <= S_L0_CHECK;
                     end
+                end
+
+                S_TLB_READ: begin
+                    l0_pte <= tlb_pte;
+                    state <= S_L0_CHECK;
                 end
 
                 S_L0_CHECK: begin

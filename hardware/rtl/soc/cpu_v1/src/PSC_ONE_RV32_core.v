@@ -50,9 +50,12 @@ module PSC_ONE_RV32_core #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT         = 32'h1000_9008,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL        = 32'h1000_900C,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 32'h1000_9010,
+    parameter integer PSC_CACHE_2WAY                    = 0,
+    parameter integer PSC_CACHE_IO_2WAY                 = 0,
     parameter ICACHE_TAGLSB                             = 12,
     parameter DCACHE_TAGLSB                             = 10,
-    parameter ENABLE_PULP = 1'b1
+    parameter ENABLE_PULP                               = 1'b1,
+    parameter ENABLE_SV32_TLB                           = 1'b0
 )(
     // CLK, RESET
     input  wire                         clock,
@@ -179,6 +182,7 @@ module PSC_ONE_RV32_core #(
     // CORE
     // --------------------------------
     PSC_RV32_core #(
+        .ENABLE_SV32_TLB            (ENABLE_SV32_TLB),
         .COUNTER_MMIO_ADDR          (32'hF004_FFF0),
         .ENABLE_PULP                (ENABLE_PULP)
     ) u_core (
@@ -345,6 +349,7 @@ module PSC_ONE_RV32_core #(
     wire         program_cache_miss_pulse;
 
     cache_dma_controller #(
+        .PSC_CACHE_2WAY      (PSC_CACHE_2WAY),
         .ADDR_WIDTH          (32),
         .CPU_DATA_WIDTH      (32),
         .CACHE_DATA_WIDTH    (256),
@@ -397,6 +402,7 @@ module PSC_ONE_RV32_core #(
     wire    cpu_cache_wb    = csr_DCACHE_CTRL[1];
 
     cache_dma_controller_io #(
+        .PSC_CACHE_IO_2WAY   (PSC_CACHE_IO_2WAY),
         .PROTECT_MODE        (PROTECT_MODE),
         .PROTECT_ADDR        (PROTECT_ADDR),
         .ADDR_WIDTH          (32),

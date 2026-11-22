@@ -7,7 +7,8 @@ module PSC_RV32_core #(
     parameter logic [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,     // 未使用.
     parameter logic [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
     parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0,
-    parameter bit ENABLE_PULP = 1'b1
+    parameter bit ENABLE_PULP                = 1'b1,
+    parameter bit ENABLE_SV32_TLB            = 1'b0
 )(
     input logic         clock,
     input logic         reset_n,
@@ -354,7 +355,9 @@ module PSC_RV32_core #(
 
     assign fetch_pc = pc;
 
-    PSC_RV32_FetchUnit u_fetch_unit(
+    PSC_RV32_FetchUnit #(
+        .ENABLE_SV32_TLB (ENABLE_SV32_TLB)
+    ) u_fetch_unit(
         // clock, reset
         .clock                      (clock),
         .reset_n                    (reset_n),
@@ -418,7 +421,10 @@ module PSC_RV32_core #(
 
     assign illegal_instruction = decoder_ctrl.raise_illegal_instruction;
 
-    PSC_RV32_InstructionEngine #(.ENABLE_PULP(ENABLE_PULP)) u_inst_engine(
+    PSC_RV32_InstructionEngine #(
+        .ENABLE_PULP     (ENABLE_PULP),
+        .ENABLE_SV32_TLB (ENABLE_SV32_TLB)
+    ) u_inst_engine(
         // clock, reset
         .clock                      (clock),
         .reset_n                    (reset_n),

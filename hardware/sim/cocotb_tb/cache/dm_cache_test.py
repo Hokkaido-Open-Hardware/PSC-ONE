@@ -1464,7 +1464,7 @@ async def cache_data_double_writeback_test(dut):
     await reset_dut(dut)
     await sdram_init_fin_wait(dut)
     base = 0x0020_0000
-    # Same direct-mapped index for either supported cache size (TAGLSB<=14).
+    # These addresses share a backing set for both supported cache sizes.
     conflict = base + 0x4000
     rng = random.Random(0x64CA_C4E)
     words = {address + i * 4: rng.getrandbits(32)
@@ -1485,6 +1485,12 @@ async def cache_data_double_writeback_test(dut):
             for i in range(8):
                 await cpu_width_access(dut, address + i * 4, double=False,
                                        expected=words[address + i * 4])
+
+            if address == base and int(dut.PSC_CACHE_IO_2WAY.value) == 1:
+                # Dirty the free way so the conflict evicts base, then the
+                # reload below must also write back its dirty victim.
+                await cpu_width_access(dut, base + 0x8000, double=True,
+                                       data=0xABCD_EF01_2345_6789, path="clean miss")
 
         # Read back the dirty victim from SDRAM, forcing a second eviction.
         await cpu_width_access(dut, base + offset, double=True,

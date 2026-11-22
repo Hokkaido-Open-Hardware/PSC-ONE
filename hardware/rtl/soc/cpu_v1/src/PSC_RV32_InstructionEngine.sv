@@ -6,7 +6,8 @@ module PSC_RV32_InstructionEngine #(
     parameter logic [31:0] UART_MMIO_ADDR    = 32'hF004_00F0,
     parameter logic [31:0] UART_MMIO_FLAG    = 32'hF004_00F4,
     parameter logic [31:0] COUNTER_MMIO_ADDR = 32'hF004_FFF0,
-    parameter bit ENABLE_PULP = 1'b1
+    parameter bit ENABLE_PULP = 1'b1,
+    parameter bit ENABLE_SV32_TLB = 1'b0
 )(
     input  logic        clock,
     input  logic        reset_n,
@@ -278,7 +279,9 @@ module PSC_RV32_InstructionEngine #(
         .done                 (execute_done)
     );
 
-    MMU u_mmu_d (
+    MMU #(
+        .ENABLE_SV32_TLB (ENABLE_SV32_TLB)
+    ) u_mmu_d (
         .clk                  (clock),
         .reset_n              (reset_n),
         .MMU_enb              (d_mmu_enb),

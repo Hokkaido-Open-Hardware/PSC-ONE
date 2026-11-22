@@ -51,8 +51,10 @@ module PSC_ONE_RV32_core #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL        = 32'h1000_900C,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 32'h1000_9010,
     parameter ICACHE_TAGLSB                             = 12,
-    parameter DCACHE_TAGLSB                             = 10
-    
+    parameter DCACHE_TAGLSB                             = 10,
+    parameter integer PSC_CACHE_2WAY = 0,
+    parameter integer PSC_CACHE_IO_2WAY = 0,
+    parameter ENABLE_SV32_TLB = 1'b0  // Shared SoC option implemented by RV32 v1.
 )(
     // CLK, RESET
     input  wire                         clock,
@@ -343,6 +345,7 @@ module PSC_ONE_RV32_core #(
     wire         program_cache_miss_pulse;
 
     cache_dma_controller #(
+        .PSC_CACHE_2WAY      (PSC_CACHE_2WAY),
         .ADDR_WIDTH          (32),
         .CPU_DATA_WIDTH      (32),
         .CACHE_DATA_WIDTH    (256),
@@ -395,6 +398,7 @@ module PSC_ONE_RV32_core #(
     wire    cpu_cache_wb    = csr_DCACHE_CTRL[1];
 
     cache_dma_controller_io #(
+        .PSC_CACHE_IO_2WAY   (PSC_CACHE_IO_2WAY),
         .PROTECT_MODE        (PROTECT_MODE),
         .PROTECT_ADDR        (PROTECT_ADDR),
         .ADDR_WIDTH          (32),
