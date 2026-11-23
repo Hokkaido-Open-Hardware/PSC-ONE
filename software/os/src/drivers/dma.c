@@ -28,7 +28,7 @@ static inline uint32_t csr_read_dma_status(void)
     return value;
 }
 
-static inline void dcache_writeback(const void *sync_addr)
+void dcache_writeback(const void *sync_addr)
 {
     /* The serial load waits until the data-cache maintenance sweep finishes. */
     __asm__ __volatile__(

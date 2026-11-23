@@ -30,12 +30,17 @@ CPU_VERSION ?= v1
 
 # Board wiring/configuration is separate from the PSC_RV32 v1/v2 selector.
 BOARD ?= $(if $(filter rv64,$(CPU_VERSION)),psc_one_rv64,psc_one)
-ifeq ($(filter $(BOARD),psc_one psc_one_rv64),)
-$(error Unknown BOARD '$(BOARD)' (use: psc_one | psc_one_rv64))
+ifeq ($(filter $(BOARD),psc_one psc_one_tang138k psc_one_rv64),)
+$(error Unknown BOARD '$(BOARD)' (use: psc_one | psc_one_tang138k | psc_one_rv64))
 endif
-BOARD_DIR := $(Src)/board/$(BOARD)
+BOARD_DIR := $(Src)/board/$(patsubst psc_one_tang138k,psc_one,$(BOARD))
 BOARD_MK := $(BOARD_DIR)/board.mk
 include $(BOARD_MK)
+ifeq ($(BOARD),psc_one_tang138k)
+ifneq ($(MODE),sbi)
+BOARD_CPPFLAGS += -DPSC_TANG138K_VRAM
+endif
+endif
 BOARD_HEADERS := $(Src)/board/board.h $(BOARD_DIR)/config.h
 
 ifneq ($(filter $(MODE),sim fpga_mem),)

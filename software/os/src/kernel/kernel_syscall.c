@@ -251,6 +251,12 @@ void handle_syscall(struct trap_frame *f) {
         break;
     }
 
+#ifdef PSC_TANG138K_VRAM
+    case SYS_VRAM_TEST_PATTERN:
+        lcd_draw_vram_test_pattern();
+        f->a0 = 0;
+        break;
+#endif
     case SYS_LCD_RGB888_BEGIN:
         f->a0 = lcd_begin_rgb888();
         break;

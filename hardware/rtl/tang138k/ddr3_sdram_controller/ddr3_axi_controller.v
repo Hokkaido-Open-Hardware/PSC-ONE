@@ -1,7 +1,8 @@
 /*
-NISHIHARU — SDRAM Controller AXI4 4-port Slave
-- 4x AXI4-S (32-bit) -> Single SDRAM controller
-- INCR only, SIZE=2(4B), LEN={0,1,3,7}
+NISHIHARU — SDRAM Controller AXI4 5-port Slave
+- 5x AXI4-S (32-bit) -> Single SDRAM controller
+- INCR only, SIZE=2(4B), LEN={0,1,3,7}. The video read port also
+  accepts naturally aligned bursts of 16 and 32 words.
 */
 `timescale 1ns/1ps
 
@@ -154,6 +155,41 @@ module ddr3_axi_controller #(
     output reg                       s3_axi_rvalid,
     input  wire                      s3_axi_rready,
 
+    // -------- Port 4 (video port) --------
+    input  wire [ID_WIDTH-1:0]       s4_axi_awid,
+    input  wire [ADDR_WIDTH-1:0]     s4_axi_awaddr,
+    input  wire [7:0]                s4_axi_awlen,
+    input  wire [2:0]                s4_axi_awsize,
+    input  wire [1:0]                s4_axi_awburst,
+    input  wire                      s4_axi_awvalid,
+    output reg                       s4_axi_awready,
+
+    input  wire [DATA_WIDTH-1:0]     s4_axi_wdata,
+    input  wire [(DATA_WIDTH/8)-1:0] s4_axi_wstrb,
+    input  wire                      s4_axi_wlast,
+    input  wire                      s4_axi_wvalid,
+    output reg                       s4_axi_wready,
+
+    output reg  [ID_WIDTH-1:0]       s4_axi_bid,
+    output reg  [1:0]                s4_axi_bresp,
+    output reg                       s4_axi_bvalid,
+    input  wire                      s4_axi_bready,
+
+    input  wire [ID_WIDTH-1:0]       s4_axi_arid,
+    input  wire [ADDR_WIDTH-1:0]     s4_axi_araddr,
+    input  wire [7:0]                s4_axi_arlen,
+    input  wire [2:0]                s4_axi_arsize,
+    input  wire [1:0]                s4_axi_arburst,
+    input  wire                      s4_axi_arvalid,
+    output reg                       s4_axi_arready,
+
+    output reg  [ID_WIDTH-1:0]       s4_axi_rid,
+    output reg  [DATA_WIDTH-1:0]     s4_axi_rdata,
+    output reg  [1:0]                s4_axi_rresp,
+    output reg                       s4_axi_rlast,
+    output reg                       s4_axi_rvalid,
+    input  wire                      s4_axi_rready,
+
     // -------- DDR3 controller --------
     input  wire                     app_rdy,
     input  wire                     app_rd_data_valid,
@@ -186,6 +222,10 @@ module ddr3_axi_controller #(
 
 	localparam DRAM_NUM = 2'd2;
 
+    wire legacy_en, video_fetch;
+    wire [2:0] legacy_cmd;
+    wire [28:0] legacy_addr;
+
     ddr3_controller_if #(
         .ADDR_WIDTH(29),
         .WORD_ADDR_WIDTH(ADDR_WIDTH),
@@ -206,15 +246,15 @@ module ddr3_axi_controller #(
         .write_addr         (write_addr),
         .write_data         (write_data),
         .app_rdy            (app_rdy),
-        .app_en             (app_en),
-        .app_cmd            (app_cmd),
-        .app_addr           (app_addr),
+        .app_en             (legacy_en),
+        .app_cmd            (legacy_cmd),
+        .app_addr           (legacy_addr),
         .app_wdf_data       (app_wdf_data),
         .app_wdf_wren       (app_wdf_wren),
         .app_wdf_end        (app_wdf_end),
         .app_wdf_mask       (app_wdf_mask),
         .app_burst          (app_burst),
-        .app_rd_data_valid  (app_rd_data_valid),
+        .app_rd_data_valid  (app_rd_data_valid && !video_fetch),
         .app_rd_data        (app_rd_data),
         .init_calib_complete(init_calib_complete),
         .wr_data_rdy        (wr_data_rdy),
@@ -285,11 +325,36 @@ module ddr3_axi_controller #(
         R_AR         = 4'd8,
         R_WAIT_START = 4'd9,
         R_ISSUE      = 4'd10,
-        R_SEND       = 4'd11;
+        R_SEND       = 4'd11,
+        VIDEO_FETCH  = 4'd12,
+        VIDEO_SEND   = 4'd13;
 
     reg [3:0] st;
-    reg [1:0] cur_port;
+    reg [2:0] cur_port;
     reg       cur_is_write;
+
+    // Consecutive BL8 reads return in command order. Reserve all response
+    // slots before issuing commands, so AXI backpressure cannot lose data.
+    wire video_long_read = cur_port == 4 && s4_axi_arsize == 2 &&
+                           s4_axi_arburst == 2'b01 && s4_axi_araddr[5:0] == 0 &&
+                           (s4_axi_arlen == 15 ||
+                            (s4_axi_arlen == 31 && !s4_axi_araddr[6]));
+    reg [28:0] video_base_word;
+    reg [2:0] video_groups, video_issued;
+    reg [1:0] video_received;
+    reg [4:0] video_next_word, video_last_word;
+    reg [255:0] video_lines [0:3];
+    assign video_fetch = st == VIDEO_FETCH;
+    wire video_issue = aresetn && req_ready && app_rdy && video_issued < video_groups;
+    assign app_en   = video_fetch ? video_issue : legacy_en;
+    assign app_cmd  = video_fetch ? 3'b001 : legacy_cmd;
+    // Each transaction starts at a multiple of its group count. OR selects
+    // the next BL8 within that block without an address-width carry chain.
+    assign app_addr = video_fetch ? video_base_word | {24'b0,video_issued[1:0],3'b0} : legacy_addr;
+
+    always @(posedge aclk)
+        if (video_fetch && app_rd_data_valid)
+            video_lines[video_received] <= app_rd_data;
 
     // WRITE regs
     reg [ID_WIDTH-1:0]   w_id;
@@ -331,94 +396,112 @@ module ddr3_axi_controller #(
     // selected port signals
     // ============================================================
     wire [ID_WIDTH-1:0] sel_awid =
-        (cur_port==2'd0) ? s0_axi_awid :
-        (cur_port==2'd1) ? s1_axi_awid :
-        (cur_port==2'd2) ? s2_axi_awid : s3_axi_awid;
+        (cur_port==3'd0) ? s0_axi_awid :
+        (cur_port==3'd1) ? s1_axi_awid :
+        (cur_port==3'd2) ? s2_axi_awid :
+        (cur_port==3'd3) ? s3_axi_awid : s4_axi_awid;
 
     wire [ADDR_WIDTH-1:0] sel_awaddr =
-        (cur_port==2'd0) ? s0_axi_awaddr :
-        (cur_port==2'd1) ? s1_axi_awaddr :
-        (cur_port==2'd2) ? s2_axi_awaddr : s3_axi_awaddr;
+        (cur_port==3'd0) ? s0_axi_awaddr :
+        (cur_port==3'd1) ? s1_axi_awaddr :
+        (cur_port==3'd2) ? s2_axi_awaddr :
+        (cur_port==3'd3) ? s3_axi_awaddr : s4_axi_awaddr;
 
     wire [7:0] sel_awlen =
-        (cur_port==2'd0) ? s0_axi_awlen :
-        (cur_port==2'd1) ? s1_axi_awlen :
-        (cur_port==2'd2) ? s2_axi_awlen : s3_axi_awlen;
+        (cur_port==3'd0) ? s0_axi_awlen :
+        (cur_port==3'd1) ? s1_axi_awlen :
+        (cur_port==3'd2) ? s2_axi_awlen :
+        (cur_port==3'd3) ? s3_axi_awlen : s4_axi_awlen;
 
     wire [2:0] sel_awsize =
-        (cur_port==2'd0) ? s0_axi_awsize :
-        (cur_port==2'd1) ? s1_axi_awsize :
-        (cur_port==2'd2) ? s2_axi_awsize : s3_axi_awsize;
+        (cur_port==3'd0) ? s0_axi_awsize :
+        (cur_port==3'd1) ? s1_axi_awsize :
+        (cur_port==3'd2) ? s2_axi_awsize :
+        (cur_port==3'd3) ? s3_axi_awsize : s4_axi_awsize;
 
     wire [1:0] sel_awburst =
-        (cur_port==2'd0) ? s0_axi_awburst :
-        (cur_port==2'd1) ? s1_axi_awburst :
-        (cur_port==2'd2) ? s2_axi_awburst : s3_axi_awburst;
+        (cur_port==3'd0) ? s0_axi_awburst :
+        (cur_port==3'd1) ? s1_axi_awburst :
+        (cur_port==3'd2) ? s2_axi_awburst :
+        (cur_port==3'd3) ? s3_axi_awburst : s4_axi_awburst;
 
     wire [ID_WIDTH-1:0] sel_arid =
-        (cur_port==2'd0) ? s0_axi_arid :
-        (cur_port==2'd1) ? s1_axi_arid :
-        (cur_port==2'd2) ? s2_axi_arid : s3_axi_arid;
+        (cur_port==3'd0) ? s0_axi_arid :
+        (cur_port==3'd1) ? s1_axi_arid :
+        (cur_port==3'd2) ? s2_axi_arid :
+        (cur_port==3'd3) ? s3_axi_arid : s4_axi_arid;
 
     wire [ADDR_WIDTH-1:0] sel_araddr =
-        (cur_port==2'd0) ? s0_axi_araddr :
-        (cur_port==2'd1) ? s1_axi_araddr :
-        (cur_port==2'd2) ? s2_axi_araddr : s3_axi_araddr;
+        (cur_port==3'd0) ? s0_axi_araddr :
+        (cur_port==3'd1) ? s1_axi_araddr :
+        (cur_port==3'd2) ? s2_axi_araddr :
+        (cur_port==3'd3) ? s3_axi_araddr : s4_axi_araddr;
 
     wire [7:0] sel_arlen =
-        (cur_port==2'd0) ? s0_axi_arlen :
-        (cur_port==2'd1) ? s1_axi_arlen :
-        (cur_port==2'd2) ? s2_axi_arlen : s3_axi_arlen;
+        (cur_port==3'd0) ? s0_axi_arlen :
+        (cur_port==3'd1) ? s1_axi_arlen :
+        (cur_port==3'd2) ? s2_axi_arlen :
+        (cur_port==3'd3) ? s3_axi_arlen : s4_axi_arlen;
 
     wire [2:0] sel_arsize =
-        (cur_port==2'd0) ? s0_axi_arsize :
-        (cur_port==2'd1) ? s1_axi_arsize :
-        (cur_port==2'd2) ? s2_axi_arsize : s3_axi_arsize;
+        (cur_port==3'd0) ? s0_axi_arsize :
+        (cur_port==3'd1) ? s1_axi_arsize :
+        (cur_port==3'd2) ? s2_axi_arsize :
+        (cur_port==3'd3) ? s3_axi_arsize : s4_axi_arsize;
 
     wire [1:0] sel_arburst =
-        (cur_port==2'd0) ? s0_axi_arburst :
-        (cur_port==2'd1) ? s1_axi_arburst :
-        (cur_port==2'd2) ? s2_axi_arburst : s3_axi_arburst;
+        (cur_port==3'd0) ? s0_axi_arburst :
+        (cur_port==3'd1) ? s1_axi_arburst :
+        (cur_port==3'd2) ? s2_axi_arburst :
+        (cur_port==3'd3) ? s3_axi_arburst : s4_axi_arburst;
 
     wire sel_wvalid =
-        (cur_port==2'd0) ? s0_axi_wvalid :
-        (cur_port==2'd1) ? s1_axi_wvalid :
-        (cur_port==2'd2) ? s2_axi_wvalid : s3_axi_wvalid;
+        (cur_port==3'd0) ? s0_axi_wvalid :
+        (cur_port==3'd1) ? s1_axi_wvalid :
+        (cur_port==3'd2) ? s2_axi_wvalid :
+        (cur_port==3'd3) ? s3_axi_wvalid : s4_axi_wvalid;
 
     wire [DATA_WIDTH-1:0] sel_wdata =
-        (cur_port==2'd0) ? s0_axi_wdata :
-        (cur_port==2'd1) ? s1_axi_wdata :
-        (cur_port==2'd2) ? s2_axi_wdata : s3_axi_wdata;
+        (cur_port==3'd0) ? s0_axi_wdata :
+        (cur_port==3'd1) ? s1_axi_wdata :
+        (cur_port==3'd2) ? s2_axi_wdata :
+        (cur_port==3'd3) ? s3_axi_wdata : s4_axi_wdata;
 
     wire [(DATA_WIDTH/8)-1:0] sel_wstrb =
-        (cur_port==2'd0) ? s0_axi_wstrb :
-        (cur_port==2'd1) ? s1_axi_wstrb :
-        (cur_port==2'd2) ? s2_axi_wstrb : s3_axi_wstrb;
+        (cur_port==3'd0) ? s0_axi_wstrb :
+        (cur_port==3'd1) ? s1_axi_wstrb :
+        (cur_port==3'd2) ? s2_axi_wstrb :
+        (cur_port==3'd3) ? s3_axi_wstrb : s4_axi_wstrb;
 
     wire sel_wlast =
-        (cur_port==2'd0) ? s0_axi_wlast :
-        (cur_port==2'd1) ? s1_axi_wlast :
-        (cur_port==2'd2) ? s2_axi_wlast : s3_axi_wlast;
+        (cur_port==3'd0) ? s0_axi_wlast :
+        (cur_port==3'd1) ? s1_axi_wlast :
+        (cur_port==3'd2) ? s2_axi_wlast :
+        (cur_port==3'd3) ? s3_axi_wlast : s4_axi_wlast;
 
     wire sel_bready =
-        (cur_port==2'd0) ? s0_axi_bready :
-        (cur_port==2'd1) ? s1_axi_bready :
-        (cur_port==2'd2) ? s2_axi_bready : s3_axi_bready;
+        (cur_port==3'd0) ? s0_axi_bready :
+        (cur_port==3'd1) ? s1_axi_bready :
+        (cur_port==3'd2) ? s2_axi_bready :
+        (cur_port==3'd3) ? s3_axi_bready : s4_axi_bready;
 
     wire sel_rready =
-        (cur_port==2'd0) ? s0_axi_rready :
-        (cur_port==2'd1) ? s1_axi_rready :
-        (cur_port==2'd2) ? s2_axi_rready : s3_axi_rready;
+        (cur_port==3'd0) ? s0_axi_rready :
+        (cur_port==3'd1) ? s1_axi_rready :
+        (cur_port==3'd2) ? s2_axi_rready :
+        (cur_port==3'd3) ? s3_axi_rready : s4_axi_rready;
 
     wire sel_rvalid_now =
-        (cur_port==2'd0) ? s0_axi_rvalid :
-        (cur_port==2'd1) ? s1_axi_rvalid :
-        (cur_port==2'd2) ? s2_axi_rvalid : s3_axi_rvalid;
+        (cur_port==3'd0) ? s0_axi_rvalid :
+        (cur_port==3'd1) ? s1_axi_rvalid :
+        (cur_port==3'd2) ? s2_axi_rvalid :
+        (cur_port==3'd3) ? s3_axi_rvalid : s4_axi_rvalid;
 
     wire sel_wready_now =
-        (cur_port==2'd0) ? s0_axi_wready :
-        (cur_port==2'd1) ? s1_axi_wready :
-        (cur_port==2'd2) ? s2_axi_wready : s3_axi_wready;
+        (cur_port==3'd0) ? s0_axi_wready :
+        (cur_port==3'd1) ? s1_axi_wready :
+        (cur_port==3'd2) ? s2_axi_wready :
+        (cur_port==3'd3) ? s3_axi_wready : s4_axi_wready;
 
     wire w_fire = sel_wvalid & sel_wready_now;
 
@@ -431,90 +514,98 @@ module ddr3_axi_controller #(
             s1_axi_awready <= 1'b0;
             s2_axi_awready <= 1'b0;
             s3_axi_awready <= 1'b0;
+            s4_axi_awready <= 1'b0;
 
             s0_axi_wready  <= 1'b0;
             s1_axi_wready  <= 1'b0;
             s2_axi_wready  <= 1'b0;
             s3_axi_wready  <= 1'b0;
+            s4_axi_wready  <= 1'b0;
 
             s0_axi_arready <= 1'b0;
             s1_axi_arready <= 1'b0;
             s2_axi_arready <= 1'b0;
             s3_axi_arready <= 1'b0;
-
-            s0_axi_rlast   <= 1'b0;
-            s1_axi_rlast   <= 1'b0;
-            s2_axi_rlast   <= 1'b0;
-            s3_axi_rlast   <= 1'b0;
+            s4_axi_arready <= 1'b0;
         end
     endtask
 
     task set_awready_port;
-        input [1:0] p;
+        input [2:0] p;
         begin
             case (p)
-                2'd0: s0_axi_awready <= 1'b1;
-                2'd1: s1_axi_awready <= 1'b1;
-                2'd2: s2_axi_awready <= 1'b1;
-                default: s3_axi_awready <= 1'b1;
+                3'd0: s0_axi_awready <= 1'b1;
+                3'd1: s1_axi_awready <= 1'b1;
+                3'd2: s2_axi_awready <= 1'b1;
+                3'd3: s3_axi_awready <= 1'b1;
+                3'd4: s4_axi_awready <= 1'b1;
+                default: ;
             endcase
         end
     endtask
 
     task set_arready_port;
-        input [1:0] p;
+        input [2:0] p;
         begin
             case (p)
-                2'd0: s0_axi_arready <= 1'b1;
-                2'd1: s1_axi_arready <= 1'b1;
-                2'd2: s2_axi_arready <= 1'b1;
-                default: s3_axi_arready <= 1'b1;
+                3'd0: s0_axi_arready <= 1'b1;
+                3'd1: s1_axi_arready <= 1'b1;
+                3'd2: s2_axi_arready <= 1'b1;
+                3'd3: s3_axi_arready <= 1'b1;
+                3'd4: s4_axi_arready <= 1'b1;
+                default: ;
             endcase
         end
     endtask
 
     task set_wready_port;
-        input [1:0] p;
+        input [2:0] p;
         input       v;
         begin
             case (p)
-                2'd0: s0_axi_wready <= v;
-                2'd1: s1_axi_wready <= v;
-                2'd2: s2_axi_wready <= v;
-                default: s3_axi_wready <= v;
+                3'd0: s0_axi_wready <= v;
+                3'd1: s1_axi_wready <= v;
+                3'd2: s2_axi_wready <= v;
+                3'd3: s3_axi_wready <= v;
+                3'd4: s4_axi_wready <= v;
+                default: ;
             endcase
         end
     endtask
 
     task drive_bresp_port;
-        input [1:0] p;
+        input [2:0] p;
         input [ID_WIDTH-1:0] id;
         input [1:0] resp;
         input set_valid;
         begin
             case (p)
-                2'd0: begin s0_axi_bid <= id; s0_axi_bresp <= resp; s0_axi_bvalid <= set_valid; end
-                2'd1: begin s1_axi_bid <= id; s1_axi_bresp <= resp; s1_axi_bvalid <= set_valid; end
-                2'd2: begin s2_axi_bid <= id; s2_axi_bresp <= resp; s2_axi_bvalid <= set_valid; end
-                default: begin s3_axi_bid <= id; s3_axi_bresp <= resp; s3_axi_bvalid <= set_valid; end
+                3'd0: begin s0_axi_bid <= id; s0_axi_bresp <= resp; s0_axi_bvalid <= set_valid; end
+                3'd1: begin s1_axi_bid <= id; s1_axi_bresp <= resp; s1_axi_bvalid <= set_valid; end
+                3'd2: begin s2_axi_bid <= id; s2_axi_bresp <= resp; s2_axi_bvalid <= set_valid; end
+                3'd3: begin s3_axi_bid <= id; s3_axi_bresp <= resp; s3_axi_bvalid <= set_valid; end
+                3'd4: begin s4_axi_bid <= id; s4_axi_bresp <= resp; s4_axi_bvalid <= set_valid; end
+                default: ;
             endcase
         end
     endtask
 
     task drop_bvalid_port;
-        input [1:0] p;
+        input [2:0] p;
         begin
             case (p)
-                2'd0: s0_axi_bvalid <= 1'b0;
-                2'd1: s1_axi_bvalid <= 1'b0;
-                2'd2: s2_axi_bvalid <= 1'b0;
-                default: s3_axi_bvalid <= 1'b0;
+                3'd0: s0_axi_bvalid <= 1'b0;
+                3'd1: s1_axi_bvalid <= 1'b0;
+                3'd2: s2_axi_bvalid <= 1'b0;
+                3'd3: s3_axi_bvalid <= 1'b0;
+                3'd4: s4_axi_bvalid <= 1'b0;
+                default: ;
             endcase
         end
     endtask
 
     task drive_rdata_port;
-        input [1:0] p;
+        input [2:0] p;
         input [ID_WIDTH-1:0] id;
         input [DATA_WIDTH-1:0] data;
         input [1:0] resp;
@@ -522,22 +613,26 @@ module ddr3_axi_controller #(
         input set_valid;
         begin
             case (p)
-                2'd0: begin s0_axi_rid <= id; s0_axi_rdata <= data; s0_axi_rresp <= resp; s0_axi_rlast <= last; s0_axi_rvalid <= set_valid; end
-                2'd1: begin s1_axi_rid <= id; s1_axi_rdata <= data; s1_axi_rresp <= resp; s1_axi_rlast <= last; s1_axi_rvalid <= set_valid; end
-                2'd2: begin s2_axi_rid <= id; s2_axi_rdata <= data; s2_axi_rresp <= resp; s2_axi_rlast <= last; s2_axi_rvalid <= set_valid; end
-                default: begin s3_axi_rid <= id; s3_axi_rdata <= data; s3_axi_rresp <= resp; s3_axi_rlast <= last; s3_axi_rvalid <= set_valid; end
+                3'd0: begin s0_axi_rid <= id; s0_axi_rdata <= data; s0_axi_rresp <= resp; s0_axi_rlast <= last; s0_axi_rvalid <= set_valid; end
+                3'd1: begin s1_axi_rid <= id; s1_axi_rdata <= data; s1_axi_rresp <= resp; s1_axi_rlast <= last; s1_axi_rvalid <= set_valid; end
+                3'd2: begin s2_axi_rid <= id; s2_axi_rdata <= data; s2_axi_rresp <= resp; s2_axi_rlast <= last; s2_axi_rvalid <= set_valid; end
+                3'd3: begin s3_axi_rid <= id; s3_axi_rdata <= data; s3_axi_rresp <= resp; s3_axi_rlast <= last; s3_axi_rvalid <= set_valid; end
+                3'd4: begin s4_axi_rid <= id; s4_axi_rdata <= data; s4_axi_rresp <= resp; s4_axi_rlast <= last; s4_axi_rvalid <= set_valid; end
+                default: ;
             endcase
         end
     endtask
 
     task drop_rvalid_port;
-        input [1:0] p;
+        input [2:0] p;
         begin
             case (p)
-                2'd0: begin s0_axi_rvalid <= 1'b0; s0_axi_rlast <= 1'b0; end
-                2'd1: begin s1_axi_rvalid <= 1'b0; s1_axi_rlast <= 1'b0; end
-                2'd2: begin s2_axi_rvalid <= 1'b0; s2_axi_rlast <= 1'b0; end
-                default: begin s3_axi_rvalid <= 1'b0; s3_axi_rlast <= 1'b0; end
+                3'd0: begin s0_axi_rvalid <= 1'b0; s0_axi_rlast <= 1'b0; end
+                3'd1: begin s1_axi_rvalid <= 1'b0; s1_axi_rlast <= 1'b0; end
+                3'd2: begin s2_axi_rvalid <= 1'b0; s2_axi_rlast <= 1'b0; end
+                3'd3: begin s3_axi_rvalid <= 1'b0; s3_axi_rlast <= 1'b0; end
+                3'd4: begin s4_axi_rvalid <= 1'b0; s4_axi_rlast <= 1'b0; end
+                default: ;
             endcase
         end
     endtask
@@ -551,56 +646,67 @@ module ddr3_axi_controller #(
             s1_axi_awready <= 1'b0;
             s2_axi_awready <= 1'b0;
             s3_axi_awready <= 1'b0;
+            s4_axi_awready <= 1'b0;
 
             s0_axi_wready  <= 1'b0;
             s1_axi_wready  <= 1'b0;
             s2_axi_wready  <= 1'b0;
             s3_axi_wready  <= 1'b0;
+            s4_axi_wready  <= 1'b0;
 
             s0_axi_bvalid <= 1'b0;
             s1_axi_bvalid <= 1'b0;
             s2_axi_bvalid <= 1'b0;
             s3_axi_bvalid <= 1'b0;
+            s4_axi_bvalid <= 1'b0;
 
             s0_axi_bresp <= 2'b00;
             s1_axi_bresp <= 2'b00;
             s2_axi_bresp <= 2'b00;
             s3_axi_bresp <= 2'b00;
+            s4_axi_bresp <= 2'b00;
 
             s0_axi_bid <= {ID_WIDTH{1'b0}};
             s1_axi_bid <= {ID_WIDTH{1'b0}};
             s2_axi_bid <= {ID_WIDTH{1'b0}};
             s3_axi_bid <= {ID_WIDTH{1'b0}};
+            s4_axi_bid <= {ID_WIDTH{1'b0}};
 
             s0_axi_arready <= 1'b0;
             s1_axi_arready <= 1'b0;
             s2_axi_arready <= 1'b0;
             s3_axi_arready <= 1'b0;
+            s4_axi_arready <= 1'b0;
 
             s0_axi_rvalid <= 1'b0;
             s1_axi_rvalid <= 1'b0;
             s2_axi_rvalid <= 1'b0;
             s3_axi_rvalid <= 1'b0;
+            s4_axi_rvalid <= 1'b0;
 
             s0_axi_rresp <= 2'b00;
             s1_axi_rresp <= 2'b00;
             s2_axi_rresp <= 2'b00;
             s3_axi_rresp <= 2'b00;
+            s4_axi_rresp <= 2'b00;
 
             s0_axi_rid <= {ID_WIDTH{1'b0}};
             s1_axi_rid <= {ID_WIDTH{1'b0}};
             s2_axi_rid <= {ID_WIDTH{1'b0}};
             s3_axi_rid <= {ID_WIDTH{1'b0}};
+            s4_axi_rid <= {ID_WIDTH{1'b0}};
 
             s0_axi_rdata <= {DATA_WIDTH{1'b0}};
             s1_axi_rdata <= {DATA_WIDTH{1'b0}};
             s2_axi_rdata <= {DATA_WIDTH{1'b0}};
             s3_axi_rdata <= {DATA_WIDTH{1'b0}};
+            s4_axi_rdata <= {DATA_WIDTH{1'b0}};
 
             s0_axi_rlast <= 1'b0;
             s1_axi_rlast <= 1'b0;
             s2_axi_rlast <= 1'b0;
             s3_axi_rlast <= 1'b0;
+            s4_axi_rlast <= 1'b0;
 
             read_valid  <= 1'b0;
             write_valid <= 1'b0;
@@ -609,8 +715,14 @@ module ddr3_axi_controller #(
             write_data  <= 32'h0000_0000;
             rw_length   <= 4'd0;
 
+            video_base_word <= 0;
+            video_groups <= 0;
+            video_issued <= 0;
+            video_received <= 0;
+            video_next_word <= 0;
+            video_last_word <= 0;
             st           <= IDLE;
-            cur_port     <= 2'd0;
+            cur_port     <= 3'd0;
             cur_is_write <= 1'b0;
 
             w_id          <= {ID_WIDTH{1'b0}};
@@ -648,14 +760,16 @@ module ddr3_axi_controller #(
 
             case (st)
                 IDLE: begin
-                    if      (s0_axi_awvalid) begin cur_port <= 2'd0; cur_is_write <= 1'b1; st <= W_AW; end
-                    else if (s0_axi_arvalid) begin cur_port <= 2'd0; cur_is_write <= 1'b0; st <= R_AR; end
-                    else if (s1_axi_awvalid) begin cur_port <= 2'd1; cur_is_write <= 1'b1; st <= W_AW; end
-                    else if (s1_axi_arvalid) begin cur_port <= 2'd1; cur_is_write <= 1'b0; st <= R_AR; end
-                    else if (s2_axi_awvalid) begin cur_port <= 2'd2; cur_is_write <= 1'b1; st <= W_AW; end
-                    else if (s2_axi_arvalid) begin cur_port <= 2'd2; cur_is_write <= 1'b0; st <= R_AR; end
-                    else if (s3_axi_awvalid) begin cur_port <= 2'd3; cur_is_write <= 1'b1; st <= W_AW; end
-                    else if (s3_axi_arvalid) begin cur_port <= 2'd3; cur_is_write <= 1'b0; st <= R_AR; end
+                    if      (s0_axi_awvalid) begin cur_port <= 3'd0; cur_is_write <= 1'b1; st <= W_AW; end
+                    else if (s0_axi_arvalid) begin cur_port <= 3'd0; cur_is_write <= 1'b0; st <= R_AR; end
+                    else if (s1_axi_awvalid) begin cur_port <= 3'd1; cur_is_write <= 1'b1; st <= W_AW; end
+                    else if (s1_axi_arvalid) begin cur_port <= 3'd1; cur_is_write <= 1'b0; st <= R_AR; end
+                    else if (s2_axi_awvalid) begin cur_port <= 3'd2; cur_is_write <= 1'b1; st <= W_AW; end
+                    else if (s2_axi_arvalid) begin cur_port <= 3'd2; cur_is_write <= 1'b0; st <= R_AR; end
+                    else if (s3_axi_awvalid) begin cur_port <= 3'd3; cur_is_write <= 1'b1; st <= W_AW; end
+                    else if (s3_axi_arvalid) begin cur_port <= 3'd3; cur_is_write <= 1'b0; st <= R_AR; end
+                    else if (s4_axi_awvalid) begin cur_port <= 3'd4; cur_is_write <= 1'b1; st <= W_AW; end
+                    else if (s4_axi_arvalid) begin cur_port <= 3'd4; cur_is_write <= 1'b0; st <= R_AR; end
 
                     w_err <= 1'b0;
                     r_err <= 1'b0;
@@ -664,10 +778,11 @@ module ddr3_axi_controller #(
                 W_AW: begin
                     set_awready_port(cur_port);
 
-                    if ((cur_port==2'd0 && s0_axi_awvalid) ||
-                        (cur_port==2'd1 && s1_axi_awvalid) ||
-                        (cur_port==2'd2 && s2_axi_awvalid) ||
-                        (cur_port==2'd3 && s3_axi_awvalid)) begin
+                    if ((cur_port==3'd0 && s0_axi_awvalid) ||
+                        (cur_port==3'd1 && s1_axi_awvalid) ||
+                        (cur_port==3'd2 && s2_axi_awvalid) ||
+                        (cur_port==3'd3 && s3_axi_awvalid) ||
+                        (cur_port==3'd4 && s4_axi_awvalid)) begin
 
                         w_id          <= sel_awid;
                         w_base_word   <= {2'b00, sel_awaddr[ADDR_WIDTH-1:2]};   // word addressへ変換
@@ -705,6 +820,7 @@ module ddr3_axi_controller #(
                                  (sel_wlast != (w_cnt == (w_beats_total - 1'b1)));
 
                         if (w_cnt == (w_beats_total - 1'b1)) begin
+                            set_wready_port(cur_port, 1'b0);
                             w_cnt      <= 4'd0;
                             w_cur_word <= w_base_word;
                             st         <= W_WAIT_START;
@@ -776,10 +892,11 @@ module ddr3_axi_controller #(
                 R_AR: begin
                     set_arready_port(cur_port);
 
-                    if ((cur_port==2'd0 && s0_axi_arvalid) ||
-                        (cur_port==2'd1 && s1_axi_arvalid) ||
-                        (cur_port==2'd2 && s2_axi_arvalid) ||
-                        (cur_port==2'd3 && s3_axi_arvalid)) begin
+                    if ((cur_port==3'd0 && s0_axi_arvalid) ||
+                        (cur_port==3'd1 && s1_axi_arvalid) ||
+                        (cur_port==3'd2 && s2_axi_arvalid) ||
+                        (cur_port==3'd3 && s3_axi_arvalid) ||
+                        (cur_port==3'd4 && s4_axi_arvalid)) begin
 
                         r_id          <= sel_arid;
                         r_base_word   <= {2'b00, sel_araddr[ADDR_WIDTH-1:2]};   // word addressへ変換
@@ -789,7 +906,38 @@ module ddr3_axi_controller #(
                         r_issue_cnt   <= 4'd0;
                         r_recv_cnt    <= 4'd0;
                         r_send_cnt    <= 4'd0;
-                        st            <= R_WAIT_START;
+                        if (video_long_read) begin
+                            video_base_word <= s4_axi_araddr >> 2;
+                            video_groups <= s4_axi_arlen == 31 ? 3'd4 : 3'd2;
+                            video_issued <= 0;
+                            video_received <= 0;
+                            video_next_word <= 0;
+                            video_last_word <= s4_axi_arlen[4:0];
+                            st <= VIDEO_FETCH;
+                        end else st <= R_WAIT_START;
+                    end
+                end
+
+                VIDEO_FETCH: begin
+                    if (video_issue) video_issued <= video_issued + 1'b1;
+                    if (app_rd_data_valid) begin
+                        video_received <= video_received + 1'b1;
+                        if (video_received == video_last_word[4:3]) st <= VIDEO_SEND;
+                    end
+                end
+
+                VIDEO_SEND: begin
+                    if (s4_axi_rvalid && s4_axi_rready && s4_axi_rlast) begin
+                        s4_axi_rvalid <= 0;
+                        s4_axi_rlast <= 0;
+                        st <= IDLE;
+                    end else if (!s4_axi_rvalid || s4_axi_rready) begin
+                        s4_axi_rvalid <= 1;
+                        s4_axi_rid <= r_id;
+                        s4_axi_rresp <= 2'b00;
+                        s4_axi_rdata <= video_lines[video_next_word[4:3]][video_next_word[2:0]*32 +: 32];
+                        s4_axi_rlast <= video_next_word == video_last_word;
+                        video_next_word <= video_next_word + 1'b1;
                     end
                 end
 

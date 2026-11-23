@@ -71,6 +71,7 @@
 #define SYS_LCD_FILL_RGB          91
 #define SYS_LCD_RGB888_BEGIN      92
 #define SYS_LCD_RGB888_RECT       93
+#define SYS_VRAM_TEST_PATTERN     94
 
 // --- SYSTEM ---
 #define SYS_EXIT                  100

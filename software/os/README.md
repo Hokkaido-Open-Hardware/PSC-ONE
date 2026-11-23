@@ -11,6 +11,22 @@ PSC-ONE向けのOS、シェル、デバイスAPI、ユーザーアプリケー�
 - [FAT32回帰](tests/fat32/README.md)
 - [外部依存ライブラリ](third_party/README.md)
 
+## Tang Mega 138K の VRAM テスト
+
+リポジトリのルートで Tang 138K 用の SD 起動イメージをビルドします。
+
+```sh
+make -C PSC-ONE/hardware/firmware firmware_fat32_tang138k
+```
+
+`PSC-ONE/hardware/firmware/mem/tang138k/` の `kernel.mem` と `user.mem` を SD カードのルートに
+`KERNEL.MEM` と `USER.MEM` として置きます。FPGA は `COLOR_BAR_MODE=0`、
+`VRAM_ADDRESS=0x00800000` で合成します。
+
+起動後、UART シェルで `vram_test` を実行すると、HDMI 接続の LCD に左から
+黒〜白のパレット番号順で 16 本の縦帯が表示されます。各帯は 120 画素幅です。
+VRAM は物理 `0x00800000`〜`0x008FD1FF` で、先頭 8 MiB の OS 領域の直後にあります。
+
 以下はJPEG表示機能の実装・検証記録です。Phase 1時点の測定と、その後のlandscape修正を区別して記載します。
 
 <!-- contents -->

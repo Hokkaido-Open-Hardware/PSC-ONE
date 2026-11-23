@@ -24,6 +24,9 @@ typedef uint32_t vaddr_t;
 #define true  1
 #define false 0
 
+#ifdef PSC_TANG138K_VRAM
+void lcd_draw_vram_test_pattern(void);
+#endif
 void lcd_draw_boot_logo(void);
 void lcd_draw_text(void);
 

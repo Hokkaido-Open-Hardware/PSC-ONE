@@ -6,6 +6,24 @@
 #include "../lib/common.h"
 #include <stdarg.h>
 
+#ifdef PSC_TANG138K_VRAM
+#include "dma.h"
+
+void lcd_draw_vram_test_pattern(void)
+{
+    volatile uint32_t *dst = (volatile uint32_t *)PSC_BOARD_VRAM_VA;
+    /* Packed EGA indices: 8 pixels per word, 16 equal vertical bars. */
+    for (unsigned y = 0; y < PSC_BOARD_VRAM_HEIGHT; ++y) {
+        for (unsigned color = 0; color < 16; ++color) {
+            uint32_t pixels = color * 0x11111111u;
+            for (unsigned i = 0; i < PSC_BOARD_VRAM_WIDTH / (16 * 8); ++i)
+                *dst++ = pixels;
+        }
+    }
+    dcache_writeback((const void *)PSC_BOARD_VRAM_VA);
+}
+#endif
+
 #define IPS_MODE 1
 
 static inline void tiny_delay(unsigned n){

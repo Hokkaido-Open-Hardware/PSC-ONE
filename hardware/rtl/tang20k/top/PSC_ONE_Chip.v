@@ -251,7 +251,7 @@ module PSC_ONE_Chip #(
     wire                    p_axi_rready;
 
     // =========================================================
-    // Data-side AXI (16-bit) — SLAVE-facing ports of DUT
+    // Data-side AXI (32-bit) — SLAVE-facing ports of DUT
     // =========================================================
     wire [ID_W-1:0]         d_axi_awid;
     wire [ADDR_W-1:0]       d_axi_awaddr;

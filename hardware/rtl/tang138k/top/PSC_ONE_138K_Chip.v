@@ -29,16 +29,21 @@
 // Phase Flow Engine OFF mode
 //`define PFE_OFF
 
+`define HDMI
+
 // Yosys mode
 //`define YOSYS
 
 module PSC_ONE_138K_Chip #(
-    parameter integer CLK_FREQ           = 100,
+    parameter integer CLK_FREQ           = 80,
     parameter integer ID_WIDTH           = 1,
     parameter integer DATA_WIDTH         = 32,   // AXI Data bus. fixed 32bit Bus
     parameter integer PSC_CACHE_2WAY     = 1,
     parameter integer PSC_CACHE_IO_2WAY  = 1,
-    parameter ENABLE_SV32_TLB = 1'b1
+    parameter ENABLE_SV32_TLB            = 1'b1,
+    // HDMI
+    parameter integer COLOR_BAR_MODE     = 1,
+    parameter [31:0]  VRAM_ADDRESS       = 32'h0080_0000
 )(
     // ==== RV32IS CPU IF ====
     input  wire         sys_clk,
@@ -62,7 +67,9 @@ module PSC_ONE_138K_Chip #(
 
     // ---- HDMI ----
     output wire [2:0]   tmds_d_p_0,
+    output wire [2:0]   tmds_d_n_0,
     output wire         tmds_clk_p_0,
+    output wire         tmds_clk_n_0,
 
 `ifdef COCOTB_SIM
     // ---------------- PSC-ONE SW ----------------
@@ -186,10 +193,22 @@ module PSC_ONE_138K_Chip #(
     wire clock_100MHz;
     wire clk_x1;
     wire clk = clk_x1;
+    wire clk_p, clk_p5, pll_hdmi_lock;
 `ifdef COCOTB_SIM
     assign clock_100MHz = sys_clk;
     assign clk_x1       = sys_clk;
+`ifdef HDMI
+    // Functional PLL model: use the testbench clock as the 5x serializer clock.
+    reg [2:0] hdmi_div = 0;
+    always @(posedge sys_clk) begin
+        if (hdmi_div == 4) hdmi_div <= 0;
+        else hdmi_div <= hdmi_div + 1'b1;
+    end
+    assign clk_p5 = sys_clk;
+    assign clk_p  = hdmi_div < 2;
+`endif
 `else
+    // Main PLL
     wire memory_clk, pll_lock, pll_stop;
     Gowin_PLL Gowin_PLL_inst (
         .lock       (pll_lock), 
@@ -205,6 +224,20 @@ module PSC_ONE_138K_Chip #(
         .enclk1     (1'b1), 
         .enclk2     (pll_stop)
     );
+    // HDMI PLL
+`ifdef HDMI
+    Gowin_HDMI_PLL Gowin_HDMI_PLL_inst (
+        .lock       (pll_hdmi_lock), 
+        .clkout0    (clk_p), 
+        .clkout1    (clk_p5), 
+        .clkin      (sys_clk), 
+
+        .init_clk   (sys_clk), 
+        .reset      (~sys_reset),
+        .enclk0     (1'b1), 
+        .enclk1     (1'b1)
+    );
+`endif
 `endif
 
 `ifdef COCOTB_SIM
@@ -341,7 +374,7 @@ module PSC_ONE_138K_Chip #(
     wire                    p_axi_rready;
 
     // =========================================================
-    // Data-side AXI (16-bit) — SLAVE-facing ports of DUT
+    // Data-side AXI (32-bit) — SLAVE-facing ports of DUT
     // =========================================================
     wire [ID_W-1:0]         u_axi_awid;
     wire [ADDR_W-1:0]       u_axi_awaddr;
@@ -460,6 +493,43 @@ module PSC_ONE_138K_Chip #(
     wire                    bt_axi_rlast;
     wire                    bt_axi_rvalid;
     wire                    bt_axi_rready;
+
+    // =========================================================
+    // Data-side AXI (32-bit) — SLAVE-facing ports of DUT
+    // =========================================================
+    wire [ID_W-1:0]         pix_axi_awid;
+    wire [ADDR_W-1:0]       pix_axi_awaddr;
+    wire [7:0]              pix_axi_awlen;
+    wire [2:0]              pix_axi_awsize;
+    wire [1:0]              pix_axi_awburst;
+    wire                    pix_axi_awvalid;
+    wire                    pix_axi_awready;
+
+    wire [DW-1:0]           pix_axi_wdata;
+    wire [(DW/8)-1:0]       pix_axi_wstrb;
+    wire                    pix_axi_wlast;
+    wire                    pix_axi_wvalid;
+    wire                    pix_axi_wready;
+
+    wire [ID_W-1:0]         pix_axi_bid;
+    wire [1:0]              pix_axi_bresp;
+    wire                    pix_axi_bvalid;
+    wire                    pix_axi_bready;
+
+    wire [ID_W-1:0]         pix_axi_arid;
+    wire [ADDR_W-1:0]       pix_axi_araddr;
+    wire [7:0]              pix_axi_arlen;
+    wire [2:0]              pix_axi_arsize;
+    wire [1:0]              pix_axi_arburst;
+    wire                    pix_axi_arvalid;
+    wire                    pix_axi_arready;
+
+    wire [ID_W-1:0]         pix_axi_rid;
+    wire [DW-1:0]           pix_axi_rdata;
+    wire [1:0]              pix_axi_rresp;
+    wire                    pix_axi_rlast;
+    wire                    pix_axi_rvalid;
+    wire                    pix_axi_rready;
 
     //==========================================================
     // AXI But Sdram I/F
@@ -632,6 +702,46 @@ module PSC_ONE_138K_Chip #(
         .s3_axi_rlast       (bt_axi_rlast),
         .s3_axi_rvalid      (bt_axi_rvalid),
         .s3_axi_rready      (bt_axi_rready),
+
+        // ==== ch:4 (HDMI VRAM) ====
+        // AXI4 Write Address
+        .s4_axi_awid        (pix_axi_awid),
+        .s4_axi_awaddr      (pix_axi_awaddr[23:0]),
+        .s4_axi_awlen       (pix_axi_awlen),
+        .s4_axi_awsize      (pix_axi_awsize),
+        .s4_axi_awburst     (pix_axi_awburst),
+        .s4_axi_awvalid     (pix_axi_awvalid),
+        .s4_axi_awready     (pix_axi_awready),
+
+        // AXI4 Write Data
+        .s4_axi_wdata       (pix_axi_wdata),
+        .s4_axi_wstrb       (pix_axi_wstrb),
+        .s4_axi_wlast       (pix_axi_wlast),
+        .s4_axi_wvalid      (pix_axi_wvalid),
+        .s4_axi_wready      (pix_axi_wready),
+
+        // AXI4 Write Response
+        .s4_axi_bid         (pix_axi_bid),
+        .s4_axi_bresp       (pix_axi_bresp),
+        .s4_axi_bvalid      (pix_axi_bvalid),
+        .s4_axi_bready      (pix_axi_bready),
+
+        // AXI4 Read Address
+        .s4_axi_arid        (pix_axi_arid),
+        .s4_axi_araddr      (pix_axi_araddr[23:0]),
+        .s4_axi_arlen       (pix_axi_arlen),
+        .s4_axi_arsize      (pix_axi_arsize),
+        .s4_axi_arburst     (pix_axi_arburst),
+        .s4_axi_arvalid     (pix_axi_arvalid),
+        .s4_axi_arready     (pix_axi_arready),
+
+        // AXI4 Read Data
+        .s4_axi_rid         (pix_axi_rid),
+        .s4_axi_rdata       (pix_axi_rdata),
+        .s4_axi_rresp       (pix_axi_rresp),
+        .s4_axi_rlast       (pix_axi_rlast),
+        .s4_axi_rvalid      (pix_axi_rvalid),
+        .s4_axi_rready      (pix_axi_rready),
 
         // ==== DDR3 SDRAM controller IF ====
         // mem interface
@@ -940,5 +1050,71 @@ module PSC_ONE_138K_Chip #(
         .u_axi_rvalid  (u_axi_rvalid),
         .u_axi_rready  (u_axi_rready)
     );
+
+    //==========================================================
+    // HDMI
+    //==========================================================
+`ifdef HDMI
+`ifdef COCOTB_SIM
+    // The GW5A OSER10 model looks up GSR.GSRO by instance name.
+    GSR GSR (.GSRI(reset_n));
+`endif
+    // HDMI Tx Top
+	dvi_tx_top #(
+        .COLOR_BAR_MODE     (COLOR_BAR_MODE),
+        .VRAM_ADDRESS       (VRAM_ADDRESS)
+    ) u_dvi_tx_top(
+        .axi_clock          (clk_x1),
+		.pixel_clock		(clk_p),
+		.ddr_bit_clock		(clk_p5),
+		.reset				(~reset_n),
+        // AXI port
+
+        // Write Address
+        .pix_axi_awid       (pix_axi_awid),
+        .pix_axi_awaddr     (pix_axi_awaddr),
+        .pix_axi_awlen      (pix_axi_awlen),
+        .pix_axi_awsize     (pix_axi_awsize),
+        .pix_axi_awburst    (pix_axi_awburst),
+        .pix_axi_awvalid    (pix_axi_awvalid),
+        .pix_axi_awready    (pix_axi_awready),
+
+        // Write Data
+        .pix_axi_wdata      (pix_axi_wdata),
+        .pix_axi_wstrb      (pix_axi_wstrb),
+        .pix_axi_wlast      (pix_axi_wlast),
+        .pix_axi_wvalid     (pix_axi_wvalid),
+        .pix_axi_wready     (pix_axi_wready),
+
+        // Write Response
+        .pix_axi_bid        (pix_axi_bid),
+        .pix_axi_bresp      (pix_axi_bresp),
+        .pix_axi_bvalid     (pix_axi_bvalid),
+        .pix_axi_bready     (pix_axi_bready),
+
+        // Read Address
+        .pix_axi_arid       (pix_axi_arid),
+        .pix_axi_araddr     (pix_axi_araddr),
+        .pix_axi_arlen      (pix_axi_arlen),
+        .pix_axi_arsize     (pix_axi_arsize),
+        .pix_axi_arburst    (pix_axi_arburst),
+        .pix_axi_arvalid    (pix_axi_arvalid),
+        .pix_axi_arready    (pix_axi_arready),
+
+        // Read Data
+        .pix_axi_rid        (pix_axi_rid),
+        .pix_axi_rdata      (pix_axi_rdata),
+        .pix_axi_rresp      (pix_axi_rresp),
+        .pix_axi_rlast      (pix_axi_rlast),
+        .pix_axi_rvalid     (pix_axi_rvalid),
+        .pix_axi_rready     (pix_axi_rready),
+
+		// TMDS Output
+		.tmds_clk			({tmds_clk_p_0, tmds_clk_n_0}),
+		.tmds_d0			({tmds_d_p_0[0], tmds_d_n_0[0]}),
+		.tmds_d1			({tmds_d_p_0[1], tmds_d_n_0[1]}),
+		.tmds_d2			({tmds_d_p_0[2], tmds_d_n_0[2]})
+	);
+`endif
 
 endmodule

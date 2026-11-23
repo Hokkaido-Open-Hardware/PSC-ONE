@@ -466,6 +466,14 @@ prompt:
             if (argc != 2) printf("usage: tflite_info MODEL.TFL\n");
             else cmd_tflite_info(argv[1]);
 
+#ifdef PSC_TANG138K_VRAM
+        } else if (strcmp(argv[0], "vram_test") == 0) {
+            if (argc != 1) printf("usage: vram_test\n");
+            else if (call_vram_test_pattern() == 0)
+                printf("VRAM: 16 color bars written\n");
+            else printf("VRAM write failed\n");
+#endif
+
         // ---- JPEG disp LCD ----
 #ifndef PSC_OS_DEBUG_WITHOUT_JPEGLCD
         } else if (strcmp(argv[0], "jpeg") == 0) {
@@ -515,6 +523,9 @@ prompt:
             printf("  i2c_capture imu_test (math self-test + snapshot estimate)\n");
             printf("  i2c_capture imu_monitor (snapshots, reset per sample; q exits)\n");
             printf("  microPython | micropython\n");
+#ifdef PSC_TANG138K_VRAM
+            printf("  vram_test (write 16 vertical color bars to HDMI VRAM)\n");
+#endif
             printf("  jpeg TEST.JPG\n");
             printf("  yolo YOLO.TFL TEST.JPG (detection to UART + LCD)\n");
             printf("  yolo_backend cpu|pulp|npu|auto (default cpu)\n");

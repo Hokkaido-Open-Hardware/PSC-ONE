@@ -76,6 +76,26 @@ CACHE_DIR    = ../rtl/soc/cache/src
 SOC_TOP_SRC_DIR  = ../rtl/soc/soc_top
 USER_SRC_DIR  = ../rtl/tang138k/user_logic
 
+HDMI_DIR = ../rtl/tang138k/hdmi
+GOWIN_SIMLIB ?= /opt/gowin/IDE/simlib/gw5a/prim_sim.v
+
+# Board revisions with the DVI transmitter use the GW5A functional models.
+ifneq ($(wildcard $(HDMI_DIR)/dvi_tx_top.v),)
+HDMI_FILES = \
+	$(HDMI_DIR)/dvi_tx_top.v \
+	$(HDMI_DIR)/dvi_vram_scanout.v \
+	$(HDMI_DIR)/test_pattern_gen.v \
+	$(HDMI_DIR)/video_timing_ctrl.v \
+	$(HDMI_DIR)/dvi_tx_tmds_enc.v \
+	$(HDMI_DIR)/dvi_tx_tmds_phy.v \
+	$(HDMI_DIR)/dvi_tx_clk_drv.v \
+	$(GOWIN_SIMLIB)
+ifeq ($(MODE),verilator)
+# prim_sim.v uses procedural assign/deassign in vendor cell models.
+TOP_COMPILE_ARGS += -Wno-IEEEMAYDEPRECATE
+endif
+endif
+
 PSCONE_SIM_TOP_FILE = \
 	$(TOP_SRC_DIR)/PSC_ONE_138K_Chip_sim.v \
 
@@ -324,7 +344,7 @@ LCD_ILI9488_MODEL = ../rtl/model/LCD_model/PSC_LCD_ILI9488_MODEL.v
 
 INPUT_PSCONE_SIM_FILE = \
 	$(PSCONE_SIM_TOP_FILE) $(PSCONE_TOP_FILE) $(PSCONE_SOC_TOP_FILE) \
-	$(USER_LOGIC_FILE) \
+	$(USER_LOGIC_FILE) $(HDMI_FILES) \
 	$(CPU_FILES) $(DDR3_AXI_FILES) \
 	$(PSC_ONE_BOOT_FILE) $(PSC_ONE_DMA_FILE) \
 	$(SA_FILE) $(PSCONELCD_FILE) $(SD_READER_FILE) $(TIMER_FILE) \
@@ -351,7 +371,7 @@ SIM_BUILD        ?= sim_build
 # PSC-ONE テスト
 
 PSCONE_SINGLE_TEST = \
-	sd_card_test1:RV32_chip_test:./mem/sd_card_test1.mem:0x000000e0 \
+	add_test1:RV32_chip_test:./mem/add_test1.mem:0xff00ff0b \
 
 # ============================================================
 # 複数テスト定義
@@ -514,7 +534,7 @@ TEST_BUILD_ROOT ?= /tmp
 sdcard/sdcard.hex:
 	if test -f sdcard/sdcard.img; then $(MAKE) -f Makefile.sdcard hex; else $(MAKE) -f Makefile.sdcard all; fi
 
-simulate_PSC_ONE_TESTS: sdcard/sdcard.hex
+simulate_PSC_ONE_TESTS: sdcard/sdcard.hex $(HDMI_FILES)
 	@mkdir -p ./wave
 	@echo "MODE=$(MODE)"
 	@echo "CPU_VERSION=$(CPU_VERSION)"

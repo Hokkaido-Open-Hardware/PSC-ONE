@@ -229,6 +229,12 @@ static struct process *create_process_image(const void *image,
             map_page(page_table, va, page, PAGE_U | PAGE_R | PAGE_W);
         }
         map_model(page_table);
+#ifdef PSC_TANG138K_VRAM
+        /* The model already occupies VA 0x00800000. Map VRAM separately. */
+        for (uint32_t off = 0; off < PSC_BOARD_VRAM_BYTES; off += PAGE_SIZE)
+            map_page(page_table, PSC_BOARD_VRAM_VA + off, PSC_BOARD_VRAM_BASE + off,
+                     PAGE_R | PAGE_W);
+#endif
         sync_user_code();
     }
 

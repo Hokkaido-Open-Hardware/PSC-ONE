@@ -101,7 +101,9 @@ module PSC_ONE_138K_Chip_sim #(
 
         // ---- HDMI ----
         .tmds_d_p_0          (),
+        .tmds_d_n_0          (),
         .tmds_clk_p_0        (),
+        .tmds_clk_n_0        (),
 
         // ---------------- PSC-ONE SW ----------------
         .PSCONE_SW1          (PSCONE_SW1),

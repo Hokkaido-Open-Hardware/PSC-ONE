@@ -19,3 +19,6 @@ typedef uint32_t vaddr_t;
 
 #define true  1
 #define false 0
+
+/* Publish dirty CPU cache lines before an external bus master reads RAM. */
+void dcache_writeback(const void *sync_addr);

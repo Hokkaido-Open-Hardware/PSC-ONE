@@ -27,6 +27,16 @@
 #define PSC_BOARD_MEMORY_TEST_START 0x00600000
 #define PSC_BOARD_MEMORY_TEST_END   0x00800000
 
+#ifdef PSC_TANG138K_VRAM
+/* Physical DDR3 address shared with PSC_ONE_138K_Chip.VRAM_ADDRESS. */
+#define PSC_BOARD_VRAM_BASE         0x00800000
+#define PSC_BOARD_VRAM_WIDTH        1920
+#define PSC_BOARD_VRAM_HEIGHT       1080
+#define PSC_BOARD_VRAM_BYTES        (PSC_BOARD_VRAM_WIDTH / 2 * PSC_BOARD_VRAM_HEIGHT)
+/* Supervisor VA in the unused part of the shell's Arena leaf table. */
+#define PSC_BOARD_VRAM_VA           0x00d00000
+#endif
+
 /* Keep in sync with boot/kernel/shell linker scripts and the RTL ROM loader. */
 #define PSC_BOARD_USER_BASE         0x00400000
 #define PSC_BOARD_USER_STACK_OFFSET 0x00100000

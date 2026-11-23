@@ -1,7 +1,6 @@
 [submodule "hardware/sim/riscv_tests"]
 	path = hardware/sim/riscv_tests
 	url = https://github.com/riscv-software-src/riscv-tests.git
-
 [submodule "software/micropython/micropython"]
 	path = software/os/micropython/micropython
 	url = https://github.com/micropython/micropython.git
@@ -11,10 +10,6 @@
 [submodule "sim/coremark"]
         path = hardware/sim/coremark
         url = https://github.com/eembc/coremark.git
-
-[submodule "hardware/sim/coremark"]
-	path = hardware/sim/coremark
-	url = https://github.com/eembc/coremark.git
 [submodule "toolchain/riscv-gnu-toolchain"]
 	path = toolchain/riscv-gnu-toolchain
 	url = https://github.com/nharu1977/riscv-gnu-toolchain.git

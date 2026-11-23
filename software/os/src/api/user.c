@@ -770,6 +770,13 @@ void start(void) {
         : [stk] "r"(__user_stack_top)
     );
 }
+#ifdef PSC_TANG138K_VRAM
+int call_vram_test_pattern(void)
+{
+    return (int)sd_api(SYS_VRAM_TEST_PATTERN, 0);
+}
+#endif
+
 int call_lcd_rgb888_begin(void)
 {
     return (int)sd_api(SYS_LCD_RGB888_BEGIN, 0);

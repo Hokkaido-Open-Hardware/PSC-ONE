@@ -14,7 +14,7 @@ module USER_LOGIC #(
     // -------------------------------
     // 外部：Shared I/D 32bit AXI IF (u_axi_*)
     // -------------------------------
-    // ===== AXI4 Master (16-bit) =====
+    // ===== AXI4 Master (32-bit) =====
     // Write Address
     output wire  [ID_WIDTH-1:0]      u_axi_awid,
     output wire  [ADDR_WIDTH-1:0]    u_axi_awaddr,

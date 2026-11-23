@@ -139,6 +139,20 @@ module PSC_ONE_LCD #(
     // ------------------------------------------------------------
     wire    spi_idle;
 
+    // Launch the command halfway between CPU rising edges. The LCD clock
+    // is divided from this clock, with positive skew at the SPI registers.
+    reg lcd_valid;
+    reg [8:0] lcd_data;
+    always @(negedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            lcd_valid <= 1'b0;
+            lcd_data <= 9'b0;
+        end else begin
+            lcd_valid <= cpu_if_valid;
+            lcd_data <= cpu_if_data;
+        end
+    end
+
     tft_ili9488 #(
         .INPUT_CLK_MHZ          (CLK_FREQ)
     ) u_tft (
@@ -152,9 +166,9 @@ module PSC_ONE_LCD #(
         .tft_cs                 (tft_cs),
         .spi_idle               (spi_idle),
 
-        .cpu_if_valid           (cpu_if_valid),
+        .cpu_if_valid           (lcd_valid),
         .cpu_if_ready           (cpu_if_ready),
-        .cpu_if_data            (cpu_if_data)                // 9bit
+        .cpu_if_data            (lcd_data)                   // 9bit
     );
 
 endmodule

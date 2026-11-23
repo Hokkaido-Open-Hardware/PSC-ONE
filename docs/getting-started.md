@@ -398,6 +398,8 @@ make firmware_fat32
 
 After the build completes, copy `./mem/kernel.mem` and `./mem/user.mem` to the root directory of the FAT32-formatted SD card.
 
+For a Tang Mega 138K with HDMI VRAM scanout, run `make firmware_fat32_tang138k` in the same directory. Copy `mem/tang138k/kernel.mem` and `mem/tang138k/user.mem` to the SD root as `KERNEL.MEM` and `USER.MEM`. With the FPGA configured for `COLOR_BAR_MODE=0` and `VRAM_ADDRESS=0x00800000`, enter `vram_test` at the PSC-OS prompt to display 16 vertical color bars.
+
 ### Add the Boot ROM Files to the Gowin Project
 
 Register the generated files in the FPGA project so that Gowin EDA can find them during synthesis:

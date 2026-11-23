@@ -84,6 +84,9 @@ uint32_t poll_switch_api(void);
 void printf(const char *fmt, ...);
 __attribute__((noreturn)) void exit(void);
 
+#ifdef PSC_TANG138K_VRAM
+int call_vram_test_pattern(void);
+#endif
 int call_lcd_rgb888_begin(void);
 int call_lcd_rgb888_rect(uint32_t x, uint32_t y, uint32_t width,
                         uint32_t height, const uint8_t *rgb);
