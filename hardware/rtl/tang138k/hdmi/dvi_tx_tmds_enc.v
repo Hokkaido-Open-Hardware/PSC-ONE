@@ -1,10 +1,10 @@
 module dvi_tx_tmds_enc(
-    input wire clock,
-    input wire reset,
-    input wire den,
-    input wire [7:0] data,
-    input wire [1:0] ctrl,
-    output reg [9:0] tmds
+    input wire          clock,
+    input wire          reset,
+    input wire          den,
+    input wire [7:0]    data,
+    input wire [1:0]    ctrl,
+    output reg [9:0]    tmds
 );
     function [2:0] ones4(input [3:0] bits);
         begin

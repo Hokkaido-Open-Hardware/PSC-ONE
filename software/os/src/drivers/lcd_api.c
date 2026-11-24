@@ -9,9 +9,61 @@
 #ifdef PSC_TANG138K_VRAM
 #include "dma.h"
 
-void lcd_draw_vram_test_pattern(void)
+#define RGBZ_CONTROL (*(volatile uint32_t *)PSC_BOARD_RGBZ_CONTROL)
+#define RGBZ_STATUS  (*(volatile uint32_t *)PSC_BOARD_RGBZ_STATUS)
+enum { RGBZ_BUSY = 1, RGBZ_DONE = 2, RGBZ_ERROR = 4, RGBZ_PAGE_B = 8 };
+
+static int rgbz_ready(void)
 {
-    volatile uint32_t *dst = (volatile uint32_t *)PSC_BOARD_VRAM_VA;
+    if (RGBZ_CONTROL != 0x5247425au) return -2;
+    return RGBZ_STATUS & RGBZ_BUSY ? -3 : 0;
+}
+
+int rgbz_upload(unsigned offset, const void *src, unsigned bytes)
+{
+    const unsigned plane = PSC_BOARD_RGBZ_PLANE_BYTES;
+    uintptr_t base = PSC_BOARD_RGB565_VA;
+    if (offset >= plane) {
+        offset -= plane;
+        base = PSC_BOARD_Z16_VA;
+    }
+    if (offset >= plane || !bytes || bytes > plane - offset) return -1;
+    int rc = rgbz_ready();
+    if (rc) return rc;
+    memcpy((void *)(base + offset), src, bytes);
+    return 0;
+}
+
+int rgbz_present(void)
+{
+    int rc = rgbz_ready();
+    if (rc) return rc;
+    dcache_writeback((const void *)PSC_BOARD_RGB565_VA);
+    __asm__ volatile("fence iorw, iorw" ::: "memory");
+    RGBZ_CONTROL = 1;
+    for (unsigned poll = 0; poll < 4000000u; ++poll) {
+        uint32_t status = RGBZ_STATUS;
+        if (status & RGBZ_ERROR) return -4;
+        if ((status & (RGBZ_BUSY | RGBZ_DONE)) == RGBZ_DONE)
+            return (status & RGBZ_PAGE_B) != 0;
+    }
+    return -5;
+}
+
+int rgbz_teapot(void)
+{
+    int rc = rgbz_ready();
+    if (rc) return rc;
+    rgbz_draw_teapot((uint16_t *)PSC_BOARD_RGB565_VA, (uint16_t *)PSC_BOARD_Z16_VA);
+    return rgbz_present();
+}
+
+int lcd_draw_vram_test_pattern(void)
+{
+    uint32_t status = RGBZ_CONTROL == 0x5247425au ? RGBZ_STATUS : 0;
+    if (status & RGBZ_BUSY) return -1;
+    uintptr_t base = (status & RGBZ_PAGE_B) ? PSC_BOARD_VRAM_B_VA : PSC_BOARD_VRAM_VA;
+    volatile uint32_t *dst = (volatile uint32_t *)base;
     /* Packed EGA indices: 8 pixels per word, 16 equal vertical bars. */
     for (unsigned y = 0; y < PSC_BOARD_VRAM_HEIGHT; ++y) {
         for (unsigned color = 0; color < 16; ++color) {
@@ -20,7 +72,8 @@ void lcd_draw_vram_test_pattern(void)
                 *dst++ = pixels;
         }
     }
-    dcache_writeback((const void *)PSC_BOARD_VRAM_VA);
+    dcache_writeback((const void *)base);
+    return 0;
 }
 #endif
 

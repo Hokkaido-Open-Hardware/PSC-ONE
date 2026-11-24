@@ -25,7 +25,11 @@ typedef uint32_t vaddr_t;
 #define false 0
 
 #ifdef PSC_TANG138K_VRAM
-void lcd_draw_vram_test_pattern(void);
+int lcd_draw_vram_test_pattern(void);
+int rgbz_upload(unsigned offset, const void *src, unsigned bytes);
+int rgbz_present(void);
+int rgbz_teapot(void);
+void rgbz_draw_teapot(uint16_t *rgb, uint16_t *depth);
 #endif
 void lcd_draw_boot_logo(void);
 void lcd_draw_text(void);

@@ -1,11 +1,12 @@
 module dvi_tx_top #(
     // Parameter
     parameter integer 		    COLOR_BAR_MODE = 1,
-    parameter [ADDR_WIDTH-1:0]  VRAM_ADDRESS   = 32'h0080_0000,
+    parameter [ADDR_WIDTH-1:0]  VRAM_ADDRESS   = 32'h0090_0000,
 	// AXI Prameter
     parameter integer ADDR_WIDTH   = 32,
     parameter integer ID_WIDTH     = 1,
-    parameter integer DATA_WIDTH   = 32     // AXI bus. fixed 32
+    parameter integer DATA_WIDTH   = 256,
+    parameter DOUBLE_BUFFER = 1'b0
 )(
     // CLK, RESET
 	input				axi_clock,
@@ -14,21 +15,19 @@ module dvi_tx_top #(
 	input				reset,
 
     // -------------------------------
-    // 外部：Shared I/D 32bit AXI IF (pix_axi_*)
-    // -------------------------------
-    // ===== AXI4 Master (32-bit) =====
+    // AXI4 master, 32 bytes per beat
     // Write Address
     output wire  [ID_WIDTH-1:0]      pix_axi_awid,
     output wire  [ADDR_WIDTH-1:0]    pix_axi_awaddr,
-    output wire  [7:0]               pix_axi_awlen,         // 7 (=8beat)
-    output wire  [2:0]               pix_axi_awsize,        // 1 (2B)
+    output wire  [7:0]               pix_axi_awlen,
+    output wire  [2:0]               pix_axi_awsize,
     output wire  [1:0]               pix_axi_awburst,       // INCR=01
     output wire                      pix_axi_awvalid,
     input  wire                      pix_axi_awready,
 
     // Write Data
     output wire  [DATA_WIDTH-1:0]    pix_axi_wdata,
-    output wire  [(DATA_WIDTH/8)-1:0]pix_axi_wstrb,         // 2'b11
+    output wire  [(DATA_WIDTH/8)-1:0]pix_axi_wstrb,
     output wire                      pix_axi_wlast,
     output wire                      pix_axi_wvalid,
     input  wire                      pix_axi_wready,
@@ -42,8 +41,8 @@ module dvi_tx_top #(
     // Read Address
     output wire  [ID_WIDTH-1:0]      pix_axi_arid,
     output wire  [ADDR_WIDTH-1:0]    pix_axi_araddr,
-    output wire  [7:0]               pix_axi_arlen,         // 0/1/3/7 for 1/2/4/8 beats
-    output wire  [2:0]               pix_axi_arsize,        // 2 (4 bytes) in VRAM mode
+    output wire  [7:0]               pix_axi_arlen,
+    output wire  [2:0]               pix_axi_arsize,
     output wire  [1:0]               pix_axi_arburst,       // INCR
     output wire                      pix_axi_arvalid,
     input  wire                      pix_axi_arready,
@@ -60,7 +59,9 @@ module dvi_tx_top #(
 	output	[1 : 0]		tmds_clk,
 	output	[1 : 0]		tmds_d0,
 	output	[1 : 0]		tmds_d1,
-	output	[1 : 0]		tmds_d2
+	output	[1 : 0]		tmds_d2,
+    input wire requested_page,
+    output wire displayed_page, scanout_busy
 );
 
     // Video scanout only uses the AXI read channels.
@@ -88,13 +89,17 @@ module dvi_tx_top #(
 	
     generate
         if (COLOR_BAR_MODE == 0) begin : gen_vram
-            assign pix_axi_arsize  = 3'd2;
+            assign pix_axi_arsize  = 3'd5;
             assign pix_axi_arburst = 2'b01;
 
             dvi_vram_scanout #(
                 .ADDR_WIDTH          (ADDR_WIDTH),
-                .VRAM_ADDRESS        (VRAM_ADDRESS)
+                .VRAM_ADDRESS        (VRAM_ADDRESS),
+                .DOUBLE_BUFFER       (DOUBLE_BUFFER)
             ) scanout (
+                .requested_page      (requested_page),
+                .displayed_page      (displayed_page),
+                .scanout_busy        (scanout_busy),
                 .axi_clock           (axi_clock),
                 .pixel_clock         (pixel_clock),
                 .reset               (reset),
@@ -113,6 +118,8 @@ module dvi_tx_top #(
                 .rgb                 (dvi_data)
             );
         end else begin : gen_bars
+            assign displayed_page = 0;
+            assign scanout_busy = 0;
             assign pix_axi_araddr  = '0;
             assign pix_axi_arlen   = '0;
             assign pix_axi_arsize  = '0;

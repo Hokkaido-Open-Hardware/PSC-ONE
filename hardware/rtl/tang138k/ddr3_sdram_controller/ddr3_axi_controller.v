@@ -1,8 +1,7 @@
 /*
 NISHIHARU — SDRAM Controller AXI4 5-port Slave
-- 5x AXI4-S (32-bit) -> Single SDRAM controller
-- INCR only, SIZE=2(4B), LEN={0,1,3,7}. The video read port also
-  accepts naturally aligned bursts of 16 and 32 words.
+- Ports 0..2: 32-bit INCR transfers of 1/2/4/8 words.
+- Ports 3..4: aligned 256-bit INCR transfers, one DDR3 BL8 per AXI beat.
 */
 `timescale 1ns/1ps
 
@@ -129,11 +128,11 @@ module ddr3_axi_controller #(
     input  wire                      s3_axi_awvalid,
     output reg                       s3_axi_awready,
 
-    input  wire [DATA_WIDTH-1:0]     s3_axi_wdata,
-    input  wire [(DATA_WIDTH/8)-1:0] s3_axi_wstrb,
+    input  wire [255:0]              s3_axi_wdata,
+    input  wire [31:0]               s3_axi_wstrb,
     input  wire                      s3_axi_wlast,
     input  wire                      s3_axi_wvalid,
-    output reg                       s3_axi_wready,
+    output wire                      s3_axi_wready,
 
     output reg  [ID_WIDTH-1:0]       s3_axi_bid,
     output reg  [1:0]                s3_axi_bresp,
@@ -148,11 +147,11 @@ module ddr3_axi_controller #(
     input  wire                      s3_axi_arvalid,
     output reg                       s3_axi_arready,
 
-    output reg  [ID_WIDTH-1:0]       s3_axi_rid,
-    output reg  [DATA_WIDTH-1:0]     s3_axi_rdata,
-    output reg  [1:0]                s3_axi_rresp,
-    output reg                       s3_axi_rlast,
-    output reg                       s3_axi_rvalid,
+    output wire [ID_WIDTH-1:0]       s3_axi_rid,
+    output wire [255:0]              s3_axi_rdata,
+    output wire [1:0]                s3_axi_rresp,
+    output wire                      s3_axi_rlast,
+    output wire                      s3_axi_rvalid,
     input  wire                      s3_axi_rready,
 
     // -------- Port 4 (video port) --------
@@ -164,11 +163,11 @@ module ddr3_axi_controller #(
     input  wire                      s4_axi_awvalid,
     output reg                       s4_axi_awready,
 
-    input  wire [DATA_WIDTH-1:0]     s4_axi_wdata,
-    input  wire [(DATA_WIDTH/8)-1:0] s4_axi_wstrb,
+    input  wire [255:0]              s4_axi_wdata,
+    input  wire [31:0]               s4_axi_wstrb,
     input  wire                      s4_axi_wlast,
     input  wire                      s4_axi_wvalid,
-    output reg                       s4_axi_wready,
+    output wire                      s4_axi_wready,
 
     output reg  [ID_WIDTH-1:0]       s4_axi_bid,
     output reg  [1:0]                s4_axi_bresp,
@@ -183,11 +182,11 @@ module ddr3_axi_controller #(
     input  wire                      s4_axi_arvalid,
     output reg                       s4_axi_arready,
 
-    output reg  [ID_WIDTH-1:0]       s4_axi_rid,
-    output reg  [DATA_WIDTH-1:0]     s4_axi_rdata,
-    output reg  [1:0]                s4_axi_rresp,
-    output reg                       s4_axi_rlast,
-    output reg                       s4_axi_rvalid,
+    output wire [ID_WIDTH-1:0]       s4_axi_rid,
+    output wire [255:0]              s4_axi_rdata,
+    output wire [1:0]                s4_axi_rresp,
+    output wire                      s4_axi_rlast,
+    output wire                      s4_axi_rvalid,
     input  wire                      s4_axi_rready,
 
     // -------- DDR3 controller --------
@@ -222,7 +221,9 @@ module ddr3_axi_controller #(
 
 	localparam DRAM_NUM = 2'd2;
 
-    wire legacy_en, video_fetch;
+    wire legacy_en, legacy_wren, legacy_wend, wide_fetch;
+    wire [255:0] legacy_wdata;
+    wire [31:0] legacy_mask;
     wire [2:0] legacy_cmd;
     wire [28:0] legacy_addr;
 
@@ -249,12 +250,12 @@ module ddr3_axi_controller #(
         .app_en             (legacy_en),
         .app_cmd            (legacy_cmd),
         .app_addr           (legacy_addr),
-        .app_wdf_data       (app_wdf_data),
-        .app_wdf_wren       (app_wdf_wren),
-        .app_wdf_end        (app_wdf_end),
-        .app_wdf_mask       (app_wdf_mask),
+        .app_wdf_data       (legacy_wdata),
+        .app_wdf_wren       (legacy_wren),
+        .app_wdf_end        (legacy_wend),
+        .app_wdf_mask       (legacy_mask),
         .app_burst          (app_burst),
-        .app_rd_data_valid  (app_rd_data_valid && !video_fetch),
+        .app_rd_data_valid  (app_rd_data_valid && !wide_fetch),
         .app_rd_data        (app_rd_data),
         .init_calib_complete(init_calib_complete),
         .wr_data_rdy        (wr_data_rdy),
@@ -326,35 +327,13 @@ module ddr3_axi_controller #(
         R_WAIT_START = 4'd9,
         R_ISSUE      = 4'd10,
         R_SEND       = 4'd11,
-        VIDEO_FETCH  = 4'd12,
-        VIDEO_SEND   = 4'd13;
+        WIDE_FETCH   = 4'd12,
+        WIDE_SEND    = 4'd13,
+        WIDE_WRITE   = 4'd14;
 
     reg [3:0] st;
     reg [2:0] cur_port;
     reg       cur_is_write;
-
-    // Consecutive BL8 reads return in command order. Reserve all response
-    // slots before issuing commands, so AXI backpressure cannot lose data.
-    wire video_long_read = cur_port == 4 && s4_axi_arsize == 2 &&
-                           s4_axi_arburst == 2'b01 && s4_axi_araddr[5:0] == 0 &&
-                           (s4_axi_arlen == 15 ||
-                            (s4_axi_arlen == 31 && !s4_axi_araddr[6]));
-    reg [28:0] video_base_word;
-    reg [2:0] video_groups, video_issued;
-    reg [1:0] video_received;
-    reg [4:0] video_next_word, video_last_word;
-    reg [255:0] video_lines [0:3];
-    assign video_fetch = st == VIDEO_FETCH;
-    wire video_issue = aresetn && req_ready && app_rdy && video_issued < video_groups;
-    assign app_en   = video_fetch ? video_issue : legacy_en;
-    assign app_cmd  = video_fetch ? 3'b001 : legacy_cmd;
-    // Each transaction starts at a multiple of its group count. OR selects
-    // the next BL8 within that block without an address-width carry chain.
-    assign app_addr = video_fetch ? video_base_word | {24'b0,video_issued[1:0],3'b0} : legacy_addr;
-
-    always @(posedge aclk)
-        if (video_fetch && app_rd_data_valid)
-            video_lines[video_received] <= app_rd_data;
 
     // WRITE regs
     reg [ID_WIDTH-1:0]   w_id;
@@ -391,6 +370,64 @@ module ddr3_axi_controller #(
     reg [31:0] rbuf5;
     reg [31:0] rbuf6;
     reg [31:0] rbuf7;
+
+    // Wide requests use the native x32 BL8 interface. The command address
+    // counts 32-bit words, so successive 32-byte beats are eight words apart.
+    localparam LINE_BITS = (ADDR_WIDTH-5 < 26) ? ADDR_WIDTH-5 : 26;
+    reg [LINE_BITS-1:0] wide_line;
+    wire [28:0] wide_word_addr = {{(26-LINE_BITS){1'b0}}, wide_line, 3'b0};
+    reg [7:0] wide_len;  // remaining beats minus one (at the start of a read group)
+    wire wide_port = cur_port == 3 || cur_port == 4;
+    function bad_wide_request;
+        input [ADDR_WIDTH-1:0] addr;
+        input [7:0] len;
+        input [2:0] size;
+        input [1:0] burst;
+        begin
+            bad_wide_request = size != 5 || burst != 2'b01 || addr[4:0] != 0 ||
+                               ({2'b0, addr[11:5]} + {1'b0, len} >= 9'd128);
+        end
+    endfunction
+
+    // Reserve four response slots before issuing a group of consecutive reads.
+    // DDR returns are ordered and have no ready signal.
+    reg [255:0] wide_lines [0:3];
+    reg [2:0] wide_issued;
+    reg [1:0] wide_received, wide_sent;
+    wire [1:0] group_last = wide_len < 4 ? wide_len[1:0] : 2'd3;
+    assign wide_fetch = st == WIDE_FETCH;
+    wire wide_read_issue = wide_fetch && req_ready && app_rdy &&
+                           wide_issued <= {1'b0, group_last};
+    always @(posedge aclk)
+        if (wide_fetch && app_rd_data_valid)
+            wide_lines[wide_received] <= app_rd_data;
+
+    assign s3_axi_rvalid = st == WIDE_SEND && cur_port == 3;
+    assign s4_axi_rvalid = st == WIDE_SEND && cur_port == 4;
+    assign s3_axi_rdata = r_err ? 256'b0 : wide_lines[wide_sent];
+    assign s4_axi_rdata = s3_axi_rdata;
+    assign s3_axi_rid = r_id;
+    assign s4_axi_rid = r_id;
+    assign s3_axi_rresp = r_err ? 2'b10 : 2'b00;
+    assign s4_axi_rresp = s3_axi_rresp;
+    assign s3_axi_rlast = s3_axi_rvalid && wide_len == {6'b0, wide_sent};
+    assign s4_axi_rlast = s4_axi_rvalid && wide_len == {6'b0, wide_sent};
+
+    // Accept WDATA on the same edge as the DDR command and data FIFOs.
+    wire wide_write = st == WIDE_WRITE;
+    wire wide_wready = wide_write && (w_err || (req_ready && app_rdy && wr_data_rdy));
+    assign s3_axi_wready = wide_wready && cur_port == 3;
+    assign s4_axi_wready = wide_wready && cur_port == 4;
+    wire wide_write_fire = (s3_axi_wready && s3_axi_wvalid) ||
+                           (s4_axi_wready && s4_axi_wvalid);
+    wire wide_write_issue = wide_write_fire && !w_err;
+    assign app_en = legacy_en || wide_read_issue || wide_write_issue;
+    assign app_cmd = wide_fetch ? 3'b001 : wide_write ? 3'b000 : legacy_cmd;
+    assign app_addr = (wide_fetch || wide_write) ? wide_word_addr : legacy_addr;
+    assign app_wdf_wren = legacy_wren || wide_write_issue;
+    assign app_wdf_end = legacy_wend || wide_write_issue;
+    assign app_wdf_data = wide_write ? (cur_port == 3 ? s3_axi_wdata : s4_axi_wdata) : legacy_wdata;
+    assign app_wdf_mask = wide_write ? ~(cur_port == 3 ? s3_axi_wstrb : s4_axi_wstrb) : legacy_mask;
 
     // ============================================================
     // selected port signals
@@ -455,6 +492,8 @@ module ddr3_axi_controller #(
         (cur_port==3'd2) ? s2_axi_arburst :
         (cur_port==3'd3) ? s3_axi_arburst : s4_axi_arburst;
 
+    wire wide_ar_error = bad_wide_request(sel_araddr, sel_arlen, sel_arsize, sel_arburst);
+
     wire sel_wvalid =
         (cur_port==3'd0) ? s0_axi_wvalid :
         (cur_port==3'd1) ? s1_axi_wvalid :
@@ -464,14 +503,12 @@ module ddr3_axi_controller #(
     wire [DATA_WIDTH-1:0] sel_wdata =
         (cur_port==3'd0) ? s0_axi_wdata :
         (cur_port==3'd1) ? s1_axi_wdata :
-        (cur_port==3'd2) ? s2_axi_wdata :
-        (cur_port==3'd3) ? s3_axi_wdata : s4_axi_wdata;
+        s2_axi_wdata;
 
     wire [(DATA_WIDTH/8)-1:0] sel_wstrb =
         (cur_port==3'd0) ? s0_axi_wstrb :
         (cur_port==3'd1) ? s1_axi_wstrb :
-        (cur_port==3'd2) ? s2_axi_wstrb :
-        (cur_port==3'd3) ? s3_axi_wstrb : s4_axi_wstrb;
+        s2_axi_wstrb;
 
     wire sel_wlast =
         (cur_port==3'd0) ? s0_axi_wlast :
@@ -519,8 +556,6 @@ module ddr3_axi_controller #(
             s0_axi_wready  <= 1'b0;
             s1_axi_wready  <= 1'b0;
             s2_axi_wready  <= 1'b0;
-            s3_axi_wready  <= 1'b0;
-            s4_axi_wready  <= 1'b0;
 
             s0_axi_arready <= 1'b0;
             s1_axi_arready <= 1'b0;
@@ -566,8 +601,6 @@ module ddr3_axi_controller #(
                 3'd0: s0_axi_wready <= v;
                 3'd1: s1_axi_wready <= v;
                 3'd2: s2_axi_wready <= v;
-                3'd3: s3_axi_wready <= v;
-                3'd4: s4_axi_wready <= v;
                 default: ;
             endcase
         end
@@ -616,8 +649,6 @@ module ddr3_axi_controller #(
                 3'd0: begin s0_axi_rid <= id; s0_axi_rdata <= data; s0_axi_rresp <= resp; s0_axi_rlast <= last; s0_axi_rvalid <= set_valid; end
                 3'd1: begin s1_axi_rid <= id; s1_axi_rdata <= data; s1_axi_rresp <= resp; s1_axi_rlast <= last; s1_axi_rvalid <= set_valid; end
                 3'd2: begin s2_axi_rid <= id; s2_axi_rdata <= data; s2_axi_rresp <= resp; s2_axi_rlast <= last; s2_axi_rvalid <= set_valid; end
-                3'd3: begin s3_axi_rid <= id; s3_axi_rdata <= data; s3_axi_rresp <= resp; s3_axi_rlast <= last; s3_axi_rvalid <= set_valid; end
-                3'd4: begin s4_axi_rid <= id; s4_axi_rdata <= data; s4_axi_rresp <= resp; s4_axi_rlast <= last; s4_axi_rvalid <= set_valid; end
                 default: ;
             endcase
         end
@@ -630,8 +661,6 @@ module ddr3_axi_controller #(
                 3'd0: begin s0_axi_rvalid <= 1'b0; s0_axi_rlast <= 1'b0; end
                 3'd1: begin s1_axi_rvalid <= 1'b0; s1_axi_rlast <= 1'b0; end
                 3'd2: begin s2_axi_rvalid <= 1'b0; s2_axi_rlast <= 1'b0; end
-                3'd3: begin s3_axi_rvalid <= 1'b0; s3_axi_rlast <= 1'b0; end
-                3'd4: begin s4_axi_rvalid <= 1'b0; s4_axi_rlast <= 1'b0; end
                 default: ;
             endcase
         end
@@ -651,8 +680,6 @@ module ddr3_axi_controller #(
             s0_axi_wready  <= 1'b0;
             s1_axi_wready  <= 1'b0;
             s2_axi_wready  <= 1'b0;
-            s3_axi_wready  <= 1'b0;
-            s4_axi_wready  <= 1'b0;
 
             s0_axi_bvalid <= 1'b0;
             s1_axi_bvalid <= 1'b0;
@@ -681,32 +708,22 @@ module ddr3_axi_controller #(
             s0_axi_rvalid <= 1'b0;
             s1_axi_rvalid <= 1'b0;
             s2_axi_rvalid <= 1'b0;
-            s3_axi_rvalid <= 1'b0;
-            s4_axi_rvalid <= 1'b0;
 
             s0_axi_rresp <= 2'b00;
             s1_axi_rresp <= 2'b00;
             s2_axi_rresp <= 2'b00;
-            s3_axi_rresp <= 2'b00;
-            s4_axi_rresp <= 2'b00;
 
             s0_axi_rid <= {ID_WIDTH{1'b0}};
             s1_axi_rid <= {ID_WIDTH{1'b0}};
             s2_axi_rid <= {ID_WIDTH{1'b0}};
-            s3_axi_rid <= {ID_WIDTH{1'b0}};
-            s4_axi_rid <= {ID_WIDTH{1'b0}};
 
             s0_axi_rdata <= {DATA_WIDTH{1'b0}};
             s1_axi_rdata <= {DATA_WIDTH{1'b0}};
             s2_axi_rdata <= {DATA_WIDTH{1'b0}};
-            s3_axi_rdata <= {DATA_WIDTH{1'b0}};
-            s4_axi_rdata <= {DATA_WIDTH{1'b0}};
 
             s0_axi_rlast <= 1'b0;
             s1_axi_rlast <= 1'b0;
             s2_axi_rlast <= 1'b0;
-            s3_axi_rlast <= 1'b0;
-            s4_axi_rlast <= 1'b0;
 
             read_valid  <= 1'b0;
             write_valid <= 1'b0;
@@ -715,12 +732,11 @@ module ddr3_axi_controller #(
             write_data  <= 32'h0000_0000;
             rw_length   <= 4'd0;
 
-            video_base_word <= 0;
-            video_groups <= 0;
-            video_issued <= 0;
-            video_received <= 0;
-            video_next_word <= 0;
-            video_last_word <= 0;
+            wide_line <= 0;
+            wide_len <= 0;
+            wide_issued <= 0;
+            wide_received <= 0;
+            wide_sent <= 0;
             st           <= IDLE;
             cur_port     <= 3'd0;
             cur_is_write <= 1'b0;
@@ -785,12 +801,30 @@ module ddr3_axi_controller #(
                         (cur_port==3'd4 && s4_axi_awvalid)) begin
 
                         w_id          <= sel_awid;
-                        w_base_word   <= {2'b00, sel_awaddr[ADDR_WIDTH-1:2]};   // word addressへ変換
-                        w_cur_word    <= {2'b00, sel_awaddr[ADDR_WIDTH-1:2]};   // word addressへ変換
-                        w_beats_total <= len_to_beats(sel_awlen);
-                        w_err         <= bad_aw(sel_awlen, sel_awsize, sel_awburst, sel_awaddr[1:0]);
-                        w_cnt         <= 4'd0;
-                        st            <= W_COLLECT;
+                        if (wide_port) begin
+                            wide_line <= sel_awaddr[5 +: LINE_BITS];
+                            wide_len <= sel_awlen;
+                            w_err <= bad_wide_request(sel_awaddr, sel_awlen, sel_awsize, sel_awburst);
+                            st <= WIDE_WRITE;
+                        end else begin
+                            w_base_word   <= {2'b00, sel_awaddr[ADDR_WIDTH-1:2]};   // word addressへ変換
+                            w_cur_word    <= {2'b00, sel_awaddr[ADDR_WIDTH-1:2]};   // word addressへ変換
+                            w_beats_total <= len_to_beats(sel_awlen);
+                            w_err         <= bad_aw(sel_awlen, sel_awsize, sel_awburst, sel_awaddr[1:0]);
+                            w_cnt         <= 4'd0;
+                            st <= W_COLLECT;
+                        end
+                    end
+                end
+
+                WIDE_WRITE: if (wide_write_fire) begin
+                    w_err <= w_err || (sel_wlast != (wide_len == 0));
+                    if (wide_len == 0) begin
+                        drive_bresp_port(cur_port, w_id, (w_err || !sel_wlast) ? 2'b10 : 2'b00, 1'b1);
+                        st <= W_RESP;
+                    end else begin
+                        wide_line <= wide_line + 1'b1;
+                        wide_len <= wide_len - 1'b1;
                     end
                 end
 
@@ -899,45 +933,47 @@ module ddr3_axi_controller #(
                         (cur_port==3'd4 && s4_axi_arvalid)) begin
 
                         r_id          <= sel_arid;
-                        r_base_word   <= {2'b00, sel_araddr[ADDR_WIDTH-1:2]};   // word addressへ変換
-                        r_cur_word    <= {2'b00, sel_araddr[ADDR_WIDTH-1:2]};   // word addressへ変換
-                        r_beats_total <= len_to_beats(sel_arlen);
-                        r_err         <= bad_ar(sel_arlen, sel_arsize, sel_arburst, sel_araddr[1:0]);
-                        r_issue_cnt   <= 4'd0;
-                        r_recv_cnt    <= 4'd0;
-                        r_send_cnt    <= 4'd0;
-                        if (video_long_read) begin
-                            video_base_word <= s4_axi_araddr >> 2;
-                            video_groups <= s4_axi_arlen == 31 ? 3'd4 : 3'd2;
-                            video_issued <= 0;
-                            video_received <= 0;
-                            video_next_word <= 0;
-                            video_last_word <= s4_axi_arlen[4:0];
-                            st <= VIDEO_FETCH;
-                        end else st <= R_WAIT_START;
+                        if (wide_port) begin
+                            wide_line <= sel_araddr[5 +: LINE_BITS];
+                            wide_len <= sel_arlen;
+                            wide_issued <= 0;
+                            wide_received <= 0;
+                            wide_sent <= 0;
+                            r_err <= wide_ar_error;
+                            st <= wide_ar_error ? WIDE_SEND : WIDE_FETCH;
+                        end else begin
+                            r_base_word   <= {2'b00, sel_araddr[ADDR_WIDTH-1:2]};   // word addressへ変換
+                            r_cur_word    <= {2'b00, sel_araddr[ADDR_WIDTH-1:2]};   // word addressへ変換
+                            r_beats_total <= len_to_beats(sel_arlen);
+                            r_err         <= bad_ar(sel_arlen, sel_arsize, sel_arburst, sel_araddr[1:0]);
+                            r_issue_cnt   <= 4'd0;
+                            r_recv_cnt    <= 4'd0;
+                            r_send_cnt    <= 4'd0;
+                            st <= R_WAIT_START;
+                        end
                     end
                 end
 
-                VIDEO_FETCH: begin
-                    if (video_issue) video_issued <= video_issued + 1'b1;
+                WIDE_FETCH: begin
+                    if (wide_read_issue) begin
+                        wide_line <= wide_line + 1'b1;
+                        wide_issued <= wide_issued + 1'b1;
+                    end
                     if (app_rd_data_valid) begin
-                        video_received <= video_received + 1'b1;
-                        if (video_received == video_last_word[4:3]) st <= VIDEO_SEND;
+                        wide_received <= wide_received + 1'b1;
+                        if (wide_received == group_last) st <= WIDE_SEND;
                     end
                 end
 
-                VIDEO_SEND: begin
-                    if (s4_axi_rvalid && s4_axi_rready && s4_axi_rlast) begin
-                        s4_axi_rvalid <= 0;
-                        s4_axi_rlast <= 0;
-                        st <= IDLE;
-                    end else if (!s4_axi_rvalid || s4_axi_rready) begin
-                        s4_axi_rvalid <= 1;
-                        s4_axi_rid <= r_id;
-                        s4_axi_rresp <= 2'b00;
-                        s4_axi_rdata <= video_lines[video_next_word[4:3]][video_next_word[2:0]*32 +: 32];
-                        s4_axi_rlast <= video_next_word == video_last_word;
-                        video_next_word <= video_next_word + 1'b1;
+                WIDE_SEND: if (sel_rready) begin
+                    wide_sent <= wide_sent + 1'b1;
+                    if (wide_sent == group_last) begin
+                        if (wide_len < 4) st <= IDLE;
+                        else begin
+                            wide_len <= wide_len - 8'd4;
+                            wide_issued <= 0;
+                            if (!r_err) st <= WIDE_FETCH;
+                        end
                     end
                 end
 

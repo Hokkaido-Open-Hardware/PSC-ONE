@@ -2,28 +2,36 @@
 // One AXI line request is in flight at a time. Each bank holds one scan line.
 module dvi_vram_scanout #(
     parameter integer ADDR_WIDTH = 32,
-    parameter [ADDR_WIDTH-1:0] VRAM_ADDRESS = 32'h0080_0000 // word aligned
+    parameter [ADDR_WIDTH-1:0] VRAM_ADDRESS = 32'h0090_0000, // word aligned
+    parameter DOUBLE_BUFFER = 1'b0
 )(
-    input wire axi_clock,
-    input wire pixel_clock,
-    input wire reset,
+    input  wire                 axi_clock,
+    input  wire                 pixel_clock,
+    input  wire                 reset,
     output reg [ADDR_WIDTH-1:0] araddr,
-    output wire [7:0] arlen,
-    output wire arvalid,
-    input wire arready,
-    input wire [31:0] rdata,
-    input wire [1:0] rresp,
-    input wire rlast,
-    input wire rvalid,
-    output wire rready,
-    output reg hsync,
-    output reg vsync,
-    output reg den,
-    output reg [23:0] rgb
+    output wire [7:0]           arlen,
+    output wire                 arvalid,
+    input  wire                 arready,
+    input  wire [255:0]         rdata,
+    input  wire [1:0]           rresp,
+    input  wire                 rlast,
+    input  wire                 rvalid,
+    output wire                 rready,
+    output reg                  hsync,
+    output reg                  vsync,
+    output reg                  den,
+    output reg [23:0]           rgb,
+    input  wire                 requested_page,
+    output wire                 displayed_page,
+    output wire                 scanout_busy
 );
     localparam WIDTH = 1920, HEIGHT = 1080;
-    localparam [7:0] WORDS_PER_LINE = WIDTH[10:3]; // eight 4-bit pixels per word
     localparam STRIDE = WIDTH / 2;
+
+    // STRIDE is a multiple of 32, so the alignment offset is constant for all rows.
+    localparam [ADDR_WIDTH-1:0] FIRST_BEAT = {VRAM_ADDRESS[ADDR_WIDTH-1:5], 5'b0};
+    localparam LINE_BEATS = STRIDE / 32;
+    localparam [4:0] LAST_BEAT = VRAM_ADDRESS[4:0] == 0 ? LINE_BEATS[4:0] - 1'b1 : LINE_BEATS[4:0];
 
     // Both sides of the toggle handshake restart together, even if a PLL
     // has not yet started. Release each domain after two local clock edges.
@@ -66,6 +74,24 @@ module dvi_vram_scanout #(
 
     wire frame_start = hpos == 0 && vpos == 0;
     wire idle = request == completed_sync[1];
+    // The requested page stays stable until the acknowledged page returns.
+    (* ASYNC_REG = "TRUE" *) reg [1:0] page_request_sync, page_ack_sync;
+    reg front_page;
+    always @(posedge pixel_clock or posedge pix_reset)
+        if (pix_reset) begin
+            page_request_sync <= 0;
+            front_page <= 0;
+        end else begin
+            page_request_sync <= {page_request_sync[0], requested_page};
+            if (frame_start && idle && DOUBLE_BUFFER) front_page <= page_request_sync[1];
+        end
+    always @(posedge axi_clock or posedge axi_reset)
+        if (axi_reset) page_ack_sync <= 0;
+        else page_ack_sync <= {page_ack_sync[0], front_page};
+    assign displayed_page = page_ack_sync[1];
+    assign scanout_busy = request_sync[1] != completed;
+    wire first_page = DOUBLE_BUFFER && (idle ? page_request_sync[1] : front_page);
+    wire [ADDR_WIDTH-1:0] frame_base = first_page ? FIRST_BEAT + 32'h0010_0000 : FIRST_BEAT;
     reg requested, show_line;
     // Bundled request payload stays stable until completion returns.
     reg [ADDR_WIDTH-1:0] request_addr, next_addr;
@@ -73,9 +99,9 @@ module dvi_vram_scanout #(
     always @(posedge pixel_clock or posedge pix_reset) begin
         if (pix_reset) begin
             request <= 0;
-            request_addr <= VRAM_ADDRESS;
+            request_addr <= FIRST_BEAT;
             request_bank <= 0;
-            next_addr <= VRAM_ADDRESS;
+            next_addr <= FIRST_BEAT;
             requested <= 0;
             show_line <= 0;
         end else if (frame_start || line_start) begin
@@ -84,9 +110,9 @@ module dvi_vram_scanout #(
             show_line <= line_start && requested && idle;
             requested <= 0;
             if (frame_start || y != HEIGHT-1) begin
-                next_addr <= frame_start ? VRAM_ADDRESS + STRIDE : next_addr + STRIDE;
+                next_addr <= frame_start ? frame_base + STRIDE : next_addr + STRIDE;
                 if (idle) begin
-                    request_addr <= frame_start ? VRAM_ADDRESS : next_addr;
+                    request_addr <= frame_start ? frame_base : next_addr;
                     request_bank <= frame_start ? 1'b0 : ~y[0];
                     request <= ~request;
                     requested <= 1;
@@ -98,38 +124,34 @@ module dvi_vram_scanout #(
     localparam WAIT_LINE = 2'd0, ADDRESS = 2'd1, DATA = 2'd2;
     reg [1:0] state;
     reg bank;
-    reg [7:0] word_index;
+    reg [4:0] beat_index;
     assign arvalid = state == ADDRESS;
     assign rready = state == DATA;
-    // Naturally aligned bursts of up to 32 words fit the video port and never
-    // cross 4 KiB. A word-aligned base may need short bursts at line edges.
-    assign arlen = araddr[6:2] == 0 && word_index <= WORDS_PER_LINE - 8'd32 ? 8'd31 :
-                   araddr[5:2] == 0 && word_index <= WORDS_PER_LINE - 8'd16 ? 8'd15 :
-                   araddr[4:2] == 0 && word_index <= WORDS_PER_LINE - 8'd8 ? 8'd7 :
-                   araddr[3:2] == 0 && word_index <= WORDS_PER_LINE - 8'd4 ? 8'd3 :
-                   araddr[2]   == 0 && word_index <= WORDS_PER_LINE - 8'd2 ? 8'd1 : 8'd0;
+    // Naturally aligned 1/2/4-beat bursts never cross a 4 KiB boundary.
+    assign arlen = araddr[6:5] == 0 && beat_index <= LAST_BEAT - 5'd3 ? 8'd3 :
+                   araddr[5] == 0 && beat_index < LAST_BEAT ? 8'd1 : 8'd0;
 
     always @(posedge axi_clock or posedge axi_reset) begin
         if (axi_reset) begin
             state <= WAIT_LINE;
             completed <= 0;
-            araddr <= VRAM_ADDRESS;
+            araddr <= FIRST_BEAT;
             bank <= 0;
-            word_index <= 0;
+            beat_index <= 0;
         end else begin
             case (state)
                 WAIT_LINE: if (request_sync[1] != completed) begin
                     araddr <= request_addr;
                     bank <= request_bank;
-                    word_index <= 0;
+                    beat_index <= 0;
                     state <= ADDRESS;
                 end
                 ADDRESS: if (arready) state <= DATA;
                 DATA: if (rvalid) begin
-                    araddr <= araddr + 4;
-                    word_index <= word_index + 1'b1;
+                    araddr <= araddr + 32;
+                    beat_index <= beat_index + 1'b1;
                     if (rlast) begin
-                        if (word_index == WORDS_PER_LINE - 8'd1) begin
+                        if (beat_index == LAST_BEAT) begin
                             completed <= request_sync[1];
                             state <= WAIT_LINE;
                         end else state <= ADDRESS;
@@ -141,26 +163,28 @@ module dvi_vram_scanout #(
     end
 
     // Simple dual-port RAM with independent clocks and synchronous read.
-    reg [31:0] lines [0:511];
-    reg [31:0] pixel_word;
+    reg [255:0] lines [0:63];
+    reg [255:0] pixel_beat;
+    // A word-aligned VRAM base may place pixel zero partway through a beat.
+    wire [7:0] pixel_word_index = x[10:3] + {5'b0, VRAM_ADDRESS[4:2]};
     always @(posedge axi_clock)
         if (rvalid && rready)
-            lines[{bank, word_index}] <= rresp == 2'b00 ? rdata : 32'b0;
+            lines[{bank, beat_index}] <= rresp == 2'b00 ? rdata : 256'b0;
     always @(posedge pixel_clock)
-        pixel_word <= lines[{y[0], x[10:3]}];
+        pixel_beat <= lines[{y[0], pixel_word_index[7:3]}];
 
-    reg [2:0] nibble;
+    reg [5:0] nibble;
     reg pixel_valid;
     always @(posedge pixel_clock) begin
         hsync <= timing_hsync;
         vsync <= timing_vsync;
         den <= timing_den && !pix_reset;
         pixel_valid <= timing_den && show_line && !pix_reset;
-        nibble <= x[2:0];
+        nibble <= {pixel_word_index[2:0], x[2:0]};
     end
 
     // Fixed EGA 16-colour palette. Index zero is also the underrun colour.
-    wire [3:0] colour = pixel_valid ? pixel_word[nibble*4 +: 4] : 4'h0;
+    wire [3:0] colour = pixel_valid ? pixel_beat[nibble*4 +: 4] : 4'h0;
     always @* begin
         case (colour)
             4'h0: rgb = 24'h000000;

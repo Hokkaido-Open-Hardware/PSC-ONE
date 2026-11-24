@@ -230,10 +230,19 @@ static struct process *create_process_image(const void *image,
         }
         map_model(page_table);
 #ifdef PSC_TANG138K_VRAM
-        /* The model already occupies VA 0x00800000. Map VRAM separately. */
-        for (uint32_t off = 0; off < PSC_BOARD_VRAM_BYTES; off += PAGE_SIZE)
+        /* Supervisor windows share the Arena leaf table above the model VA. */
+        for (uint32_t off = 0; off < PSC_BOARD_VRAM_BYTES; off += PAGE_SIZE) {
             map_page(page_table, PSC_BOARD_VRAM_VA + off, PSC_BOARD_VRAM_BASE + off,
                      PAGE_R | PAGE_W);
+            map_page(page_table, PSC_BOARD_VRAM_B_VA + off, PSC_BOARD_VRAM_B_BASE + off,
+                     PAGE_R | PAGE_W);
+        }
+        for (uint32_t off = 0; off < PSC_BOARD_RGBZ_PLANE_BYTES; off += PAGE_SIZE) {
+            map_page(page_table, PSC_BOARD_RGB565_VA + off, PSC_BOARD_RGB565_BASE + off,
+                     PAGE_R | PAGE_W);
+            map_page(page_table, PSC_BOARD_Z16_VA + off, PSC_BOARD_Z16_BASE + off,
+                     PAGE_R | PAGE_W);
+        }
 #endif
         sync_user_code();
     }

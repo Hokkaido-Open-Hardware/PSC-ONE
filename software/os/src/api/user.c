@@ -775,6 +775,21 @@ int call_vram_test_pattern(void)
 {
     return (int)sd_api(SYS_VRAM_TEST_PATTERN, 0);
 }
+
+int call_rgbz_upload(unsigned offset, const void *src, unsigned bytes)
+{
+    return syscall(SYS_RGBZ_UPLOAD, (int)offset, (int)(uintptr_t)src, (int)bytes);
+}
+
+int call_rgbz_teapot(void)
+{
+    return (int)sd_api(SYS_RGBZ_TEAPOT, 0);
+}
+
+int call_rgbz_present(void)
+{
+    return (int)sd_api(SYS_RGBZ_PRESENT, 0);
+}
 #endif
 
 int call_lcd_rgb888_begin(void)

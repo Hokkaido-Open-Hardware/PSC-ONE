@@ -42,8 +42,9 @@ module PSC_ONE_138K_Chip #(
     parameter integer PSC_CACHE_IO_2WAY  = 1,
     parameter ENABLE_SV32_TLB            = 1'b1,
     // HDMI
-    parameter integer COLOR_BAR_MODE     = 1,
-    parameter [31:0]  VRAM_ADDRESS       = 32'h0080_0000
+    parameter integer COLOR_BAR_MODE     = 0,
+    parameter [31:0]  VRAM_ADDRESS       = 32'h0090_0000,
+    parameter ENABLE_RGBZ = (COLOR_BAR_MODE == 0 && VRAM_ADDRESS == 32'h0090_0000)
 )(
     // ==== RV32IS CPU IF ====
     input  wire         sys_clk,
@@ -333,6 +334,7 @@ module PSC_ONE_138K_Chip #(
     localparam ADDR_W = 32;
     localparam ID_W   = 1;
     localparam DW     = 32;
+    localparam WIDE_DW = 256;
 
     // Write Address
     wire [ID_W-1:0]         p_axi_awid;
@@ -374,7 +376,7 @@ module PSC_ONE_138K_Chip #(
     wire                    p_axi_rready;
 
     // =========================================================
-    // Data-side AXI (32-bit) — SLAVE-facing ports of DUT
+    // USER_LOGIC AXI (256-bit)
     // =========================================================
     wire [ID_W-1:0]         u_axi_awid;
     wire [ADDR_W-1:0]       u_axi_awaddr;
@@ -384,8 +386,8 @@ module PSC_ONE_138K_Chip #(
     wire                    u_axi_awvalid;
     wire                    u_axi_awready;
 
-    wire [DW-1:0]           u_axi_wdata;
-    wire [(DW/8)-1:0]       u_axi_wstrb;
+    wire [WIDE_DW-1:0]      u_axi_wdata;
+    wire [(WIDE_DW/8)-1:0]  u_axi_wstrb;
     wire                    u_axi_wlast;
     wire                    u_axi_wvalid;
     wire                    u_axi_wready;
@@ -404,7 +406,7 @@ module PSC_ONE_138K_Chip #(
     wire                    u_axi_arready;
 
     wire [ID_W-1:0]         u_axi_rid;
-    wire [DW-1:0]           u_axi_rdata;
+    wire [WIDE_DW-1:0]      u_axi_rdata;
     wire [1:0]              u_axi_rresp;
     wire                    u_axi_rlast;
     wire                    u_axi_rvalid;
@@ -495,7 +497,7 @@ module PSC_ONE_138K_Chip #(
     wire                    bt_axi_rready;
 
     // =========================================================
-    // Data-side AXI (32-bit) — SLAVE-facing ports of DUT
+    // HDMI AXI (256-bit)
     // =========================================================
     wire [ID_W-1:0]         pix_axi_awid;
     wire [ADDR_W-1:0]       pix_axi_awaddr;
@@ -505,8 +507,8 @@ module PSC_ONE_138K_Chip #(
     wire                    pix_axi_awvalid;
     wire                    pix_axi_awready;
 
-    wire [DW-1:0]           pix_axi_wdata;
-    wire [(DW/8)-1:0]       pix_axi_wstrb;
+    wire [WIDE_DW-1:0]           pix_axi_wdata;
+    wire [(WIDE_DW/8)-1:0]       pix_axi_wstrb;
     wire                    pix_axi_wlast;
     wire                    pix_axi_wvalid;
     wire                    pix_axi_wready;
@@ -525,7 +527,7 @@ module PSC_ONE_138K_Chip #(
     wire                    pix_axi_arready;
 
     wire [ID_W-1:0]         pix_axi_rid;
-    wire [DW-1:0]           pix_axi_rdata;
+    wire [WIDE_DW-1:0]           pix_axi_rdata;
     wire [1:0]              pix_axi_rresp;
     wire                    pix_axi_rlast;
     wire                    pix_axi_rvalid;
@@ -583,125 +585,125 @@ module PSC_ONE_138K_Chip #(
         .s0_axi_rvalid      (p_axi_rvalid),
         .s0_axi_rready      (p_axi_rready),
 
-        // ==== ch:0 (USER LOGIC) ====
+        // ==== ch:1 (DMA) ====
         // AXI4 Write Address
-        .s1_axi_awid        (u_axi_awid),
-        .s1_axi_awaddr      (u_axi_awaddr[23:0]),   // 下位24bitへスライス
-        .s1_axi_awlen       (u_axi_awlen),
-        .s1_axi_awsize      (u_axi_awsize),
-        .s1_axi_awburst     (u_axi_awburst),
-        .s1_axi_awvalid     (u_axi_awvalid),
-        .s1_axi_awready     (u_axi_awready),
+        .s1_axi_awid        (dma_axi_awid),
+        .s1_axi_awaddr      (dma_axi_awaddr[23:0]),   // 下位24bitへスライス
+        .s1_axi_awlen       (dma_axi_awlen),
+        .s1_axi_awsize      (dma_axi_awsize),
+        .s1_axi_awburst     (dma_axi_awburst),
+        .s1_axi_awvalid     (dma_axi_awvalid),
+        .s1_axi_awready     (dma_axi_awready),
 
         // AXI4 Write Data
-        .s1_axi_wdata       (u_axi_wdata),
-        .s1_axi_wstrb       (u_axi_wstrb),
-        .s1_axi_wlast       (u_axi_wlast),
-        .s1_axi_wvalid      (u_axi_wvalid),
-        .s1_axi_wready      (u_axi_wready),
+        .s1_axi_wdata       (dma_axi_wdata),
+        .s1_axi_wstrb       (dma_axi_wstrb),
+        .s1_axi_wlast       (dma_axi_wlast),
+        .s1_axi_wvalid      (dma_axi_wvalid),
+        .s1_axi_wready      (dma_axi_wready),
 
         // AXI4 Write Response
-        .s1_axi_bid         (u_axi_bid),
-        .s1_axi_bresp       (u_axi_bresp),
-        .s1_axi_bvalid      (u_axi_bvalid),
-        .s1_axi_bready      (u_axi_bready),
+        .s1_axi_bid         (dma_axi_bid),
+        .s1_axi_bresp       (dma_axi_bresp),
+        .s1_axi_bvalid      (dma_axi_bvalid),
+        .s1_axi_bready      (dma_axi_bready),
 
         // AXI4 Read Address
-        .s1_axi_arid        (u_axi_arid),
-        .s1_axi_araddr      (u_axi_araddr[23:0]),
-        .s1_axi_arlen       (u_axi_arlen),
-        .s1_axi_arsize      (u_axi_arsize),
-        .s1_axi_arburst     (u_axi_arburst),
-        .s1_axi_arvalid     (u_axi_arvalid),
-        .s1_axi_arready     (u_axi_arready),
+        .s1_axi_arid        (dma_axi_arid),
+        .s1_axi_araddr      (dma_axi_araddr[23:0]),
+        .s1_axi_arlen       (dma_axi_arlen),
+        .s1_axi_arsize      (dma_axi_arsize),
+        .s1_axi_arburst     (dma_axi_arburst),
+        .s1_axi_arvalid     (dma_axi_arvalid),
+        .s1_axi_arready     (dma_axi_arready),
 
         // AXI4 Read Data
-        .s1_axi_rid         (u_axi_rid),
-        .s1_axi_rdata       (u_axi_rdata),
-        .s1_axi_rresp       (u_axi_rresp),
-        .s1_axi_rlast       (u_axi_rlast),
-        .s1_axi_rvalid      (u_axi_rvalid),
-        .s1_axi_rready      (u_axi_rready),
+        .s1_axi_rid         (dma_axi_rid),
+        .s1_axi_rdata       (dma_axi_rdata),
+        .s1_axi_rresp       (dma_axi_rresp),
+        .s1_axi_rlast       (dma_axi_rlast),
+        .s1_axi_rvalid      (dma_axi_rvalid),
+        .s1_axi_rready      (dma_axi_rready),
 
-        // ==== ch:2 (DMA) ====
+        // ==== ch:2 ====
         // AXI4 Write Address
-        .s2_axi_awid        (dma_axi_awid),
-        .s2_axi_awaddr      (dma_axi_awaddr[23:0]),   // 下位24bitへスライス
-        .s2_axi_awlen       (dma_axi_awlen),
-        .s2_axi_awsize      (dma_axi_awsize),
-        .s2_axi_awburst     (dma_axi_awburst),
-        .s2_axi_awvalid     (dma_axi_awvalid),
-        .s2_axi_awready     (dma_axi_awready),
+        .s2_axi_awid        (bt_axi_awid),
+        .s2_axi_awaddr      (bt_axi_awaddr[23:0]),   // 下位24bitへスライス
+        .s2_axi_awlen       (bt_axi_awlen),
+        .s2_axi_awsize      (bt_axi_awsize),
+        .s2_axi_awburst     (bt_axi_awburst),
+        .s2_axi_awvalid     (bt_axi_awvalid),
+        .s2_axi_awready     (bt_axi_awready),
 
         // AXI4 Write Data
-        .s2_axi_wdata       (dma_axi_wdata),
-        .s2_axi_wstrb       (dma_axi_wstrb),
-        .s2_axi_wlast       (dma_axi_wlast),
-        .s2_axi_wvalid      (dma_axi_wvalid),
-        .s2_axi_wready      (dma_axi_wready),
+        .s2_axi_wdata       (bt_axi_wdata),
+        .s2_axi_wstrb       (bt_axi_wstrb),
+        .s2_axi_wlast       (bt_axi_wlast),
+        .s2_axi_wvalid      (bt_axi_wvalid),
+        .s2_axi_wready      (bt_axi_wready),
 
         // AXI4 Write Response
-        .s2_axi_bid         (dma_axi_bid),
-        .s2_axi_bresp       (dma_axi_bresp),
-        .s2_axi_bvalid      (dma_axi_bvalid),
-        .s2_axi_bready      (dma_axi_bready),
+        .s2_axi_bid         (bt_axi_bid),
+        .s2_axi_bresp       (bt_axi_bresp),
+        .s2_axi_bvalid      (bt_axi_bvalid),
+        .s2_axi_bready      (bt_axi_bready),
 
         // AXI4 Read Address
-        .s2_axi_arid        (dma_axi_arid),
-        .s2_axi_araddr      (dma_axi_araddr[23:0]),
-        .s2_axi_arlen       (dma_axi_arlen),
-        .s2_axi_arsize      (dma_axi_arsize),
-        .s2_axi_arburst     (dma_axi_arburst),
-        .s2_axi_arvalid     (dma_axi_arvalid),
-        .s2_axi_arready     (dma_axi_arready),
+        .s2_axi_arid        (bt_axi_arid),
+        .s2_axi_araddr      (bt_axi_araddr[23:0]),
+        .s2_axi_arlen       (bt_axi_arlen),
+        .s2_axi_arsize      (bt_axi_arsize),
+        .s2_axi_arburst     (bt_axi_arburst),
+        .s2_axi_arvalid     (bt_axi_arvalid),
+        .s2_axi_arready     (bt_axi_arready),
 
         // AXI4 Read Data
-        .s2_axi_rid         (dma_axi_rid),
-        .s2_axi_rdata       (dma_axi_rdata),
-        .s2_axi_rresp       (dma_axi_rresp),
-        .s2_axi_rlast       (dma_axi_rlast),
-        .s2_axi_rvalid      (dma_axi_rvalid),
-        .s2_axi_rready      (dma_axi_rready),
+        .s2_axi_rid         (bt_axi_rid),
+        .s2_axi_rdata       (bt_axi_rdata),
+        .s2_axi_rresp       (bt_axi_rresp),
+        .s2_axi_rlast       (bt_axi_rlast),
+        .s2_axi_rvalid      (bt_axi_rvalid),
+        .s2_axi_rready      (bt_axi_rready),
 
-        // ==== ch:3 ====
+        // ==== ch:3 (USER LOGIC) ====
         // AXI4 Write Address
-        .s3_axi_awid        (bt_axi_awid),
-        .s3_axi_awaddr      (bt_axi_awaddr[23:0]),   // 下位24bitへスライス
-        .s3_axi_awlen       (bt_axi_awlen),
-        .s3_axi_awsize      (bt_axi_awsize),
-        .s3_axi_awburst     (bt_axi_awburst),
-        .s3_axi_awvalid     (bt_axi_awvalid),
-        .s3_axi_awready     (bt_axi_awready),
+        .s3_axi_awid        (u_axi_awid),
+        .s3_axi_awaddr      (u_axi_awaddr[23:0]),   // 下位24bitへスライス
+        .s3_axi_awlen       (u_axi_awlen),
+        .s3_axi_awsize      (u_axi_awsize),
+        .s3_axi_awburst     (u_axi_awburst),
+        .s3_axi_awvalid     (u_axi_awvalid),
+        .s3_axi_awready     (u_axi_awready),
 
         // AXI4 Write Data
-        .s3_axi_wdata       (bt_axi_wdata),
-        .s3_axi_wstrb       (bt_axi_wstrb),
-        .s3_axi_wlast       (bt_axi_wlast),
-        .s3_axi_wvalid      (bt_axi_wvalid),
-        .s3_axi_wready      (bt_axi_wready),
+        .s3_axi_wdata       (u_axi_wdata),
+        .s3_axi_wstrb       (u_axi_wstrb),
+        .s3_axi_wlast       (u_axi_wlast),
+        .s3_axi_wvalid      (u_axi_wvalid),
+        .s3_axi_wready      (u_axi_wready),
 
         // AXI4 Write Response
-        .s3_axi_bid         (bt_axi_bid),
-        .s3_axi_bresp       (bt_axi_bresp),
-        .s3_axi_bvalid      (bt_axi_bvalid),
-        .s3_axi_bready      (bt_axi_bready),
+        .s3_axi_bid         (u_axi_bid),
+        .s3_axi_bresp       (u_axi_bresp),
+        .s3_axi_bvalid      (u_axi_bvalid),
+        .s3_axi_bready      (u_axi_bready),
 
         // AXI4 Read Address
-        .s3_axi_arid        (bt_axi_arid),
-        .s3_axi_araddr      (bt_axi_araddr[23:0]),
-        .s3_axi_arlen       (bt_axi_arlen),
-        .s3_axi_arsize      (bt_axi_arsize),
-        .s3_axi_arburst     (bt_axi_arburst),
-        .s3_axi_arvalid     (bt_axi_arvalid),
-        .s3_axi_arready     (bt_axi_arready),
+        .s3_axi_arid        (u_axi_arid),
+        .s3_axi_araddr      (u_axi_araddr[23:0]),
+        .s3_axi_arlen       (u_axi_arlen),
+        .s3_axi_arsize      (u_axi_arsize),
+        .s3_axi_arburst     (u_axi_arburst),
+        .s3_axi_arvalid     (u_axi_arvalid),
+        .s3_axi_arready     (u_axi_arready),
 
         // AXI4 Read Data
-        .s3_axi_rid         (bt_axi_rid),
-        .s3_axi_rdata       (bt_axi_rdata),
-        .s3_axi_rresp       (bt_axi_rresp),
-        .s3_axi_rlast       (bt_axi_rlast),
-        .s3_axi_rvalid      (bt_axi_rvalid),
-        .s3_axi_rready      (bt_axi_rready),
+        .s3_axi_rid         (u_axi_rid),
+        .s3_axi_rdata       (u_axi_rdata),
+        .s3_axi_rresp       (u_axi_rresp),
+        .s3_axi_rlast       (u_axi_rlast),
+        .s3_axi_rvalid      (u_axi_rvalid),
+        .s3_axi_rready      (u_axi_rready),
 
         // ==== ch:4 (HDMI VRAM) ====
         // AXI4 Write Address
@@ -766,7 +768,18 @@ module PSC_ONE_138K_Chip #(
     //==========================================================
     // PSC-ONE SOC TOP
     //==========================================================
+    wire rgbz_start, requested_page, displayed_page, scanout_busy;
+    wire [3:0] rgbz_status;
+    // The RGB/Z input slots occupy B00000..BFFFFF. The two output
+    // reservations must fit below them or above them in the 24-bit window.
+    generate if (ENABLE_RGBZ && (COLOR_BAR_MODE != 0 || VRAM_ADDRESS <= 32'h0080_0000 ||
+            VRAM_ADDRESS[4:0] != 0 || VRAM_ADDRESS > 32'h00e0_0000 ||
+            (VRAM_ADDRESS > 32'h0090_0000 && VRAM_ADDRESS < 32'h00c0_0000))) begin : invalid_rgbz_layout
+        INVALID_TANG138K_RGBZ_MEMORY_CONFIGURATION invalid_configuration();
+    end endgenerate
     PSC_ONE_SOC #(
+        .ENABLE_RGBZ        (ENABLE_RGBZ),
+        .DECODE_RGBZ_MMIO   (1'b1),
         .ENABLE_SV32_TLB    (ENABLE_SV32_TLB),
         .PSC_CACHE_IO_2WAY  (PSC_CACHE_IO_2WAY),
         .PSC_CACHE_2WAY     (PSC_CACHE_2WAY),
@@ -775,6 +788,8 @@ module PSC_ONE_138K_Chip #(
         .ID_WIDTH           (ID_WIDTH),
         .DATA_WIDTH         (DATA_WIDTH)
     ) u_soc (
+        .rgbz_start         (rgbz_start),
+        .rgbz_status        (rgbz_status),
         // Clock / Reset
         .clock              (clk_x1),
         .reset_n            (reset_n),
@@ -1004,10 +1019,16 @@ module PSC_ONE_138K_Chip #(
     // USER LOGIC
     //==========================================================
     USER_LOGIC #(
+        .VRAM_ADDRESS  (VRAM_ADDRESS),
         .ADDR_WIDTH (32),
         .ID_WIDTH   (1),
-        .DATA_WIDTH (32)
+        .DATA_WIDTH (WIDE_DW)
     ) u_user_logic (
+        .start         (rgbz_start),
+        .displayed_page(displayed_page),
+        .requested_page(requested_page),
+        .scanout_busy  (scanout_busy),
+        .status        (rgbz_status),
         .clock         (clk_x1),
         .reset_n       (reset_n),
 
@@ -1061,9 +1082,14 @@ module PSC_ONE_138K_Chip #(
 `endif
     // HDMI Tx Top
 	dvi_tx_top #(
+        .DATA_WIDTH         (WIDE_DW),
+        .DOUBLE_BUFFER      (ENABLE_RGBZ),
         .COLOR_BAR_MODE     (COLOR_BAR_MODE),
         .VRAM_ADDRESS       (VRAM_ADDRESS)
     ) u_dvi_tx_top(
+        .requested_page     (requested_page),
+        .displayed_page     (displayed_page),
+        .scanout_busy       (scanout_busy),
         .axi_clock          (clk_x1),
 		.pixel_clock		(clk_p),
 		.ddr_bit_clock		(clk_p5),

@@ -253,8 +253,17 @@ void handle_syscall(struct trap_frame *f) {
 
 #ifdef PSC_TANG138K_VRAM
     case SYS_VRAM_TEST_PATTERN:
-        lcd_draw_vram_test_pattern();
-        f->a0 = 0;
+        f->a0 = lcd_draw_vram_test_pattern();
+        break;
+    case SYS_RGBZ_UPLOAD:
+        if (!user_accessible(f->a1, f->a2, PAGE_R)) f->a0 = (uint32_t)-1;
+        else f->a0 = rgbz_upload(f->a0, (const void *)(uintptr_t)f->a1, f->a2);
+        break;
+    case SYS_RGBZ_TEAPOT:
+        f->a0 = rgbz_teapot();
+        break;
+    case SYS_RGBZ_PRESENT:
+        f->a0 = rgbz_present();
         break;
 #endif
     case SYS_LCD_RGB888_BEGIN:

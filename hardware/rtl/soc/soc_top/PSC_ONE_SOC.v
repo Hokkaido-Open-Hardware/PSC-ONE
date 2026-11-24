@@ -45,7 +45,9 @@ module PSC_ONE_SOC #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ        = 32'h1000_9010,
     parameter integer PSC_CACHE_2WAY                = 0,
     parameter integer PSC_CACHE_IO_2WAY             = 0,
-    parameter ENABLE_SV32_TLB = 1'b0
+    parameter ENABLE_SV32_TLB = 1'b0,
+    parameter ENABLE_RGBZ = 1'b0,
+    parameter DECODE_RGBZ_MMIO = ENABLE_RGBZ
 )(
     // ==== RV32IS CPU IF ====
     input  wire         clock,
@@ -189,7 +191,9 @@ module PSC_ONE_SOC #(
     input  wire [1:0]                bt_axi_rresp,
     input  wire                      bt_axi_rlast,
     input  wire                      bt_axi_rvalid,
-    output wire                      bt_axi_rready
+    output wire                      bt_axi_rready,
+    output wire                      rgbz_start,
+    input wire [3:0]                 rgbz_status
 );
 
     //assign UART_TXD = UART_RXD;
@@ -216,6 +220,7 @@ module PSC_ONE_SOC #(
     wire [31:0] mmio_rdata_i2s;
     wire [31:0] mmio_rdata_pfe;
 
+    localparam RGBZ_CONTROL = 32'h1000_a000, RGBZ_STATUS = 32'h1000_a004;
     wire [31:0] addr_mmio_masked = mmio_addr & MMMIO_BASK_BITS;
     
     always @(*) begin
@@ -243,6 +248,8 @@ module PSC_ONE_SOC #(
             I2C_ADDR_SEQ + 4:    mmio_rdata = mmio_i2c_rdata;
             I2C_ADDR_SEQ + 8:    mmio_rdata = mmio_i2c_rdata;
             I2C_ADDR_SEQ + 12:   mmio_rdata = mmio_i2c_rdata;
+            RGBZ_CONTROL:        mmio_rdata = ENABLE_RGBZ ? 32'h5247425a : 0; // RGBZ signature
+            RGBZ_STATUS:         mmio_rdata = ENABLE_RGBZ ? {28'b0,rgbz_status} : 0;
             default: mmio_rdata = 32'd0;
         endcase
     end
@@ -272,7 +279,11 @@ module PSC_ONE_SOC #(
     wire    mmio_rready_pfe;
     wire    mmio_wready_pfe;
 
-    wire    mmio_ready = 
+    assign rgbz_start = ENABLE_RGBZ && mmio_valid && mmio_rw &&
+                        mmio_addr == RGBZ_CONTROL && mmio_wdata[0];
+    wire rgbz_ready = DECODE_RGBZ_MMIO && mmio_valid &&
+                      (mmio_addr == RGBZ_CONTROL || mmio_addr == RGBZ_STATUS);
+    wire    mmio_ready = rgbz_ready |
                 mmio_rready_pio | mmio_wready_pio |
                 mmio_rready_uart | mmio_wready_uart |
                 mmio_i2c_rready  | mmio_i2c_wready |
@@ -328,8 +339,8 @@ module PSC_ONE_SOC #(
         .LCD_PIXS_DATA       (LCD_PIXS_DATA),
         .LCD_PIXS_ST         (LCD_PIXS_ST),
         .LED_ADDRESS         (LED_ADDRESS),
-        .PSC_SA_CTRL         (PSC_SA_CTRL),
-        .PSC_SA_STATUS       (PSC_SA_STATUS),
+        .PSC_SA_CTRL         (DECODE_RGBZ_MMIO ? RGBZ_CONTROL : PSC_SA_CTRL),
+        .PSC_SA_STATUS       (DECODE_RGBZ_MMIO ? RGBZ_STATUS : PSC_SA_STATUS),
         .PSC_SD_IF_READ_DATA (PSC_SD_IF_READ_DATA),
         .PSC_SD_IF_SECTOR    (PSC_SD_IF_SECTOR),
         .PSC_SD_IF_CTRL      (PSC_SD_IF_CTRL),

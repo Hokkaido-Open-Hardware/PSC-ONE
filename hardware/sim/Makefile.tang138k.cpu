@@ -107,7 +107,9 @@ PSCONE_SOC_TOP_FILE = \
 
 # USER_LOGIC
 USER_LOGIC_FILE = \
-	$(USER_SRC_DIR)/USER_LOGIC.v
+	$(USER_SRC_DIR)/USER_LOGIC.v \
+	$(USER_SRC_DIR)/rgbz_to_vram.v \
+	$(USER_SRC_DIR)/rgbz_axi_master.v
 
 # RV32_core
 CPU_CORE_FILES = \
@@ -528,6 +530,17 @@ endif
 
 # run test
 TEST_BUILD_ROOT ?= /tmp
+
+.PHONY: simulate_RGBZ
+simulate_RGBZ:
+	@mkdir -p "$(TEST_BUILD_ROOT)"
+	@set -e; build_dir=$$(mktemp -d "$(TEST_BUILD_ROOT)/psc-rgbz-XXXXXX"); \
+	verilator --binary --timing -j 4 -Wno-PINMISSING --top-module rgbz_tb \
+		--Mdir "$$build_dir" $(USER_SRC_DIR)/tests/rgbz_tb.sv $(USER_LOGIC_FILE) \
+		$(HDMI_DIR)/dvi_vram_scanout.v $(HDMI_DIR)/video_timing_ctrl.v \
+		$(SDRAM_CNT_DIR)/ddr3_axi_controller.v $(SDRAM_CNT_DIR)/ddr3_controller_if.sv \
+		../rtl/model/DDR3_SDRAM_model/ddr3_app_model.sv; \
+	"$$build_dir/Vrgbz_tb"
 
 .PHONY: simulate_PSC_ONE_TESTS
 # SD and SPI-bypass models both open this image at startup.

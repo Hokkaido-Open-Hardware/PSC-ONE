@@ -17,6 +17,59 @@
 
 extern int psc_micropython_run(void);
 
+#ifdef PSC_TANG138K_VRAM
+static int rgbz_read_plane(const char *name, unsigned offset)
+{
+    fat32_file_t file;
+    int rc = fat32_open(&file, name);
+    if (rc) {
+        printf("rgbz: cannot open %s (FAT32 %d)\n", name, rc);
+        return -1;
+    }
+    if (file.file_size != PSC_BOARD_RGBZ_PLANE_BYTES) {
+        printf("rgbz: %s must contain exactly %d bytes\n", name, PSC_BOARD_RGBZ_PLANE_BYTES);
+        fat32_close(&file);
+        return -1;
+    }
+    uint32_t buf[1024];
+    while (file.file_pos < file.file_size) {
+        unsigned pos = file.file_pos;
+        unsigned count = file.file_size - pos;
+        if (count > sizeof(buf)) count = sizeof(buf);
+        uint32_t actual;
+        rc = fat32_stream_read(&file, buf, count, &actual);
+        if (rc || actual != count) {
+            printf("rgbz: read failed %s at byte %d (FAT32 %d)\n", name, (int)pos, rc);
+            rc = -1;
+            break;
+        }
+        rc = call_rgbz_upload(offset + pos, buf, count);
+        if (rc) {
+            if (rc == -1) printf("rgbz: upload rejected at byte %d\n", (int)pos);
+            break;
+        }
+    }
+    fat32_close(&file);
+    return rc;
+}
+
+static void rgbz_result(int rc)
+{
+    if (rc >= 0) printf("RGBZ: frame displayed on page %s\n", rc ? "B" : "A");
+    else if (rc == -2) printf("rgbz: RGBZ hardware unavailable\n");
+    else if (rc == -3) printf("rgbz: converter busy\n");
+    else if (rc == -4) printf("rgbz: AXI transfer failed\n");
+    else if (rc == -5) printf("rgbz: display timeout\n");
+}
+
+static void cmd_rgbz(const char *colour, const char *depth)
+{
+    int rc = rgbz_read_plane(colour, 0);
+    if (!rc) rc = rgbz_read_plane(depth, PSC_BOARD_RGBZ_PLANE_BYTES);
+    rgbz_result(rc ? rc : call_rgbz_present());
+}
+#endif
+
 static void i2c_capture_hex(uint32_t byte)
 {
     putchar("0123456789ABCDEF"[(byte >> 4) & 15u]);
@@ -467,6 +520,13 @@ prompt:
             else cmd_tflite_info(argv[1]);
 
 #ifdef PSC_TANG138K_VRAM
+        } else if (strcmp(argv[0], "teapot") == 0) {
+            if (argc == 1) rgbz_result(call_rgbz_teapot());
+            else printf("usage: teapot\n");
+        } else if (strcmp(argv[0], "rgbz") == 0) {
+            if (argc == 1) cmd_rgbz("COLOR.RAW", "DEPTH.RAW");
+            else if (argc == 3) cmd_rgbz(argv[1], argv[2]);
+            else printf("usage: rgbz [COLOR.RAW DEPTH.RAW]\n");
         } else if (strcmp(argv[0], "vram_test") == 0) {
             if (argc != 1) printf("usage: vram_test\n");
             else if (call_vram_test_pattern() == 0)
@@ -525,6 +585,8 @@ prompt:
             printf("  microPython | micropython\n");
 #ifdef PSC_TANG138K_VRAM
             printf("  vram_test (write 16 vertical color bars to HDMI VRAM)\n");
+            printf("  teapot (Utah teapot wireframe on HDMI)\n");
+            printf("  rgbz [COLOR.RAW DEPTH.RAW] (640x360 RGB565 + Z16 to HDMI)\n");
 #endif
             printf("  jpeg TEST.JPG\n");
             printf("  yolo YOLO.TFL TEST.JPG (detection to UART + LCD)\n");

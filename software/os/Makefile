@@ -317,6 +317,17 @@ SRCS_KERNEL := \
 	$(Src)/api/speech_recognition_api.c \
 	$(Src)/kernel/multitask_test.c
 
+ifeq ($(BOARD),psc_one_tang138k)
+ifneq ($(MODE),sbi)
+TEAPOT_HEADER := $(Build)/teapot_mesh.h
+TEAPOT_MODEL := ../../hardware/rtl/tang138k/user_logic/utah-teapot/teapot.obj
+SRCS_KERNEL += $(Src)/drivers/rgbz_teapot.c
+KERNEL_CFLAGS += -I$(Build)
+$(TEAPOT_HEADER): $(TEAPOT_MODEL) tools/pack_teapot.py | $(Build)
+	python3 tools/pack_teapot.py "$<" "$@"
+endif
+endif
+
 SRCS_MBIOS := $(Src)/boot/psc_mbios.S
 
 # ========================
@@ -550,7 +561,7 @@ $(Build)/kernel.config: FORCE_KERNEL_CONFIG | $(Build)
 
 $(KERNEL_ELF): \
 	$(Build) \
-	$(SRCS_KERNEL) \
+	$(SRCS_KERNEL) $(TEAPOT_HEADER) \
 	$(wildcard $(Src)/*/*.h) $(BOARD_HEADERS) $(BOARD_MK) $(Src)/api/robot/robot_control.h $(Src)/kernel/kernel_fpga.ld \
 	$(USER_BIN) \
 	$(Build)/divmodsi3.o $(KERNEL_BUILTINS) Makefile $(Build)/kernel.config

@@ -21,11 +21,15 @@ make -C PSC-ONE/hardware/firmware firmware_fat32_tang138k
 
 `PSC-ONE/hardware/firmware/mem/tang138k/` の `kernel.mem` と `user.mem` を SD カードのルートに
 `KERNEL.MEM` と `USER.MEM` として置きます。FPGA は `COLOR_BAR_MODE=0`、
-`VRAM_ADDRESS=0x00800000` で合成します。
+`VRAM_ADDRESS=0x00900000` で合成します。
 
 起動後、UART シェルで `vram_test` を実行すると、HDMI 接続の LCD に左から
 黒〜白のパレット番号順で 16 本の縦帯が表示されます。各帯は 120 画素幅です。
-VRAM は物理 `0x00800000`〜`0x008FD1FF` で、先頭 8 MiB の OS 領域の直後にあります。
+テストパターンは現在の表示面に書き込みます。
+
+Tang 138K 用の `rgbz` コマンドは SD ルートの `COLOR.RAW` と `DEPTH.RAW` を読み、固定視点の HDMI 画像を表示します。任意のファイル名は `rgbz MYRGB.RAW MYZ.RAW` で指定できます。両ファイルは各460,800バイトです。
+
+同じファームウェアで `teapot` を実行すると、内蔵の Utah ティーポットを HDMI にワイヤーフレーム表示します。モデルの辺はビルド時に OBJ から生成されるので、このコマンドは SD 上の画像ファイルを必要としません。[配布画像と実行手順](../../hardware/rtl/tang138k/user_logic/README.md)・[RGB・Z 変換のレジスタと配置](../../../report/tang138k-user-logic-rgbz-vram.md)
 
 以下はJPEG表示機能の実装・検証記録です。Phase 1時点の測定と、その後のlandscape修正を区別して記載します。
 

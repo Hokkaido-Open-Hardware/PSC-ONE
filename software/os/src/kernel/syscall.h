@@ -72,6 +72,9 @@
 #define SYS_LCD_RGB888_BEGIN      92
 #define SYS_LCD_RGB888_RECT       93
 #define SYS_VRAM_TEST_PATTERN     94
+#define SYS_RGBZ_UPLOAD           95
+#define SYS_RGBZ_PRESENT          96
+#define SYS_RGBZ_TEAPOT           97
 
 // --- SYSTEM ---
 #define SYS_EXIT                  100

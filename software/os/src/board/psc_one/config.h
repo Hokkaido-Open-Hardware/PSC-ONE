@@ -29,12 +29,21 @@
 
 #ifdef PSC_TANG138K_VRAM
 /* Physical DDR3 address shared with PSC_ONE_138K_Chip.VRAM_ADDRESS. */
-#define PSC_BOARD_VRAM_BASE         0x00800000
+#define PSC_BOARD_VRAM_BASE         0x00900000
 #define PSC_BOARD_VRAM_WIDTH        1920
 #define PSC_BOARD_VRAM_HEIGHT       1080
 #define PSC_BOARD_VRAM_BYTES        (PSC_BOARD_VRAM_WIDTH / 2 * PSC_BOARD_VRAM_HEIGHT)
 /* Supervisor VA in the unused part of the shell's Arena leaf table. */
 #define PSC_BOARD_VRAM_VA           0x00d00000
+#define PSC_BOARD_VRAM_B_BASE       (PSC_BOARD_VRAM_BASE + 0x00100000)
+#define PSC_BOARD_VRAM_B_VA         0x00f00000
+#define PSC_BOARD_RGB565_BASE       0x00b00000
+#define PSC_BOARD_Z16_BASE          0x00b80000
+#define PSC_BOARD_RGB565_VA         0x00e00000
+#define PSC_BOARD_Z16_VA            0x00e80000
+#define PSC_BOARD_RGBZ_PLANE_BYTES  (640 * 360 * 2)
+#define PSC_BOARD_RGBZ_CONTROL      0x1000a000
+#define PSC_BOARD_RGBZ_STATUS       0x1000a004
 #endif
 
 /* Keep in sync with boot/kernel/shell linker scripts and the RTL ROM loader. */

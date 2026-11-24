@@ -86,6 +86,9 @@ __attribute__((noreturn)) void exit(void);
 
 #ifdef PSC_TANG138K_VRAM
 int call_vram_test_pattern(void);
+int call_rgbz_upload(unsigned offset, const void *src, unsigned bytes);
+int call_rgbz_present(void);
+int call_rgbz_teapot(void);
 #endif
 int call_lcd_rgb888_begin(void);
 int call_lcd_rgb888_rect(uint32_t x, uint32_t y, uint32_t width,
