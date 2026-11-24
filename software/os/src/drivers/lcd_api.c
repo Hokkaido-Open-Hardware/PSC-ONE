@@ -50,10 +50,18 @@ int rgbz_present(void)
     return -5;
 }
 
-int rgbz_teapot(void)
+int rgbz_teapot(unsigned view, int first)
 {
     int rc = rgbz_ready();
     if (rc) return rc;
+    if (view) {
+        int page = (RGBZ_STATUS & RGBZ_PAGE_B) != 0;
+        uint32_t *vram = (uint32_t *)(page ? PSC_BOARD_VRAM_B_VA : PSC_BOARD_VRAM_VA);
+        rgbz_draw_teapot_frame(vram, (uint32_t *)PSC_BOARD_RGB565_VA,
+                               (uint32_t *)PSC_BOARD_Z16_VA, view - 1, first);
+        dcache_writeback(vram);
+        return page;
+    }
     rgbz_draw_teapot((uint16_t *)PSC_BOARD_RGB565_VA, (uint16_t *)PSC_BOARD_Z16_VA);
     return rgbz_present();
 }

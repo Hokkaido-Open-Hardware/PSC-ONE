@@ -62,6 +62,33 @@ static void rgbz_result(int rc)
     else if (rc == -5) printf("rgbz: display timeout\n");
 }
 
+static void cmd_teapot_rotate(void)
+{
+    const unsigned period_us = 200000;
+    if (call_timer_measure_begin() != 0) {
+        printf("teapot: timer busy\n");
+        return;
+    }
+    printf("Rotating teapot (q to stop)\n");
+    unsigned angle = 0;
+    uint32_t tick = (uint32_t)call_timer_measure_read_us();
+    int rc = call_rgbz_teapot_frame(angle, 1);
+    while (rc >= 0) {
+        uint32_t now;
+        do {
+            int ch = getchar_timeout();
+            if (ch == 'q' || ch == 'Q' || ch == 3) goto done;
+            now = (uint32_t)call_timer_measure_read_us();
+        } while (now - tick < period_us);
+        tick = now;
+        angle = (angle + 1) % 360;
+        rc = call_rgbz_teapot_frame(angle, 0);
+    }
+    rgbz_result(rc);
+done:
+    call_timer_measure_end_us();
+}
+
 static void cmd_rgbz(const char *colour, const char *depth)
 {
     int rc = rgbz_read_plane(colour, 0);
@@ -520,9 +547,10 @@ prompt:
             else cmd_tflite_info(argv[1]);
 
 #ifdef PSC_TANG138K_VRAM
-        } else if (strcmp(argv[0], "teapot") == 0) {
+        } else if (strcmp(argv[0], "teapot") == 0 || strcmp(argv[0], "teapod") == 0) {
             if (argc == 1) rgbz_result(call_rgbz_teapot());
-            else printf("usage: teapot\n");
+            else if (argc == 2 && strcmp(argv[1], "-r") == 0) cmd_teapot_rotate();
+            else printf("usage: %s [-r]\n", argv[0]);
         } else if (strcmp(argv[0], "rgbz") == 0) {
             if (argc == 1) cmd_rgbz("COLOR.RAW", "DEPTH.RAW");
             else if (argc == 3) cmd_rgbz(argv[1], argv[2]);
@@ -585,7 +613,7 @@ prompt:
             printf("  microPython | micropython\n");
 #ifdef PSC_TANG138K_VRAM
             printf("  vram_test (write 16 vertical color bars to HDMI VRAM)\n");
-            printf("  teapot (Utah teapot wireframe on HDMI)\n");
+            printf("  teapot | teapod [-r] (rotate 1 degree per 200 ms, q stops)\n");
             printf("  rgbz [COLOR.RAW DEPTH.RAW] (640x360 RGB565 + Z16 to HDMI)\n");
 #endif
             printf("  jpeg TEST.JPG\n");

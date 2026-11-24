@@ -260,7 +260,7 @@ void handle_syscall(struct trap_frame *f) {
         else f->a0 = rgbz_upload(f->a0, (const void *)(uintptr_t)f->a1, f->a2);
         break;
     case SYS_RGBZ_TEAPOT:
-        f->a0 = rgbz_teapot();
+        f->a0 = rgbz_teapot(f->a0, f->a1);
         break;
     case SYS_RGBZ_PRESENT:
         f->a0 = rgbz_present();

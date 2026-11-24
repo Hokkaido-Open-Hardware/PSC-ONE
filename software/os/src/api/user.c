@@ -786,6 +786,11 @@ int call_rgbz_teapot(void)
     return (int)sd_api(SYS_RGBZ_TEAPOT, 0);
 }
 
+int call_rgbz_teapot_frame(unsigned angle, int first)
+{
+    return (int)sd_api2(SYS_RGBZ_TEAPOT, 1u + angle % 360u, first);
+}
+
 int call_rgbz_present(void)
 {
     return (int)sd_api(SYS_RGBZ_PRESENT, 0);

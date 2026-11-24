@@ -29,7 +29,7 @@ make -C PSC-ONE/hardware/firmware firmware_fat32_tang138k
 
 Tang 138K 用の `rgbz` コマンドは SD ルートの `COLOR.RAW` と `DEPTH.RAW` を読み、固定視点の HDMI 画像を表示します。任意のファイル名は `rgbz MYRGB.RAW MYZ.RAW` で指定できます。両ファイルは各460,800バイトです。
 
-同じファームウェアで `teapot` を実行すると、内蔵の Utah ティーポットを HDMI にワイヤーフレーム表示します。モデルの辺はビルド時に OBJ から生成されるので、このコマンドは SD 上の画像ファイルを必要としません。[配布画像と実行手順](../../hardware/rtl/tang138k/user_logic/README.md)・[RGB・Z 変換のレジスタと配置](../../../report/tang138k-user-logic-rgbz-vram.md)
+同じファームウェアで `teapot` を実行すると、内蔵の Utah ティーポットを HDMI にワイヤーフレーム表示します。`teapot -r` または `teapod -r` で静止画と同じ640×360画素・同じメッシュのまま、鉛直軸まわりに1度ずつ回転します。目標は0.2秒間隔（1周約72秒）です。UART で `q` を押すと、その角度で停止してシェルに戻ります。モデルはファームウェアに含まれます。[配布画像と実行手順](../../hardware/rtl/tang138k/user_logic/README.md)・[RGB・Z 変換のレジスタと配置](../../../report/tang138k-user-logic-rgbz-vram.md)
 
 以下はJPEG表示機能の実装・検証記録です。Phase 1時点の測定と、その後のlandscape修正を区別して記載します。
 

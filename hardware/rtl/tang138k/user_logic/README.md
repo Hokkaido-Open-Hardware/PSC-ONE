@@ -4,7 +4,7 @@
 
 | PSC-OS コマンド | 表示するもの | 入力データ |
 |---|---|---|
-| `teapot` | Utah ティーポットのワイヤーフレーム | ファームウェアに組み込んだ [teapot.obj](utah-teapot/teapot.obj) |
+| `teapot` / `teapod`（`-r` で回転） | Utah ティーポットのワイヤーフレーム | ファームウェアに組み込んだ [teapot.obj](utah-teapot/teapot.obj) |
 | `rgbz` | SD カードのカラー画像と深度画像から生成した固定視点画像 | SD ルートの [COLOR.RAW](samples/COLOR.RAW) と [DEPTH.RAW](samples/DEPTH.RAW) |
 
 | ファイル | 役割 |
@@ -71,6 +71,8 @@ python3 PSC-ONE/software/os/tools/make_rgbz_sample.py /tmp/psc-rgbz-sample
 ```
 
 下図はサンプルの投影結果を縦横1/3に縮めた参照画像。赤い円の右側に生じる黒い部分は、移動後の視点で初めて見える領域であり、入力から色を復元できない。
+
+回転表示は `teapot -r` または `teapod -r` で開始する。鉛直の Y 軸まわりに1度ずつ進む。目標は0.2秒間隔（1周約72秒）で、描画が長引いたときも次の1度を順に表示する。UART で `q` を押すとその角度で停止してプロンプトに戻る。回転中も OBJ の全6,320三角形を使い、静止画と同じ640×360画素に投影する。深度から色と視差を求め、各画素を HDMI の3×3画素に展開する。初回は表示面全体を描き、以降は前回と色が変わった部分だけを書き換える。
 
 ![固定視点への投影後のサンプル画像](samples/preview.png)
 

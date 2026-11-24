@@ -28,8 +28,11 @@ typedef uint32_t vaddr_t;
 int lcd_draw_vram_test_pattern(void);
 int rgbz_upload(unsigned offset, const void *src, unsigned bytes);
 int rgbz_present(void);
-int rgbz_teapot(void);
+/* View zero selects the still. Animation views 1..360 encode yaw offsets 0..359. */
+int rgbz_teapot(unsigned view, int first);
 void rgbz_draw_teapot(uint16_t *rgb, uint16_t *depth);
+void rgbz_draw_teapot_frame(uint32_t *vram, uint32_t *previous, uint32_t *frame,
+                            unsigned angle, int first);
 #endif
 void lcd_draw_boot_logo(void);
 void lcd_draw_text(void);
