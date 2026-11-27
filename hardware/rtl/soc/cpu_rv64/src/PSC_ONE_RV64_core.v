@@ -52,6 +52,8 @@ module PSC_ONE_RV64_core #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT         = 64'h1000_9008,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL        = 64'h1000_900C,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 64'h1000_9010,
+    parameter [ADDR_WIDTH-1:0]  RGBZ_CONTROL            = 64'h1000_A000,
+    parameter [ADDR_WIDTH-1:0]  RGBZ_STATUS             = 64'h1000_A004,
     parameter ICACHE_TAGLSB = 11, // 2 KiB (64 x 32-byte lines)
     parameter DCACHE_TAGLSB = 9,  // 512 B (16 x 32-byte lines)
     parameter ENABLE_PULP = 1'b0,
@@ -465,7 +467,9 @@ module PSC_ONE_RV64_core #(
         .I2C_ADDR_STATUS     (I2C_ADDR_STATUS),
         .I2C_ADDR_OUTPUT     (I2C_ADDR_OUTPUT),
         .I2C_ADDR_CONTROL    (I2C_ADDR_CONTROL),
-        .I2C_ADDR_SEQ        (I2C_ADDR_SEQ)
+        .I2C_ADDR_SEQ        (I2C_ADDR_SEQ),
+        .RGBZ_CONTROL        (RGBZ_CONTROL),
+        .RGBZ_STATUS         (RGBZ_STATUS)
     ) u_data_dma_ctrl (
         .clock              (clock),
         .reset_n            (reset_n),

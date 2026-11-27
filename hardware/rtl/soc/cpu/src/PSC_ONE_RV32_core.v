@@ -50,9 +50,11 @@ module PSC_ONE_RV32_core #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT         = 32'h1000_9008,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL        = 32'h1000_900C,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ            = 32'h1000_9010,
+    parameter [ADDR_WIDTH-1:0]  RGBZ_CONTROL            = 32'h1000_A000,
+    parameter [ADDR_WIDTH-1:0]  RGBZ_STATUS             = 32'h1000_A004,
     parameter ICACHE_TAGLSB                             = 12,
     parameter DCACHE_TAGLSB                             = 10,
-    parameter integer PSC_CACHE_2WAY = 0,
+    parameter integer PSC_CACHE_2WAY    = 0,
     parameter integer PSC_CACHE_IO_2WAY = 0,
     parameter ENABLE_SV32_TLB = 1'b0  // Shared SoC option implemented by RV32 v1.
 )(
@@ -434,7 +436,9 @@ module PSC_ONE_RV32_core #(
         .I2C_ADDR_STATUS     (I2C_ADDR_STATUS),
         .I2C_ADDR_OUTPUT     (I2C_ADDR_OUTPUT),
         .I2C_ADDR_CONTROL    (I2C_ADDR_CONTROL),
-        .I2C_ADDR_SEQ        (I2C_ADDR_SEQ)
+        .I2C_ADDR_SEQ        (I2C_ADDR_SEQ),
+        .RGBZ_CONTROL        (RGBZ_CONTROL),
+        .RGBZ_STATUS         (RGBZ_STATUS)
     ) u_data_dma_ctrl (
         .clock              (clock),
         .reset_n            (reset_n),

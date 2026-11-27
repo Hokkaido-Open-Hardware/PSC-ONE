@@ -2,6 +2,12 @@
 
 <img src="../../docs/images/TangMega138K.jpg" alt="Tang Mega 138K board" width="600">
 
+## Rotating teapot demo
+
+<img src="../../docs/images/tang138k_teapod.jpg" alt="Teapot demo running on the Tang Mega 138K" width="600">
+
+The display controller reads pixel data over the AXI bus from a framebuffer (VRAM) in external DDR3 memory. The demo rotates the teapot to its next orientation every 0.2 seconds.
+
 ## SoC block diagram
 
 <img src="../../docs/images/PSC_ONE_SoC_138K_Block.jpg" alt="Block diagram of the PSC-ONE SoC for the Tang Mega 138K" width="600">

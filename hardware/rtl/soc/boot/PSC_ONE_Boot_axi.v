@@ -49,19 +49,19 @@ module PSC_ONE_Boot_axi #(
     input  wire                     sdram_init_fin,
     output reg                      done,
 
-    // ===== AXI4 Master (16-bit) : Write only =====
+    // ===== AXI4 Master (32-bit) : Write only =====
     // Write Address
     output reg  [ID_WIDTH-1:0]      bt_axi_awid,
     output reg  [ADDR_WIDTH-1:0]    bt_axi_awaddr,
     output reg  [7:0]               bt_axi_awlen,         // 0 (=1beat)
-    output reg  [2:0]               bt_axi_awsize,        // 1 (2B)
+    output reg  [2:0]               bt_axi_awsize,        // 2 (4B)
     output reg  [1:0]               bt_axi_awburst,       // INCR=01
     output reg                      bt_axi_awvalid,
     input  wire                     bt_axi_awready,
 
     // Write Data
     output reg  [DATA_WIDTH-1:0]    bt_axi_wdata,
-    output reg  [(DATA_WIDTH/8)-1:0]bt_axi_wstrb,         // 2'b11
+    output reg  [(DATA_WIDTH/8)-1:0]bt_axi_wstrb,         // 4'b1111
     output reg                      bt_axi_wlast,
     output reg                      bt_axi_wvalid,
     input  wire                     bt_axi_wready,
@@ -204,7 +204,7 @@ module PSC_ONE_Boot_axi #(
             bt_axi_awid     <= {ID_WIDTH{1'b0}};
             bt_axi_awaddr   <= {ADDR_WIDTH{1'b0}};
             bt_axi_awlen    <= 8'd0;          // 1 beat 固定
-            bt_axi_awsize   <= 3'd1;          // 2B
+            bt_axi_awsize   <= 3'd2;          // 4B
             bt_axi_awburst  <= 2'b01;         // INCR
             bt_axi_awvalid  <= 1'b0;
 
@@ -328,7 +328,7 @@ module PSC_ONE_Boot_axi #(
                                 bt_axi_awaddr  <= ({{(ADDR_WIDTH-ROMIDX_W){1'b0}}, rom_idx} << 2);
                             end
                             BOOT_STAGE: begin
-                                // 次の 1語を書き出す（アドレスは 0x0000 + rom_idx*2 に固定）
+                                // 次の 1語を書き出す（アドレスは 0x0000 + rom_idx*4 に固定）
                                 bt_axi_awid    <= {ID_WIDTH{1'b0}};
                                 bt_axi_awaddr  <= ({{(ADDR_WIDTH-ROMIDX_W){1'b0}}, rom_idx} << 2);
                             end
@@ -350,7 +350,7 @@ module PSC_ONE_Boot_axi #(
                             end
                         endcase
                         bt_axi_awlen   <= 8'd0;      // 1 beat 固定
-                        bt_axi_awsize  <= 3'd1;      // 2B
+                        bt_axi_awsize  <= 3'd2;      // 4B
                         bt_axi_awburst <= 2'b01;     // INCR
                         bt_axi_awvalid <= 1'b1;
                         st <= ST_W_AW;

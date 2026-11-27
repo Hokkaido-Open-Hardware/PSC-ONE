@@ -27,11 +27,11 @@ module cache_dma_controller_io #(
     // MMIO MASK BITS
     parameter [ADDR_WIDTH-1:0]  MMMIO_BASK_BITS     = 32'h1000_FFFF,
     // MMIO アドレス（0なら無効）
-    parameter [ADDR_WIDTH-1:0]  PIO_ADDRESS         = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_TX     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_RX     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_ST     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  UART_ADDRESS_CT     = {ADDR_WIDTH{1'b0}},
+    parameter [ADDR_WIDTH-1:0]  PIO_ADDRESS         = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  TIMER_WRITE_ADDR    = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  TIMER_READ_ADDR     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  TIMER_ST_ADDR       = {ADDR_WIDTH{1'b0}},
@@ -51,7 +51,9 @@ module cache_dma_controller_io #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_STATUS     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT     = {ADDR_WIDTH{1'b0}},
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL    = {ADDR_WIDTH{1'b0}},
-    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ        = {ADDR_WIDTH{1'b0}}
+    parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ        = {ADDR_WIDTH{1'b0}},
+    parameter [ADDR_WIDTH-1:0]  RGBZ_CONTROL        = {ADDR_WIDTH{1'b0}},
+    parameter [ADDR_WIDTH-1:0]  RGBZ_STATUS         = {ADDR_WIDTH{1'b0}}
 )(
     input  wire                             clock,
     input  wire                             reset_n,
@@ -308,11 +310,11 @@ module cache_dma_controller_io #(
         begin
             addr_mmio_masked = addr_mmio & MMMIO_BASK_BITS;
             mmio_hit =
-                (((PIO_ADDRESS          != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PIO_ADDRESS          )) |
-                 ((UART_ADDRESS_TX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == UART_ADDRESS_TX      )) |
+                (((UART_ADDRESS_TX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == UART_ADDRESS_TX      )) |
                  ((UART_ADDRESS_RX      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == UART_ADDRESS_RX      )) |
                  ((UART_ADDRESS_ST      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == UART_ADDRESS_ST      )) |
                  ((UART_ADDRESS_CT      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == UART_ADDRESS_CT      )) |
+                 ((PIO_ADDRESS          != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == PIO_ADDRESS          )) |
                  ((TIMER_WRITE_ADDR     != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == TIMER_WRITE_ADDR     )) |
                  ((TIMER_READ_ADDR      != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == TIMER_READ_ADDR      )) |
                  ((TIMER_ST_ADDR        != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == TIMER_ST_ADDR        )) |
@@ -335,7 +337,9 @@ module cache_dma_controller_io #(
                  ((I2C_ADDR_SEQ         != {ADDR_WIDTH{1'b0}}) && ((addr_mmio_masked == I2C_ADDR_SEQ) ||
                     (addr_mmio_masked == I2C_ADDR_SEQ + 4) ||
                     (addr_mmio_masked == I2C_ADDR_SEQ + 8) ||
-                    (addr_mmio_masked == I2C_ADDR_SEQ + 12))));
+                    (addr_mmio_masked == I2C_ADDR_SEQ + 12))) |
+                 ((RGBZ_CONTROL         != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == RGBZ_CONTROL         )) |
+                 ((RGBZ_STATUS          != {ADDR_WIDTH{1'b0}}) && (addr_mmio_masked == RGBZ_STATUS          )));
         end
     endfunction
 

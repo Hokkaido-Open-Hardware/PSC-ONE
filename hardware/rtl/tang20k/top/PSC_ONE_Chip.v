@@ -131,9 +131,6 @@ module PSC_ONE_Chip #(
     wire os_sim_mode = 1'b1;
     initial $display("PSCOS_SIM ENABLE");
 `endif
-`ifdef FPGA_BOOT_LOADER_MODE
-    initial $display("FPGA_BOOT_LOADER_MODE ENABLE");
-`endif
 `ifdef FST_UART_MODE
     wire fst_uart_mode = 1'b1;
     initial $display("FST_UART_MODE ENABLE");

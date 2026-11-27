@@ -43,11 +43,13 @@ module PSC_ONE_SOC #(
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_OUTPUT     = 32'h1000_9008,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_CONTROL    = 32'h1000_900C,
     parameter [ADDR_WIDTH-1:0]  I2C_ADDR_SEQ        = 32'h1000_9010,
+    parameter [ADDR_WIDTH-1:0]  RGBZ_CONTROL        = 32'h1000_A000,
+    parameter [ADDR_WIDTH-1:0]  RGBZ_STATUS         = 32'h1000_A004,
     parameter integer PSC_CACHE_2WAY                = 0,
     parameter integer PSC_CACHE_IO_2WAY             = 0,
-    parameter ENABLE_SV32_TLB = 1'b0,
-    parameter ENABLE_RGBZ = 1'b0,
-    parameter DECODE_RGBZ_MMIO = ENABLE_RGBZ
+    parameter ENABLE_SV32_TLB                       = 1'b0,
+    parameter ENABLE_RGBZ                           = 1'b0,
+    parameter DECODE_RGBZ_MMIO                      = ENABLE_RGBZ
 )(
     // ==== RV32IS CPU IF ====
     input  wire         clock,
@@ -220,7 +222,6 @@ module PSC_ONE_SOC #(
     wire [31:0] mmio_rdata_i2s;
     wire [31:0] mmio_rdata_pfe;
 
-    localparam RGBZ_CONTROL = 32'h1000_a000, RGBZ_STATUS = 32'h1000_a004;
     wire [31:0] addr_mmio_masked = mmio_addr & MMMIO_BASK_BITS;
     
     always @(*) begin
@@ -339,15 +340,22 @@ module PSC_ONE_SOC #(
         .LCD_PIXS_DATA       (LCD_PIXS_DATA),
         .LCD_PIXS_ST         (LCD_PIXS_ST),
         .LED_ADDRESS         (LED_ADDRESS),
-        .PSC_SA_CTRL         (DECODE_RGBZ_MMIO ? RGBZ_CONTROL : PSC_SA_CTRL),
-        .PSC_SA_STATUS       (DECODE_RGBZ_MMIO ? RGBZ_STATUS : PSC_SA_STATUS),
+        .PSC_SA_CTRL         (PSC_SA_CTRL),
+        .PSC_SA_STATUS       (PSC_SA_STATUS),
+        .RGBZ_CONTROL        (DECODE_RGBZ_MMIO ? RGBZ_CONTROL : {ADDR_WIDTH{1'b0}}),
+        .RGBZ_STATUS         (DECODE_RGBZ_MMIO ? RGBZ_STATUS : {ADDR_WIDTH{1'b0}}),
         .PSC_SD_IF_READ_DATA (PSC_SD_IF_READ_DATA),
         .PSC_SD_IF_SECTOR    (PSC_SD_IF_SECTOR),
         .PSC_SD_IF_CTRL      (PSC_SD_IF_CTRL),
         .PSC_I2S_ADDR_RX     (PSC_I2S_ADDR_RX),
         .PSC_I2S_ADDR_ST     (PSC_I2S_ADDR_ST),
         .PSC_PFE_IF_DATA     (PSC_PFE_IF_DATA),
-        .PSC_PFE_IF_CTRL     (PSC_PFE_IF_CTRL)
+        .PSC_PFE_IF_CTRL     (PSC_PFE_IF_CTRL),
+        .I2C_ADDR_INPUT      (I2C_ADDR_INPUT),
+        .I2C_ADDR_STATUS     (I2C_ADDR_STATUS),
+        .I2C_ADDR_OUTPUT     (I2C_ADDR_OUTPUT),
+        .I2C_ADDR_CONTROL    (I2C_ADDR_CONTROL),
+        .I2C_ADDR_SEQ        (I2C_ADDR_SEQ)
 `ifdef CPU_RV64
     ) u_rv_core_axi (
 `else
