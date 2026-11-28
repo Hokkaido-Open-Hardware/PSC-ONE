@@ -9,6 +9,8 @@ module sim_PSC_SDCard #(
     input  wire        clock,
     input  wire        reset_n,
 
+    input  logic       self_test_en,
+
     // ---------------- CPU BUS ----------------
     input  wire        cpu_rvalid,
     input  wire [31:0] cpu_raddr,
@@ -58,9 +60,13 @@ module sim_PSC_SDCard #(
         end
     end
 
-    PSC_SDCard #(.BYPASS_IMAGE_HEX(IMAGE_HEX)) u_sd (
+    PSC_SDCard #(
+        .BYPASS_IMAGE_HEX (IMAGE_HEX) 
+    ) u_sd (
         .clock          (clock),
         .reset_n        (reset_n),
+        
+        .SD_SELF_TESTMODE (self_test_en),
 
         // CPU BUS
         .cpu_rvalid     (cpu_rvalid),

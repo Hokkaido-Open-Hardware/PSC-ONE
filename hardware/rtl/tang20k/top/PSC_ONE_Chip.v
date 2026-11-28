@@ -598,6 +598,10 @@ module PSC_ONE_Chip #(
         .sdram_init_fin     (sdram_init_fin),
         .Boot_rom_done      (Boot_rom_done),
 
+        // teapod demo.
+        .rgbz_start         (),
+        .rgbz_status        (4'b0),
+
         // UART
         .UART_RXD           (UART_RXD),
         .UART_TXD           (UART_TXD),

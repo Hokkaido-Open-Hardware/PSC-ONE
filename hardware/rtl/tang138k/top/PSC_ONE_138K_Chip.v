@@ -788,14 +788,16 @@ module PSC_ONE_138K_Chip #(
         .ID_WIDTH           (ID_WIDTH),
         .DATA_WIDTH         (DATA_WIDTH)
     ) u_soc (
-        .rgbz_start         (rgbz_start),
-        .rgbz_status        (rgbz_status),
         // Clock / Reset
         .clock              (clk_x1),
         .reset_n            (reset_n),
         .cpu_stop           (cpu_stop),
         .sdram_init_fin     (sdram_init_fin),
         .Boot_rom_done      (Boot_rom_done),
+
+        // teapod demo.
+        .rgbz_start         (rgbz_start),
+        .rgbz_status        (rgbz_status),
 
 `ifdef COCOTB_SIM
         // UART

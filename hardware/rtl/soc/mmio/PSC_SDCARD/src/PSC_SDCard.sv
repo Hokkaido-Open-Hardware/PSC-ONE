@@ -17,10 +17,13 @@ module PSC_SDCard #(
     parameter SD_IF_CTRL        = 32'h1000_6008,  // RW: start/status
     parameter FIFO_DEPTH        = 512,            // 512推奨（将来64/128でも可）
     parameter BYPASS_IMAGE_HEX  = "sdcard/sdcard.hex",
-    parameter integer BYPASS_IMAGE_SECTORS = 131072 // 64 MiB
+    parameter integer BYPASS_IMAGE_SECTORS = 131072, // 64 MiB
+    parameter integer SD_SELF_TEST_ST = 10000
 )(
     input  logic        clock,
     input  logic        reset_n,
+
+    input  logic        SD_SELF_TESTMODE,
 
     // ---------------- CPU BUS ----------------
     input  logic        cpu_rvalid,
@@ -423,6 +426,34 @@ module PSC_SDCard #(
     end
 
     // ============================================================
+    // SD_SELF_TESTMODE
+    // ============================================================
+    // Pause while disabled and issue one init request per hardware reset.
+    localparam integer SELF_TEST_CNT_WIDTH = (SD_SELF_TEST_ST > 0)
+        ? $clog2(SD_SELF_TEST_ST + 32'd1) : 1;
+    logic [SELF_TEST_CNT_WIDTH-1:0] self_test_cnt;
+    logic self_test_done;
+    logic self_test_init_pulse;
+
+    always @(posedge clock or negedge reset_n) begin
+        if (!reset_n) begin
+            self_test_cnt        <= '0;
+            self_test_done       <= 1'b0;
+            self_test_init_pulse <= 1'b0;
+        end else begin
+            self_test_init_pulse <= 1'b0;
+            if (SD_SELF_TESTMODE && !self_test_done) begin
+                if (32'(self_test_cnt) == SD_SELF_TEST_ST) begin
+                    self_test_init_pulse <= 1'b1;
+                    self_test_done       <= 1'b1;
+                end else begin
+                    self_test_cnt <= self_test_cnt + 1'b1;
+                end
+            end
+        end
+    end
+
+    // ============================================================
     // SD INIT + READ FSM
     // ============================================================
     localparam [4:0]
@@ -603,7 +634,7 @@ module PSC_SDCard #(
                 ST_RESET: begin
                     spi_cs_high   <= 1'b1;
                     sd_card_ready <= 1'b0;
-                    if (init_pulse && !state_error) begin
+                    if ((init_pulse || self_test_init_pulse) && !state_error) begin
                         // start init sequence
                         spi_tx_start    <= 1'b1;
                         state <= ST_INIT_CLK;

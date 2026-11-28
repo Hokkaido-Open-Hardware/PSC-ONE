@@ -48,6 +48,7 @@ def assert_spi_unchanged(dut, before):
 
 async def reset_dut(dut):
     dut.reset_n.value = 0
+    dut.self_test_en.value = 0
     dut.cpu_rvalid.value = 0
     dut.cpu_raddr.value = 0
     dut.cpu_rdata.value = 0
@@ -277,6 +278,17 @@ def assert_sector_equal(actual, expected, lba):
             f"got 0x{actual[mismatch]:02x}, expected 0x{expected[mismatch]:02x}"
         )
 
+
+# SD_SELF_TESTMODE = 1
+@cocotb.test()
+async def sd_self_testmode_test(dut):
+    await setup_dut(dut)
+    dut.self_test_en.value = 1
+
+    for _ in range(200000):
+        await RisingEdge(dut.clock)
+
+    dut.self_test_en.value = 0
 
 @cocotb.test()
 async def sd_reset_status_test(dut):

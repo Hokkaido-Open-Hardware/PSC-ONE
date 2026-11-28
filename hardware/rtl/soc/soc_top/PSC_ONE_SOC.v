@@ -742,10 +742,14 @@ module PSC_ONE_SOC #(
         .SD_IF_DATA     (PSC_SD_IF_READ_DATA),
         .SD_IF_SECTOR   (PSC_SD_IF_SECTOR),
 		.SD_IF_CTRL     (PSC_SD_IF_CTRL),
-        .FIFO_DEPTH     (512)     // max: 512
+        .FIFO_DEPTH     (512),     // max: 512
+        .SD_SELF_TEST_ST(10000)
     ) u_sd_if (
         .clock          (clock),
         .reset_n        (reset_n),
+
+        // self test mode
+        .SD_SELF_TESTMODE (1'b0),
 
         // CPU BUS
 		.cpu_rvalid     (mmio_valid & ~mmio_rw),
